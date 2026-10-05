@@ -1,18 +1,20 @@
 <script lang="ts">
+  import { onDestroy } from "svelte";
   import { confirm } from "@tauri-apps/plugin-dialog";
   import { importCadDxf, pickCadDxfPath } from "../../ipc";
   import type { ConfigStore } from "../../stores/config.svelte";
   import type { ProjectStore } from "../../stores/project.svelte";
   import type { CadImportResult } from "../../types";
   import { attachBackdropScrollGuard, lockPageScroll } from "../../utils/pageScrollLock";
+  import { fitWorldToView, type WorldTransform } from "../../chart";
   import CoilPreviewControls from "../design/CoilPreviewControls.svelte";
   import LayerVisibilityControls from "../design/LayerVisibilityControls.svelte";
+  import { PREVIEW_H, PREVIEW_W } from "../design/coilPreviewCanvas";
   import { CoilPreviewViewState } from "../design/coilPreviewViewState.svelte";
   import {
-    formatZoom,
-    nextZoomStepDown,
-    nextZoomStepUp,
+    CoilPreviewGestures,
   } from "../../utils/coilPreviewGestures.svelte";
+  import HelpTag from "../ui/HelpTag.svelte";
 
   let {
     config,
@@ -30,35 +32,44 @@
   let zTolerance = $state(0.05);
   let traceWidthOverride = $state<number | null>(null);
   let traceWidth = $derived(traceWidthOverride ?? config.min_trace_mm);
+  let viaDrillOverride = $state<number | null>(null);
+  let viaDrill = $derived(viaDrillOverride ?? config.min_via_drill_mm);
+  let viaAnnularRingOverride = $state<number | null>(null);
+  let viaAnnularRing = $derived(viaAnnularRingOverride ?? config.min_via_annular_ring_mm);
+  let viaPadRadius = $derived(viaDrill / 2 + viaAnnularRing);
+  let viaSizingValid = $derived(
+    Number.isFinite(viaDrill) && viaDrill > 0 &&
+    Number.isFinite(viaAnnularRing) && viaAnnularRing > 0,
+  );
   let selectedLayersOverride = $state<number | null>(null);
   let selectedLayers = $derived(selectedLayersOverride ?? config.num_layers);
   let selectedPath = $state<string | null>(null);
   let imported = $state<CadImportResult | null>(null);
   let importedOptions = $state("");
-  let previewZoom = $state(1);
   const previewView = new CoilPreviewViewState();
-  const minZoom = 0.5;
-  const maxZoom = 10;
-  const zoomSteps = [0.5, 1, 1.5, 2, 3, 4, 6, 8, 10] as const;
+  const previewPad = 24;
   let error = $state<string | null>(null);
   let importFailed = $state(false);
   let busy = $state(false);
+  let refreshScheduled = $state(false);
+  let previewFrameRef = $state<HTMLDivElement | undefined>(undefined);
   let backdropRef = $state<HTMLDivElement | undefined>(undefined);
   let dialogRef = $state<HTMLDivElement | undefined>(undefined);
+  let previewRefreshTimer: ReturnType<typeof setTimeout> | undefined;
 
   let optionsKey = $derived(
     [unitsToMm, zTolerance, traceWidth, selectedLayers, config.pcb_thickness_mm].join("|"),
   );
   let previewIsCurrent = $derived(Boolean(imported && importedOptions === optionsKey));
-  let previewBox = $derived.by(() => {
+  let previewBounds = $derived.by(() => {
     const geometry = imported?.geometry;
-    if (!geometry) return "0 0 1 1";
+    if (!geometry) return { minX: 0, minY: 0, maxX: 1, maxY: 1 };
     const points = [
       ...geometry.routing.segments.flatMap(({ start, end }) => [start, end]),
       ...geometry.routing.curves.flatMap(({ start, mid, end }) => [start, mid, end]),
       ...geometry.routing.vias.map(({ position }) => position),
     ];
-    if (points.length === 0) return "0 0 1 1";
+    if (points.length === 0) return { minX: 0, minY: 0, maxX: 1, maxY: 1 };
 
     let minX = Infinity;
     let maxX = -Infinity;
@@ -71,21 +82,33 @@
       maxY = Math.max(maxY, y);
     }
     const span = Math.max(maxX - minX, maxY - minY, geometry.trace_width_mm * 4, 1);
-    const padding = Math.max(span * 0.05, geometry.trace_width_mm * 2);
-    return `${minX - padding} ${minY - padding} ${Math.max(maxX - minX, 1) + padding * 2} ${Math.max(maxY - minY, 1) + padding * 2}`;
+    const padding = Math.max(span * 0.05, geometry.trace_width_mm * 2, viaPadRadius * 1.5);
+    return {
+      minX: minX - padding,
+      minY: minY - padding,
+      maxX: maxX + padding,
+      maxY: maxY + padding,
+    };
   });
   let previewStrokeWidth = $derived.by(() => {
     const geometry = imported?.geometry;
     if (!geometry) return 1;
-    const [, , width, height] = previewBox.split(" ").map(Number);
+    const width = previewBounds.maxX - previewBounds.minX;
+    const height = previewBounds.maxY - previewBounds.minY;
     return Math.max(geometry.trace_width_mm, Math.max(width, height) / 350);
   });
-  let zoomedPreviewBox = $derived.by(() => {
-    const [x, y, width, height] = previewBox.split(" ").map(Number);
-    const zoomedWidth = width / previewZoom;
-    const zoomedHeight = height / previewZoom;
-    return `${x + (width - zoomedWidth) / 2} ${y + (height - zoomedHeight) / 2} ${zoomedWidth} ${zoomedHeight}`;
+  function worldTransformFor(zoom: number): WorldTransform {
+    return fitWorldToView(previewBounds, PREVIEW_W, PREVIEW_H, previewPad, zoom);
+  }
+  const gestures = new CoilPreviewGestures({
+    virtualW: PREVIEW_W,
+    virtualH: PREVIEW_H,
+    minZoom: 0.5,
+    maxZoom: 10,
+    zoomSteps: [0.5, 1, 1.5, 2, 3, 4, 6, 8, 10],
+    getWorldTransform: worldTransformFor,
   });
+  let worldTransform = $derived(worldTransformFor(gestures.zoom));
   let previewLayers = $derived(
     imported?.geometry.layer_z_mm.map((_, idx) => ({ idx })) ?? [],
   );
@@ -101,19 +124,38 @@
     };
   });
 
+  $effect(() => {
+    const frame = previewFrameRef;
+    if (!frame) return;
+    frame.addEventListener("wheel", gestures.handleWheel, { passive: false });
+    return () => frame.removeEventListener("wheel", gestures.handleWheel);
+  });
+
+  onDestroy(() => {
+    if (previewRefreshTimer) clearTimeout(previewRefreshTimer);
+  });
+
   function baseName(path: string): string {
     return path.slice(Math.max(path.lastIndexOf("/"), path.lastIndexOf("\\")) + 1);
   }
 
+  function schedulePreviewRefresh(): void {
+    if (!selectedPath) return;
+    if (previewRefreshTimer) clearTimeout(previewRefreshTimer);
+    refreshScheduled = true;
+    previewRefreshTimer = setTimeout(() => {
+      previewRefreshTimer = undefined;
+      refreshScheduled = false;
+      void refreshPreview();
+    }, 350);
+  }
+
   async function readPreview(path: string): Promise<void> {
-    imported = null;
-    importedOptions = "";
-    previewZoom = 1;
-    previewView.layerVisibility = {};
+    const requestedOptions = optionsKey;
     error = null;
     importFailed = false;
     try {
-      imported = await importCadDxf(
+      const result = await importCadDxf(
         path,
         Number(unitsToMm),
         zTolerance,
@@ -121,7 +163,12 @@
         selectedLayers,
         config.pcb_thickness_mm,
       );
-      importedOptions = optionsKey;
+      if (path === selectedPath && requestedOptions === optionsKey) {
+        imported = result;
+        importedOptions = requestedOptions;
+      } else if (path === selectedPath) {
+        schedulePreviewRefresh();
+      }
     } catch (e) {
       error = e instanceof Error ? e.message : String(e);
       importFailed = true;
@@ -130,6 +177,9 @@
 
   async function chooseCadFile(): Promise<void> {
     if (busy) return;
+    if (previewRefreshTimer) clearTimeout(previewRefreshTimer);
+    previewRefreshTimer = undefined;
+    refreshScheduled = false;
     busy = true;
     error = null;
     importFailed = false;
@@ -137,6 +187,10 @@
       const path = await pickCadDxfPath();
       if (!path) return;
       selectedPath = path;
+      imported = null;
+      importedOptions = "";
+      gestures.resetView();
+      previewView.layerVisibility = {};
       await readPreview(path);
     } catch (e) {
       error = e instanceof Error ? e.message : String(e);
@@ -155,8 +209,24 @@
     }
   }
 
+  function updateTraceWidth(event: Event): void {
+    const input = event.currentTarget as HTMLInputElement;
+    traceWidthOverride = Number.isFinite(input.valueAsNumber) ? input.valueAsNumber : null;
+    schedulePreviewRefresh();
+  }
+
+  function updateViaDrill(event: Event): void {
+    const input = event.currentTarget as HTMLInputElement;
+    viaDrillOverride = Number.isFinite(input.valueAsNumber) ? input.valueAsNumber : null;
+  }
+
+  function updateViaAnnularRing(event: Event): void {
+    const input = event.currentTarget as HTMLInputElement;
+    viaAnnularRingOverride = Number.isFinite(input.valueAsNumber) ? input.valueAsNumber : null;
+  }
+
   async function useImportedGeometry(): Promise<void> {
-    if (!imported || !previewIsCurrent || busy) return;
+    if (!imported || !previewIsCurrent || !viaSizingValid || busy) return;
     if (projects.cadGeometry) {
       const replace = await confirm(
         "Replace the currently imported CAD geometry? The project copy is preserved only if you save it first.",
@@ -165,6 +235,8 @@
       if (!replace) return;
     }
     config.num_layers = imported.geometry.layer_z_mm.length;
+    config.min_via_drill_mm = viaDrill;
+    config.min_via_annular_ring_mm = viaAnnularRing;
     projects.setCadGeometry(imported.geometry);
     if (imported.warnings.length > 0) {
       projects.notice = `Imported ${baseName(selectedPath ?? "CAD file")} with ${imported.warnings.length} warning(s). Review the CAD import diagnostics in Design.`;
@@ -204,24 +276,32 @@
 
     <div class="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain px-5 py-4 md:px-7">
       <section class="rounded-md border border-slate-700 bg-slate-950/50 p-4" aria-label="CAD import options">
-        <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <label class="text-xs font-medium text-slate-300" for="cad-units">
             DXF units
-            <select id="cad-units" aria-label="DXF units" bind:value={unitsToMm} disabled={busy} class="mt-1.5 w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 disabled:opacity-50">
+            <select id="cad-units" aria-label="DXF units" bind:value={unitsToMm} onchange={schedulePreviewRefresh} disabled={busy} class="mt-1.5 w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 disabled:opacity-50">
               <option value="1">Millimetres</option>
               <option value="25.4">Inches</option>
             </select>
           </label>
           <label class="text-xs font-medium text-slate-300" for="cad-z-tolerance">
-            Z tolerance (mm)
-            <input id="cad-z-tolerance" aria-label="Z tolerance (mm)" type="number" min="0" step="0.01" bind:value={zTolerance} disabled={busy} class="mt-1.5 w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 disabled:opacity-50" />
+            <span class="inline-flex items-center">Z tolerance (mm)<HelpTag label="About Z tolerance" tip="Controls how close Z heights must be to count as one copper layer. It also allows small XY offsets when recognizing vertical via centerlines and matching via endpoints to traces. Lower it if nearby layers merge; raise it only to accommodate coordinate noise." /></span>
+            <input id="cad-z-tolerance" aria-label="Z tolerance (mm)" type="number" min="0" step="0.01" bind:value={zTolerance} oninput={schedulePreviewRefresh} disabled={busy} class="mt-1.5 w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 disabled:opacity-50" />
           </label>
           <label class="text-xs font-medium text-slate-300" for="cad-trace-width">
             Default trace width (mm)
-            <input id="cad-trace-width" aria-label="Default trace width (mm)" type="number" min="0.001" step="0.01" value={traceWidth} oninput={(event) => (traceWidthOverride = Number.isFinite(event.currentTarget.valueAsNumber) ? event.currentTarget.valueAsNumber : null)} disabled={busy} class="mt-1.5 w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 disabled:opacity-50" />
+            <input id="cad-trace-width" aria-label="Default trace width (mm)" type="number" min="0.001" step="0.01" value={traceWidth} oninput={updateTraceWidth} disabled={busy} class="mt-1.5 w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 disabled:opacity-50" />
+          </label>
+          <label class="text-xs font-medium text-slate-300" for="cad-via-drill">
+            Via drill (mm)
+            <input id="cad-via-drill" aria-label="Via drill (mm)" type="number" min="0.001" step="0.01" value={viaDrill} oninput={updateViaDrill} disabled={busy} class="mt-1.5 w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 disabled:opacity-50" />
+          </label>
+          <label class="text-xs font-medium text-slate-300" for="cad-via-annular-ring">
+            Via annular ring (mm)
+            <input id="cad-via-annular-ring" aria-label="Via annular ring (mm)" type="number" min="0.001" step="0.01" value={viaAnnularRing} oninput={updateViaAnnularRing} disabled={busy} class="mt-1.5 w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 disabled:opacity-50" />
           </label>
           <div class="flex items-end">
-            <p class="pb-2 text-[11px] leading-relaxed text-slate-500">3D layer positions are detected from Z heights.</p>
+            <p class="pb-2 text-[11px] leading-relaxed text-slate-500">3D layer positions are detected from Z heights. Via sizes use the project manufacturing defaults.</p>
           </div>
         </div>
       </section>
@@ -230,10 +310,10 @@
         <p role="alert" class="rounded-md border border-rose-500/50 bg-rose-500/10 px-3 py-2 text-xs text-rose-200">{error}</p>
       {/if}
 
-      {#if selectedPath && importFailed && error && !imported}
+      {#if selectedPath && importFailed && error}
         <label class="block max-w-xs text-xs font-medium text-slate-300" for="cad-retry-layer-count">
           Copper layers for retry
-          <select id="cad-retry-layer-count" value={String(selectedLayers)} onchange={(event) => (selectedLayersOverride = Number(event.currentTarget.value))} disabled={busy} class="mt-1.5 w-full rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 disabled:opacity-50">
+          <select id="cad-retry-layer-count" value={String(selectedLayers)} onchange={(event) => { selectedLayersOverride = Number(event.currentTarget.value); schedulePreviewRefresh(); }} disabled={busy} class="mt-1.5 w-full rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 disabled:opacity-50">
             {#each config.layerOptions as layer (layer)}<option value={layer}>{layer} layers</option>{/each}
           </select>
         </label>
@@ -245,30 +325,51 @@
             <h3 class="text-sm font-medium text-slate-100">Preview · {baseName(selectedPath ?? "CAD file")}</h3>
             <span class="text-[11px] text-slate-400">{imported.geometry.layer_z_mm.length} copper layer(s)</span>
           </div>
-          <div class="overflow-hidden rounded-md border border-slate-700 bg-slate-950 p-2">
+          <div
+            bind:this={previewFrameRef}
+            class="relative w-full touch-none select-none overflow-hidden rounded-md border border-slate-700 bg-slate-950 {gestures.isPanning ? 'cursor-grabbing' : 'cursor-grab'}"
+            role="img"
+            aria-label="CAD import preview"
+            style={`aspect-ratio: ${PREVIEW_W} / ${PREVIEW_H}`}
+            onpointerdown={gestures.handlePointerDown}
+            onpointermove={gestures.handlePointerMove}
+            onpointerup={gestures.handlePointerEnd}
+            onpointercancel={gestures.handlePointerEnd}
+            onlostpointercapture={gestures.handleLostPointerCapture}
+            ontouchstart={gestures.handleTouchStart}
+            ontouchmove={gestures.handleTouchMove}
+            ontouchend={gestures.handleTouchEnd}
+            ontouchcancel={gestures.handleTouchEnd}
+          >
             <svg
-              viewBox={zoomedPreviewBox}
-              role="img"
-              aria-label="Preview of imported CAD traces and vias"
+              viewBox={`0 0 ${PREVIEW_W} ${PREVIEW_H}`}
+              aria-hidden="true"
               preserveAspectRatio="xMidYMid meet"
-              class="h-56 w-full"
+              class="block h-full w-full"
             >
-              {#each imported.geometry.layer_z_mm as _, layer (layer)}
-                {#if previewView.isLayerVisible(layer)}
-                  <g fill="none" stroke={['#34d399', '#38bdf8', '#c084fc', '#fbbf24', '#fb7185', '#a3e635'][layer % 6]} stroke-width={previewStrokeWidth} stroke-linecap="round" stroke-linejoin="round">
-                    {#each imported.geometry.routing.segments.filter((segment) => segment.layer === layer) as segment (segment)}
-                      <path d={`M ${segment.start.x} ${segment.start.y} L ${segment.end.x} ${segment.end.y}`} />
-                    {/each}
-                    {#each imported.geometry.routing.curves.filter((curve) => curve.layer === layer) as curve (curve)}
-                      <path d={`M ${curve.start.x} ${curve.start.y} Q ${curve.mid.x} ${curve.mid.y} ${curve.end.x} ${curve.end.y}`} />
-                    {/each}
-                  </g>
-                {/if}
-              {/each}
-              <g fill="#f8fafc" stroke="#0f172a" stroke-width={previewStrokeWidth * 0.6}>
-                {#each imported.geometry.routing.vias as via (via)}
-                  <circle cx={via.position.x} cy={via.position.y} r={previewStrokeWidth * 1.8} />
+              <g transform={`matrix(${worldTransform.s} 0 0 ${-worldTransform.s} ${worldTransform.tx + gestures.panX} ${worldTransform.ty + gestures.panY})`}>
+                {#each imported.geometry.layer_z_mm as _, layer (layer)}
+                  {#if previewView.isLayerVisible(layer)}
+                    <g fill="none" stroke={['#34d399', '#38bdf8', '#c084fc', '#fbbf24', '#fb7185', '#a3e635'][layer % 6]} stroke-width={previewStrokeWidth} stroke-linecap="round" stroke-linejoin="round">
+                      {#each imported.geometry.routing.segments.filter((segment) => segment.layer === layer) as segment (segment)}
+                        <path d={`M ${segment.start.x} ${segment.start.y} L ${segment.end.x} ${segment.end.y}`} />
+                      {/each}
+                      {#each imported.geometry.routing.curves.filter((curve) => curve.layer === layer) as curve (curve)}
+                        <path d={`M ${curve.start.x} ${curve.start.y} Q ${curve.mid.x} ${curve.mid.y} ${curve.end.x} ${curve.end.y}`} />
+                      {/each}
+                    </g>
+                  {/if}
                 {/each}
+                <g fill="#fbbf24" stroke="#0f172a" stroke-width={previewStrokeWidth * 0.25}>
+                  {#each imported.geometry.routing.vias as via (via)}
+                    <circle cx={via.position.x} cy={via.position.y} r={viaPadRadius} />
+                  {/each}
+                </g>
+                <g fill="#020617" stroke="#0f172a" stroke-width={previewStrokeWidth * 0.2}>
+                  {#each imported.geometry.routing.vias as via (via)}
+                    <circle cx={via.position.x} cy={via.position.y} r={viaDrill / 2} />
+                  {/each}
+                </g>
               </g>
             </svg>
           </div>
@@ -279,23 +380,26 @@
               onToggle={(layerIdx) => previewView.toggleLayer(layerIdx)}
             />
             <CoilPreviewControls
-              zoomLabel={formatZoom(previewZoom)}
-              canZoomIn={previewZoom >= maxZoom}
-              canZoomOut={previewZoom <= minZoom}
-              onZoomIn={() => (previewZoom = nextZoomStepUp(previewZoom, zoomSteps, maxZoom))}
-              onZoomOut={() => (previewZoom = nextZoomStepDown(previewZoom, zoomSteps, minZoom))}
-              onResetZoom={() => (previewZoom = 1)}
-              onResetView={() => (previewZoom = 1)}
+              zoomLabel={gestures.zoomLabel}
+              canZoomIn={gestures.canZoomIn}
+              canZoomOut={gestures.canZoomOut}
+              onZoomIn={gestures.zoomIn}
+              onZoomOut={gestures.zoomOut}
+              onResetZoom={gestures.zoomReset}
+              onResetView={gestures.resetView}
             />
           </div>
           <p class="text-xs text-slate-300">
             {imported.geometry.routing.segments.length} line(s),
             {imported.geometry.routing.curves.length} arc(s),
             {imported.geometry.routing.vias.length} via(s).
-            Review the preview, then open the design with this geometry.
+            Drag to pan; pinch or ctrl-scroll to zoom. Review the preview, then open the design with this geometry.
           </p>
+          {#if !viaSizingValid}
+            <p role="alert" class="text-xs text-rose-200">Via drill and annular ring must be positive values.</p>
+          {/if}
           {#if !previewIsCurrent}
-            <p role="status" class="text-xs text-amber-200">Import options changed. Update the preview before opening.</p>
+            <p role="status" class="text-xs text-amber-200">{refreshScheduled || busy ? "Updating preview for changed options…" : "Preview settings changed; preview will refresh automatically."}</p>
           {/if}
           {#if imported.warnings.length > 0}
             <div class="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-100">
@@ -324,14 +428,14 @@
         {/if}
       </div>
       <div class="flex flex-wrap justify-end gap-2">
-        {#if imported && previewIsCurrent}
+        {#if imported && previewIsCurrent && viaSizingValid}
           <button type="button" onclick={chooseCadFile} disabled={busy} class="rounded-md border border-slate-700 px-3 py-2 text-xs text-slate-300 hover:bg-slate-800 disabled:opacity-50">Choose another file…</button>
           <button type="button" onclick={useImportedGeometry} disabled={busy} class="rounded-md border border-emerald-500/50 bg-emerald-600/30 px-4 py-2 text-xs font-medium text-emerald-100 hover:bg-emerald-500/40 disabled:opacity-50">Open with this geometry</button>
-        {:else if imported}
-          <button type="button" onclick={refreshPreview} disabled={busy} class="rounded-md border border-sky-500/50 bg-sky-600/30 px-4 py-2 text-xs font-medium text-sky-100 hover:bg-sky-500/40 disabled:opacity-50">{busy ? "Updating…" : "Update preview"}</button>
-        {:else if selectedPath && importFailed && error}
+        {:else if selectedPath && importFailed && error && !refreshScheduled}
           <button type="button" onclick={refreshPreview} disabled={busy} class="rounded-md border border-sky-500/50 bg-sky-600/30 px-4 py-2 text-xs font-medium text-sky-100 hover:bg-sky-500/40 disabled:opacity-50">{busy ? "Retrying…" : "Retry import"}</button>
           <button type="button" onclick={chooseCadFile} disabled={busy} class="rounded-md border border-slate-700 px-3 py-2 text-xs text-slate-300 hover:bg-slate-800 disabled:opacity-50">Choose another file…</button>
+        {:else if selectedPath}
+          <span role="status" class="px-3 py-2 text-xs text-slate-400">{busy || refreshScheduled ? "Updating preview…" : "Preview updates automatically when settings change."}</span>
         {:else}
           <button type="button" onclick={chooseCadFile} disabled={busy} class="rounded-md border border-sky-500/50 bg-sky-600/30 px-4 py-2 text-xs font-medium text-sky-100 hover:bg-sky-500/40 disabled:opacity-50">{busy ? "Preparing preview…" : "Choose DXF…"}</button>
         {/if}
