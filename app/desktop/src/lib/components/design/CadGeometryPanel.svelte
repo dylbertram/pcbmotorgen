@@ -1,6 +1,8 @@
 <script lang="ts">
   import { confirm } from "@tauri-apps/plugin-dialog";
   import { importCadDxf, pickCadDxfPath } from "../../ipc";
+  import ScrollArea from "../ui/ScrollArea.svelte";
+  import { groupCadImportWarnings } from "../../cadPreview";
   import type { ConfigStore } from "../../stores/config.svelte";
   import type { ProjectStore } from "../../stores/project.svelte";
   import type { CadImportResult } from "../../types";
@@ -13,6 +15,7 @@
   let busy = $state(false);
   let error = $state<string | null>(null);
   let lastImport = $state<CadImportResult | null>(null);
+  let warningGroups = $derived(groupCadImportWarnings(lastImport?.warnings ?? []));
 
   async function handleImport(): Promise<void> {
     if (busy) return;
@@ -80,10 +83,24 @@
       {/each}
     </ul>
   {/if}
-  {#if lastImport?.warnings.length}
-    <ul class="mt-2 list-disc space-y-1 pl-4 text-[11px] text-amber-200" aria-label="CAD import warnings">
-      {#each lastImport.warnings as warning (warning)}<li>{warning}</li>{/each}
-    </ul>
+  {#if warningGroups.length > 0}
+    <p class="mt-2 text-[11px] text-amber-200">{lastImport?.warnings.length} import warning(s) in {warningGroups.length} group(s)</p>
+    <ScrollArea class="mt-1 max-h-48 rounded border border-amber-500/30 bg-slate-950/40" viewportClass="p-1 pr-3" aria-label="CAD import warnings">
+      <div class="space-y-1">
+        {#each warningGroups as group (group.key)}
+          <details class="rounded border border-slate-700/70 bg-slate-900/70 px-2 py-1">
+            <summary class="cursor-pointer list-none text-[11px] text-amber-200">
+              <span class="mr-1 text-slate-500">›</span>{group.title}
+              <span class="ml-1 rounded bg-amber-500/15 px-1.5 py-0.5 font-mono text-amber-100">{group.count}</span>
+            </summary>
+            <ul class="mt-1 space-y-1 pl-4 text-[10px] text-slate-300">
+              {#each group.examples as example (example)}<li class="break-all">{example}</li>{/each}
+              {#if group.count > group.examples.length}<li class="italic text-slate-500">{group.count - group.examples.length} more matching warning(s)</li>{/if}
+            </ul>
+          </details>
+        {/each}
+      </div>
+    </ScrollArea>
   {/if}
   {#if projects.cadGeometry}
     <p class="mt-2 text-[11px] text-amber-200">Imported geometry is preview/export-only in this version; simulation and KiCad writing continue to use generated geometry.</p>

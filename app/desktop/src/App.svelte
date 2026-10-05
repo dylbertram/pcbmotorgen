@@ -451,10 +451,10 @@ import {
              themselves, so the footer is always visible and the page never
              scrolls. Below lg the columns stack and the page scrolls normally. -->
         <aside
-          class="relative min-w-0 min-h-0 lg:pt-4 lg:pb-4 lg:pr-2"
+        class="relative min-w-0 min-h-0 lg:h-full lg:pt-4 lg:pb-4 lg:pr-2"
           aria-label="Persistent design reflection"
         >
-          <ScrollArea class="h-full">
+          <ScrollArea class="h-full min-h-0">
             <TravelDiagram {config} {motion} {measuredTrace} />
             <!-- Traces view lives here in the Design tab so layout and geometry can
                  be inspected side by side; the Simulation tab keeps its own copy. -->
@@ -469,7 +469,7 @@ import {
           </ScrollArea>
         </aside>
 
-        <div class="min-w-0 min-h-0">
+        <div class="min-w-0 min-h-0 lg:h-full">
           <!-- All three panels stay mounted so component-local controls retain
                their state — Bits Tabs.Content never unmounts inactive panels, it
                toggles the hidden attribute instead. Hidden Simulation content is

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cadGeometryToPreview } from "./cadPreview";
+import { cadGeometryToPreview, groupCadImportWarnings } from "./cadPreview";
 import type { CadGeometry } from "./types";
 
 describe("cadGeometryToPreview", () => {
@@ -21,5 +21,17 @@ describe("cadGeometryToPreview", () => {
     expect(preview.phases[0].segments[0].start).toEqual([0.001, 0.002]);
     expect(preview.phases[0].via_positions).toEqual([[0.004, 0.002]]);
     expect(preview.phases[1].via_positions).toEqual([[0.004, 0.002]]);
+  });
+});
+
+describe("groupCadImportWarnings", () => {
+  it("collapses repeated disconnected-via diagnostics by layer and caps examples", () => {
+    const warnings = Array.from({ length: 30 }, (_, i) =>
+      `Via at (${i}.000, 1.000) mm has no matching trace endpoint on layer 2.`,
+    );
+    const [group] = groupCadImportWarnings(warnings);
+    expect(group.title).toContain("layer 2");
+    expect(group.count).toBe(30);
+    expect(group.examples).toHaveLength(5);
   });
 });

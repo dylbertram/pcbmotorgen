@@ -36,8 +36,8 @@ pub struct DxfExportSummary {
 /// string suitable for mechanical CAD / CAM import.
 ///
 /// The command builds the same `PhaseCoil` set as `write_coils_to_board`,
-/// converts it to DXF via `pcbmotorgen_export::phase_coils_to_dxf`, and returns
-/// the complete file content. The frontend is responsible for saving to disk.
+/// converts it to Z-aware centerline geometry, and returns a round-trippable
+/// 3D DXF. The frontend is responsible for saving to disk.
 #[tauri::command]
 pub async fn export_coils_dxf(config: LinearMotorConfigIpc) -> Result<DxfExportResult, String> {
     let core = config.to_core();
@@ -45,29 +45,14 @@ pub async fn export_coils_dxf(config: LinearMotorConfigIpc) -> Result<DxfExportR
         let coils = core.generate_coils_for_board();
         let num_layers = core.num_layers;
         let rules = core.design_rules();
-        let active = core.active_area_length_m * 1e3;
-
         let geometry = phase_coils_to_cad_geometry(
             &coils,
             num_layers,
             core.pcb_thickness_m * 1e3,
             rules.min_trace_mm,
         )?;
-        let mut geometry = geometry;
-        // Generated geometry is centred for CAD, matching the legacy exporter.
-        let x_offset = active / 2.0;
-        for segment in &mut geometry.routing.segments {
-            segment.start.x -= x_offset;
-            segment.end.x -= x_offset;
-        }
-        for curve in &mut geometry.routing.curves {
-            curve.start.x -= x_offset;
-            curve.mid.x -= x_offset;
-            curve.end.x -= x_offset;
-        }
-        for via in &mut geometry.routing.vias {
-            via.position.x -= x_offset;
-        }
+        // Keep x=0 at the trace start so import, preview and mover travel use
+        // the same frame without a hidden half-length translation.
         let dxf_content = cad_geometry_to_3d_dxf(&geometry)?;
 
         let total_lines = dxf_content.matches("0\nLINE\n").count() as u32;

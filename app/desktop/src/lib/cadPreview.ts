@@ -67,3 +67,34 @@ export function cadGeometryToPreview(geometry: CadGeometry): CoilPathDto {
   }
   return { phases, layer_count: Math.max(geometry.layer_z_mm.length, 1) };
 }
+
+export interface CadWarningGroup {
+  key: string;
+  title: string;
+  count: number;
+  examples: string[];
+}
+
+/** Collapse repeated import diagnostics by failure class/layer for the UI. */
+export function groupCadImportWarnings(warnings: string[]): CadWarningGroup[] {
+  const groups = new Map<string, CadWarningGroup>();
+  for (const warning of warnings) {
+    const viaLayer = warning.match(/^Via at .* has no matching trace endpoint on layer (\d+)\.$/)?.[1];
+    const unsupported = warning.match(/^Skipped unsupported DXF (.+) entity on layer '(.+)'\.$/);
+    const key = viaLayer !== undefined
+      ? `unconnected-via-layer-${viaLayer}`
+      : unsupported
+        ? `unsupported-${unsupported[1]}-${unsupported[2]}`
+        : `warning-${warning}`;
+    const title = viaLayer !== undefined
+      ? `Via endpoint does not meet a trace · layer ${viaLayer}`
+      : unsupported
+        ? `Unsupported ${unsupported[1]} entities · ${unsupported[2]}`
+        : warning;
+    const group = groups.get(key) ?? { key, title, count: 0, examples: [] };
+    group.count += 1;
+    if (group.examples.length < 5) group.examples.push(warning);
+    groups.set(key, group);
+  }
+  return [...groups.values()];
+}

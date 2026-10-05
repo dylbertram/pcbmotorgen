@@ -172,9 +172,7 @@ pub fn phase_coils_to_cad_geometry(
         vec![0.0]
     } else {
         (0..num_layers)
-            .map(|i| {
-                -pcb_thickness_mm / 2.0 + pcb_thickness_mm * i as f64 / (num_layers - 1) as f64
-            })
+            .map(|i| pcb_thickness_mm * (i as f64 / (num_layers - 1) as f64 - 1.0))
             .collect()
     };
     let mut routing = RoutingResult::default();
@@ -198,7 +196,15 @@ pub fn phase_coils_to_cad_geometry(
                 is_active: curve.is_active,
             });
         }
-        let (from_layer, to_layer) = coil.layer_pair.unwrap_or((0, num_layers.saturating_sub(1)));
+        let (from_layer, to_layer) = if let Some(pair) = coil.layer_pair {
+            pair
+        } else if coil.layer_idx + 1 < num_layers {
+            (coil.layer_idx, coil.layer_idx + 1)
+        } else if coil.layer_idx > 0 {
+            (coil.layer_idx - 1, coil.layer_idx)
+        } else {
+            return Err("Cannot assign an inter-layer via on a single-layer board".into());
+        };
         for &(x, y) in &coil.center_via_positions {
             routing.vias.push(Via {
                 position: Point::new(x, y),
@@ -406,14 +412,13 @@ pub fn import_3d_dxf(text: &str, options: CadImportOptions) -> Result<CadImportR
                 .map_or(1, |n| n + 1),
         )
         .max(1);
-    let layer_z_mm = if legacy_2d {
+    let mut layer_z_mm = if legacy_2d {
         if legacy_layers == 1 {
             vec![0.0]
         } else {
             (0..legacy_layers)
                 .map(|i| {
-                    -options.legacy_pcb_thickness_mm / 2.0
-                        + options.legacy_pcb_thickness_mm * i as f64 / (legacy_layers - 1) as f64
+                    options.legacy_pcb_thickness_mm * (i as f64 / (legacy_layers - 1) as f64 - 1.0)
                 })
                 .collect()
         }
@@ -494,6 +499,13 @@ pub fn import_3d_dxf(text: &str, options: CadImportOptions) -> Result<CadImportR
     if !warnings.is_empty() {
         warnings.sort();
         warnings.dedup();
+    }
+    // Normalize the physical top copper plane to the DXF/app Z origin. Keep
+    // layer indices bottom-to-top, matching the KiCad mapping.
+    if let Some(top_z) = layer_z_mm.last().copied() {
+        for z in &mut layer_z_mm {
+            *z -= top_z;
+        }
     }
     let geometry = CadGeometry {
         routing,
@@ -813,7 +825,7 @@ mod tests {
         });
         CadGeometry {
             routing,
-            layer_z_mm: vec![-0.8, 0.8],
+            layer_z_mm: vec![-1.6, 0.0],
             trace_width_mm: 0.2,
         }
     }
@@ -823,7 +835,7 @@ mod tests {
         let source = sample();
         let dxf = cad_geometry_to_3d_dxf(&source).unwrap();
         assert!(dxf.contains("0\nLINE\n"));
-        assert!(dxf.contains("31\n0.8"));
+        assert!(dxf.contains("31\n0"));
         let imported = import_3d_dxf(
             &dxf,
             CadImportOptions {
@@ -844,6 +856,15 @@ mod tests {
         assert_eq!(imported.geometry.routing.vias[0].from_layer, 0);
         assert_eq!(imported.geometry.routing.vias[0].to_layer, 1);
         assert_eq!(imported.geometry.routing.vias[0].net, "A");
+        assert_eq!(
+            imported.geometry.routing.segments[0].start,
+            source.routing.segments[0].start
+        );
+        assert!(
+            imported.warnings.is_empty(),
+            "unexpected import warnings: {:?}",
+            imported.warnings
+        );
     }
 
     #[test]
@@ -879,8 +900,8 @@ mod tests {
         )
         .unwrap();
         assert_eq!(imported.geometry.layer_z_mm.len(), 4);
-        assert!((imported.geometry.layer_z_mm[0] + 0.8).abs() < 1e-12);
-        assert!((imported.geometry.layer_z_mm[3] - 0.8).abs() < 1e-12);
+        assert!((imported.geometry.layer_z_mm[0] + 1.6).abs() < 1e-12);
+        assert_eq!(imported.geometry.layer_z_mm[3], 0.0);
         assert_eq!(imported.geometry.routing.segments[0].layer, 0);
         assert_eq!(imported.geometry.routing.segments[1].layer, 3);
         assert!(imported
@@ -891,7 +912,7 @@ mod tests {
 
     #[test]
     fn imports_lightweight_polyline_as_connected_segments() {
-        let dxf = "0\nSECTION\n2\nENTITIES\n0\nLWPOLYLINE\n8\nL0_A\n90\n3\n70\n0\n38\n0.5\n10\n0\n20\n0\n10\n1\n20\n0\n10\n1\n20\n1\n0\nENDSEC\n0\nEOF\n";
+        let dxf = "0\nSECTION\n2\nENTITIES\n0\nLWPOLYLINE\n8\nL0_A\n90\n3\n70\n0\n38\n0.5\n10\n0\n20\n0\n10\n1\n20\n0\n10\n1\n20\n1\n0\nLINE\n8\nL1_B\n10\n0\n20\n2\n30\n1\n11\n1\n21\n2\n31\n1\n0\nENDSEC\n0\nEOF\n";
         let imported = import_3d_dxf(
             dxf,
             CadImportOptions {
@@ -903,11 +924,41 @@ mod tests {
             },
         )
         .unwrap();
-        assert_eq!(imported.geometry.routing.segments.len(), 2);
-        assert_eq!(imported.geometry.layer_z_mm, vec![0.5]);
+        assert_eq!(imported.geometry.routing.segments.len(), 3);
+        assert_eq!(imported.geometry.layer_z_mm, vec![-0.5, 0.0]);
         assert_eq!(
             imported.geometry.routing.segments[0].end,
             imported.geometry.routing.segments[1].start
+        );
+    }
+
+    #[test]
+    fn generated_stack_places_top_copper_at_origin_and_vias_on_adjacent_planes() {
+        let coil = pcbmotorgen_routing::PhaseCoil {
+            layer_idx: 0,
+            phase_name: "A".into(),
+            segments: vec![pcbmotorgen_routing::CoilSegment {
+                start: (0.0, 1.0),
+                end: (10.0, 1.0),
+                is_active: true,
+            }],
+            center_via_positions: vec![(2.0, 3.0)],
+            ..Default::default()
+        };
+        let geometry = phase_coils_to_cad_geometry(&[coil], 4, 1.6, 0.2).unwrap();
+        assert!((geometry.layer_z_mm[0] + 1.6).abs() < 1e-12);
+        assert!((geometry.layer_z_mm[1] + 1.6 / 3.0 * 2.0).abs() < 1e-12);
+        assert_eq!(geometry.layer_z_mm[3], 0.0);
+        let via = &geometry.routing.vias[0];
+        assert_eq!((via.from_layer, via.to_layer), (0, 1));
+        assert_eq!(geometry.routing.segments[0].start.x, 0.0);
+        assert!(
+            ((geometry.layer_z_mm[via.to_layer as usize]
+                - geometry.layer_z_mm[via.from_layer as usize])
+                .abs()
+                - 1.6 / 3.0)
+                .abs()
+                < 1e-12
         );
     }
 }
