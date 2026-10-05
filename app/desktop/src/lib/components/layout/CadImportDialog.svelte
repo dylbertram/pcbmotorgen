@@ -5,6 +5,7 @@
   import type { ConfigStore } from "../../stores/config.svelte";
   import type { ProjectStore } from "../../stores/project.svelte";
   import type { CadImportResult } from "../../types";
+  import { joinCadPreviewEndpoints } from "../../cadPreview";
   import { attachBackdropScrollGuard, lockPageScroll } from "../../utils/pageScrollLock";
   import { fitWorldToView, type WorldTransform } from "../../chart";
   import CoilPreviewControls from "../design/CoilPreviewControls.svelte";
@@ -29,17 +30,28 @@
   } = $props();
 
   let unitsToMm = $state("1");
-  let zTolerance = $state(0.05);
-  let traceWidthOverride = $state<number | null>(null);
-  let traceWidth = $derived(traceWidthOverride ?? config.min_trace_mm);
-  let viaDrillOverride = $state<number | null>(null);
-  let viaDrill = $derived(viaDrillOverride ?? config.min_via_drill_mm);
-  let viaAnnularRingOverride = $state<number | null>(null);
-  let viaAnnularRing = $derived(viaAnnularRingOverride ?? config.min_via_annular_ring_mm);
-  let viaPadRadius = $derived(viaDrill / 2 + viaAnnularRing);
+  let zToleranceDraft = $state("0.05");
+  let zToleranceParsed = $derived(parseNumberDraft(zToleranceDraft));
+  let zTolerance = $derived(zToleranceParsed ?? 0.05);
+  let zToleranceValid = $derived(zToleranceParsed !== null && zToleranceParsed >= 0);
+  let traceWidthDraft = $state<string | null>(null);
+  let traceWidthText = $derived(traceWidthDraft ?? String(config.min_trace_mm));
+  let traceWidthParsed = $derived(parseNumberDraft(traceWidthText));
+  let traceWidth = $derived(traceWidthParsed ?? config.min_trace_mm);
+  let traceWidthValid = $derived(traceWidthParsed !== null && traceWidthParsed > 0);
+  let viaDrillDraft = $state<string | null>(null);
+  let viaDrillText = $derived(viaDrillDraft ?? String(config.min_via_drill_mm));
+  let viaDrillParsed = $derived(parseNumberDraft(viaDrillText));
+  let viaDrill = $derived(viaDrillParsed ?? config.min_via_drill_mm);
+  let viaAnnularRingDraft = $state<string | null>(null);
+  let viaAnnularRingText = $derived(viaAnnularRingDraft ?? String(config.min_via_annular_ring_mm));
+  let viaAnnularRingParsed = $derived(parseNumberDraft(viaAnnularRingText));
+  let viaAnnularRing = $derived(viaAnnularRingParsed ?? config.min_via_annular_ring_mm);
+  let viaPadRadius = $derived(Math.max(0, viaDrill / 2 + viaAnnularRing));
+  let viaDrillRadius = $derived(Math.max(0, viaDrill / 2));
   let viaSizingValid = $derived(
-    Number.isFinite(viaDrill) && viaDrill > 0 &&
-    Number.isFinite(viaAnnularRing) && viaAnnularRing > 0,
+    viaDrillParsed !== null && viaDrillParsed > 0 &&
+    viaAnnularRingParsed !== null && viaAnnularRingParsed > 0,
   );
   let selectedLayersOverride = $state<number | null>(null);
   let selectedLayers = $derived(selectedLayersOverride ?? config.num_layers);
@@ -60,7 +72,10 @@
   let optionsKey = $derived(
     [unitsToMm, zTolerance, traceWidth, selectedLayers, config.pcb_thickness_mm].join("|"),
   );
-  let previewIsCurrent = $derived(Boolean(imported && importedOptions === optionsKey));
+  let importSettingsValid = $derived(zToleranceValid && traceWidthValid);
+  let previewIsCurrent = $derived(
+    Boolean(imported && importedOptions === optionsKey && importSettingsValid),
+  );
   let previewBounds = $derived.by(() => {
     const geometry = imported?.geometry;
     if (!geometry) return { minX: 0, minY: 0, maxX: 1, maxY: 1 };
@@ -81,8 +96,9 @@
       minY = Math.min(minY, y);
       maxY = Math.max(maxY, y);
     }
-    const span = Math.max(maxX - minX, maxY - minY, geometry.trace_width_mm * 4, 1);
-    const padding = Math.max(span * 0.05, geometry.trace_width_mm * 2, viaPadRadius * 1.5);
+    const effectiveTraceWidth = traceWidthValid ? traceWidth : geometry.trace_width_mm;
+    const span = Math.max(maxX - minX, maxY - minY, effectiveTraceWidth * 4, 1);
+    const padding = Math.max(span * 0.05, effectiveTraceWidth * 2, viaPadRadius * 1.5);
     return {
       minX: minX - padding,
       minY: minY - padding,
@@ -91,12 +107,14 @@
     };
   });
   let previewStrokeWidth = $derived.by(() => {
-    const geometry = imported?.geometry;
-    if (!geometry) return 1;
-    const width = previewBounds.maxX - previewBounds.minX;
-    const height = previewBounds.maxY - previewBounds.minY;
-    return Math.max(geometry.trace_width_mm, Math.max(width, height) / 350);
+    if (traceWidthValid) return traceWidth;
+    return imported?.geometry.trace_width_mm ?? config.min_trace_mm;
   });
+  let joinedPreview = $derived.by(() =>
+    imported
+      ? joinCadPreviewEndpoints(imported.geometry, zToleranceValid ? zTolerance : 0)
+      : { segments: [], curves: [] },
+  );
   function worldTransformFor(zoom: number): WorldTransform {
     return fitWorldToView(previewBounds, PREVIEW_W, PREVIEW_H, previewPad, zoom);
   }
@@ -139,8 +157,15 @@
     return path.slice(Math.max(path.lastIndexOf("/"), path.lastIndexOf("\\")) + 1);
   }
 
+  function parseNumberDraft(value: string): number | null {
+    if (value.trim() === "") return null;
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+
   function schedulePreviewRefresh(): void {
     if (!selectedPath) return;
+    if (!importSettingsValid) return;
     if (previewRefreshTimer) clearTimeout(previewRefreshTimer);
     refreshScheduled = true;
     previewRefreshTimer = setTimeout(() => {
@@ -152,6 +177,7 @@
 
   async function readPreview(path: string): Promise<void> {
     const requestedOptions = optionsKey;
+    const requestedTraceWidth = traceWidth;
     error = null;
     importFailed = false;
     try {
@@ -164,7 +190,10 @@
         config.pcb_thickness_mm,
       );
       if (path === selectedPath && requestedOptions === optionsKey) {
-        imported = result;
+        imported = {
+          ...result,
+          geometry: { ...result.geometry, trace_width_mm: requestedTraceWidth },
+        };
         importedOptions = requestedOptions;
       } else if (path === selectedPath) {
         schedulePreviewRefresh();
@@ -176,7 +205,7 @@
   }
 
   async function chooseCadFile(): Promise<void> {
-    if (busy) return;
+    if (busy || !importSettingsValid) return;
     if (previewRefreshTimer) clearTimeout(previewRefreshTimer);
     previewRefreshTimer = undefined;
     refreshScheduled = false;
@@ -200,7 +229,7 @@
   }
 
   async function refreshPreview(): Promise<void> {
-    if (busy || !selectedPath) return;
+    if (busy || !selectedPath || !importSettingsValid) return;
     busy = true;
     try {
       await readPreview(selectedPath);
@@ -211,18 +240,24 @@
 
   function updateTraceWidth(event: Event): void {
     const input = event.currentTarget as HTMLInputElement;
-    traceWidthOverride = Number.isFinite(input.valueAsNumber) ? input.valueAsNumber : null;
-    schedulePreviewRefresh();
+    traceWidthDraft = input.value;
+    if (traceWidthValid) schedulePreviewRefresh();
+  }
+
+  function updateZTolerance(event: Event): void {
+    const input = event.currentTarget as HTMLInputElement;
+    zToleranceDraft = input.value;
+    if (zToleranceValid) schedulePreviewRefresh();
   }
 
   function updateViaDrill(event: Event): void {
     const input = event.currentTarget as HTMLInputElement;
-    viaDrillOverride = Number.isFinite(input.valueAsNumber) ? input.valueAsNumber : null;
+    viaDrillDraft = input.value;
   }
 
   function updateViaAnnularRing(event: Event): void {
     const input = event.currentTarget as HTMLInputElement;
-    viaAnnularRingOverride = Number.isFinite(input.valueAsNumber) ? input.valueAsNumber : null;
+    viaAnnularRingDraft = input.value;
   }
 
   async function useImportedGeometry(): Promise<void> {
@@ -286,24 +321,27 @@
           </label>
           <label class="text-xs font-medium text-slate-300" for="cad-z-tolerance">
             <span class="inline-flex items-center">Z tolerance (mm)<HelpTag label="About Z tolerance" tip="Controls how close Z heights must be to count as one copper layer. It also allows small XY offsets when recognizing vertical via centerlines and matching via endpoints to traces. Lower it if nearby layers merge; raise it only to accommodate coordinate noise." /></span>
-            <input id="cad-z-tolerance" aria-label="Z tolerance (mm)" type="number" min="0" step="0.01" bind:value={zTolerance} oninput={schedulePreviewRefresh} disabled={busy} class="mt-1.5 w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 disabled:opacity-50" />
+            <input id="cad-z-tolerance" aria-label="Z tolerance (mm)" type="text" inputmode="decimal" value={zToleranceDraft} oninput={updateZTolerance} disabled={busy} class="mt-1.5 w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 disabled:opacity-50" />
           </label>
           <label class="text-xs font-medium text-slate-300" for="cad-trace-width">
-            Default trace width (mm)
-            <input id="cad-trace-width" aria-label="Default trace width (mm)" type="number" min="0.001" step="0.01" value={traceWidth} oninput={updateTraceWidth} disabled={busy} class="mt-1.5 w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 disabled:opacity-50" />
+            <span class="inline-flex items-center">Trace width (mm)<HelpTag label="About trace width" tip="Applied uniformly to imported trace centerlines. This value controls their preview width and overrides embedded global trace-width metadata." /></span>
+            <input id="cad-trace-width" aria-label="Trace width (mm)" type="text" inputmode="decimal" value={traceWidthText} oninput={updateTraceWidth} disabled={busy} class="mt-1.5 w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 disabled:opacity-50" />
           </label>
           <label class="text-xs font-medium text-slate-300" for="cad-via-drill">
             Via drill (mm)
-            <input id="cad-via-drill" aria-label="Via drill (mm)" type="number" min="0.001" step="0.01" value={viaDrill} oninput={updateViaDrill} disabled={busy} class="mt-1.5 w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 disabled:opacity-50" />
+            <input id="cad-via-drill" aria-label="Via drill (mm)" type="text" inputmode="decimal" value={viaDrillText} oninput={updateViaDrill} disabled={busy} class="mt-1.5 w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 disabled:opacity-50" />
           </label>
           <label class="text-xs font-medium text-slate-300" for="cad-via-annular-ring">
             Via annular ring (mm)
-            <input id="cad-via-annular-ring" aria-label="Via annular ring (mm)" type="number" min="0.001" step="0.01" value={viaAnnularRing} oninput={updateViaAnnularRing} disabled={busy} class="mt-1.5 w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 disabled:opacity-50" />
+            <input id="cad-via-annular-ring" aria-label="Via annular ring (mm)" type="text" inputmode="decimal" value={viaAnnularRingText} oninput={updateViaAnnularRing} disabled={busy} class="mt-1.5 w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 disabled:opacity-50" />
           </label>
           <div class="flex items-end">
             <p class="pb-2 text-[11px] leading-relaxed text-slate-500">3D layer positions are detected from Z heights. Via sizes use the project manufacturing defaults.</p>
           </div>
         </div>
+        {#if !importSettingsValid}
+          <p role="alert" class="mt-3 text-xs text-rose-200">Enter a positive trace width and a non-negative Z tolerance to import.</p>
+        {/if}
       </section>
 
       {#if error}
@@ -351,10 +389,10 @@
                 {#each imported.geometry.layer_z_mm as _, layer (layer)}
                   {#if previewView.isLayerVisible(layer)}
                     <g fill="none" stroke={['#34d399', '#38bdf8', '#c084fc', '#fbbf24', '#fb7185', '#a3e635'][layer % 6]} stroke-width={previewStrokeWidth} stroke-linecap="round" stroke-linejoin="round">
-                      {#each imported.geometry.routing.segments.filter((segment) => segment.layer === layer) as segment (segment)}
+                      {#each joinedPreview.segments.filter((segment) => segment.layer === layer) as segment (segment)}
                         <path d={`M ${segment.start.x} ${segment.start.y} L ${segment.end.x} ${segment.end.y}`} />
                       {/each}
-                      {#each imported.geometry.routing.curves.filter((curve) => curve.layer === layer) as curve (curve)}
+                      {#each joinedPreview.curves.filter((curve) => curve.layer === layer) as curve (curve)}
                         <path d={`M ${curve.start.x} ${curve.start.y} Q ${curve.mid.x} ${curve.mid.y} ${curve.end.x} ${curve.end.y}`} />
                       {/each}
                     </g>
@@ -367,7 +405,7 @@
                 </g>
                 <g fill="#020617" stroke="#0f172a" stroke-width={previewStrokeWidth * 0.2}>
                   {#each imported.geometry.routing.vias as via (via)}
-                    <circle cx={via.position.x} cy={via.position.y} r={viaDrill / 2} />
+                    <circle cx={via.position.x} cy={via.position.y} r={viaDrillRadius} />
                   {/each}
                 </g>
               </g>
@@ -432,12 +470,12 @@
           <button type="button" onclick={chooseCadFile} disabled={busy} class="rounded-md border border-slate-700 px-3 py-2 text-xs text-slate-300 hover:bg-slate-800 disabled:opacity-50">Choose another file…</button>
           <button type="button" onclick={useImportedGeometry} disabled={busy} class="rounded-md border border-emerald-500/50 bg-emerald-600/30 px-4 py-2 text-xs font-medium text-emerald-100 hover:bg-emerald-500/40 disabled:opacity-50">Open with this geometry</button>
         {:else if selectedPath && importFailed && error && !refreshScheduled}
-          <button type="button" onclick={refreshPreview} disabled={busy} class="rounded-md border border-sky-500/50 bg-sky-600/30 px-4 py-2 text-xs font-medium text-sky-100 hover:bg-sky-500/40 disabled:opacity-50">{busy ? "Retrying…" : "Retry import"}</button>
+          <button type="button" onclick={refreshPreview} disabled={busy || !importSettingsValid} class="rounded-md border border-sky-500/50 bg-sky-600/30 px-4 py-2 text-xs font-medium text-sky-100 hover:bg-sky-500/40 disabled:opacity-50">{busy ? "Retrying…" : "Retry import"}</button>
           <button type="button" onclick={chooseCadFile} disabled={busy} class="rounded-md border border-slate-700 px-3 py-2 text-xs text-slate-300 hover:bg-slate-800 disabled:opacity-50">Choose another file…</button>
         {:else if selectedPath}
           <span role="status" class="px-3 py-2 text-xs text-slate-400">{busy || refreshScheduled ? "Updating preview…" : "Preview updates automatically when settings change."}</span>
         {:else}
-          <button type="button" onclick={chooseCadFile} disabled={busy} class="rounded-md border border-sky-500/50 bg-sky-600/30 px-4 py-2 text-xs font-medium text-sky-100 hover:bg-sky-500/40 disabled:opacity-50">{busy ? "Preparing preview…" : "Choose DXF…"}</button>
+          <button type="button" onclick={chooseCadFile} disabled={busy || !importSettingsValid} class="rounded-md border border-sky-500/50 bg-sky-600/30 px-4 py-2 text-xs font-medium text-sky-100 hover:bg-sky-500/40 disabled:opacity-50">{busy ? "Preparing preview…" : "Choose DXF…"}</button>
         {/if}
       </div>
     </footer>

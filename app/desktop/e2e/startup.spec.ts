@@ -36,7 +36,13 @@ test.describe("startup chooser and new-design setup", () => {
     await expect(importDialog.getByLabel("DXF units")).toBeVisible();
     await expect(importDialog.getByLabel("Z tolerance (mm)")).toBeVisible();
     await expect(importDialog.getByRole("button", { name: "About Z tolerance" })).toBeVisible();
-    await expect(importDialog.getByLabel("Default trace width (mm)")).toBeVisible();
+    const traceWidth = importDialog.getByLabel("Trace width (mm)");
+    await expect(traceWidth).toBeVisible();
+    await expect(traceWidth).toHaveAttribute("type", "text");
+    await traceWidth.fill("0.127");
+    await traceWidth.evaluate((input: HTMLInputElement) => input.setSelectionRange(3, 3));
+    await traceWidth.press("Backspace");
+    await expect(traceWidth).toHaveValue("0.27");
     await expect(importDialog.getByLabel("Via drill (mm)")).toBeVisible();
     await expect(importDialog.getByLabel("Via annular ring (mm)")).toBeVisible();
     await expect(importDialog.locator("#cad-retry-layer-count")).toHaveCount(0);
