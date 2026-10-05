@@ -12,6 +12,7 @@
 
 import type { CommutationMode } from "./enums";
 import type { CadGeometry } from "./dxf";
+import type { SensorConfig } from "./sensor";
 
 /** Every user-facing design input, in UI units (mm + SI engineering
  *  units) — mirrors the fields of the frontend `ConfigStore` one-for-one
@@ -79,6 +80,8 @@ export interface ProjectState {
   mover_position_mm: number;
   /** Optional authoritative imported CAD geometry; absent in older projects. */
   cad_geometry?: CadGeometry | null;
+  /** Dedicated induction-sensor workflow settings; missing in older files. */
+  sensor_config?: SensorConfig;
 }
 
 /** Design-level validation findings reported by the backend on load.

@@ -5,6 +5,7 @@ use pcbmotorgen_export::cad_dxf::{
     cad_geometry_to_3d_dxf, import_3d_dxf, phase_coils_to_cad_geometry, CadGeometry,
     CadImportOptions,
 };
+use pcbmotorgen_routing::{RouteSegment, RoutingResult, SensorConfig, Via};
 
 // ===========================================================================
 // export_coils_dxf — REAL (pcbmotorgen-export pure DXF R12 ASCII export)
@@ -75,6 +76,61 @@ pub async fn export_coils_dxf(config: LinearMotorConfigIpc) -> Result<DxfExportR
     })
     .await
     .map_err(|e| format!("export_coils_dxf worker failed: {e}"))?
+}
+
+/// Generate the independent inductive sensor and return a 3D DXF centerline
+/// exchange. Terminal coordinates are not exported as footprints or pads.
+#[tauri::command]
+pub async fn export_sensor_dxf(config: SensorConfig) -> Result<DxfExportResult, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let sensor = pcbmotorgen_routing::generate_sensor(&config)?;
+        let mut routing = RoutingResult::default();
+        for net in &sensor.nets {
+            for segment in &net.segments {
+                // DXF's CAD contract indexes copper bottom-to-top. Sensor
+                // geometry uses F.Cu=0/B.Cu=1, so invert the two-layer IDs.
+                routing.segments.push(RouteSegment {
+                    start: segment.start,
+                    end: segment.end,
+                    layer: 1 - segment.layer,
+                    net: segment.net.clone(),
+                    is_active: segment.is_active,
+                });
+            }
+            for via in &net.vias {
+                routing.vias.push(Via {
+                    position: via.position,
+                    from_layer: 0,
+                    to_layer: 1,
+                    net: via.net.clone(),
+                });
+            }
+        }
+        let trace_width_mm = config.trace_width_mm;
+        let geometry = CadGeometry {
+            routing,
+            // This prototype has no configurable board stack yet; use the
+            // conventional 1.6 mm two-layer substrate for 3D coordinates.
+            layer_z_mm: vec![-0.8, 0.8],
+            trace_width_mm,
+        };
+        let dxf_content = cad_geometry_to_3d_dxf(&geometry)?;
+        let total_lines = dxf_content.matches("0\nLINE\n").count() as u32;
+        let total_arcs = dxf_content.matches("0\nARC\n").count() as u32;
+        let total_circles = dxf_content.matches("0\nCIRCLE\n").count() as u32;
+        let layer_count = dxf_content.match_indices("LAYER\n  2\n").count() as u32;
+        Ok(DxfExportResult {
+            dxf_content,
+            summary: DxfExportSummary {
+                total_lines,
+                total_arcs,
+                total_circles,
+                layer_count,
+            },
+        })
+    })
+    .await
+    .map_err(|e| format!("export_sensor_dxf worker failed: {e}"))?
 }
 
 /// Import planar copper traces and vertical inter-layer via centerlines from DXF.

@@ -38,3 +38,4 @@ export * from "./kicad";
 export * from "./physics";
 export * from "./project";
 export * from "./routing";
+export * from "./sensor";

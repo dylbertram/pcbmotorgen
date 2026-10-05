@@ -3,12 +3,12 @@
 
 use crate::ipc::*;
 
-use pcbmotorgen_export::{
-    BoardHandle, DocumentSpecifier, DocumentType, KiCadClient,
-};
+use pcbmotorgen_dfm::DesignRules;
 use pcbmotorgen_export::proto::common::commands::{
     GetOpenDocuments, GetOpenDocumentsResponse, GetVersion, GetVersionResponse,
 };
+use pcbmotorgen_export::{BoardHandle, DocumentSpecifier, DocumentType, KiCadClient};
+use pcbmotorgen_routing::{generate_sensor, SensorConfig};
 
 // ===========================================================================
 // KiCad IPC commands (Phase 7)
@@ -65,17 +65,14 @@ const GET_OPEN_DOCUMENTS_TYPE_URL: &str =
     "type.googleapis.com/kiapi.common.commands.GetOpenDocuments";
 
 /// Type URL for the `GetVersion` command.
-const GET_VERSION_TYPE_URL: &str =
-    "type.googleapis.com/kiapi.common.commands.GetVersion";
+const GET_VERSION_TYPE_URL: &str = "type.googleapis.com/kiapi.common.commands.GetVersion";
 
 /// Query the first open PCB document from KiCad.
 ///
 /// Sends a `GetOpenDocuments` command with `DOCTYPE_PCB` and returns the
 /// first `DocumentSpecifier` from the response, or an error if no board is
 /// open.
-fn get_open_pcb_document(
-    client: &mut KiCadClient,
-) -> Result<DocumentSpecifier, String> {
+fn get_open_pcb_document(client: &mut KiCadClient) -> Result<DocumentSpecifier, String> {
     let cmd = GetOpenDocuments {
         r#type: DocumentType::DoctypePcb as i32,
     };
@@ -204,6 +201,56 @@ pub async fn write_coils_to_board(
     .map_err(|e| format!("write_coils_to_board worker failed: {e}"))?
 }
 
+/// Generate and write sensor copper to an open two-layer KiCad board.
+/// The dry-run form validates the board and returns a track/via item count
+/// without committing anything. Sensor terminal coordinates never become pads.
+#[tauri::command]
+pub async fn write_sensor_to_board(
+    config: SensorConfig,
+    dry_run: bool,
+) -> Result<KicadWriteResult, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let geometry = generate_sensor(&config)?;
+        let rules = DesignRules {
+            min_trace_mm: config.trace_width_mm,
+            min_space_mm: config.min_clearance_mm,
+            min_via_drill_mm: 0.2,
+            min_via_annular_ring_mm: 0.2,
+        };
+        let mut client = KiCadClient::new(None, None, 5000);
+        client
+            .connect()
+            .map_err(|e| format!("KiCad connection failed: {e}"))?;
+        let doc = get_open_pcb_document(&mut client)
+            .map_err(|e| format!("No open PCB to write to: {e}"))?;
+        let mut board = BoardHandle::new(&mut client, doc);
+        let copper_layers = board
+            .get_copper_layer_count()
+            .map_err(|e| format!("Could not read KiCad copper layers: {e}"))?;
+        if copper_layers != 2 {
+            return Err(format!(
+                "The induction sensor requires a two-layer KiCad board; this board has {copper_layers} copper layers"
+            ));
+        }
+        let result = board
+            .write_sensor_geometry(&geometry, &rules, dry_run)
+            .map_err(|e| format!("KiCad sensor write failed: {e}"))?;
+        Ok(KicadWriteResult {
+            items_attempted: result.items_attempted,
+            items_created: result.items_created,
+            failures: result.failures,
+            failure_summary: result.failure_summary,
+            commit_id: if dry_run {
+                "(dry run - no commit)".into()
+            } else {
+                "atomic-commit".into()
+            },
+        })
+    })
+    .await
+    .map_err(|e| format!("write_sensor_to_board worker failed: {e}"))?
+}
+
 // ===========================================================================
 // Board diagnostics (Phase 7 — robust KiCad connection, WP-1.B)
 // ===========================================================================
@@ -221,8 +268,7 @@ pub async fn get_board_diagnostics() -> Result<BoardDiagnosticsIpc, String> {
         client
             .connect()
             .map_err(|e| format!("KiCad connection failed: {e}"))?;
-        let doc = get_open_pcb_document(&mut client)
-            .map_err(|e| format!("No open PCB: {e}"))?;
+        let doc = get_open_pcb_document(&mut client).map_err(|e| format!("No open PCB: {e}"))?;
         let mut board = BoardHandle::new(&mut client, doc);
         pcbmotorgen_export::get_board_diagnostics(&mut board)
             .map(|d| BoardDiagnosticsIpc::from_core(&d))
@@ -309,10 +355,9 @@ pub async fn ping_kicad() -> Result<KicadPingResult, String> {
             });
         }
 
-        let version = match client.send::<GetVersion, GetVersionResponse>(
-            GET_VERSION_TYPE_URL,
-            &GetVersion {},
-        ) {
+        let version = match client
+            .send::<GetVersion, GetVersionResponse>(GET_VERSION_TYPE_URL, &GetVersion {})
+        {
             Ok(resp) => resp
                 .version
                 .map(|v| v.full_version)
@@ -320,10 +365,7 @@ pub async fn ping_kicad() -> Result<KicadPingResult, String> {
             Err(_) => "connected".to_string(),
         };
 
-        Ok(KicadPingResult {
-            ok: true,
-            version,
-        })
+        Ok(KicadPingResult { ok: true, version })
     })
     .await
     .map_err(|e| format!("ping_kicad worker failed: {e}"))?
