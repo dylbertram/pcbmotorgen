@@ -4,7 +4,7 @@
 
 import { invoke } from "@tauri-apps/api/core";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
-import type { LinearMotorConfig, DxfExportResult } from "../types";
+import type { CadGeometry, CadImportResult, LinearMotorConfig, DxfExportResult } from "../types";
 import { isTauriAvailable } from "./core";
 import { mockDxfExportResult } from "./mocks";
 
@@ -40,4 +40,35 @@ export async function exportCoilsDxf(
 ): Promise<DxfExportResult> {
   if (!isTauriAvailable()) return mockDxfExportResult(config);
   return await invoke<DxfExportResult>("export_coils_dxf", { config });
+}
+
+const CAD_FILE_FILTERS = [{ name: "CAD DXF (*.dxf)", extensions: ["dxf"] }];
+
+export async function pickCadDxfPath(): Promise<string | null> {
+  if (!isTauriAvailable()) throw new Error("CAD import requires the desktop app");
+  return await openDialog({ multiple: false, filters: CAD_FILE_FILTERS });
+}
+
+export async function importCadDxf(
+  path: string,
+  unitsToMm: number,
+  zToleranceMm: number,
+  defaultTraceWidthMm: number,
+  legacyLayerCount: number,
+  legacyPcbThicknessMm: number,
+): Promise<CadImportResult> {
+  if (!isTauriAvailable()) throw new Error("CAD import requires the desktop app");
+  return await invoke<CadImportResult>("import_cad_dxf", {
+    path,
+    unitsToMm,
+    zToleranceMm,
+    defaultTraceWidthMm,
+    legacyLayerCount,
+    legacyPcbThicknessMm,
+  });
+}
+
+export async function exportCadGeometryDxf(geometry: CadGeometry): Promise<DxfExportResult> {
+  if (!isTauriAvailable()) throw new Error("CAD export requires the desktop app");
+  return await invoke<DxfExportResult>("export_cad_geometry_dxf", { geometry });
 }

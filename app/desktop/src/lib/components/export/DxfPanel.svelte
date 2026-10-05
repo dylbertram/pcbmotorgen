@@ -1,11 +1,12 @@
 <script lang="ts">
-  import { exportCoilsDxf } from "../../ipc";
+  import { exportCadGeometryDxf, exportCoilsDxf } from "../../ipc";
   import { saveTextToFile } from "../../files";
   import { pluralize } from "../../format";
   import type { ConfigStore } from "../../stores/config.svelte";
+  import type { ProjectStore } from "../../stores/project.svelte";
   import type { DxfExportResult } from "../../types";
 
-  let { config }: { config: ConfigStore } = $props();
+  let { config, projects }: { config: ConfigStore; projects: ProjectStore } = $props();
 
   // --- State -------------------------------------------------------------
   let generating = $state(false);
@@ -34,7 +35,9 @@
     result = null;
     savedTo = null;
     try {
-      result = await exportCoilsDxf(config.toIpc());
+      result = projects.cadGeometry
+        ? await exportCadGeometryDxf(projects.cadGeometry)
+        : await exportCoilsDxf(config.toIpc());
     } catch (e) {
       result = null;
       error = e instanceof Error ? e.message : String(e);
@@ -82,7 +85,7 @@
       </div>
     {:else}
       <div class="text-xs text-slate-500 text-right flex-shrink-0">
-        Export coil geometry as DXF R12 for CAD/CAM.
+        {projects.cadGeometry ? "Export the active imported geometry as 3D DXF." : "Export generated trace geometry as 3D DXF."}
       </div>
     {/if}
   </div>
@@ -95,7 +98,7 @@
       disabled={generating}
       class="rounded-md border border-sky-500/50 bg-sky-600/30 px-3 py-1.5 text-xs font-medium text-sky-100 transition hover:bg-sky-500/40 disabled:cursor-not-allowed disabled:opacity-40"
     >
-      {generating ? "Generating…" : "Generate DXF"}
+      {generating ? "Preparing…" : "Prepare 3D DXF"}
     </button>
 
     {#if result}
@@ -117,7 +120,7 @@
       role="status"
       aria-live="polite"
     >
-      Generating DXF from the current coil config…
+      Preparing a DXF from the active geometry…
     </div>
   {/if}
 

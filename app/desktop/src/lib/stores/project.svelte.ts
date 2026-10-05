@@ -16,6 +16,7 @@
  */
 
 import type {
+  CadGeometry,
   LoadProjectResult,
   ProjectState,
   ProjectValidation,
@@ -59,6 +60,8 @@ export class ProjectStore {
    * first baseline — a fresh untitled design is not "dirty".
    */
   savedSnapshot = $state<string | null>(null);
+  /** Imported CAD geometry is authoritative until the user explicitly replaces it. */
+  cadGeometry = $state.raw<CadGeometry | null>(null);
 
   constructor(
     private config: ConfigStore,
@@ -141,6 +144,7 @@ export class ProjectStore {
         max_temperature_rise_c: this.config.max_temperature_rise_c,
       },
       mover_position_mm: this.motion.positionMm,
+      cad_geometry: this.cadGeometry,
     };
   }
 
@@ -191,6 +195,11 @@ export class ProjectStore {
     this.config.drive_frequency_hz = c.drive_frequency_hz;
     this.config.max_temperature_rise_c = c.max_temperature_rise_c;
     this.motion.positionMm = state.mover_position_mm;
+    this.cadGeometry = state.cad_geometry ?? null;
+  }
+
+  setCadGeometry(geometry: CadGeometry | null): void {
+    this.cadGeometry = geometry;
   }
 
   /** Re-baseline the dirty tracker at the current state. */

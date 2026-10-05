@@ -4,6 +4,7 @@ import { MotionStore } from "./motion.svelte";
 import { ProjectStore } from "./project.svelte";
 import { RecentFilesStore } from "./recentFiles.svelte";
 import type { ProjectState } from "../types";
+import type { CadGeometry } from "../types";
 import type { LoadProjectResult } from "../types";
 import { loadProject } from "../ipc";
 
@@ -135,6 +136,22 @@ describe("ProjectStore dirty tracking", () => {
     projects.markClean();
     motion.positionMm = 10;
     expect(projects.isDirty).toBe(true);
+  });
+
+  it("tracks imported geometry and preserves it across a project snapshot", () => {
+    const { projects } = makeStores();
+    projects.markClean();
+    const geometry: CadGeometry = {
+      routing: { format_version: 2, segments: [], curves: [], vias: [] },
+      layer_z_mm: [-0.8, 0.8],
+      trace_width_mm: 0.2,
+    };
+    projects.setCadGeometry(geometry);
+    expect(projects.isDirty).toBe(true);
+    const target = makeStores().projects;
+    target.applyToState(projects.snapshotIpc());
+    expect(target.cadGeometry).toEqual(geometry);
+    expect(target.snapshotIpc().cad_geometry).toEqual(geometry);
   });
 
   it("reports the file name and untitled label", () => {

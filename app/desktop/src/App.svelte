@@ -26,6 +26,7 @@ import {
   import { ProjectStore } from "./lib/stores/project.svelte";
   import { recentFiles } from "./lib/stores/recentFiles.svelte";
   import { measureTrace } from "./lib/previewGeometry";
+  import { cadGeometryToPreview } from "./lib/cadPreview";
 
   import TabNav from "./lib/components/layout/TabNav.svelte";
   import TitleBar from "./lib/components/layout/TitleBar.svelte";
@@ -57,7 +58,6 @@ import {
    * the configured routing domain — every preview and readout consumes THIS,
    * never the configured numbers. Null until the first payload arrives.
    */
-  let measuredTrace = $derived.by(() => measureTrace(coils, config));
   let friction = $state<FrictionBudgetDto | null>(null);
   let power = $state<PowerBudgetDto | null>(null);
   let height = $state<HeightStackResultDto | null>(null);
@@ -76,6 +76,8 @@ import {
   // backend behind save_project/load_project; this store is the interface
   // half (DTO mapping + dirty tracking + dialog flows).
   const projects = new ProjectStore(config, motion, recentFiles);
+  let activeCoils = $derived(projects.cadGeometry ? cadGeometryToPreview(projects.cadGeometry) : coils);
+  let measuredTrace = $derived.by(() => measureTrace(activeCoils, config));
 
   // Open Recent (kata eap8): lazily load the persisted list and build the
   // native submenu from disk truth (the load prunes vanished entries).
@@ -457,11 +459,11 @@ import {
             <!-- Traces view lives here in the Design tab so layout and geometry can
                  be inspected side by side; the Simulation tab keeps its own copy. -->
             <div class="mt-3 space-y-3">
-              <CoilPreview {config} {coils} {motion} />
+              <CoilPreview {config} coils={activeCoils} {motion} />
               <DesignDimensions
                 {config}
                 measuredTraceLengthMm={measuredTrace?.traceLengthMm ?? null}
-                routingDimensions={coils?.routing_dimensions ?? null}
+                routingDimensions={activeCoils?.routing_dimensions ?? null}
               />
             </div>
           </ScrollArea>
@@ -479,7 +481,7 @@ import {
             id="panel-design"
             class="h-full p-4 lg:pr-0"
           >
-            <DesignTab {config} />
+             <DesignTab {config} {projects} />
           </Tabs.Content>
 
           <Tabs.Content
@@ -494,8 +496,9 @@ import {
               {friction}
               {power}
               {height}
-              {stackup}
-              {error}
+               {stackup}
+               {error}
+               cadGeometryActive={projects.cadGeometry !== null}
             />
           </Tabs.Content>
 
@@ -506,6 +509,7 @@ import {
           >
             <ExportTab
               {config}
+              {projects}
               drcViolations={drc.violations}
               drcLoading={drc.loading}
               drcError={drc.error}

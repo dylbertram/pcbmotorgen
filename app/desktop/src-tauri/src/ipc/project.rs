@@ -61,8 +61,9 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::Path;
 
-use super::enums::CommutationModeIpc;
 use super::config::LinearMotorConfigIpc;
+use super::enums::CommutationModeIpc;
+use pcbmotorgen_export::cad_dxf::CadGeometry;
 
 /// Current project-file format version. Bump on breaking changes and add
 /// a migration step (see the module docs).
@@ -113,6 +114,10 @@ pub struct ProjectStateIpc {
     /// Mover-centre position the user left the design at (mm, absolute
     /// track coordinates — same frame as `MotionStore.positionMm`).
     pub mover_position_mm: f64,
+    /// Imported/user-owned CAD geometry. Missing fields in v1 artifacts mean
+    /// the project remains config-generated, preserving backward compatibility.
+    #[serde(default)]
+    pub cad_geometry: Option<CadGeometry>,
 }
 
 impl Default for ProjectStateIpc {
@@ -120,6 +125,7 @@ impl Default for ProjectStateIpc {
         Self {
             config: ProjectConfigStateIpc::default(),
             mover_position_mm: 60.0,
+            cad_geometry: None,
         }
     }
 }
@@ -379,11 +385,7 @@ fn migrate_value(value: serde_json::Value, from: u32) -> Result<serde_json::Valu
             // 1 → current: identity while v1 is current. When v2 lands,
             // transform the v1 payload here (e.g. rename/move fields).
             1 => value,
-            other => {
-                return Err(format!(
-                    "no migration path from project format v{other}"
-                ))
-            }
+            other => return Err(format!("no migration path from project format v{other}")),
         };
         v += 1;
     }
@@ -467,6 +469,20 @@ mod tests {
         ProjectStateIpc {
             config,
             mover_position_mm: 42.5,
+            cad_geometry: Some(CadGeometry {
+                routing: pcbmotorgen_routing::RoutingResult {
+                    segments: vec![pcbmotorgen_routing::RouteSegment {
+                        start: pcbmotorgen_routing::Point::new(1.0, 2.0),
+                        end: pcbmotorgen_routing::Point::new(3.0, 2.0),
+                        layer: 0,
+                        net: "A".into(),
+                        is_active: true,
+                    }],
+                    ..Default::default()
+                },
+                layer_z_mm: vec![-0.8, 0.8],
+                trace_width_mm: 0.2,
+            }),
         }
     }
 
@@ -497,6 +513,10 @@ mod tests {
         // Untouched defaults survive the round trip too.
         assert_eq!(c.electrical_pitch_mm, 12.0);
         assert_eq!(c.capacitor_bank_uf, 1000.0);
+        let geometry = loaded.cad_geometry.expect("saved CAD geometry");
+        assert_eq!(geometry.layer_z_mm, vec![-0.8, 0.8]);
+        assert_eq!(geometry.trace_width_mm, 0.2);
+        assert_eq!(geometry.routing.segments[0].net, "A");
     }
 
     #[test]
@@ -558,6 +578,7 @@ mod tests {
         assert_eq!(state.config.routing_pattern, "infinity-braid");
         assert_eq!(state.config.capacitor_bank_uf, 1000.0);
         assert!(state.config.routing_params.is_empty());
+        assert!(state.cad_geometry.is_none());
     }
 
     #[test]
@@ -616,7 +637,13 @@ mod tests {
         write_project_atomic(&path, &json2).expect("overwrite");
         let read2 = std::fs::read_to_string(&path).expect("read back");
         assert_eq!(read2, json2);
-        assert!(parse_project_file(&read2).expect("parse").0.mover_position_mm == 77.0);
+        assert!(
+            parse_project_file(&read2)
+                .expect("parse")
+                .0
+                .mover_position_mm
+                == 77.0
+        );
 
         // No orphaned temp files.
         let leftovers: Vec<_> = std::fs::read_dir(&dir)

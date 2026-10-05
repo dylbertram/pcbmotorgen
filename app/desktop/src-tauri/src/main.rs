@@ -65,6 +65,8 @@ fn main() {
             commands::kicad::validate_write_preconditions,
             commands::kicad::preview_coils,
             commands::dxf::export_coils_dxf,
+            commands::dxf::import_cad_dxf,
+            commands::dxf::export_cad_geometry_dxf,
             commands::project::save_project,
             commands::project::load_project,
             commands::project::set_recent_files,
