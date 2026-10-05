@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { importCadDxf, loadProject, pickCadDxfPath } from "../../ipc";
+  import { loadProject } from "../../ipc";
   import type { ConfigStore } from "../../stores/config.svelte";
   import type { ProjectStore } from "../../stores/project.svelte";
   import type { RecentFilesStore } from "../../stores/recentFiles.svelte";
@@ -17,15 +17,17 @@
     recentFiles,
     recentLoading,
     onComplete,
+    onImportCad,
   }: {
     config: ConfigStore;
     projects: ProjectStore;
     recentFiles: RecentFilesStore;
     recentLoading: boolean;
     onComplete: () => void;
+    onImportCad: () => void;
   } = $props();
 
-  type Screen = "home" | "new" | "import";
+  type Screen = "home" | "new";
 
   let screen = $state<Screen>("home");
   let selectedPath = $state<string | null>(null);
@@ -58,7 +60,6 @@
 
   let detailTitle = $derived.by(() => {
     if (screen === "new") return "New design";
-    if (screen === "import") return "Import CAD";
     return selectedPath ? baseName(selectedPath) : "Welcome";
   });
 
@@ -71,12 +72,6 @@
     selectedPattern = config.routing_pattern;
     selectedLayers = config.num_layers;
     screen = "new";
-  }
-
-  function startImport(): void {
-    actionError = null;
-    selectedLayers = config.num_layers;
-    screen = "import";
   }
 
   function goHome(): void {
@@ -164,33 +159,6 @@
     }
   }
 
-  async function importCad(): Promise<void> {
-    if (busy) return;
-    busy = true;
-    actionError = null;
-    try {
-      const path = await pickCadDxfPath();
-      if (!path) return;
-      const imported = await importCadDxf(
-        path,
-        1,
-        0.05,
-        config.min_trace_mm,
-        selectedLayers,
-        config.pcb_thickness_mm,
-      );
-      config.num_layers = selectedLayers;
-      projects.setCadGeometry(imported.geometry);
-      if (imported.warnings.length > 0) {
-        projects.notice = `Imported ${baseName(path)} with ${imported.warnings.length} warning(s). Review the CAD import diagnostics in Design.`;
-      }
-      onComplete();
-    } catch (e) {
-      actionError = e instanceof Error ? e.message : String(e);
-    } finally {
-      busy = false;
-    }
-  }
 </script>
 
 <div
@@ -246,7 +214,7 @@
         <button type="button" onclick={startNewDesign} disabled={busy} class="flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-xs text-slate-300 hover:bg-slate-800 hover:text-slate-100 disabled:opacity-50">
           <span>New design</span><span aria-hidden="true" class="text-slate-500">＋</span>
         </button>
-        <button type="button" onclick={startImport} disabled={busy} class="flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-xs text-slate-300 hover:bg-slate-800 hover:text-slate-100 disabled:opacity-50">
+        <button type="button" onclick={onImportCad} disabled={busy} class="flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-xs text-slate-300 hover:bg-slate-800 hover:text-slate-100 disabled:opacity-50">
           <span>Import CAD</span><span aria-hidden="true" class="text-slate-500">↗</span>
         </button>
       </div>
@@ -259,8 +227,6 @@
         <p class="mt-1 text-xs text-slate-400">
           {#if screen === "new"}
             Configure the board stack and generated routing pattern.
-          {:else if screen === "import"}
-            Select a CAD file to use as the active trace geometry.
           {:else if selectedPath}
             Project overview. Double-click its row or choose Open to continue.
           {:else}
@@ -290,17 +256,6 @@
           <div class="mt-5 rounded-md border border-slate-700 bg-slate-950/50 p-4">
             <h3 class="text-sm font-medium text-slate-100">Generated design</h3>
             <p class="mt-1 text-xs leading-relaxed text-slate-400">Trace geometry will be created by the selected routing pattern.</p>
-          </div>
-        {:else if screen === "import"}
-          <div class="rounded-md border border-slate-700 bg-slate-950/50 p-4">
-            <h3 class="text-sm font-medium text-slate-100">CAD geometry</h3>
-            <p class="mt-1 text-xs leading-relaxed text-slate-400">Choose a DXF file. Copper layers are detected from Z heights; the layer count below is used for legacy 2D files.</p>
-            <label class="mt-4 block max-w-xs text-xs font-medium text-slate-300" for="import-layer-count">
-              Fallback copper layers
-              <select id="import-layer-count" value={String(selectedLayers)} onchange={(event) => (selectedLayers = Number(event.currentTarget.value))} class="mt-1.5 w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100">
-                {#each config.layerOptions as layer (layer)}<option value={layer}>{layer} layers</option>{/each}
-              </select>
-            </label>
           </div>
         {:else if selectedPath && summaryLoading}
           <p class="rounded-md border border-slate-700 bg-slate-950/50 px-4 py-5 text-sm text-slate-400">Loading project overview…</p>
@@ -346,8 +301,6 @@
         {/if}
         {#if screen === "new"}
           <button type="button" onclick={createDesign} disabled={busy || layerChoices.length === 0} class="rounded-md border border-emerald-500/50 bg-emerald-600/30 px-4 py-2 text-xs font-medium text-emerald-100 hover:bg-emerald-500/40 disabled:opacity-50">{busy ? "Setting up…" : "Create design"}</button>
-        {:else if screen === "import"}
-          <button type="button" onclick={importCad} disabled={busy} class="rounded-md border border-sky-500/50 bg-sky-600/30 px-4 py-2 text-xs font-medium text-sky-100 hover:bg-sky-500/40 disabled:opacity-50">{busy ? "Importing…" : "Import DXF…"}</button>
         {:else if selectedPath}
           <button type="button" onclick={openSelectedRecent} disabled={busy || summaryLoading || !selectedProject} class="rounded-md border border-emerald-500/50 bg-emerald-600/30 px-4 py-2 text-xs font-medium text-emerald-100 hover:bg-emerald-500/40 disabled:opacity-50">{busy ? "Opening…" : "Open"}</button>
         {/if}

@@ -30,7 +30,11 @@ fn main() {
             let id = event.id().as_ref();
             if matches!(
                 id,
-                menu::OPEN_ID | menu::SAVE_ID | menu::SAVE_AS_ID | menu::CLEAR_RECENT_ID
+                menu::OPEN_ID
+                    | menu::SAVE_ID
+                    | menu::SAVE_AS_ID
+                    | menu::CLEAR_RECENT_ID
+                    | menu::IMPORT_CAD_ID
             ) {
                 // File-menu project actions run in the webview flows
                 // (ProjectStore); forward the item ids as events — ids equal

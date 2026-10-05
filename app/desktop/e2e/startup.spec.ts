@@ -27,13 +27,23 @@ test.describe("startup chooser and new-design setup", () => {
     await expect(page.locator("#num-layers")).toContainText("6");
   });
 
-  test("Import CAD opens a single dedicated import setup", async ({ page }) => {
+  test("Import CAD uses a modal and the Design page has no inline import controls", async ({ page }) => {
     await page.goto("/");
     const startup = page.getByRole("dialog", { name: "Recent projects" });
     await startup.getByRole("button", { name: "Import CAD" }).click();
-    await expect(startup.getByRole("heading", { name: "Import CAD" })).toBeVisible();
-    await expect(page.locator("#import-layer-count")).toBeVisible();
-    await expect(startup.getByRole("button", { name: "Import DXF…" })).toBeVisible();
-    await expect(startup.getByText(/centerlines/i)).toHaveCount(0);
+    const importDialog = page.getByRole("dialog", { name: "Import CAD" });
+    await expect(importDialog).toBeVisible();
+    await expect(importDialog.getByLabel("DXF units")).toBeVisible();
+    await expect(importDialog.getByLabel("Z tolerance (mm)")).toBeVisible();
+    await expect(importDialog.getByLabel("Default trace width (mm)")).toBeVisible();
+    await expect(importDialog.locator("#cad-retry-layer-count")).toHaveCount(0);
+    await expect(importDialog.getByRole("button", { name: "Choose DXF…" })).toBeVisible();
+
+    await importDialog.getByRole("button", { name: "Cancel" }).click();
+    await startup.getByRole("button", { name: "New design" }).click();
+    await startup.getByRole("button", { name: "Create design" }).click();
+    await expect(startup).toBeHidden();
+    await expect(page.getByRole("button", { name: /Import DXF/i })).toHaveCount(0);
+    await expect(page.getByLabel("DXF units")).toHaveCount(0);
   });
 });

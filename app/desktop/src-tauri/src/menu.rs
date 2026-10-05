@@ -1,5 +1,5 @@
 //! Native application menu (kata 0cgm, eap8) — the File dropdown carries
-//! the project actions (Open / Save / Save As) plus an "Open Recent"
+//! the project actions (Open / Save / Save As / Import CAD) plus an "Open Recent"
 //! submenu; the top-bar buttons are gone.
 //!
 //! Rust owns the menu bar. Each project item's id equals the Tauri event
@@ -28,6 +28,8 @@ pub const OPEN_ID: &str = "menu:open-project";
 pub const SAVE_ID: &str = "menu:save-project";
 /// Menu item id == webview event name for Save As.
 pub const SAVE_AS_ID: &str = "menu:save-project-as";
+/// Menu item id == webview event name for importing CAD geometry.
+pub const IMPORT_CAD_ID: &str = "menu:import-cad";
 
 /// Submenu id of the "Open Recent" container inside the File menu. Purely
 /// internal — the container itself never fires an event.
@@ -101,6 +103,8 @@ fn file_submenu(app: &tauri::AppHandle) -> tauri::Result<Submenu<Wry>> {
     let save = MenuItem::with_id(app, SAVE_ID, "Save", true, Some("CmdOrCtrl+S"))?;
     let save_as = MenuItem::with_id(app, SAVE_AS_ID, "Save As…", true, Some("CmdOrCtrl+Shift+S"))?;
     let sep = PredefinedMenuItem::separator(app)?;
+    let import_cad = MenuItem::with_id(app, IMPORT_CAD_ID, "Import CAD…", true, None::<&str>)?;
+    let sep_after_recent = PredefinedMenuItem::separator(app)?;
 
     // Placeholder until the first `set_recent_files` push — a disabled
     // item so the submenu shape is stable across rebuilds.
@@ -113,7 +117,15 @@ fn file_submenu(app: &tauri::AppHandle) -> tauri::Result<Submenu<Wry>> {
         "file",
         "File",
         true,
-        &[&open, &save, &save_as, &sep, &recent],
+        &[
+            &open,
+            &save,
+            &save_as,
+            &sep,
+            &recent,
+            &sep_after_recent,
+            &import_cad,
+        ],
     )
 }
 

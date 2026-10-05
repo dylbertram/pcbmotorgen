@@ -5,8 +5,8 @@
 </script>
 
 <!--
-  Project file affordance (kata 0cgm): the active project name plus the
-  dirty-state indicator. Open / Save / Save As live in the native File
+  Project file affordance: the active project name plus the dirty-state
+  indicator. Open / Save / Save As / Import CAD live in the native File
   menu (src-tauri/src/menu.rs → bindProjectMenuActions in App.svelte);
   the store owns the flows.
 -->

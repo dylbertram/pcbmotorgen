@@ -39,11 +39,13 @@ import {
   import SimulateTab from "./lib/components/layout/SimulateTab.svelte";
   import ExportTab from "./lib/components/layout/ExportTab.svelte";
   import StartupScreen from "./lib/components/layout/StartupScreen.svelte";
+  import CadImportDialog from "./lib/components/layout/CadImportDialog.svelte";
 
   // Session-only navigation state; none of these values enter IPC.
   let activeTab = $state<TabId>("design");
   let startupOpen = $state(true);
   let startupRecentLoading = $state(true);
+  let cadImportDialogOpen = $state(false);
 
   // App init: populate the routing-pattern selector + magnet-grade reference
   // from the backend. Fire-and-forget — failures are swallowed inside the
@@ -91,7 +93,7 @@ import {
     .catch(() => undefined)
     .finally(() => (startupRecentLoading = false));
 
-  // Native File menu (Open / Save / Save As, kata 0cgm; Open Recent +
+  // Native File menu (Open / Save / Save As / Import CAD, kata 0cgm; Open Recent +
   // Clear Recent Files, kata eap8): menu clicks land here as Tauri events
   // and dispatch into the same store flows. The store's busy guard
   // serializes overlapping menu events.
@@ -100,6 +102,7 @@ import {
       open: () => void projects.open(),
       save: () => void projects.save(false),
       saveAs: () => void projects.save(true),
+      importCad: () => (cadImportDialogOpen = true),
       openRecent: (path) => {
         // Open-recent access point: refresh menu truth (the entry is pruned
         // when its file vanished) before dispatching into the shared open
@@ -493,7 +496,7 @@ import {
             id="panel-design"
             class="h-full p-4 lg:pr-0"
           >
-             <DesignTab {config} {projects} />
+             <DesignTab {config} />
           </Tabs.Content>
 
           <Tabs.Content
@@ -540,6 +543,19 @@ import {
           {recentFiles}
           recentLoading={startupRecentLoading}
           onComplete={() => (startupOpen = false)}
+          onImportCad={() => (cadImportDialogOpen = true)}
+        />
+      {/if}
+
+      {#if cadImportDialogOpen}
+        <CadImportDialog
+          {config}
+          {projects}
+          onClose={() => (cadImportDialogOpen = false)}
+          onComplete={() => {
+            cadImportDialogOpen = false;
+            startupOpen = false;
+          }}
         />
       {/if}
 
