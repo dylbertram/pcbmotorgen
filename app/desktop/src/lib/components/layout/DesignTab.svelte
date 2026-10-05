@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { ConfigStore } from "../../stores/config.svelte";
+  import type { CadGeometry } from "../../types";
   import TopologySelector from "../design/TopologySelector.svelte";
   import TracesBoardPanel from "../design/parameters/TracesBoardPanel.svelte";
   import MagnetsPanel from "../design/parameters/MagnetsPanel.svelte";
@@ -9,7 +10,13 @@
   import ScrollArea from "../ui/ScrollArea.svelte";
   import electricalPitchSvg from "../../assets/electrical-pitch.svg";
 
-  let { config }: { config: ConfigStore } = $props();
+  let {
+    config,
+    cadGeometry = null,
+  }: {
+    config: ConfigStore;
+    cadGeometry?: CadGeometry | null;
+  } = $props();
 </script>
 
 <ScrollArea
@@ -144,8 +151,47 @@
         Topology &amp; Board
       </h2>
       <div class="space-y-3">
-        <TopologySelector {config} />
-        <TracesBoardPanel {config} />
+        {#if cadGeometry}
+          <div
+            class="rounded-md border border-sky-500/30 bg-sky-500/5 px-3 py-3"
+            role="group"
+            aria-label="Imported CAD pattern"
+          >
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                  Routing pattern
+                </p>
+                <p class="mt-0.5 text-sm font-medium text-sky-200">Imported CAD pattern</p>
+              </div>
+              <span class="rounded-full border border-sky-400/30 bg-sky-400/10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-sky-200">
+                Imported
+              </span>
+            </div>
+            <p class="mt-2 text-[11px] leading-relaxed text-slate-400">
+              The DXF geometry is active. Generator topology and winding settings are hidden because they do not describe the imported traces. To return to a generated pattern, choose File → Import CAD → Use generated geometry.
+            </p>
+            <dl class="mt-3 grid grid-cols-3 gap-2 border-t border-slate-700/70 pt-2">
+              <div>
+                <dt class="text-[10px] text-slate-500">Copper layers</dt>
+                <dd class="font-mono text-xs text-slate-200">{cadGeometry.layer_z_mm.length}</dd>
+              </div>
+              <div>
+                <dt class="text-[10px] text-slate-500">Trace elements</dt>
+                <dd class="font-mono text-xs text-slate-200">
+                  {cadGeometry.routing.segments.length + cadGeometry.routing.curves.length}
+                </dd>
+              </div>
+              <div>
+                <dt class="text-[10px] text-slate-500">Vias</dt>
+                <dd class="font-mono text-xs text-slate-200">{cadGeometry.routing.vias.length}</dd>
+              </div>
+            </dl>
+          </div>
+        {:else}
+          <TopologySelector {config} />
+          <TracesBoardPanel {config} />
+        {/if}
       </div>
     </section>
 

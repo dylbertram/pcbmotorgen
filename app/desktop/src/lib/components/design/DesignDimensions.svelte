@@ -17,6 +17,7 @@
     config,
     measuredTraceLengthMm = null,
     routingDimensions = null,
+    cadGeometryActive = false,
   }: {
     config: ConfigStore;
     /** Trace X-span MEASURED from the returned coil payload (mm); falls back
@@ -27,6 +28,8 @@
      *  inside are additionally pattern-dependent and stay null when the
      *  pattern declares no leg grid. */
     routingDimensions?: RoutingDimensionsDto | null;
+    /** True when the displayed trace geometry came from a DXF import. */
+    cadGeometryActive?: boolean;
   } = $props();
 
   // Vernier phase-band pitch / rest-offset formulas live in lib/geometry.
@@ -180,10 +183,16 @@
     </div>
     <div class="min-w-0">
       <dt class="flex min-w-0 items-center gap-0.5 text-[10px] text-slate-500">
-        <span class="truncate">Routing</span>
-        <HelpTag tip="Active routing pattern id. Switch or add generators in the Design tab's routing-pattern selector." />
+        <span class="truncate">{cadGeometryActive ? "Routing pattern" : "Routing"}</span>
+        <HelpTag
+          tip={cadGeometryActive
+            ? "Active trace geometry was imported from a DXF; no generated routing pattern is active."
+            : "Active routing pattern id. Switch or add generators in the Design tab's routing-pattern selector."}
+        />
       </dt>
-      <dd class="truncate font-mono text-xs text-sky-200">{config.routing_pattern}</dd>
+      <dd class="truncate font-mono text-xs text-sky-200">
+        {cadGeometryActive ? "Imported CAD pattern" : config.routing_pattern}
+      </dd>
     </div>
     <div class="min-w-0">
       <dt class="truncate text-[10px] text-slate-500">Layers</dt>

@@ -479,6 +479,7 @@ import {
                 {config}
                 measuredTraceLengthMm={measuredTrace?.traceLengthMm ?? null}
                 routingDimensions={activeCoils?.routing_dimensions ?? null}
+                cadGeometryActive={projects.cadGeometry !== null}
               />
             </div>
           </ScrollArea>
@@ -496,7 +497,7 @@ import {
             id="panel-design"
             class="h-full p-4 lg:pr-0"
           >
-             <DesignTab {config} />
+              <DesignTab {config} cadGeometry={projects.cadGeometry} />
           </Tabs.Content>
 
           <Tabs.Content
