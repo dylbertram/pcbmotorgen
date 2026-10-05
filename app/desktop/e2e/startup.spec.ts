@@ -1,28 +1,25 @@
 import { expect, test } from "@playwright/test";
 
 test.describe("startup chooser and new-design setup", () => {
-  test("offers import, recent, and new design flows", async ({ page }) => {
+  test("immediately shows recents and keeps Open project available when the list is empty", async ({ page }) => {
     await page.goto("/");
-    const dialog = page.getByRole("dialog", { name: "Start a design" });
+    const dialog = page.getByRole("dialog", { name: "Recent projects" });
     await expect(dialog).toBeVisible();
+    await expect(dialog.getByText("No recent projects yet.")).toBeVisible();
+    await expect(dialog.getByRole("button", { name: "Open project…" })).toBeEnabled();
+    await expect(dialog.getByRole("button", { name: "New design" })).toBeVisible();
     await expect(dialog.getByRole("button", { name: "Import CAD" })).toBeVisible();
-    await expect(dialog.getByRole("button", { name: "Load Recent" })).toBeVisible();
-    await expect(dialog.getByRole("button", { name: "New Design" })).toBeVisible();
-
-    await dialog.getByRole("button", { name: "Load Recent" }).click();
-    await expect(page.getByRole("dialog", { name: "Open a recent design" })).toBeVisible();
-    await expect(page.getByText("No recent project files yet.")).toBeVisible();
   });
 
-  test("sets millimetres, layer count, and generated pattern before entering the app", async ({ page }) => {
+  test("sets layer count and generated pattern before entering the app", async ({ page }) => {
     await page.goto("/");
     const startup = page.getByRole("dialog");
-    await startup.getByRole("button", { name: "New Design" }).click();
+    await startup.getByRole("button", { name: "New design" }).click();
 
     await expect(startup).toHaveAttribute("aria-labelledby", "startup-title");
-    await expect(page.locator("#startup-units")).toHaveValue("Millimetres (mm)");
     await expect(page.locator("#startup-pattern")).toBeVisible();
-    await expect(page.locator("input[name='startup-source'][value='generated']")).toBeChecked();
+    await expect(page.locator("#startup-source")).toHaveCount(0);
+    await expect(startup.getByRole("button", { name: "Import CAD", exact: true })).toHaveCount(1);
 
     await page.locator("#startup-layers").selectOption("6");
     await startup.getByRole("button", { name: "Create design" }).click();
@@ -30,12 +27,13 @@ test.describe("startup chooser and new-design setup", () => {
     await expect(page.locator("#num-layers")).toContainText("6");
   });
 
-  test("import flow still collects stack settings and keeps units fixed to mm", async ({ page }) => {
+  test("Import CAD opens a single dedicated import setup", async ({ page }) => {
     await page.goto("/");
-    const startup = page.getByRole("dialog", { name: "Start a design" });
+    const startup = page.getByRole("dialog", { name: "Recent projects" });
     await startup.getByRole("button", { name: "Import CAD" }).click();
-    await expect(page.locator("#startup-units")).toHaveValue("Millimetres (mm)");
-    await expect(page.locator("input[name='startup-source'][value='import']")).toBeChecked();
-    await expect(page.getByRole("button", { name: "Choose DXF…" })).toBeVisible();
+    await expect(startup.getByRole("heading", { name: "Import CAD" })).toBeVisible();
+    await expect(page.locator("#import-layer-count")).toBeVisible();
+    await expect(startup.getByRole("button", { name: "Import DXF…" })).toBeVisible();
+    await expect(startup.getByText(/centerlines/i)).toHaveCount(0);
   });
 });
