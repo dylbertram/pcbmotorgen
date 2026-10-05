@@ -5,6 +5,14 @@
   import type { ProjectStore } from "../../stores/project.svelte";
   import type { CadImportResult } from "../../types";
   import { attachBackdropScrollGuard, lockPageScroll } from "../../utils/pageScrollLock";
+  import CoilPreviewControls from "../design/CoilPreviewControls.svelte";
+  import LayerVisibilityControls from "../design/LayerVisibilityControls.svelte";
+  import { CoilPreviewViewState } from "../design/coilPreviewViewState.svelte";
+  import {
+    formatZoom,
+    nextZoomStepDown,
+    nextZoomStepUp,
+  } from "../../utils/coilPreviewGestures.svelte";
 
   let {
     config,
@@ -27,6 +35,11 @@
   let selectedPath = $state<string | null>(null);
   let imported = $state<CadImportResult | null>(null);
   let importedOptions = $state("");
+  let previewZoom = $state(1);
+  const previewView = new CoilPreviewViewState();
+  const minZoom = 0.5;
+  const maxZoom = 10;
+  const zoomSteps = [0.5, 1, 1.5, 2, 3, 4, 6, 8, 10] as const;
   let error = $state<string | null>(null);
   let importFailed = $state(false);
   let busy = $state(false);
@@ -67,6 +80,15 @@
     const [, , width, height] = previewBox.split(" ").map(Number);
     return Math.max(geometry.trace_width_mm, Math.max(width, height) / 350);
   });
+  let zoomedPreviewBox = $derived.by(() => {
+    const [x, y, width, height] = previewBox.split(" ").map(Number);
+    const zoomedWidth = width / previewZoom;
+    const zoomedHeight = height / previewZoom;
+    return `${x + (width - zoomedWidth) / 2} ${y + (height - zoomedHeight) / 2} ${zoomedWidth} ${zoomedHeight}`;
+  });
+  let previewLayers = $derived(
+    imported?.geometry.layer_z_mm.map((_, idx) => ({ idx })) ?? [],
+  );
 
   $effect(() => {
     if (!backdropRef || !dialogRef) return;
@@ -86,6 +108,8 @@
   async function readPreview(path: string): Promise<void> {
     imported = null;
     importedOptions = "";
+    previewZoom = 1;
+    previewView.layerVisibility = {};
     error = null;
     importFailed = false;
     try {
@@ -223,21 +247,23 @@
           </div>
           <div class="overflow-hidden rounded-md border border-slate-700 bg-slate-950 p-2">
             <svg
-              viewBox={previewBox}
+              viewBox={zoomedPreviewBox}
               role="img"
               aria-label="Preview of imported CAD traces and vias"
               preserveAspectRatio="xMidYMid meet"
               class="h-56 w-full"
             >
               {#each imported.geometry.layer_z_mm as _, layer (layer)}
-                <g fill="none" stroke={['#34d399', '#38bdf8', '#c084fc', '#fbbf24', '#fb7185', '#a3e635'][layer % 6]} stroke-width={previewStrokeWidth} stroke-linecap="round" stroke-linejoin="round">
-                  {#each imported.geometry.routing.segments.filter((segment) => segment.layer === layer) as segment (segment)}
-                    <path d={`M ${segment.start.x} ${segment.start.y} L ${segment.end.x} ${segment.end.y}`} />
-                  {/each}
-                  {#each imported.geometry.routing.curves.filter((curve) => curve.layer === layer) as curve (curve)}
-                    <path d={`M ${curve.start.x} ${curve.start.y} Q ${curve.mid.x} ${curve.mid.y} ${curve.end.x} ${curve.end.y}`} />
-                  {/each}
-                </g>
+                {#if previewView.isLayerVisible(layer)}
+                  <g fill="none" stroke={['#34d399', '#38bdf8', '#c084fc', '#fbbf24', '#fb7185', '#a3e635'][layer % 6]} stroke-width={previewStrokeWidth} stroke-linecap="round" stroke-linejoin="round">
+                    {#each imported.geometry.routing.segments.filter((segment) => segment.layer === layer) as segment (segment)}
+                      <path d={`M ${segment.start.x} ${segment.start.y} L ${segment.end.x} ${segment.end.y}`} />
+                    {/each}
+                    {#each imported.geometry.routing.curves.filter((curve) => curve.layer === layer) as curve (curve)}
+                      <path d={`M ${curve.start.x} ${curve.start.y} Q ${curve.mid.x} ${curve.mid.y} ${curve.end.x} ${curve.end.y}`} />
+                    {/each}
+                  </g>
+                {/if}
               {/each}
               <g fill="#f8fafc" stroke="#0f172a" stroke-width={previewStrokeWidth * 0.6}>
                 {#each imported.geometry.routing.vias as via (via)}
@@ -245,6 +271,22 @@
                 {/each}
               </g>
             </svg>
+          </div>
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <LayerVisibilityControls
+              layers={previewLayers}
+              isVisible={(layerIdx) => previewView.isLayerVisible(layerIdx)}
+              onToggle={(layerIdx) => previewView.toggleLayer(layerIdx)}
+            />
+            <CoilPreviewControls
+              zoomLabel={formatZoom(previewZoom)}
+              canZoomIn={previewZoom >= maxZoom}
+              canZoomOut={previewZoom <= minZoom}
+              onZoomIn={() => (previewZoom = nextZoomStepUp(previewZoom, zoomSteps, maxZoom))}
+              onZoomOut={() => (previewZoom = nextZoomStepDown(previewZoom, zoomSteps, minZoom))}
+              onResetZoom={() => (previewZoom = 1)}
+              onResetView={() => (previewZoom = 1)}
+            />
           </div>
           <p class="text-xs text-slate-300">
             {imported.geometry.routing.segments.length} line(s),
