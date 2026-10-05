@@ -38,9 +38,12 @@ import {
   import DesignTab from "./lib/components/layout/DesignTab.svelte";
   import SimulateTab from "./lib/components/layout/SimulateTab.svelte";
   import ExportTab from "./lib/components/layout/ExportTab.svelte";
+  import StartupScreen from "./lib/components/layout/StartupScreen.svelte";
 
   // Session-only navigation state; none of these values enter IPC.
   let activeTab = $state<TabId>("design");
+  let startupOpen = $state(true);
+  let startupRecentLoading = $state(true);
 
   // App init: populate the routing-pattern selector + magnet-grade reference
   // from the backend. Fire-and-forget — failures are swallowed inside the
@@ -81,8 +84,12 @@ import {
 
   // Open Recent (kata eap8): lazily load the persisted list and build the
   // native submenu from disk truth (the load prunes vanished entries).
-  // Best effort — a recents hiccup must never block app init.
-  void recentFiles.load().catch(() => undefined);
+  // Load recents before the startup chooser offers its recent-project list.
+  // Best effort — a recents hiccup must never block startup.
+  void recentFiles
+    .load()
+    .catch(() => undefined)
+    .finally(() => (startupRecentLoading = false));
 
   // Native File menu (Open / Save / Save As, kata 0cgm; Open Recent +
   // Clear Recent Files, kata eap8): menu clicks land here as Tauri events
@@ -150,6 +157,10 @@ import {
   // Generate the Design-tab reflection when geometry or routing inputs change.
   // This effect intentionally runs regardless of the active workflow tab.
   $effect(() => {
+    if (startupOpen) {
+      scheduleCoilPreview.cancel();
+      return;
+    }
     void [
       config.desired_travel_mm,
       config.active_area_length_mm,
@@ -339,6 +350,7 @@ import {
   // request id and layout key together prevent stale responses from opening
   // the export gate for a newer config.
   $effect(() => {
+    if (startupOpen) return;
     void drc.currentLayoutKey;
     drc.request();
   });
@@ -520,6 +532,16 @@ import {
           </Tabs.Content>
         </div>
       </div>
+
+      {#if startupOpen}
+        <StartupScreen
+          {config}
+          {projects}
+          {recentFiles}
+          recentLoading={startupRecentLoading}
+          onComplete={() => (startupOpen = false)}
+        />
+      {/if}
 
       <footer
         class="shrink-0 border-t border-slate-800 px-6 py-3 text-xs text-slate-500"

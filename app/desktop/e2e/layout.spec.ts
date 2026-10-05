@@ -5,13 +5,14 @@ import {
   leftColumnFirstCard,
   ASIDE,
   box,
+  gotoDesignApp,
 } from "./helpers";
 
 test.describe("Design tab layout geometry", () => {
   test("left column first card aligns with the right column content padding", async ({
     page,
   }) => {
-    await page.goto("/");
+    await gotoDesignApp(page);
     const panel = await box(page, designPanel(page));
     const card = await box(page, leftColumnFirstCard(page));
     expect(panel).not.toBeNull();
@@ -24,7 +25,7 @@ test.describe("Design tab layout geometry", () => {
   test("design-tab scrollbar sits flush with the right window edge", async ({
     page,
   }) => {
-    await page.goto("/");
+    await gotoDesignApp(page);
     // The ScrollArea ROOT carries the geometry (kata 2npg): it must extend
     // to the window's right edge, while the actual scrolling element is its
     // Bits viewport descendant.
@@ -43,7 +44,7 @@ test.describe("Design tab layout geometry", () => {
   test("traces preview is visible in the Design-tab left column", async ({
     page,
   }) => {
-    await page.goto("/");
+    await gotoDesignApp(page);
     const aside = page.locator(ASIDE);
     const coilHeading = aside.locator("text=Coil Preview");
     await expect(coilHeading).toBeVisible();
@@ -58,7 +59,7 @@ test.describe("Design tab layout geometry", () => {
   test("page height is locked and the footer is always visible", async ({
     page,
   }) => {
-    await page.goto("/");
+    await gotoDesignApp(page);
     // Attempt to scroll the window: it must not move (the root scroller is
     // locked at the desktop layout; only the inner columns scroll).
     await page.evaluate(() => window.scrollTo(0, 400));
@@ -75,7 +76,7 @@ test.describe("Design tab layout geometry", () => {
   }, { tag: ["@visual", "@desktop"] });
 
   test("left and right columns scroll independently", async ({ page }) => {
-    await page.goto("/");
+    await gotoDesignApp(page);
     // Both columns are Bits UI ScrollAreas at the lg layout (kata 2npg):
     // the aside and the settings root are the positioned containers, the
     // real scrollers are their viewport descendants.

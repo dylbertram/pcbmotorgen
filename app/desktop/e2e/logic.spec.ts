@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { ASIDE, eventually } from "./helpers";
+import { ASIDE, eventually, gotoDesignApp } from "./helpers";
 
 /**
  * Guards the frontend plumbing of the "traces follow the magnet pattern"
@@ -18,7 +18,7 @@ test.describe("magnet pattern -> trace regeneration", () => {
   test("changing magnet count regenerates the painted coil traces", async ({
     page,
   }) => {
-    await page.goto("/");
+    await gotoDesignApp(page);
 
     const canvas = page.locator(
       `${ASIDE} [aria-label='Coil preview'] canvas[data-segments]`,
@@ -55,7 +55,7 @@ test.describe("routing dimensions -> preview overlays", () => {
   test("pole pitch and band-width overlays can be toggled independently", async ({
     page,
   }) => {
-    await page.goto("/");
+    await gotoDesignApp(page);
 
     const preview = page.locator(`${ASIDE} [aria-label='Coil preview']`);
     const inlineCanvas = preview.locator("canvas[data-pole-pitch]");
@@ -98,7 +98,7 @@ test.describe("routing dimensions -> preview overlays", () => {
   test("pole-region zones can be filtered by phase and hidden", async ({
     page,
   }) => {
-    await page.goto("/");
+    await gotoDesignApp(page);
 
     const preview = page.locator(`${ASIDE} [aria-label='Coil preview']`);
     const inlineCanvas = preview.locator("canvas[data-pole-regions]");
