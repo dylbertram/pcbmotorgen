@@ -1,17 +1,18 @@
 <script lang="ts">
   import { config } from "./lib/stores/config.svelte";
   import { BitsConfig, Tabs } from "bits-ui";
-import {
-  evaluateForceSweep,
-  generateCoils,
-  fetchTravelEnvelope,
-  computeFriction,
-  computePowerBudget,
-  computeHeightStack,
-  computeStackup,
-  bindProjectMenuActions,
-  debounce,
-} from "./lib/ipc";
+  import {
+    evaluateForceSweep,
+    generateCoils,
+    generateSensorGeometry,
+    fetchTravelEnvelope,
+    computeFriction,
+    computePowerBudget,
+    computeHeightStack,
+    computeStackup,
+    bindProjectMenuActions,
+    debounce,
+  } from "./lib/ipc";
   import type {
     ForceSweepResult,
     CoilPathDto,
@@ -19,11 +20,13 @@ import {
     PowerBudgetDto,
     HeightStackResultDto,
     StackupResultDto,
+    SensorConfig,
   } from "./lib/types";
   import { TABS, type TabId } from "./lib/ui";
   import { DrcController } from "./lib/stores/drc.svelte";
   import { MotionStore } from "./lib/stores/motion.svelte";
   import { ProjectStore } from "./lib/stores/project.svelte";
+  import { sensor as sensorStore } from "./lib/stores/sensor.svelte";
   import { recentFiles } from "./lib/stores/recentFiles.svelte";
   import { measureTrace } from "./lib/previewGeometry";
   import { cadGeometryToPreview } from "./lib/cadPreview";
@@ -40,6 +43,8 @@ import {
   import ExportTab from "./lib/components/layout/ExportTab.svelte";
   import StartupScreen from "./lib/components/layout/StartupScreen.svelte";
   import CadImportDialog from "./lib/components/layout/CadImportDialog.svelte";
+  import SensorTab from "./lib/components/layout/SensorTab.svelte";
+  import SensorPreview from "./lib/components/design/SensorPreview.svelte";
 
   // Session-only navigation state; none of these values enter IPC.
   let activeTab = $state<TabId>("design");
@@ -80,7 +85,7 @@ import {
   // Project save/load (kata 0cgm): all persistence logic lives in the Rust
   // backend behind save_project/load_project; this store is the interface
   // half (DTO mapping + dirty tracking + dialog flows).
-  const projects = new ProjectStore(config, motion, recentFiles);
+  const projects = new ProjectStore(config, motion, recentFiles, sensorStore);
   let activeCoils = $derived(projects.cadGeometry ? cadGeometryToPreview(projects.cadGeometry) : coils);
   let measuredTrace = $derived.by(() => measureTrace(activeCoils, config));
 
@@ -141,6 +146,43 @@ import {
     }
     void updateCoilPreview(generation, config.toIpc());
   }, 150);
+
+  let sensorGeneration = 0;
+  const scheduleSensorGeometry = debounce(
+    (generation: number, request: SensorConfig) => {
+      if (generation !== sensorGeneration) return;
+      void updateSensorGeometry(generation, request);
+    },
+    150,
+  );
+
+  async function updateSensorGeometry(
+    generation: number,
+    request: SensorConfig,
+  ): Promise<void> {
+    sensorStore.loading = true;
+    sensorStore.error = null;
+    try {
+      const result = await generateSensorGeometry(request);
+      if (generation === sensorGeneration) sensorStore.geometry = result;
+    } catch (e) {
+      if (generation === sensorGeneration) {
+        sensorStore.geometry = null;
+        sensorStore.error = e instanceof Error ? e.message : String(e);
+      }
+    } finally {
+      if (generation === sensorGeneration) sensorStore.loading = false;
+    }
+  }
+
+  // Keep sensor geometry independent of motor travel and motor routing state.
+  $effect(() => {
+    const request = sensorStore.toIpc();
+    const generation = ++sensorGeneration;
+    sensorStore.loading = true;
+    sensorStore.error = null;
+    scheduleSensorGeometry(generation, request);
+  });
 
   async function updateCoilPreview(
     generation: number,
@@ -380,6 +422,14 @@ import {
         ? { label: "updating", className: "text-amber-300" }
         : { label: "ready", className: "text-emerald-300" };
     }
+    if (tab === "sensor") {
+      if (sensorStore.error) {
+        return { label: "needs attention", className: "text-rose-300" };
+      }
+      return sensorStore.loading || !sensorStore.geometry
+        ? { label: "updating", className: "text-amber-300" }
+        : { label: "ready", className: "text-emerald-300" };
+    }
     if (drc.loading) return { label: "checking", className: "text-amber-300" };
     if (drcReady && drc.violations.length === 0) {
       return { label: "ready", className: "text-emerald-300" };
@@ -478,18 +528,22 @@ import {
           aria-label="Persistent design reflection"
         >
           <ScrollArea class="h-full min-h-0">
-            <TravelDiagram {config} {motion} {measuredTrace} />
-            <!-- Traces view lives here in the Design tab so layout and geometry can
-                 be inspected side by side; the Simulation tab keeps its own copy. -->
-            <div class="mt-3 space-y-3">
-              <CoilPreview {config} coils={activeCoils} {motion} />
-              <DesignDimensions
-                {config}
-                measuredTraceLengthMm={measuredTrace?.traceLengthMm ?? null}
-                routingDimensions={activeCoils?.routing_dimensions ?? null}
-                cadGeometryActive={projects.cadGeometry !== null}
-              />
-            </div>
+            {#if activeTab === "sensor"}
+              <SensorPreview store={sensorStore} />
+            {:else}
+              <TravelDiagram {config} {motion} {measuredTrace} />
+              <!-- Traces view lives here in the Design tab so layout and geometry can
+                   be inspected side by side; the Simulation tab keeps its own copy. -->
+              <div class="mt-3 space-y-3">
+                <CoilPreview {config} coils={activeCoils} {motion} />
+                <DesignDimensions
+                  {config}
+                  measuredTraceLengthMm={measuredTrace?.traceLengthMm ?? null}
+                  routingDimensions={activeCoils?.routing_dimensions ?? null}
+                  cadGeometryActive={projects.cadGeometry !== null}
+                />
+              </div>
+            {/if}
           </ScrollArea>
         </aside>
 
@@ -524,6 +578,14 @@ import {
                {error}
                cadGeometryActive={projects.cadGeometry !== null}
             />
+          </Tabs.Content>
+
+          <Tabs.Content
+            value="sensor"
+            id="panel-sensor"
+            class="h-full overflow-y-auto p-4 lg:pr-0"
+          >
+            <SensorTab store={sensorStore} />
           </Tabs.Content>
 
           <Tabs.Content
@@ -571,8 +633,7 @@ import {
       <footer
         class="shrink-0 border-t border-slate-800 px-6 py-3 text-xs text-slate-500"
       >
-        Linear mode only · radial/axial-flux disabled (TODO). Physics via Tauri IPC
-        with mock fallback.
+        Motor physics and routing plus an independent two-layer induction sensor workflow.
       </footer>
     </Tabs.Root>
   </BitsConfig>

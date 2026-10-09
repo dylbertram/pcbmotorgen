@@ -19,10 +19,10 @@
   navigation (arrow/Home/End) with automatic activation; tab selection
   itself is owned by the Tabs.Root in App.svelte.
 -->
-<nav aria-label="Motor workflow" class="px-3">
+<nav aria-label="Design workflows" class="px-3">
   <Tabs.List
     class="flex items-end gap-1 border-b border-slate-800"
-    aria-label="Motor workflow tabs"
+    aria-label="Design workflow tabs"
   >
     {#each tabs as tab (tab.id)}
       {@const status = statusFor(tab.id)}
