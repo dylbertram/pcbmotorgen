@@ -16,10 +16,12 @@
  */
 
 import type {
+  CadGeometry,
   LoadProjectResult,
   ProjectState,
   ProjectValidation,
 } from "../types";
+import { DEFAULT_SENSOR_CONFIG } from "../types";
 import {
   DEFAULT_PROJECT_FILE_NAME,
   confirmDiscardChanges,
@@ -31,6 +33,7 @@ import {
 import type { ConfigStore } from "./config.svelte";
 import type { MotionStore } from "./motion.svelte";
 import type { RecentFilesStore } from "./recentFiles.svelte";
+import type { SensorStore } from "./sensor.svelte";
 
 /** Normalise any thrown value into a display string. */
 function errorMessage(e: unknown): string {
@@ -59,6 +62,8 @@ export class ProjectStore {
    * first baseline — a fresh untitled design is not "dirty".
    */
   savedSnapshot = $state<string | null>(null);
+  /** Imported CAD geometry is authoritative until the user explicitly replaces it. */
+  cadGeometry = $state.raw<CadGeometry | null>(null);
 
   constructor(
     private config: ConfigStore,
@@ -69,6 +74,7 @@ export class ProjectStore {
      * must never affect the open flow.
      */
     private recents?: RecentFilesStore | null,
+    private sensor?: SensorStore,
   ) {}
 
   // --- Derived state -----------------------------------------------------
@@ -141,6 +147,8 @@ export class ProjectStore {
         max_temperature_rise_c: this.config.max_temperature_rise_c,
       },
       mover_position_mm: this.motion.positionMm,
+      cad_geometry: this.cadGeometry,
+      sensor_config: this.sensor?.toIpc() ?? { ...DEFAULT_SENSOR_CONFIG },
     };
   }
 
@@ -191,6 +199,12 @@ export class ProjectStore {
     this.config.drive_frequency_hz = c.drive_frequency_hz;
     this.config.max_temperature_rise_c = c.max_temperature_rise_c;
     this.motion.positionMm = state.mover_position_mm;
+    this.cadGeometry = state.cad_geometry ?? null;
+    this.sensor?.apply(state.sensor_config);
+  }
+
+  setCadGeometry(geometry: CadGeometry | null): void {
+    this.cadGeometry = geometry;
   }
 
   /** Re-baseline the dirty tracker at the current state. */

@@ -29,9 +29,16 @@
         },
     },
     "mcp": {
-        "svelte": {
-            "type": "remote",
-            "url": " https://mcp.svelte.dev/mcp"
+        "servers": {
+            "rhino": {
+                "type": "local",
+                "command": [
+                    "/Users/dylanbertram/Library/Application Support/McNeel/Rhinoceros/ai/bin/rhino-mcp-router",
+                    "--default-version",
+                    "8"
+                ],
+                "disabled": false
+            }
         }
     }
 }

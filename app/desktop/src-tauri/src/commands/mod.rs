@@ -71,6 +71,7 @@ pub mod kicad;
 pub mod physics;
 pub mod project;
 pub mod routing_plugins;
+pub mod sensor;
 
 // Flat re-exports keep `commands::Foo` paths working for any consumer that
 // does not want to name the submodule. `main.rs` currently registers handlers

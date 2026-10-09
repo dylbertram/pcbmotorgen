@@ -87,6 +87,7 @@
 //! ```
 
 pub mod board;
+pub mod cad_dxf;
 pub mod client;
 pub mod commit;
 pub mod diagnostics;

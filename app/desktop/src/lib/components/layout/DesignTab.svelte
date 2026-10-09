@@ -1,15 +1,17 @@
 <script lang="ts">
   import type { ConfigStore } from "../../stores/config.svelte";
+  import type { ProjectStore } from "../../stores/project.svelte";
   import TopologySelector from "../design/TopologySelector.svelte";
   import TracesBoardPanel from "../design/parameters/TracesBoardPanel.svelte";
   import MagnetsPanel from "../design/parameters/MagnetsPanel.svelte";
   import ValidationWarning from "../design/ValidationWarning.svelte";
+  import CadGeometryPanel from "../design/CadGeometryPanel.svelte";
   import NumberField from "../ui/NumberField.svelte";
   import HelpTag from "../ui/HelpTag.svelte";
   import ScrollArea from "../ui/ScrollArea.svelte";
   import electricalPitchSvg from "../../assets/electrical-pitch.svg";
 
-  let { config }: { config: ConfigStore } = $props();
+  let { config, projects }: { config: ConfigStore; projects: ProjectStore } = $props();
 </script>
 
 <ScrollArea
@@ -18,6 +20,7 @@
   aria-label="Design settings"
 >
   <div class="space-y-3">
+    <CadGeometryPanel {config} {projects} />
     <!-- General geometry + clearance. No driver toggle: every field here is
          a normal user input. Derived values (travel, pole pitch, mover span,
          rest offset, preview metrics) stay read-only in the reflection. -->

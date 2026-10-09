@@ -2,8 +2,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ConfigStore } from "./config.svelte";
 import { MotionStore } from "./motion.svelte";
 import { ProjectStore } from "./project.svelte";
+import { SensorStore } from "./sensor.svelte";
 import { RecentFilesStore } from "./recentFiles.svelte";
 import type { ProjectState } from "../types";
+import type { CadGeometry } from "../types";
 import type { LoadProjectResult } from "../types";
 import { loadProject } from "../ipc";
 
@@ -20,8 +22,9 @@ vi.mock("../ipc", { spy: true });
 function makeStores(recents?: RecentFilesStore) {
   const config = new ConfigStore();
   const motion = new MotionStore(config);
-  const projects = new ProjectStore(config, motion, recents);
-  return { config, motion, projects };
+  const sensor = new SensorStore();
+  const projects = new ProjectStore(config, motion, recents, sensor);
+  return { config, motion, sensor, projects };
 }
 
 /** Recents store over a fake port (exposes saved/synced snapshots). */
@@ -82,6 +85,24 @@ function editDesign(config: ConfigStore, motion: MotionStore): void {
 }
 
 describe("ProjectStore snapshot mapping", () => {
+  it("uses sensor defaults when no sensor store is supplied", () => {
+    const config = new ConfigStore();
+    const motion = new MotionStore(config);
+    const projects = new ProjectStore(config, motion);
+    expect(projects.snapshotIpc().sensor_config?.lambda_mm).toBe(120);
+  });
+
+  it("tracks sensor-only edits and restores defaults from older projects", () => {
+    const { sensor, projects } = makeStores();
+    const legacy = projects.snapshotIpc();
+    delete legacy.sensor_config;
+    projects.markClean();
+    sensor.set("tx_trace_width_mm", 0.3);
+    expect(projects.isDirty).toBe(true);
+    projects.applyToState(legacy);
+    expect(sensor.config.tx_trace_width_mm).toBe(0.15);
+    expect(sensor.config.lambda_mm).toBe(120);
+  });
   it("captures every persisted input group in UI units", () => {
     const { config, motion, projects } = makeStores();
     editDesign(config, motion);
@@ -97,6 +118,25 @@ describe("ProjectStore snapshot mapping", () => {
     expect(c.num_layers).toBe(6);
     expect(c.min_trace_mm).toBe(0.2);
     expect(c.capacitor_bank_uf).toBe(2200);
+    expect(state.sensor_config?.lambda_mm).toBe(120);
+  });
+
+  it("persists sensor edits independently from motor travel", () => {
+    const { config, sensor, projects } = makeStores();
+    projects.markClean();
+    config.desired_travel_mm = 120;
+    expect(sensor.config.lambda_mm).toBe(120);
+    expect(projects.isDirty).toBe(true);
+    sensor.set("lambda_mm", 240);
+    sensor.set("tx_trace_width_mm", 0.2);
+    const state = projects.snapshotIpc();
+    expect(state.sensor_config?.lambda_mm).toBe(240);
+    expect(state.sensor_config?.tx_trace_width_mm).toBe(0.2);
+
+    const restored = makeStores();
+    restored.projects.applyToState(state);
+    expect(restored.sensor.config.lambda_mm).toBe(240);
+    expect(restored.sensor.config.tx_trace_width_mm).toBe(0.2);
   });
 
   it("serializes routing params with sorted keys for a stable snapshot", () => {
@@ -135,6 +175,22 @@ describe("ProjectStore dirty tracking", () => {
     projects.markClean();
     motion.positionMm = 10;
     expect(projects.isDirty).toBe(true);
+  });
+
+  it("tracks imported geometry and preserves it across a project snapshot", () => {
+    const { projects } = makeStores();
+    projects.markClean();
+    const geometry: CadGeometry = {
+      routing: { format_version: 2, segments: [], curves: [], vias: [] },
+      layer_z_mm: [-0.8, 0.8],
+      trace_width_mm: 0.2,
+    };
+    projects.setCadGeometry(geometry);
+    expect(projects.isDirty).toBe(true);
+    const target = makeStores().projects;
+    target.applyToState(projects.snapshotIpc());
+    expect(target.cadGeometry).toEqual(geometry);
+    expect(target.snapshotIpc().cad_geometry).toEqual(geometry);
   });
 
   it("reports the file name and untitled label", () => {

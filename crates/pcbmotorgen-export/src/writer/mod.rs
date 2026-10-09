@@ -22,10 +22,10 @@
 
 use prost_types::Any;
 
-use pcbmotorgen_dfm::DesignRules;
-use pcbmotorgen_routing::{PhaseCoil, RoutingResult};
 use crate::layer_map::{layer_idx_to_board_layer, mm_to_nm, via_pad_diameter_nm};
 use crate::Net;
+use pcbmotorgen_dfm::DesignRules;
+use pcbmotorgen_routing::{PhaseCoil, RoutingResult, SensorGeometry};
 
 mod any_pack;
 mod pad_writer;
@@ -64,7 +64,8 @@ pub fn coils_to_board_items(
 ) -> Vec<Any> {
     let trace_width_nm = mm_to_nm(rules.min_trace_mm);
     let drill_nm = mm_to_nm(rules.min_via_drill_mm);
-    let pad_diameter_nm = via_pad_diameter_nm(rules.min_via_drill_mm, rules.min_via_annular_ring_mm);
+    let pad_diameter_nm =
+        via_pad_diameter_nm(rules.min_via_drill_mm, rules.min_via_annular_ring_mm);
 
     // Centering offset: shift the whole active area so it sits symmetrically
     // about x = 0. Coils are generated starting at x = 0; we move them to
@@ -143,6 +144,57 @@ pub fn io_elements_to_board_items(
     pad_writer::io_elements_to_board_items(result, num_layers, rules, active_area_length_mm)
 }
 
+/// Convert native induction-sensor routes into tracks and through-vias.
+/// The sensor's layer IDs are F.Cu=0/B.Cu=1, while the shared writer uses
+/// board indices B.Cu=0/F.Cu=1, so this adapter explicitly reverses them.
+/// Per-net trace widths are retained and terminal markers are deliberately
+/// omitted (the prototype does not define physical footprints or pads).
+pub fn sensor_geometry_to_board_items(geometry: &SensorGeometry, rules: &DesignRules) -> Vec<Any> {
+    let mut items = Vec::new();
+    for net in &geometry.nets {
+        let net_rules = DesignRules {
+            min_trace_mm: net.trace_width_mm,
+            min_space_mm: rules.min_space_mm,
+            min_via_drill_mm: rules.min_via_drill_mm.min(net.via_size_mm / 2.0),
+            min_via_annular_ring_mm: (net.via_size_mm
+                - rules.min_via_drill_mm.min(net.via_size_mm / 2.0))
+                / 2.0,
+        };
+        for board_layer in 0..2 {
+            let sensor_layer = 1 - board_layer;
+            let coil = PhaseCoil {
+                phase_idx: 0,
+                layer_idx: board_layer,
+                segments: net
+                    .segments
+                    .iter()
+                    .filter(|segment| segment.layer == sensor_layer)
+                    .map(|segment| pcbmotorgen_routing::CoilSegment {
+                        start: (segment.start.x, segment.start.y),
+                        end: (segment.end.x, segment.end.y),
+                        is_active: segment.is_active,
+                    })
+                    .collect(),
+                corner_arcs: Vec::new(),
+                phase_name: net.name.clone(),
+                pattern_id: "induction-position-sensor".into(),
+                layer_pair: Some((0, 1)),
+                // Emit each net's vias exactly once, along with its B.Cu path.
+                center_via_positions: if board_layer == 0 {
+                    net.vias
+                        .iter()
+                        .map(|via| (via.position.x, via.position.y))
+                        .collect()
+                } else {
+                    Vec::new()
+                },
+            };
+            items.extend(coils_to_board_items(&[coil], 2, &net_rules, 0.0));
+        }
+    }
+    items
+}
+
 // ---------------------------------------------------------------------------
 // Tests (entry point)
 // ---------------------------------------------------------------------------
@@ -150,7 +202,9 @@ pub fn io_elements_to_board_items(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use pcbmotorgen_routing::{generate_coils_from_context, CoilSegment, RoutingContext};
+    use pcbmotorgen_routing::{
+        generate_coils_from_context, CoilSegment, RoutingContext, SensorConfig,
+    };
     use prost::Message;
     use std::collections::HashMap;
 
@@ -218,7 +272,12 @@ mod tests {
 
     /// Convenience: braid coil scene → (coils, num_layers, rules, active_area).
     fn braid_scene(layers: u32) -> (Vec<PhaseCoil>, u32, DesignRules, f64) {
-        (braid_coils(layers), layers, braid_rules(), BRAID_ACTIVE_AREA_MM)
+        (
+            braid_coils(layers),
+            layers,
+            braid_rules(),
+            BRAID_ACTIVE_AREA_MM,
+        )
     }
 
     /// Convenience: a 4-layer hand-built coil scene (rules + active area).
@@ -234,7 +293,10 @@ mod tests {
     fn test_infinity_braid_coils_structure() {
         let (coils, layers, rules, active) = braid_scene(2);
 
-        assert!(!coils.is_empty(), "infinity-braid must produce non-empty coils");
+        assert!(
+            !coils.is_empty(),
+            "infinity-braid must produce non-empty coils"
+        );
 
         // 3 distinct phase nets (A/B/C).
         let nets: std::collections::BTreeSet<&str> =
@@ -270,7 +332,10 @@ mod tests {
 
         // The writer converts the coil set into a non-empty item list.
         let items = coils_to_board_items(&coils, layers, &rules, active);
-        assert!(!items.is_empty(), "coils_to_board_items must produce non-empty items");
+        assert!(
+            !items.is_empty(),
+            "coils_to_board_items must produce non-empty items"
+        );
     }
 
     #[test]
@@ -281,8 +346,7 @@ mod tests {
         let nets: std::collections::BTreeSet<&str> =
             coils.iter().map(|c| c.phase_name.as_str()).collect();
         assert_eq!(nets, std::collections::BTreeSet::from(["A", "B", "C"]));
-        let layers: std::collections::BTreeSet<u32> =
-            coils.iter().map(|c| c.layer_idx).collect();
+        let layers: std::collections::BTreeSet<u32> = coils.iter().map(|c| c.layer_idx).collect();
         assert!(layers.contains(&0) && layers.contains(&1));
     }
 
@@ -291,7 +355,10 @@ mod tests {
         // The infinity-braid requires num_layers >= 2; a 1-layer board
         // produces no coils (the pattern rejects it during generation).
         let coils = braid_coils(1);
-        assert!(coils.is_empty(), "1-layer board must produce no braid coils");
+        assert!(
+            coils.is_empty(),
+            "1-layer board must produce no braid coils"
+        );
     }
 
     #[test]
@@ -311,7 +378,10 @@ mod tests {
             items.len(),
             coils.iter().map(|c| c.segments.len()).sum::<usize>(),
             coils.iter().map(|c| c.corner_arcs.len()).sum::<usize>(),
-            coils.iter().map(|c| c.center_via_positions.len()).sum::<usize>(),
+            coils
+                .iter()
+                .map(|c| c.center_via_positions.len())
+                .sum::<usize>(),
         );
     }
 
@@ -330,8 +400,14 @@ mod tests {
             nets.insert(t.net.expect("Track must carry a net").name);
         }
         let expected: std::collections::BTreeSet<String> =
-            ["/A".to_string(), "/B".to_string(), "/C".to_string()].into_iter().collect();
-        assert_eq!(nets, expected, "distinct track nets must be {{/A, /B, /C}}; got {:?}", nets);
+            ["/A".to_string(), "/B".to_string(), "/C".to_string()]
+                .into_iter()
+                .collect();
+        assert_eq!(
+            nets, expected,
+            "distinct track nets must be {{/A, /B, /C}}; got {:?}",
+            nets
+        );
     }
 
     /// Regression: the track's `Track.layer` field must be derived from the
@@ -341,24 +417,27 @@ mod tests {
     fn test_track_layer_uses_num_layers() {
         // (num_layers, expected layer set the top-layer track may land on).
         let cases: &[(u32, &[BoardLayer])] = &[
-            (4, &[
-                BoardLayer::BlBCu,
-                BoardLayer::BlIn1Cu,
-                BoardLayer::BlIn2Cu,
-                BoardLayer::BlFCu,
-            ]),
-            (2, &[
-                BoardLayer::BlBCu,
-                BoardLayer::BlFCu,
-            ]),
-            (6, &[
-                BoardLayer::BlBCu,
-                BoardLayer::BlIn1Cu,
-                BoardLayer::BlIn2Cu,
-                BoardLayer::BlIn3Cu,
-                BoardLayer::BlIn4Cu,
-                BoardLayer::BlFCu,
-            ]),
+            (
+                4,
+                &[
+                    BoardLayer::BlBCu,
+                    BoardLayer::BlIn1Cu,
+                    BoardLayer::BlIn2Cu,
+                    BoardLayer::BlFCu,
+                ],
+            ),
+            (2, &[BoardLayer::BlBCu, BoardLayer::BlFCu]),
+            (
+                6,
+                &[
+                    BoardLayer::BlBCu,
+                    BoardLayer::BlIn1Cu,
+                    BoardLayer::BlIn2Cu,
+                    BoardLayer::BlIn3Cu,
+                    BoardLayer::BlIn4Cu,
+                    BoardLayer::BlFCu,
+                ],
+            ),
         ];
 
         let (rules, active) = hand_scene();
@@ -380,10 +459,9 @@ mod tests {
             let track_any = items
                 .iter()
                 .find(|a| a.type_url.ends_with("kiapi.board.types.Track"))
-                .unwrap_or_else(|| panic!(
-                    "expected a Track in items for num_layers={}",
-                    num_layers
-                ));
+                .unwrap_or_else(|| {
+                    panic!("expected a Track in items for num_layers={}", num_layers)
+                });
             let track: Track = Track::decode(track_any.value.as_slice()).expect("decode Track");
 
             // The top-layer track must map to F_Cu (the top of the board).
@@ -392,18 +470,94 @@ mod tests {
                 BoardLayer::BlFCu as i32,
                 "num_layers={}: top-layer track MUST be F_Cu (the top of the live board), \
                  not In{}_Cu",
-                num_layers, num_layers - 1
+                num_layers,
+                num_layers - 1
             );
             // And it must be one of the board's valid layers.
-            let valid_layers: Vec<i32> = expected_layers
-                .iter()
-                .map(|l| *l as i32)
-                .collect();
+            let valid_layers: Vec<i32> = expected_layers.iter().map(|l| *l as i32).collect();
             assert!(
                 valid_layers.contains(&track.layer),
                 "num_layers={}: track must land on a layer the board has (one of {:?}); got {}",
-                num_layers, valid_layers, track.layer
+                num_layers,
+                valid_layers,
+                track.layer
             );
         }
+    }
+
+    #[test]
+    fn sensor_writer_preserves_receiver_and_transmitter_widths_and_skips_terminals() {
+        let mut config = SensorConfig::default();
+        config.tx_trace_width_mm = 0.3;
+        config.tx_via_size_mm = 0.8;
+        let geometry = pcbmotorgen_routing::generate_sensor(&config).unwrap();
+        let items = sensor_geometry_to_board_items(&geometry, &DesignRules::default());
+        let expected_segments: usize = geometry.nets.iter().map(|net| net.segments.len()).sum();
+        let expected_vias: usize = geometry.nets.iter().map(|net| net.vias.len()).sum();
+        let tracks: Vec<Track> = items
+            .iter()
+            .filter(|item| item.type_url.ends_with("kiapi.board.types.Track"))
+            .map(|item| Track::decode(item.value.as_slice()).expect("decode Track"))
+            .collect();
+        let vias: Vec<crate::Via> = items
+            .iter()
+            .filter(|item| item.type_url.ends_with("kiapi.board.types.Via"))
+            .map(|item| crate::Via::decode(item.value.as_slice()).expect("decode Via"))
+            .collect();
+
+        assert_eq!(tracks.len(), expected_segments);
+        assert_eq!(vias.len(), expected_vias);
+        assert_eq!(items.len(), expected_segments + expected_vias);
+        assert_eq!(
+            tracks
+                .iter()
+                .map(|track| track.net.as_ref().unwrap().name.as_str())
+                .collect::<std::collections::BTreeSet<_>>(),
+            std::collections::BTreeSet::from(["/CL1", "/CL2", "/OSC"])
+        );
+
+        for track in &tracks {
+            let net_name = track.net.as_ref().unwrap().name.trim_start_matches('/');
+            let net = geometry
+                .nets
+                .iter()
+                .find(|net| net.name == net_name)
+                .unwrap();
+            assert_eq!(
+                track.width.as_ref().unwrap().value_nm,
+                crate::layer_map::mm_to_nm(net.trace_width_mm),
+                "{} track width must be preserved",
+                net_name
+            );
+            assert!(
+                track.layer == BoardLayer::BlBCu as i32 || track.layer == BoardLayer::BlFCu as i32,
+                "sensor routes must stay on the two outer copper layers"
+            );
+        }
+        for via in &vias {
+            let net_name = via.net.as_ref().unwrap().name.trim_start_matches('/');
+            let net = geometry
+                .nets
+                .iter()
+                .find(|net| net.name == net_name)
+                .unwrap();
+            let pad_stack = via.pad_stack.as_ref().unwrap();
+            let copper_pad = &pad_stack.copper_layers[0];
+            assert_eq!(
+                copper_pad.size.as_ref().unwrap().x_nm,
+                crate::layer_map::mm_to_nm(net.via_size_mm),
+                "{} via diameter must be preserved",
+                net_name
+            );
+        }
+        // The two prototype terminal coordinates are visual/reference
+        // markers only; they must not become footprints or pads.
+        assert_eq!(geometry.terminal_markers.len(), 2);
+        assert!(items.iter().all(|item| {
+            !item
+                .type_url
+                .ends_with("kiapi.board.types.FootprintInstance")
+                && !item.type_url.ends_with("kiapi.board.types.Pad")
+        }));
     }
 }

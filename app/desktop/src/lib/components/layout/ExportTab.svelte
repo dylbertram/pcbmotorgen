@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { ConfigStore } from "../../stores/config.svelte";
+  import type { ProjectStore } from "../../stores/project.svelte";
   import type { InterferenceViolation } from "../../types";
   import type { ExportTarget } from "../../ui";
   import InterferencePanel from "../export/InterferencePanel.svelte";
@@ -8,6 +9,7 @@
 
   let {
     config,
+    projects,
     drcViolations,
     drcLoading,
     drcError,
@@ -16,6 +18,7 @@
     onCheckDrc,
   }: {
     config: ConfigStore;
+    projects: ProjectStore;
     drcViolations: InterferenceViolation[];
     drcLoading: boolean;
     drcError: string | null;
@@ -33,7 +36,7 @@
     <div>
       <h2 class="text-sm font-semibold text-slate-100">Export design</h2>
       <p class="mt-1 text-xs text-slate-400">
-        KiCad IPC writes directly to an open board. DXF exports coil trace geometry for CAD/CAM import.
+        KiCad IPC writes generated geometry to an open board. 3D DXF exchanges the active centerline geometry with CAD.
       </p>
     </div>
     <label class="text-xs text-slate-300" for="export-target">
@@ -48,7 +51,7 @@
         class="ml-2 rounded-md border border-emerald-500/60 bg-slate-800 px-3 py-1.5 text-sm text-emerald-200 focus:border-emerald-400 focus:outline-none"
       >
         <option value="kicad">KiCad IPC · available</option>
-        <option value="dxf">DXF R12 · available</option>
+        <option value="dxf">3D DXF · available</option>
         <option value="json" disabled>JSON · planned</option>
         <option value="svg" disabled>SVG · planned</option>
       </select>
@@ -56,6 +59,11 @@
   </div>
 </div>
 {#if exportTarget === "kicad"}
+{#if projects.cadGeometry}
+  <div class="rounded-lg border border-amber-500/50 bg-amber-500/10 p-4 text-sm text-amber-100" role="status">
+    Imported CAD geometry is active. KiCad writing is guarded because phase/net electrical semantics are not yet mapped; choose 3D DXF to export this geometry.
+  </div>
+{:else}
 <div class="grid gap-4 xl:grid-cols-2">
   <section class="rounded-lg border border-slate-700 bg-slate-800/40 p-4" aria-label="Design rule check">
     <InterferencePanel
@@ -75,6 +83,7 @@
     drcLayoutKey={drcLayoutKey}
   />
 </div>
+{/if}
 {:else}
-<DxfPanel {config} />
+<DxfPanel {config} {projects} />
 {/if}

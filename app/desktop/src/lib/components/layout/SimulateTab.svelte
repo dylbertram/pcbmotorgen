@@ -21,6 +21,7 @@
     height,
     stackup,
     error,
+    cadGeometryActive = false,
   }: {
     config: ConfigStore;
     active: boolean;
@@ -30,6 +31,7 @@
     height: HeightStackResultDto | null;
     stackup: StackupResultDto | null;
     error: string | null;
+    cadGeometryActive?: boolean;
   } = $props();
 </script>
 
@@ -42,6 +44,11 @@
         Automated adjustment tips are planned for a later iteration.
       </p>
     </div>
+    {#if cadGeometryActive}
+      <div class="rounded-md border border-amber-500/50 bg-amber-500/10 px-3 py-2 text-xs text-amber-100" role="status">
+        Imported CAD geometry is active, but simulation still uses geometry generated from the design settings.
+      </div>
+    {/if}
     {#if error}
       <div
         class="rounded-md border border-rose-500/60 bg-rose-500/10 px-4 py-2 text-sm text-rose-200"

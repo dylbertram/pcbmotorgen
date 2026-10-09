@@ -5,7 +5,7 @@
  */
 
 /** Top-level workflow tabs. */
-export type TabId = "design" | "simulate" | "export";
+export type TabId = "design" | "simulate" | "sensor" | "export";
 
 /** Export panel target picker. */
 export type ExportTarget = "kicad" | "dxf";
@@ -14,5 +14,6 @@ export type ExportTarget = "kicad" | "dxf";
 export const TABS: { id: TabId; label: string }[] = [
   { id: "design", label: "Design" },
   { id: "simulate", label: "Simulate" },
+  { id: "sensor", label: "Sensor" },
   { id: "export", label: "Export" },
 ];

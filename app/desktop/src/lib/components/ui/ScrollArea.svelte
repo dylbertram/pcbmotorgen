@@ -44,7 +44,7 @@
     orientation="vertical"
     class="h-full flex w-2.5 touch-none select-none flex-col justify-center rounded-md bg-transparent p-0.5 transition-colors data-[state=visible]:bg-slate-800/60"
   >
-    <ScrollArea.Thumb class="relative flex-1 rounded-full {scrollbarClass}" />
+    <ScrollArea.Thumb class="relative rounded-full {scrollbarClass}" />
   </ScrollArea.Scrollbar>
   <ScrollArea.Corner />
 </ScrollArea.Root>
