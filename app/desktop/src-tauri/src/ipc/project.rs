@@ -64,6 +64,7 @@ use std::path::Path;
 use super::config::LinearMotorConfigIpc;
 use super::enums::CommutationModeIpc;
 use pcbmotorgen_export::cad_dxf::CadGeometry;
+use pcbmotorgen_routing::SensorConfig;
 
 /// Current project-file format version. Bump on breaking changes and add
 /// a migration step (see the module docs).
@@ -118,6 +119,10 @@ pub struct ProjectStateIpc {
     /// the project remains config-generated, preserving backward compatibility.
     #[serde(default)]
     pub cad_geometry: Option<CadGeometry>,
+    /// Independent induction-position sensor settings. Missing in older
+    /// artifacts, in which case the generator defaults are restored.
+    #[serde(default)]
+    pub sensor_config: SensorConfig,
 }
 
 impl Default for ProjectStateIpc {
@@ -126,6 +131,7 @@ impl Default for ProjectStateIpc {
             config: ProjectConfigStateIpc::default(),
             mover_position_mm: 60.0,
             cad_geometry: None,
+            sensor_config: SensorConfig::default(),
         }
     }
 }
@@ -418,6 +424,9 @@ pub fn design_validation(state: &ProjectStateIpc) -> ProjectValidationIpc {
             travel * 1e3
         ));
     }
+    if let Err(e) = pcbmotorgen_routing::generate_sensor(&state.sensor_config) {
+        errors.push(format!("Induction sensor: {e}"));
+    }
     ProjectValidationIpc { errors, warnings }
 }
 
@@ -483,6 +492,7 @@ mod tests {
                 layer_z_mm: vec![-0.8, 0.8],
                 trace_width_mm: 0.2,
             }),
+            sensor_config: SensorConfig::default(),
         }
     }
 
@@ -517,6 +527,19 @@ mod tests {
         assert_eq!(geometry.layer_z_mm, vec![-0.8, 0.8]);
         assert_eq!(geometry.trace_width_mm, 0.2);
         assert_eq!(geometry.routing.segments[0].net, "A");
+        assert_eq!(loaded.sensor_config, SensorConfig::default());
+    }
+
+    #[test]
+    fn older_project_without_sensor_settings_gets_sensor_defaults() {
+        let mut value: serde_json::Value =
+            serde_json::from_str(&serialize(&sample_state())).expect("json");
+        value["state"]
+            .as_object_mut()
+            .unwrap()
+            .remove("sensor_config");
+        let (loaded, _) = parse_project_file(&value.to_string()).expect("old project loads");
+        assert_eq!(loaded.sensor_config, SensorConfig::default());
     }
 
     #[test]
@@ -603,6 +626,19 @@ mod tests {
         let v = design_validation(&sample_state());
         assert!(v.errors.is_empty(), "errors: {:?}", v.errors);
         assert!(v.warnings.is_empty(), "warnings: {:?}", v.warnings);
+    }
+
+    #[test]
+    fn design_validation_reports_invalid_sensor_configuration() {
+        let mut state = sample_state();
+        state.sensor_config.turns = 8;
+        state.sensor_config.lambda_mm = 30.0;
+        state.sensor_config.amplitude_mm = 8.0;
+        let validation = design_validation(&state);
+        assert!(validation
+            .errors
+            .iter()
+            .any(|error| error.starts_with("Induction sensor:")));
     }
 
     #[test]

@@ -41,13 +41,14 @@ pub mod context;
 pub mod dimensions;
 pub mod error;
 pub mod generate;
+pub mod induction_sensor;
 pub mod io;
 pub mod loaders;
 pub mod model;
 pub mod pattern;
 pub mod patterns;
-pub mod report;
 pub mod registry;
+pub mod report;
 pub mod validator;
 
 pub use coil::{CoilArc, CoilSegment, PhaseCoil, PHASE_NAMES};
@@ -59,19 +60,20 @@ pub use dimensions::{
 };
 pub use error::RoutingError;
 pub use generate::{
-    IoFanoutEdge, IoFanoutOptions, available_pattern_ids, available_pattern_metadata,
-    bundled_registry, generate_coils_from_context, generate_io_fanout, generate_routing_report,
+    available_pattern_ids, available_pattern_metadata, bundled_registry,
+    generate_coils_from_context, generate_io_fanout, generate_routing_report,
     generate_routing_report_with_io, generate_routing_result, generate_routing_result_with_io,
     pattern_metadata, pattern_parameters, register_native_plugin, register_python_runner,
     register_runtime_pattern, routing_result_to_phase_coils, unregister_runtime_pattern,
-    validate_routing_params,
+    validate_routing_params, IoFanoutEdge, IoFanoutOptions,
 };
+pub use induction_sensor::{generate_sensor, SensorConfig, SensorGeometry, SensorNetGeometry};
 pub use io::{IoPad, IoPadKind, IoTrace, IoTraceRole, PadSize};
 pub use model::{
     Layer, LegGrid, Net, PhaseBand, PhaseBandShape, Point, PoleRegion, RouteCurve, RouteSegment,
     RoutingResult, Via,
 };
 pub use pattern::{ParamType, PatternParameter, PluginMetadata, RoutingPattern};
-pub use report::RoutingReport;
 pub use registry::{RoutingErrorKind, RoutingRegistry};
+pub use report::RoutingReport;
 pub use validator::Validator;

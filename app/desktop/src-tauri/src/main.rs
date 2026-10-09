@@ -60,11 +60,13 @@ fn main() {
             commands::physics::compute_friction,
             commands::kicad::connect_kicad,
             commands::kicad::write_coils_to_board,
+            commands::kicad::write_sensor_to_board,
             commands::kicad::ping_kicad,
             commands::kicad::get_board_diagnostics,
             commands::kicad::validate_write_preconditions,
             commands::kicad::preview_coils,
             commands::dxf::export_coils_dxf,
+            commands::dxf::export_sensor_dxf,
             commands::dxf::import_cad_dxf,
             commands::dxf::export_cad_geometry_dxf,
             commands::project::save_project,
@@ -78,6 +80,7 @@ fn main() {
             commands::routing_plugins::load_installed_plugins,
             commands::routing_plugins::list_installed_plugins,
             commands::routing_plugins::remove_routing_plugin,
+            commands::sensor::generate_sensor_geometry,
         ])
         .run(tauri::generate_context!())
         .expect("error while running pcbmotorgen tauri application");

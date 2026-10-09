@@ -21,6 +21,7 @@ import type {
   ProjectState,
   ProjectValidation,
 } from "../types";
+import { DEFAULT_SENSOR_CONFIG } from "../types";
 import {
   DEFAULT_PROJECT_FILE_NAME,
   confirmDiscardChanges,
@@ -32,6 +33,7 @@ import {
 import type { ConfigStore } from "./config.svelte";
 import type { MotionStore } from "./motion.svelte";
 import type { RecentFilesStore } from "./recentFiles.svelte";
+import type { SensorStore } from "./sensor.svelte";
 
 /** Normalise any thrown value into a display string. */
 function errorMessage(e: unknown): string {
@@ -72,6 +74,7 @@ export class ProjectStore {
      * must never affect the open flow.
      */
     private recents?: RecentFilesStore | null,
+    private sensor?: SensorStore,
   ) {}
 
   // --- Derived state -----------------------------------------------------
@@ -145,6 +148,7 @@ export class ProjectStore {
       },
       mover_position_mm: this.motion.positionMm,
       cad_geometry: this.cadGeometry,
+      sensor_config: this.sensor?.toIpc() ?? { ...DEFAULT_SENSOR_CONFIG },
     };
   }
 
@@ -196,6 +200,7 @@ export class ProjectStore {
     this.config.max_temperature_rise_c = c.max_temperature_rise_c;
     this.motion.positionMm = state.mover_position_mm;
     this.cadGeometry = state.cad_geometry ?? null;
+    this.sensor?.apply(state.sensor_config);
   }
 
   setCadGeometry(geometry: CadGeometry | null): void {

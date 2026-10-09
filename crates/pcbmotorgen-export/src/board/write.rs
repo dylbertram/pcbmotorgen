@@ -7,13 +7,15 @@
 //! skips all IPC traffic.
 
 use pcbmotorgen_dfm::DesignRules;
-use pcbmotorgen_routing::{PhaseCoil, RoutingResult};
+use pcbmotorgen_routing::{PhaseCoil, RoutingResult, SensorGeometry};
 
 use super::tally::tally_item_results;
 use super::{BoardHandle, WriteCoilsResult};
 use crate::commit::Commit;
 use crate::errors::KiCadError;
-use crate::writer::{coils_to_board_items, io_elements_to_board_items};
+use crate::writer::{
+    coils_to_board_items, io_elements_to_board_items, sensor_geometry_to_board_items,
+};
 
 impl<'a> BoardHandle<'a> {
     /// Write coils to the board atomically.
@@ -51,7 +53,13 @@ impl<'a> BoardHandle<'a> {
         rules: &DesignRules,
         active_area_length_mm: f64,
     ) -> Result<WriteCoilsResult, KiCadError> {
-        self.write_coils_inner(coils, num_layers, rules, active_area_length_mm, /* dry_run = */ false)
+        self.write_coils_inner(
+            coils,
+            num_layers,
+            rules,
+            active_area_length_mm,
+            /* dry_run = */ false,
+        )
     }
 
     /// Dry-run path: convert the coil geometry to items and return a
@@ -71,7 +79,46 @@ impl<'a> BoardHandle<'a> {
         rules: &DesignRules,
         active_area_length_mm: f64,
     ) -> Result<WriteCoilsResult, KiCadError> {
-        self.write_coils_inner(coils, num_layers, rules, active_area_length_mm, /* dry_run = */ true)
+        self.write_coils_inner(
+            coils,
+            num_layers,
+            rules,
+            active_area_length_mm,
+            /* dry_run = */ true,
+        )
+    }
+
+    /// Atomically write induction-sensor tracks and vias. Sensor copper is
+    /// authored for a two-layer board; terminal markers are never converted
+    /// to pads or footprints.
+    pub fn write_sensor_geometry(
+        &mut self,
+        geometry: &SensorGeometry,
+        rules: &DesignRules,
+        dry_run: bool,
+    ) -> Result<WriteCoilsResult, KiCadError> {
+        let items = sensor_geometry_to_board_items(geometry, rules);
+        let items_attempted = items.len() as u32;
+        if dry_run {
+            return Ok(WriteCoilsResult {
+                items_attempted,
+                items_created: 0,
+                failures: Vec::new(),
+                failure_summary: Vec::new(),
+            });
+        }
+
+        let mut commit = Commit::begin(self.client)?;
+        let create_resp = commit.create_items(&items, &self.document)?;
+        commit.end()?;
+        let (items_created, failures, failure_summary) =
+            tally_item_results(&create_resp.created_items);
+        Ok(WriteCoilsResult {
+            items_attempted,
+            items_created,
+            failures,
+            failure_summary,
+        })
     }
 
     /// Shared body for [`write_coils`](Self::write_coils) and
@@ -118,9 +165,7 @@ impl<'a> BoardHandle<'a> {
             );
         } else {
             for (l, n, s) in &per_layer {
-                eprintln!(
-                    "[pcbmotorgen::write_coils]   layer {l}: {n} phase(s), {s} segment(s)"
-                );
+                eprintln!("[pcbmotorgen::write_coils]   layer {l}: {n} phase(s), {s} segment(s)");
             }
         }
 
@@ -184,7 +229,13 @@ impl<'a> BoardHandle<'a> {
         rules: &DesignRules,
         active_area_length_mm: f64,
     ) -> Result<WriteCoilsResult, KiCadError> {
-        self.write_io_inner(result, num_layers, rules, active_area_length_mm, /* dry_run = */ false)
+        self.write_io_inner(
+            result,
+            num_layers,
+            rules,
+            active_area_length_mm,
+            /* dry_run = */ false,
+        )
     }
 
     /// Dry-run path for [`write_io_elements`](Self::write_io_elements):
@@ -197,7 +248,13 @@ impl<'a> BoardHandle<'a> {
         rules: &DesignRules,
         active_area_length_mm: f64,
     ) -> Result<WriteCoilsResult, KiCadError> {
-        self.write_io_inner(result, num_layers, rules, active_area_length_mm, /* dry_run = */ true)
+        self.write_io_inner(
+            result,
+            num_layers,
+            rules,
+            active_area_length_mm,
+            /* dry_run = */ true,
+        )
     }
 
     /// Shared body for [`write_io_elements`](Self::write_io_elements) and
