@@ -20,8 +20,8 @@ import type {
   LoadProjectResult,
   ProjectState,
   ProjectValidation,
-  DEFAULT_SENSOR_CONFIG,
 } from "../types";
+import { DEFAULT_SENSOR_CONFIG } from "../types";
 import {
   DEFAULT_PROJECT_FILE_NAME,
   confirmDiscardChanges,

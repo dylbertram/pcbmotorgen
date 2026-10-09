@@ -85,6 +85,24 @@ function editDesign(config: ConfigStore, motion: MotionStore): void {
 }
 
 describe("ProjectStore snapshot mapping", () => {
+  it("uses sensor defaults when no sensor store is supplied", () => {
+    const config = new ConfigStore();
+    const motion = new MotionStore(config);
+    const projects = new ProjectStore(config, motion);
+    expect(projects.snapshotIpc().sensor_config?.lambda_mm).toBe(120);
+  });
+
+  it("tracks sensor-only edits and restores defaults from older projects", () => {
+    const { sensor, projects } = makeStores();
+    const legacy = projects.snapshotIpc();
+    delete legacy.sensor_config;
+    projects.markClean();
+    sensor.set("tx_trace_width_mm", 0.3);
+    expect(projects.isDirty).toBe(true);
+    projects.applyToState(legacy);
+    expect(sensor.config.tx_trace_width_mm).toBe(0.15);
+    expect(sensor.config.lambda_mm).toBe(120);
+  });
   it("captures every persisted input group in UI units", () => {
     const { config, motion, projects } = makeStores();
     editDesign(config, motion);

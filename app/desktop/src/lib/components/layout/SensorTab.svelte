@@ -15,7 +15,9 @@
   let dxfBusy = $state(false);
   let dxfError = $state<string | null>(null);
   let dxfResult = $state<DxfExportResult | null>(null);
+  let dxfConfigKey = $state<string | null>(null);
   let dxfSavedTo = $state<string | null>(null);
+  let dxfIsCurrent = $derived(dxfResult !== null && dxfConfigKey === configKey);
 
   let boardPreviewIsCurrent = $derived(
     boardResult !== null && boardPreviewKey === configKey,
@@ -47,8 +49,9 @@
     boardBusy = true;
     boardError = null;
     try {
-      boardResult = await writeSensorToBoard(store.toIpc(), false);
-      boardPreviewKey = configKey;
+      const request = store.toIpc();
+      boardResult = await writeSensorToBoard(request, false);
+      boardPreviewKey = JSON.stringify(request);
     } catch (e) {
       boardError = e instanceof Error ? e.message : String(e);
     } finally {
@@ -62,7 +65,9 @@
     dxfResult = null;
     dxfSavedTo = null;
     try {
-      dxfResult = await exportSensorDxf(store.toIpc());
+      const request = store.toIpc();
+      dxfResult = await exportSensorDxf(request);
+      dxfConfigKey = JSON.stringify(request);
     } catch (e) {
       dxfError = e instanceof Error ? e.message : String(e);
     } finally {
@@ -71,7 +76,7 @@
   }
 
   async function saveDxf(): Promise<void> {
-    if (!dxfResult) return;
+    if (!dxfResult || !dxfIsCurrent) return;
     dxfBusy = true;
     dxfError = null;
     try {
@@ -121,6 +126,7 @@
       <label class="inline-flex items-center gap-2 text-xs text-slate-300">
         <input
           type="checkbox"
+          aria-label="Generate OSC spiral"
           checked={store.config.tx_enabled}
           onchange={(event) => store.set("tx_enabled", (event.currentTarget as HTMLInputElement).checked)}
           class="accent-violet-400"
@@ -173,7 +179,7 @@
       <button
         type="button"
         onclick={writeBoard}
-        disabled={!boardPreviewIsCurrent || boardBusy}
+        disabled={!boardPreviewIsCurrent || boardBusy || store.loading || !!store.error}
         class="rounded-md border border-emerald-500/50 bg-emerald-600/30 px-3 py-1.5 text-xs font-medium text-emerald-100 hover:bg-emerald-500/40 disabled:cursor-not-allowed disabled:opacity-40"
       >
         {boardBusy ? "Writing…" : "Write tracks and vias"}
@@ -190,7 +196,7 @@
         <button
           type="button"
           onclick={saveDxf}
-          disabled={dxfBusy}
+          disabled={dxfBusy || !dxfIsCurrent}
           class="rounded-md border border-slate-600 px-3 py-1.5 text-xs text-slate-200 hover:bg-slate-700 disabled:opacity-40"
         >Save DXF…</button>
       {/if}
@@ -199,7 +205,7 @@
     {#if boardResult}
       <div class="rounded-md border border-slate-700 bg-slate-900/60 px-3 py-2 text-xs text-slate-300" role="status">
         {#if boardResult.commit_id === "(dry run - no commit)"}
-          Board check passed: {boardResult.items_attempted} tracks/vias would be written. Confirm the current geometry to enable writing.
+          Board check passed: {boardResult.items_attempted} tracks/vias would be written. This checks board layers, not trace clearance.
         {:else}
           KiCad accepted {boardResult.items_created} of {boardResult.items_attempted} items · {boardResult.commit_id}.
         {/if}
@@ -208,14 +214,15 @@
         {/if}
         {#if boardResult.failures.length > 0}
           <ul class="mt-1 list-disc pl-4 text-rose-300">
-            {#each boardResult.failures.slice(0, 5) as failure (failure)}<li>{failure}</li>{/each}
+            {#each boardResult.failures.slice(0, 5) as failure, index (index)}<li>{failure}</li>{/each}
           </ul>
         {/if}
       </div>
     {/if}
     {#if dxfResult}
       <div class="rounded-md border border-violet-500/40 bg-violet-500/5 px-3 py-2 text-xs text-violet-100" role="status">
-        DXF ready: {dxfResult.summary.total_lines} lines · {dxfResult.summary.total_circles} via circles · {dxfResult.summary.layer_count} layers.
+        DXF centerlines: {dxfResult.summary.total_lines} lines including vertical vias · {dxfResult.summary.layer_count} drawing layers. Copper planes use a fixed 1.6 mm stack. Trace widths are not represented by centerlines.
+        {#if !dxfIsCurrent}<span class="ml-1 text-amber-300">Configuration changed; prepare the DXF again.</span>{/if}
         {#if dxfSavedTo}<span class="ml-1 text-emerald-300">Saved to {dxfSavedTo}</span>{/if}
       </div>
     {/if}

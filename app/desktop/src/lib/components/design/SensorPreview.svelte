@@ -70,7 +70,7 @@
           <circle
             cx={via.position.x}
             cy={via.position.y}
-            r="0.32"
+            r={net.via_size_mm / 2}
             fill="#0f172a"
             stroke={colorFor(net.name)}
             stroke-width="0.12"

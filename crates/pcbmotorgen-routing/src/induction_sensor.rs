@@ -10,6 +10,14 @@ use serde::{Deserialize, Serialize};
 const F_CU: u32 = 0;
 const B_CU: u32 = 1;
 const EPSILON: f64 = 1e-6;
+const MAX_SAMPLES: usize = 100_000;
+
+fn sample_count(value: f64) -> Result<usize, String> {
+    if !value.is_finite() || value > MAX_SAMPLES as f64 {
+        return Err("Sensor geometry exceeds the sampling limit; increase the curve step or reduce its dimensions".into());
+    }
+    Ok(value.ceil().max(1.0) as usize)
+}
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case", default)]
@@ -351,7 +359,7 @@ fn sine_lead_junction(c: &SensorConfig, y: f64) -> f64 {
 fn sine_handover_x(c: &SensorConfig, strand: u32, next: u32) -> Result<f64, String> {
     let x_start = c.x_start_mm;
     let x_end = x_start + c.lambda_mm;
-    let samples_per_period = (c.lambda_mm / 0.01).ceil().max(2.0) as usize;
+    let samples_per_period = sample_count(c.lambda_mm / 0.01)?.max(2);
     let samples = samples_per_period * 2;
     let step = c.lambda_mm / samples_per_period as f64;
     let diff =
@@ -816,14 +824,14 @@ fn wave_segments(
     strand: u32,
     first: Point,
     last: Point,
-) -> Vec<(Point, Point)> {
+) -> Result<Vec<(Point, Point)>, String> {
     if x_start == x_end {
-        return Vec::new();
+        return Ok(Vec::new());
     }
     let t_start = t_for_x(c, kind, x_start, strand);
     let t_end = t_for_x(c, kind, x_end, strand);
     let delta = t_end - t_start;
-    let count = (delta.abs() / c.arc_step_mm).ceil().max(1.0) as usize;
+    let count = sample_count(delta.abs() / c.arc_step_mm)?;
     let mut points: Vec<Point> = (0..=count)
         .map(|i| {
             wave_point(
@@ -839,7 +847,7 @@ fn wave_segments(
     // makes the emitted polyline exactly contiguous at every chain junction.
     points[0] = first;
     points[count] = last;
-    points.windows(2).map(|pair| (pair[0], pair[1])).collect()
+    Ok(points.windows(2).map(|pair| (pair[0], pair[1])).collect())
 }
 
 fn bulge_segments(
@@ -876,7 +884,7 @@ fn bulge_segments(
     } else {
         -((angle_start - angle_end).rem_euclid(tau))
     };
-    let count = (sweep.abs() * radius / c.arc_step_mm).ceil().max(1.0) as usize;
+    let count = sample_count(sweep.abs() * radius / c.arc_step_mm)?;
     let mut points: Vec<Point> = (0..=count)
         .map(|i| {
             let angle = angle_start + sweep * i as f64 / count as f64;
@@ -944,7 +952,7 @@ fn emit_chain(
                 x_end,
                 strand,
                 ..
-            } => wave_segments(c, kind, side, x_start, x_end, strand, start, end),
+            } => wave_segments(c, kind, side, x_start, x_end, strand, start, end)?,
             Element::Bulge { apex_x, .. } => bulge_segments(c, start, end, apex_x)?,
         };
         segments.extend(pieces.into_iter().map(|(start, end)| RouteSegment {
@@ -1273,7 +1281,7 @@ mod tests {
     fn default_geometry_matches_python_reference_coordinate_fingerprints() {
         let geometry = generate_sensor(&SensorConfig::default()).unwrap();
         // Fingerprints are generated from the Python prototype, rounding
-        // coordinates to 1 um before hashing to ignore libm last-bit noise.
+        // coordinates to 1 nm before hashing to ignore libm last-bit noise.
         assert_eq!(segment_hash(&geometry.nets[0].segments), 0x8ddb4ba52991ccc6);
         assert_eq!(via_hash(&geometry.nets[0].vias), 0x4f9274dfa19241b8);
         assert_eq!(segment_hash(&geometry.nets[1].segments), 0x58199ed5cc38b87e);
@@ -1321,5 +1329,53 @@ mod tests {
         assert!(generate_sensor(&config)
             .unwrap_err()
             .contains("curvature radius"));
+    }
+
+    #[test]
+    fn rejects_unbounded_sampling_from_project_inputs() {
+        for config in [
+            SensorConfig {
+                arc_step_mm: 1e-300,
+                ..SensorConfig::default()
+            },
+            SensorConfig {
+                lambda_mm: 1e300,
+                ..SensorConfig::default()
+            },
+        ] {
+            assert!(generate_sensor(&config)
+                .unwrap_err()
+                .contains("sampling limit"));
+        }
+    }
+
+    #[test]
+    fn x_start_translates_tracks_vias_and_terminals_without_resizing_sensor() {
+        let original = generate_sensor(&SensorConfig::default()).unwrap();
+        let offset = -37.5;
+        let shifted = generate_sensor(&SensorConfig {
+            x_start_mm: offset,
+            ..SensorConfig::default()
+        })
+        .unwrap();
+        for (before, after) in original.nets.iter().zip(&shifted.nets) {
+            assert_eq!(before.segments.len(), after.segments.len());
+            assert_eq!(before.vias.len(), after.vias.len());
+            for (a, b) in before.segments.iter().zip(&after.segments) {
+                assert_point_near(b.start, point(a.start.x + offset, a.start.y));
+                assert_point_near(b.end, point(a.end.x + offset, a.end.y));
+                assert_eq!(a.layer, b.layer);
+            }
+            for (a, b) in before.vias.iter().zip(&after.vias) {
+                assert_point_near(b.position, point(a.position.x + offset, a.position.y));
+            }
+        }
+        for ((_, a), (_, b)) in original
+            .terminal_markers
+            .iter()
+            .zip(&shifted.terminal_markers)
+        {
+            assert_point_near(*b, point(a.x + offset, a.y));
+        }
     }
 }
