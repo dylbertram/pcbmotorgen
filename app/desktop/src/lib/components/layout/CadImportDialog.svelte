@@ -274,7 +274,7 @@
     config.min_via_annular_ring_mm = viaAnnularRing;
     projects.setCadGeometry(imported.geometry);
     if (imported.warnings.length > 0) {
-      projects.notice = `Imported ${baseName(selectedPath ?? "CAD file")} with ${imported.warnings.length} warning(s). Review the CAD import diagnostics in Design.`;
+      projects.notice = `Imported ${baseName(selectedPath ?? "CAD file")} with ${imported.warnings.length} warning(s): ${imported.warnings.slice(0, 3).join(" ")}`;
     }
     onComplete();
   }
@@ -432,6 +432,9 @@
             {imported.geometry.routing.curves.length} arc(s),
             {imported.geometry.routing.vias.length} via(s).
             Drag to pan; pinch or ctrl-scroll to zoom. Review the preview, then open the design with this geometry.
+          </p>
+          <p class="text-[11px] text-slate-500">
+            Nearby endpoints are aligned for display only. Saved and exported geometry keeps the original DXF coordinates.
           </p>
           {#if !viaSizingValid}
             <p role="alert" class="text-xs text-rose-200">Via drill and annular ring must be positive values.</p>

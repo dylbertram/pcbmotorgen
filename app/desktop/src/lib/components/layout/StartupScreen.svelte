@@ -268,7 +268,7 @@
               <span class="rounded-full bg-slate-800 px-2.5 py-1 text-xs text-slate-200">{selectedProject.cad_geometry ? "Imported CAD" : "Generated"}</span>
             </div>
             <dl class="mt-4 grid grid-cols-2 gap-x-5 gap-y-3">
-              <div><dt class="text-[10px] uppercase tracking-wider text-slate-500">Routing pattern</dt><dd class="mt-0.5 truncate text-sm text-slate-100">{selectedProject.config.routing_pattern}</dd></div>
+              <div><dt class="text-[10px] uppercase tracking-wider text-slate-500">Routing pattern</dt><dd class="mt-0.5 truncate text-sm text-slate-100">{selectedProject.cad_geometry ? "Imported CAD pattern" : selectedProject.config.routing_pattern}</dd></div>
               <div><dt class="text-[10px] uppercase tracking-wider text-slate-500">Copper layers</dt><dd class="mt-0.5 text-sm text-slate-100">{selectedProject.cad_geometry?.layer_z_mm.length ?? selectedProject.config.num_layers}</dd></div>
               <div><dt class="text-[10px] uppercase tracking-wider text-slate-500">Desired travel</dt><dd class="mt-0.5 text-sm text-slate-100">{selectedProject.config.desired_travel_mm.toFixed(1)} mm</dd></div>
               <div><dt class="text-[10px] uppercase tracking-wider text-slate-500">Board width</dt><dd class="mt-0.5 text-sm text-slate-100">{selectedProject.config.active_area_width_mm.toFixed(1)} mm</dd></div>

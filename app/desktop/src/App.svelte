@@ -99,7 +99,11 @@ import {
   // serializes overlapping menu events.
   $effect(() => {
     const unbind = bindProjectMenuActions({
-      open: () => void projects.open(),
+      open: () => {
+        void projects.open().then((opened) => {
+          if (opened) startupOpen = false;
+        });
+      },
       save: () => void projects.save(false),
       saveAs: () => void projects.save(true),
       importCad: () => (cadImportDialogOpen = true),
@@ -108,7 +112,11 @@ import {
         // when its file vanished) before dispatching into the shared open
         // flow — a vanished file surfaces the existing "Open failed — …"
         // error banner. Both calls fail-open; no catch needed.
-        void recentFiles.dropMissing(path).then(() => projects.openPath(path));
+        void recentFiles.dropMissing(path)
+          .then(() => projects.openPath(path))
+          .then((opened) => {
+            if (opened) startupOpen = false;
+          });
       },
       clearRecent: () => void recentFiles.clear(),
     });
