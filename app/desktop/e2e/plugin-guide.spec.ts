@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { gotoDesignApp } from "./helpers";
 
 /**
  * In-app plugin authoring guide + routing-pattern select suite (kata bprp,
@@ -34,7 +35,7 @@ test.describe("routing pattern select (Bits UI) @interaction @desktop", () => {
   test("lists the catalog above a separator, and the sentinel opens the upload dialog without changing the selection", async ({
     page,
   }) => {
-    await page.goto("/");
+    await gotoDesignApp(page);
 
     const trigger = page.locator(PATTERN_TRIGGER);
     await expect(trigger).toContainText(MOCK_PATTERN_LABEL);
@@ -72,7 +73,7 @@ test.describe("routing pattern select (Bits UI) @interaction @desktop", () => {
   test("choosing a real pattern keeps the selection and closes the dropdown", async ({
     page,
   }) => {
-    await page.goto("/");
+    await gotoDesignApp(page);
 
     const trigger = page.locator(PATTERN_TRIGGER);
     await trigger.click();
@@ -92,7 +93,7 @@ test.describe("plugin authoring guide @interaction @desktop", () => {
   test("opens from the upload panel, renders the bundled crate docs, and closes independently", async ({
     page,
   }) => {
-    await page.goto("/");
+    await gotoDesignApp(page);
 
     // Open the "Load new generator" modal via the pattern-select sentinel.
     await page.locator(PATTERN_TRIGGER).click();

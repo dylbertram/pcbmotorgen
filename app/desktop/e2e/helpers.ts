@@ -6,6 +6,17 @@ export const DESIGN_SCROLL = "#design-settings-scroll";
 /** The persistent left column (aside) of the main grid. */
 export const ASIDE = "aside[aria-label='Persistent design reflection']";
 
+/** Open the app and pass through its first-run chooser with generated defaults. */
+export async function gotoDesignApp(page: Page): Promise<void> {
+  await page.goto("/");
+  const startup = page.getByRole("dialog");
+  if (await startup.isVisible().catch(() => false)) {
+    await startup.getByRole("button", { name: "New Design" }).click();
+    await startup.getByRole("button", { name: "Create design" }).click();
+    await expect(startup).toBeHidden();
+  }
+}
+
 export function boundingBox(locator: Locator) {
   return locator.boundingBox();
 }

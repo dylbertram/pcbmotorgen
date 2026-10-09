@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { gotoDesignApp } from "./helpers";
 
 /**
  * Mover screenshot tooling (kata 8tc4).
@@ -37,7 +38,7 @@ const READOUT = `${MOVER_BLOCK} div[aria-live="polite"]`;
 test("capture the mover at the min and max travel endpoints", async ({
   page,
 }) => {
-  await page.goto("/");
+  await gotoDesignApp(page);
   const slider = page.locator(SLIDER).first();
   await slider.waitFor({ state: "visible", timeout: 15_000 });
 

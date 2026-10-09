@@ -158,6 +158,8 @@ export async function bindProjectMenuActions(handlers: {
   open: () => void;
   save: () => void;
   saveAs: () => void;
+  /** The native File > Import CAD menu item was clicked. */
+  importCad?: () => void;
   /**
    * An "Open Recent" entry was clicked (kata eap8). The payload is the
    * absolute path exactly as it was displayed in the submenu.
@@ -173,6 +175,7 @@ export async function bindProjectMenuActions(handlers: {
     listen("menu:open-project", handlers.open),
     listen("menu:save-project", handlers.save),
     listen("menu:save-project-as", handlers.saveAs),
+    listen("menu:import-cad", () => handlers.importCad?.()),
     // Open Recent (kata eap8): Rust resolves the entry id to the path that
     // was displayed and forwards it as the event payload. Registered even
     // when the handlers are absent — the recents wiring is optional and

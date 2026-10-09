@@ -1,6 +1,202 @@
-import type { CadGeometry, CoilPathDto, PhaseCoilDto } from "./types";
+import type {
+  CadGeometry,
+  CadPoint,
+  CadRouteCurve,
+  CadRouteSegment,
+  CoilPathDto,
+  PhaseCoilDto,
+} from "./types";
 
 const M = 1e-3;
+
+interface PreviewEndpoint {
+  point: CadPoint;
+  layer: number;
+  net: string;
+  primitive: number;
+  set: (point: CadPoint) => void;
+}
+
+interface EndpointCluster {
+  anchor: CadPoint;
+  members: PreviewEndpoint[];
+}
+
+export interface JoinedCadPreview {
+  segments: CadRouteSegment[];
+  curves: CadRouteCurve[];
+}
+
+/**
+ * Close small endpoint gaps for display only. Imported/saved CAD geometry is
+ * deliberately left untouched; snapping is constrained to the same net and
+ * copper layer and uses the import tolerance as its maximum distance.
+ */
+export function joinCadPreviewEndpoints(
+  geometry: CadGeometry,
+  toleranceMm: number,
+): JoinedCadPreview {
+  const segments = geometry.routing.segments.map((segment) => ({
+    ...segment,
+    start: { ...segment.start },
+    end: { ...segment.end },
+  }));
+  const curves = geometry.routing.curves.map((curve) => ({
+    ...curve,
+    start: { ...curve.start },
+    mid: { ...curve.mid },
+    end: { ...curve.end },
+  }));
+
+  if (!Number.isFinite(toleranceMm) || toleranceMm <= 0) {
+    return { segments, curves };
+  }
+
+  const endpoints: PreviewEndpoint[] = [];
+  let primitive = 0;
+  for (const segment of segments) {
+    const id = primitive++;
+    endpoints.push(
+      {
+        point: segment.start,
+        layer: segment.layer,
+        net: segment.net,
+        primitive: id,
+        set: (point) => {
+          segment.start = point;
+        },
+      },
+      {
+        point: segment.end,
+        layer: segment.layer,
+        net: segment.net,
+        primitive: id,
+        set: (point) => {
+          segment.end = point;
+        },
+      },
+    );
+  }
+  for (const curve of curves) {
+    const id = primitive++;
+    endpoints.push(
+      {
+        point: curve.start,
+        layer: curve.layer,
+        net: curve.net,
+        primitive: id,
+        set: (point) => {
+          curve.start = point;
+        },
+      },
+      {
+        point: curve.end,
+        layer: curve.layer,
+        net: curve.net,
+        primitive: id,
+        set: (point) => {
+          curve.end = point;
+        },
+      },
+    );
+  }
+
+  const cellSize = toleranceMm;
+  const cell = (point: CadPoint) => ({
+    x: Math.floor(point.x / cellSize),
+    y: Math.floor(point.y / cellSize),
+  });
+  const groupKey = (layer: number, net: string) => JSON.stringify([layer, net]);
+  const viaGrid = new Map<string, Map<string, CadPoint[]>>();
+  for (const via of geometry.routing.vias) {
+    for (const layer of [via.from_layer, via.to_layer]) {
+      const key = groupKey(layer, via.net);
+      let grid = viaGrid.get(key);
+      if (!grid) viaGrid.set(key, (grid = new Map()));
+      const { x, y } = cell(via.position);
+      const bucketKey = `${x},${y}`;
+      const bucket = grid.get(bucketKey) ?? [];
+      bucket.push(via.position);
+      grid.set(bucketKey, bucket);
+    }
+  }
+
+  const unresolved: PreviewEndpoint[] = [];
+  for (const endpoint of endpoints) {
+    const grid = viaGrid.get(groupKey(endpoint.layer, endpoint.net));
+    const { x, y } = cell(endpoint.point);
+    let nearest: { point: CadPoint; distance: number } | undefined;
+    for (let dx = -1; dx <= 1; dx += 1) {
+      for (let dy = -1; dy <= 1; dy += 1) {
+        for (const point of grid?.get(`${x + dx},${y + dy}`) ?? []) {
+          const distance = Math.hypot(endpoint.point.x - point.x, endpoint.point.y - point.y);
+          if (distance <= toleranceMm && (!nearest || distance < nearest.distance)) {
+            nearest = { point, distance };
+          }
+        }
+      }
+    }
+
+    if (nearest) endpoint.set({ ...nearest.point });
+    else unresolved.push(endpoint);
+  }
+
+  const groups = new Map<string, Map<string, EndpointCluster[]>>();
+  const clusters: EndpointCluster[] = [];
+
+  for (const endpoint of unresolved) {
+    const netKey = groupKey(endpoint.layer, endpoint.net);
+    let grid = groups.get(netKey);
+    if (!grid) groups.set(netKey, (grid = new Map()));
+    const { x, y } = cell(endpoint.point);
+    const nearby = new Set<EndpointCluster>();
+    for (let dx = -1; dx <= 1; dx += 1) {
+      for (let dy = -1; dy <= 1; dy += 1) {
+        for (const cluster of grid.get(`${x + dx},${y + dy}`) ?? []) nearby.add(cluster);
+      }
+    }
+
+    const matching = [...nearby]
+      .filter((cluster) =>
+        cluster.members.every((member) =>
+          member.primitive !== endpoint.primitive &&
+          Math.hypot(
+            member.point.x - endpoint.point.x,
+            member.point.y - endpoint.point.y,
+          ) <= toleranceMm,
+        ),
+      )
+      .sort((a, b) =>
+        Math.hypot(a.anchor.x - endpoint.point.x, a.anchor.y - endpoint.point.y) -
+        Math.hypot(b.anchor.x - endpoint.point.x, b.anchor.y - endpoint.point.y),
+      );
+    let cluster = matching[0];
+    if (!cluster) {
+      cluster = { anchor: endpoint.point, members: [] };
+      clusters.push(cluster);
+      const { x: cellX, y: cellY } = cell(endpoint.point);
+      const key = `${cellX},${cellY}`;
+      const bucket = grid.get(key) ?? [];
+      bucket.push(cluster);
+      grid.set(key, bucket);
+    }
+    cluster.members.push(endpoint);
+  }
+
+  for (const cluster of clusters) {
+    if (cluster.members.length < 2) continue;
+    const point = cluster.members.reduce(
+      (average, member) => ({
+        x: average.x + member.point.x / cluster.members.length,
+        y: average.y + member.point.y / cluster.members.length,
+      }),
+      { x: 0, y: 0 },
+    );
+    for (const member of cluster.members) member.set(point);
+  }
+
+  return { segments, curves };
+}
 
 /** Convert saved CAD centerlines to the existing top-down coil preview DTO. */
 export function cadGeometryToPreview(geometry: CadGeometry): CoilPathDto {
