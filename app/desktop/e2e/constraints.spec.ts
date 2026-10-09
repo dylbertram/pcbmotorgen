@@ -6,13 +6,14 @@ import {
   traceTotalReadout,
   box,
   eventually,
+  gotoDesignApp,
 } from "./helpers";
 
 test.describe("Design constraints restructure", () => {
   test("desired center-to-center travel is set in the Design constraints box", async ({
     page,
   }) => {
-    await page.goto("/");
+    await gotoDesignApp(page);
 
     const travelInput = numberField(page, "Desired travel (center-to-center)");
     await expect(travelInput).toBeVisible();
@@ -54,7 +55,7 @@ test.describe("Design constraints restructure", () => {
   test("active area width, PCB thickness and air gap remain editable", async ({
     page,
   }) => {
-    await page.goto("/");
+    await gotoDesignApp(page);
 
     // The four general geometry fields live inside the Design constraints box.
     await expect(page.locator("details", { hasText: "General" })).toHaveCount(0);
@@ -111,7 +112,7 @@ test.describe("Design constraints restructure", () => {
   test("routing parameters are not nested in their own box; dropdown hangs left of the title", async ({
     page,
   }) => {
-    await page.goto("/");
+    await gotoDesignApp(page);
 
     // No nested bordered section for routing parameters; they are part of the
     // combined Topology & Board panel.
@@ -139,7 +140,7 @@ test.describe("Design constraints restructure", () => {
   }, { tag: ["@constraints", "@desktop"] });
 
   test("drive and force targets live in the Simulation tab", async ({ page }) => {
-    await page.goto("/");
+    await gotoDesignApp(page);
 
     await expect(
       page.locator("#panel-design").getByText("Drive & Force Targets", { exact: true }),

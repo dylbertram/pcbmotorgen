@@ -1,5 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
-import { ASIDE } from "./helpers";
+import { ASIDE, gotoDesignApp } from "./helpers";
 
 /**
  * Modal scroll-lock regression suite (Kata xy31).
@@ -59,7 +59,7 @@ async function wheelWasPrevented(page: Page): Promise<boolean> {
 }
 
 async function openLightbox(page: Page) {
-  await page.goto("/");
+  await gotoDesignApp(page);
   await page.locator(EXPAND_BUTTON).click();
   await expect(page.locator(LIGHTBOX)).toBeVisible();
 }

@@ -22,6 +22,7 @@
 <script lang="ts">
   import { PHASE_COLORS } from "./coilPreviewCanvas";
   import type { CoilPreviewViewState } from "./coilPreviewViewState.svelte";
+  import LayerVisibilityControls from "./LayerVisibilityControls.svelte";
 
   let {
     view,
@@ -75,42 +76,12 @@
       {/each}
     </div>
   {/if}
-  <!-- Layer visibility toggles (per layer). A grey dot + label for
-       each copper layer, with a checkbox to show/hide that layer's
-       traces. Layers are overlaid at true coordinates, so toggling is
-       how you inspect a single layer in isolation. -->
-  {#if uniqueLayers.length > 0}
-    <div
-      class="flex items-center gap-2 flex-wrap"
-      role="group"
-      aria-label="Layer visibility"
-    >
-      {#each uniqueLayers as l (l.idx)}
-        <label
-          class="flex items-center gap-1 text-xs select-none cursor-pointer"
-          class:text-slate-500={!view.isLayerVisible(l.idx)}
-          class:text-slate-300={view.isLayerVisible(l.idx)}
-        >
-          <input
-            type="checkbox"
-            checked={view.isLayerVisible(l.idx)}
-            onchange={() => view.toggleLayer(l.idx)}
-            class="accent-emerald-500"
-            aria-label={"Show layer " + l.idx}
-          />
-          <span
-            class="inline-block w-2.5 h-2.5 rounded-full"
-            style="background-color: #94a3b8; opacity: {view.isLayerVisible(
-              l.idx,
-            )
-              ? 1
-              : 0.35}"
-          ></span>
-          <span>Layer {l.idx}</span>
-        </label>
-      {/each}
-    </div>
-  {/if}
+  <!-- Layer visibility controls are shared with the CAD import preview. -->
+  <LayerVisibilityControls
+    layers={uniqueLayers}
+    isVisible={(layerIdx) => view.isLayerVisible(layerIdx)}
+    onToggle={(layerIdx) => view.toggleLayer(layerIdx)}
+  />
   <!-- Via visibility toggle -->
   <label
     class="flex items-center gap-1.5 text-xs text-slate-300 select-none cursor-pointer"

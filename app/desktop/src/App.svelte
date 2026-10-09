@@ -41,11 +41,16 @@
   import DesignTab from "./lib/components/layout/DesignTab.svelte";
   import SimulateTab from "./lib/components/layout/SimulateTab.svelte";
   import ExportTab from "./lib/components/layout/ExportTab.svelte";
+  import StartupScreen from "./lib/components/layout/StartupScreen.svelte";
+  import CadImportDialog from "./lib/components/layout/CadImportDialog.svelte";
   import SensorTab from "./lib/components/layout/SensorTab.svelte";
   import SensorPreview from "./lib/components/design/SensorPreview.svelte";
 
   // Session-only navigation state; none of these values enter IPC.
   let activeTab = $state<TabId>("design");
+  let startupOpen = $state(true);
+  let startupRecentLoading = $state(true);
+  let cadImportDialogOpen = $state(false);
 
   // App init: populate the routing-pattern selector + magnet-grade reference
   // from the backend. Fire-and-forget — failures are swallowed inside the
@@ -86,24 +91,37 @@
 
   // Open Recent (kata eap8): lazily load the persisted list and build the
   // native submenu from disk truth (the load prunes vanished entries).
-  // Best effort — a recents hiccup must never block app init.
-  void recentFiles.load().catch(() => undefined);
+  // Load recents before the startup chooser offers its recent-project list.
+  // Best effort — a recents hiccup must never block startup.
+  void recentFiles
+    .load()
+    .catch(() => undefined)
+    .finally(() => (startupRecentLoading = false));
 
-  // Native File menu (Open / Save / Save As, kata 0cgm; Open Recent +
+  // Native File menu (Open / Save / Save As / Import CAD, kata 0cgm; Open Recent +
   // Clear Recent Files, kata eap8): menu clicks land here as Tauri events
   // and dispatch into the same store flows. The store's busy guard
   // serializes overlapping menu events.
   $effect(() => {
     const unbind = bindProjectMenuActions({
-      open: () => void projects.open(),
+      open: () => {
+        void projects.open().then((opened) => {
+          if (opened) startupOpen = false;
+        });
+      },
       save: () => void projects.save(false),
       saveAs: () => void projects.save(true),
+      importCad: () => (cadImportDialogOpen = true),
       openRecent: (path) => {
         // Open-recent access point: refresh menu truth (the entry is pruned
         // when its file vanished) before dispatching into the shared open
         // flow — a vanished file surfaces the existing "Open failed — …"
         // error banner. Both calls fail-open; no catch needed.
-        void recentFiles.dropMissing(path).then(() => projects.openPath(path));
+        void recentFiles.dropMissing(path)
+          .then(() => projects.openPath(path))
+          .then((opened) => {
+            if (opened) startupOpen = false;
+          });
       },
       clearRecent: () => void recentFiles.clear(),
     });
@@ -192,6 +210,10 @@
   // Generate the Design-tab reflection when geometry or routing inputs change.
   // This effect intentionally runs regardless of the active workflow tab.
   $effect(() => {
+    if (startupOpen) {
+      scheduleCoilPreview.cancel();
+      return;
+    }
     void [
       config.desired_travel_mm,
       config.active_area_length_mm,
@@ -381,6 +403,7 @@
   // request id and layout key together prevent stale responses from opening
   // the export gate for a newer config.
   $effect(() => {
+    if (startupOpen) return;
     void drc.currentLayoutKey;
     drc.request();
   });
@@ -517,6 +540,7 @@
                   {config}
                   measuredTraceLengthMm={measuredTrace?.traceLengthMm ?? null}
                   routingDimensions={activeCoils?.routing_dimensions ?? null}
+                  cadGeometryActive={projects.cadGeometry !== null}
                 />
               </div>
             {/if}
@@ -535,7 +559,7 @@
             id="panel-design"
             class="h-full p-4 lg:pr-0"
           >
-             <DesignTab {config} {projects} />
+              <DesignTab {config} cadGeometry={projects.cadGeometry} />
           </Tabs.Content>
 
           <Tabs.Content
@@ -582,6 +606,29 @@
           </Tabs.Content>
         </div>
       </div>
+
+      {#if startupOpen}
+        <StartupScreen
+          {config}
+          {projects}
+          {recentFiles}
+          recentLoading={startupRecentLoading}
+          onComplete={() => (startupOpen = false)}
+          onImportCad={() => (cadImportDialogOpen = true)}
+        />
+      {/if}
+
+      {#if cadImportDialogOpen}
+        <CadImportDialog
+          {config}
+          {projects}
+          onClose={() => (cadImportDialogOpen = false)}
+          onComplete={() => {
+            cadImportDialogOpen = false;
+            startupOpen = false;
+          }}
+        />
+      {/if}
 
       <footer
         class="shrink-0 border-t border-slate-800 px-6 py-3 text-xs text-slate-500"
