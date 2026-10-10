@@ -169,6 +169,7 @@
   <div
     bind:this={dialogRef}
     class="grid h-[min(680px,calc(100dvh-2rem))] w-full max-w-5xl grid-rows-[minmax(190px,0.8fr)_minmax(0,1.2fr)] overflow-hidden rounded-xl border border-slate-700 bg-slate-900 shadow-2xl shadow-black/50 md:grid-cols-[minmax(230px,0.72fr)_minmax(0,1.7fr)] md:grid-rows-1"
+    style="outline: none"
     role="dialog"
     aria-modal="true"
     aria-labelledby="startup-title"
@@ -240,7 +241,7 @@
           <div class="grid gap-4 sm:grid-cols-2">
             <label class="block text-xs font-medium text-slate-300" for="startup-layers">
               Copper layers
-              <select id="startup-layers" value={String(selectedLayers)} onchange={(event) => (selectedLayers = Number(event.currentTarget.value))} disabled={layerChoices.length === 0} class="mt-1.5 w-full rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 disabled:opacity-50">
+              <select id="startup-layers" bind:value={selectedLayers} disabled={layerChoices.length === 0} class="mt-1.5 w-full rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 disabled:opacity-50">
                 {#each layerChoices as layer (layer)}<option value={layer}>{layer} layers</option>{/each}
                 {#if layerChoices.length === 0}<option value={selectedLayers}>{selectedLayers} layers</option>{/if}
               </select>
