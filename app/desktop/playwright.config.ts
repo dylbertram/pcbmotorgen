@@ -19,8 +19,7 @@ export default defineConfig({
   retries: process.env.CI ? 2 : 0,
   use: {
     baseURL: "http://localhost:1420",
-    // Use the installed system Chrome — no Playwright browser download.
-    channel: "chrome",
+    // Use Playwright's bundled Chromium so CI/server runs need no system Chrome.
     trace: "on-first-retry",
     screenshot: "only-on-failure",
   },

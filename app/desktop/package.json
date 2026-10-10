@@ -9,7 +9,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "tauri": "tauri",
-    "test:e2e": "playwright test",
+    "test:e2e": "playwright install chromium && playwright test",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:report": "playwright show-report",
     "shot:mover": "playwright test e2e/mover-screenshots.spec.ts --project=desktop-tauri",
