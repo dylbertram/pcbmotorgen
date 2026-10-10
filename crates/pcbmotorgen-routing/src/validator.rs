@@ -58,6 +58,26 @@ impl Validator {
         validate_segments(result, ctx, &bounds)?;
         validate_curves(result, ctx, &bounds)?;
         validate_vias(result, ctx, &bounds)?;
+        for (i, spline) in result.splines.iter().enumerate() {
+            spline.validate().map_err(|message| {
+                RoutingError::new(
+                    i + 1,
+                    format!("splines[{i}]"),
+                    RoutingErrorKind::Malformed,
+                    message,
+                )
+            })?;
+            check_layer(
+                spline.layer,
+                ctx.num_layers,
+                &format!("splines[{i}].layer"),
+                i + 1,
+            )?;
+            check_net(&spline.net, &format!("splines[{i}].net"), i + 1)?;
+            for p in &spline.control_points {
+                check_point(p, &bounds, &format!("splines[{i}].control_points"), i + 1)?;
+            }
+        }
         validate_pole_regions(result, &bounds)?;
         validate_phase_bands(result, ctx, &bounds)?;
         validate_io_pads(result, ctx, &bounds)?;
@@ -94,7 +114,12 @@ fn validate_segments(
                 ),
             ));
         }
-        check_layer(s.layer, ctx.num_layers, &format!("segments[{i}].layer"), idx)?;
+        check_layer(
+            s.layer,
+            ctx.num_layers,
+            &format!("segments[{i}].layer"),
+            idx,
+        )?;
         check_net(&s.net, &format!("segments[{i}].net"), idx)?;
     }
     Ok(())
@@ -133,8 +158,18 @@ fn validate_vias(
     for (i, v) in result.vias.iter().enumerate() {
         let idx = i + 1;
         check_point(&v.position, bounds, &format!("vias[{i}].position"), idx)?;
-        check_layer(v.from_layer, ctx.num_layers, &format!("vias[{i}].from_layer"), idx)?;
-        check_layer(v.to_layer, ctx.num_layers, &format!("vias[{i}].to_layer"), idx)?;
+        check_layer(
+            v.from_layer,
+            ctx.num_layers,
+            &format!("vias[{i}].from_layer"),
+            idx,
+        )?;
+        check_layer(
+            v.to_layer,
+            ctx.num_layers,
+            &format!("vias[{i}].to_layer"),
+            idx,
+        )?;
         if v.from_layer == v.to_layer {
             return Err(RoutingError::new(
                 idx,
@@ -249,12 +284,16 @@ fn validate_phase_bands(
                 RoutingErrorKind::Degenerate,
                 format!(
                     "degenerate y-extent {} ↦ {} mm — y_min_mm and y_max_mm must differ",
-                    band.y_min_mm,
-                    band.y_max_mm
+                    band.y_min_mm, band.y_max_mm
                 ),
             ));
         }
-        check_layer(band.layer, ctx.num_layers, &format!("phase_bands[{i}].layer"), idx)?;
+        check_layer(
+            band.layer,
+            ctx.num_layers,
+            &format!("phase_bands[{i}].layer"),
+            idx,
+        )?;
         check_net(&band.net, &format!("phase_bands[{i}].net"), idx)?;
     }
     Ok(())
@@ -274,7 +313,12 @@ fn validate_io_pads(
 ) -> Result<(), RoutingError> {
     for (i, pad) in result.io_pads.iter().enumerate() {
         let idx = i + 1;
-        check_point(&pad.position, bounds, &format!("io_pads[{i}].position"), idx)?;
+        check_point(
+            &pad.position,
+            bounds,
+            &format!("io_pads[{i}].position"),
+            idx,
+        )?;
         if !pad.size.x.is_finite()
             || !pad.size.y.is_finite()
             || pad.size.x <= 0.0
@@ -323,7 +367,12 @@ fn validate_io_pads(
             _ => {}
         }
         for (j, &layer) in pad.layers.iter().enumerate() {
-            check_layer(layer, ctx.num_layers, &format!("io_pads[{i}].layers[{j}]"), idx)?;
+            check_layer(
+                layer,
+                ctx.num_layers,
+                &format!("io_pads[{i}].layers[{j}]"),
+                idx,
+            )?;
         }
         check_net(&pad.net, &format!("io_pads[{i}].net"), idx)?;
     }
@@ -353,24 +402,27 @@ fn validate_io_traces(
                 ),
             ));
         }
-        check_layer(t.layer, ctx.num_layers, &format!("io_traces[{i}].layer"), idx)?;
+        check_layer(
+            t.layer,
+            ctx.num_layers,
+            &format!("io_traces[{i}].layer"),
+            idx,
+        )?;
         check_net(&t.net, &format!("io_traces[{i}].net"), idx)?;
     }
     Ok(())
 }
 
-fn check_point(
-    p: &Point,
-    bounds: &Bounds,
-    field: &str,
-    index: usize,
-) -> Result<(), RoutingError> {
+fn check_point(p: &Point, bounds: &Bounds, field: &str, index: usize) -> Result<(), RoutingError> {
     if !p.x.is_finite() || !p.y.is_finite() {
         return Err(RoutingError::new(
             index,
             field,
             RoutingErrorKind::Malformed,
-            format!("non-finite coordinate {},{} — NaN/Inf is not a valid position", p.x, p.y),
+            format!(
+                "non-finite coordinate {},{} — NaN/Inf is not a valid position",
+                p.x, p.y
+            ),
         ));
     }
     if p.x < -bounds.eps || p.x > bounds.x_max + bounds.eps {
@@ -392,8 +444,7 @@ fn check_point(
             RoutingErrorKind::OutOfBounds,
             format!(
                 "y = {:.3} mm outside the board width [0, {:.3} mm]",
-                p.y,
-                bounds.board_width
+                p.y, bounds.board_width
             ),
         ));
     }
@@ -692,7 +743,11 @@ mod tests {
         }];
         let e = Validator::validate(&r, &ctx(), false).unwrap_err();
         assert_eq!(e.kind, RoutingErrorKind::OutOfBounds);
-        assert!(e.field.contains("phase_bands[0].end_x_mm"), "field: {}", e.field);
+        assert!(
+            e.field.contains("phase_bands[0].end_x_mm"),
+            "field: {}",
+            e.field
+        );
     }
 
     #[test]

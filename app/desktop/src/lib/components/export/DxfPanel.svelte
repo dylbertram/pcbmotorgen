@@ -23,6 +23,7 @@
     return (
       `${pluralize(s.total_lines, "line")} · ` +
       `${pluralize(s.total_arcs, "arc")} · ` +
+      (s.total_splines ? `${pluralize(s.total_splines, "spline")} · ` : "") +
       `${pluralize(s.total_circles, "circle")} · ` +
       `${pluralize(s.layer_count, "layer")}`
     );
@@ -132,6 +133,9 @@
       aria-live="polite"
     >
       <div class="font-semibold mb-2">DXF generated</div>
+      {#if result.summary.total_splines}
+        <p class="mb-2">{pluralize(result.summary.total_splines, "editable spline")} · DXF 2000</p>
+      {/if}
       <div class="grid grid-cols-2 gap-2">
         <div class="rounded border border-slate-700 bg-slate-900/40 px-2 py-1.5">
           <div class="font-mono text-[11px] text-slate-400">lines</div>

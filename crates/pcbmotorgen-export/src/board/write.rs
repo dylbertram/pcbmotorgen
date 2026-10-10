@@ -97,7 +97,8 @@ impl<'a> BoardHandle<'a> {
         rules: &DesignRules,
         dry_run: bool,
     ) -> Result<WriteCoilsResult, KiCadError> {
-        let items = sensor_geometry_to_board_items(geometry, rules);
+        let items =
+            sensor_geometry_to_board_items(geometry, rules).map_err(KiCadError::Protocol)?;
         let items_attempted = items.len() as u32;
         if dry_run {
             return Ok(WriteCoilsResult {

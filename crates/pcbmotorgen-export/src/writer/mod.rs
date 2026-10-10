@@ -149,9 +149,18 @@ pub fn io_elements_to_board_items(
 /// board indices B.Cu=0/F.Cu=1, so this adapter explicitly reverses them.
 /// Per-net trace widths are retained and terminal markers are deliberately
 /// omitted (the prototype does not define physical footprints or pads).
-pub fn sensor_geometry_to_board_items(geometry: &SensorGeometry, rules: &DesignRules) -> Vec<Any> {
+pub fn sensor_geometry_to_board_items(
+    geometry: &SensorGeometry,
+    rules: &DesignRules,
+) -> Result<Vec<Any>, String> {
     let mut items = Vec::new();
     for net in &geometry.nets {
+        // KiCad copper tracks do not support splines. Flatten only here;
+        // keep the actual circular return bends as native KiCad arcs.
+        let mut tracks = net.segments.clone();
+        for spline in &net.splines {
+            tracks.extend(spline.tessellate(net.arc_step_mm)?);
+        }
         let net_rules = DesignRules {
             min_trace_mm: net.trace_width_mm,
             min_space_mm: rules.min_space_mm,
@@ -165,8 +174,7 @@ pub fn sensor_geometry_to_board_items(geometry: &SensorGeometry, rules: &DesignR
             let coil = PhaseCoil {
                 phase_idx: 0,
                 layer_idx: board_layer,
-                segments: net
-                    .segments
+                segments: tracks
                     .iter()
                     .filter(|segment| segment.layer == sensor_layer)
                     .map(|segment| pcbmotorgen_routing::CoilSegment {
@@ -175,7 +183,17 @@ pub fn sensor_geometry_to_board_items(geometry: &SensorGeometry, rules: &DesignR
                         is_active: segment.is_active,
                     })
                     .collect(),
-                corner_arcs: Vec::new(),
+                corner_arcs: net
+                    .curves
+                    .iter()
+                    .filter(|c| c.layer == sensor_layer)
+                    .map(|c| pcbmotorgen_routing::CoilArc {
+                        start: (c.start.x, c.start.y),
+                        mid: (c.mid.x, c.mid.y),
+                        end: (c.end.x, c.end.y),
+                        is_active: c.is_active,
+                    })
+                    .collect(),
                 phase_name: net.name.clone(),
                 pattern_id: "induction-position-sensor".into(),
                 layer_pair: Some((0, 1)),
@@ -192,7 +210,7 @@ pub fn sensor_geometry_to_board_items(geometry: &SensorGeometry, rules: &DesignR
             items.extend(coils_to_board_items(&[coil], 2, &net_rules, 0.0));
         }
     }
-    items
+    Ok(items)
 }
 
 // ---------------------------------------------------------------------------
@@ -491,8 +509,20 @@ mod tests {
         config.tx_trace_width_mm = 0.3;
         config.tx_via_size_mm = 0.8;
         let geometry = pcbmotorgen_routing::generate_sensor(&config).unwrap();
-        let items = sensor_geometry_to_board_items(&geometry, &DesignRules::default());
-        let expected_segments: usize = geometry.nets.iter().map(|net| net.segments.len()).sum();
+        let items = sensor_geometry_to_board_items(&geometry, &DesignRules::default()).unwrap();
+        let expected_segments: usize = geometry
+            .nets
+            .iter()
+            .map(|net| {
+                net.segments.len()
+                    + net
+                        .splines
+                        .iter()
+                        .map(|s| s.tessellate(net.arc_step_mm).unwrap().len())
+                        .sum::<usize>()
+            })
+            .sum();
+        let expected_arcs: usize = geometry.nets.iter().map(|net| net.curves.len()).sum();
         let expected_vias: usize = geometry.nets.iter().map(|net| net.vias.len()).sum();
         let tracks: Vec<Track> = items
             .iter()
@@ -507,7 +537,10 @@ mod tests {
 
         assert_eq!(tracks.len(), expected_segments);
         assert_eq!(vias.len(), expected_vias);
-        assert_eq!(items.len(), expected_segments + expected_vias);
+        assert_eq!(
+            items.len(),
+            expected_segments + expected_arcs + expected_vias
+        );
         assert_eq!(
             tracks
                 .iter()

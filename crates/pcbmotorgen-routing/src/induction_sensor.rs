@@ -1,10 +1,9 @@
 //! Parametric two-layer linear inductive position sensor geometry.
 //!
-//! Native Rust port of `pcbInductionPosition/pcbSensor`. Curves are sampled
-//! uniformly in the base-wave parameter (not in x), and each winding is
-//! emitted as one ordered electrical chain. Coordinates are millimetres.
+//! Native Rust port of `pcbInductionPosition/pcbSensor`. Waves remain cubic
+//! B-splines and return bends remain circular arcs. Coordinates are millimetres.
 
-use crate::{Point, RouteSegment, Via};
+use crate::{Point, RouteCurve, RouteSegment, RouteSpline, Via};
 use serde::{Deserialize, Serialize};
 
 const F_CU: u32 = 0;
@@ -144,9 +143,15 @@ impl SensorConfig {
 pub struct SensorNetGeometry {
     pub name: String,
     pub segments: Vec<RouteSegment>,
+    #[serde(default)]
+    pub curves: Vec<RouteCurve>,
+    #[serde(default)]
+    pub splines: Vec<RouteSpline>,
     pub vias: Vec<Via>,
     pub trace_width_mm: f64,
     pub via_size_mm: f64,
+    /// Only used by adapters which cannot represent splines, such as KiCad.
+    pub arc_step_mm: f64,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -815,6 +820,7 @@ fn element_endpoints(c: &SensorConfig, element: Element) -> (Point, Point, u32, 
     }
 }
 
+#[cfg(test)]
 fn wave_segments(
     c: &SensorConfig,
     kind: WaveKind,
@@ -850,15 +856,7 @@ fn wave_segments(
     Ok(points.windows(2).map(|pair| (pair[0], pair[1])).collect())
 }
 
-fn bulge_segments(
-    c: &SensorConfig,
-    start: Point,
-    end: Point,
-    apex_x: f64,
-) -> Result<Vec<(Point, Point)>, String> {
-    if (start.x - end.x).abs() < 1e-9 && (start.y - end.y).abs() < 1e-9 {
-        return Ok(Vec::new());
-    }
+fn bulge_arc(start: Point, end: Point, apex_x: f64) -> Result<(Point, Point, Point), String> {
     let (x1, y1, x2, y2) = (start.x, start.y, end.x, end.y);
     let (a1, b1) = (x2 - x1, y2 - y1);
     let c1 = 0.5 * (x2 * x2 + y2 * y2 - x1 * x1 - y1 * y1);
@@ -884,16 +882,94 @@ fn bulge_segments(
     } else {
         -((angle_start - angle_end).rem_euclid(tau))
     };
-    let count = sample_count(sweep.abs() * radius / c.arc_step_mm)?;
-    let mut points: Vec<Point> = (0..=count)
-        .map(|i| {
-            let angle = angle_start + sweep * i as f64 / count as f64;
-            point(cx + radius * angle.cos(), cy + radius * angle.sin())
-        })
-        .collect();
-    points[0] = start;
-    points[count] = end;
-    Ok(points.windows(2).map(|pair| (pair[0], pair[1])).collect())
+    let mid_angle = angle_start + sweep / 2.0;
+    Ok((
+        start,
+        point(cx + radius * mid_angle.cos(), cy + radius * mid_angle.sin()),
+        end,
+    ))
+}
+
+// Sine waves and their normal offsets are not polynomial curves. Fit them
+// with tangent-matched cubic spans to 0.1 micrometre positional accuracy,
+// retaining one editable B-spline for each uninterrupted wave/layer run.
+const SPLINE_TOLERANCE_MM: f64 = 0.0001;
+
+fn fit_wave_spline(
+    c: &SensorConfig,
+    kind: WaveKind,
+    side: f64,
+    x_start: f64,
+    x_end: f64,
+    strand: u32,
+    first: Point,
+    last: Point,
+) -> Result<(Vec<Point>, Vec<f64>), String> {
+    let t_start = t_for_x(c, kind, x_start, strand);
+    let delta = t_for_x(c, kind, x_end, strand) - t_start;
+    let evaluate = |u: f64| {
+        let t = t_start + delta * u;
+        let (f, fp) = base_and_slope(c, kind, t);
+        let k = std::f64::consts::TAU / c.lambda_mm;
+        let dx = 1.0 - f64::from(strand) * c.dy() * k * k * f / fp.hypot(1.0).powi(3);
+        (
+            wave_point(c, kind, side, t, strand),
+            point(delta * dx, delta * side * fp * dx),
+        )
+    };
+    fn fit(
+        evaluate: &impl Fn(f64) -> (Point, Point),
+        lo: f64,
+        hi: f64,
+        depth: u32,
+        spans: &mut Vec<(f64, [Point; 4])>,
+    ) -> Result<(), String> {
+        let (a, da) = evaluate(lo);
+        let (b, db) = evaluate(hi);
+        let h = (hi - lo) / 3.0;
+        let controls = [
+            a,
+            point(a.x + h * da.x, a.y + h * da.y),
+            point(b.x - h * db.x, b.y - h * db.y),
+            b,
+        ];
+        let accurate = [0.25_f64, 0.5, 0.75].iter().all(|&u| {
+            let v = 1.0 - u;
+            let weights = [v.powi(3), 3.0 * v * v * u, 3.0 * v * u * u, u.powi(3)];
+            let p = point(
+                (0..4).map(|i| weights[i] * controls[i].x).sum(),
+                (0..4).map(|i| weights[i] * controls[i].y).sum(),
+            );
+            p.distance_to(evaluate(lo + (hi - lo) * u).0) <= SPLINE_TOLERANCE_MM
+        });
+        if accurate {
+            if spans.len() >= MAX_SAMPLES {
+                return Err("Sensor spline exceeds the curve fitting limit".into());
+            }
+            spans.push((hi, controls));
+        } else {
+            if depth >= 20 {
+                return Err("Sensor spline could not meet curve fitting tolerance".into());
+            }
+            let mid = (lo + hi) / 2.0;
+            fit(evaluate, lo, mid, depth + 1, spans)?;
+            fit(evaluate, mid, hi, depth + 1, spans)?;
+        }
+        Ok(())
+    }
+    let mut spans = Vec::new();
+    fit(&evaluate, 0.0, 1.0, 0, &mut spans)?;
+    let mut controls = vec![first];
+    let mut knots = vec![0.0; 4];
+    for (i, (end, span)) in spans.iter().enumerate() {
+        controls.extend_from_slice(&span[1..]);
+        if i + 1 < spans.len() {
+            knots.extend([*end; 3]);
+        }
+    }
+    *controls.last_mut().unwrap() = last;
+    knots.extend([1.0; 4]);
+    Ok((controls, knots))
 }
 
 fn same_point(a: Point, b: Point) -> bool {
@@ -912,8 +988,18 @@ fn emit_chain(
     elements: &[Element],
     net: &str,
     is_active: bool,
-) -> Result<(Vec<RouteSegment>, Vec<Via>), String> {
+) -> Result<
+    (
+        Vec<RouteSegment>,
+        Vec<RouteCurve>,
+        Vec<RouteSpline>,
+        Vec<Via>,
+    ),
+    String,
+> {
     let mut segments = Vec::new();
+    let mut curves = Vec::new();
+    let mut splines = Vec::new();
     let mut vias = Vec::new();
     let mut seen_vias = Vec::new();
     let mut previous: Option<(Point, u32, u32)> = None;
@@ -943,8 +1029,14 @@ fn emit_chain(
             }
         }
 
-        let pieces = match element {
-            Element::Connector { .. } => vec![(start, end)],
+        match element {
+            Element::Connector { .. } => segments.push(RouteSegment {
+                start,
+                end,
+                layer,
+                net: net.to_string(),
+                is_active,
+            }),
             Element::Wave {
                 kind,
                 side,
@@ -952,19 +1044,36 @@ fn emit_chain(
                 x_end,
                 strand,
                 ..
-            } => wave_segments(c, kind, side, x_start, x_end, strand, start, end)?,
-            Element::Bulge { apex_x, .. } => bulge_segments(c, start, end, apex_x)?,
-        };
-        segments.extend(pieces.into_iter().map(|(start, end)| RouteSegment {
-            start,
-            end,
-            layer,
-            net: net.to_string(),
-            is_active,
-        }));
+            } => {
+                if x_start != x_end {
+                    let (control_points, knots) =
+                        fit_wave_spline(c, kind, side, x_start, x_end, strand, start, end)?;
+                    splines.push(RouteSpline {
+                        degree: 3,
+                        control_points,
+                        knots,
+                        weights: vec![],
+                        layer,
+                        net: net.to_string(),
+                        is_active,
+                    });
+                }
+            }
+            Element::Bulge { apex_x, .. } => {
+                let (start, mid, end) = bulge_arc(start, end, apex_x)?;
+                curves.push(RouteCurve {
+                    start,
+                    mid,
+                    end,
+                    layer,
+                    net: net.to_string(),
+                    is_active,
+                });
+            }
+        }
         previous = Some((end, layer, strand));
     }
-    Ok((segments, vias))
+    Ok((segments, curves, splines, vias))
 }
 
 fn generate_tx(c: &SensorConfig) -> (Vec<RouteSegment>, Vec<Via>, Vec<(String, Point)>) {
@@ -1038,22 +1147,28 @@ pub fn generate_sensor(c: &SensorConfig) -> Result<SensorGeometry, String> {
     validate(c)?;
     let cosine = make_cosine_elements(c)?;
     let sine = make_sine_elements(c)?;
-    let (cl1_segments, cl1_vias) = emit_chain(c, &cosine, "CL1", true)?;
-    let (cl2_segments, cl2_vias) = emit_chain(c, &sine, "CL2", true)?;
+    let (cl1_segments, cl1_curves, cl1_splines, cl1_vias) = emit_chain(c, &cosine, "CL1", true)?;
+    let (cl2_segments, cl2_curves, cl2_splines, cl2_vias) = emit_chain(c, &sine, "CL2", true)?;
     let mut nets = vec![
         SensorNetGeometry {
             name: "CL1".into(),
             segments: cl1_segments,
+            curves: cl1_curves,
+            splines: cl1_splines,
             vias: cl1_vias,
             trace_width_mm: c.trace_width_mm,
             via_size_mm: c.via_size_mm,
+            arc_step_mm: c.arc_step_mm,
         },
         SensorNetGeometry {
             name: "CL2".into(),
             segments: cl2_segments,
+            curves: cl2_curves,
+            splines: cl2_splines,
             vias: cl2_vias,
             trace_width_mm: c.trace_width_mm,
             via_size_mm: c.via_size_mm,
+            arc_step_mm: c.arc_step_mm,
         },
     ];
     let mut terminal_markers = Vec::new();
@@ -1063,9 +1178,12 @@ pub fn generate_sensor(c: &SensorConfig) -> Result<SensorGeometry, String> {
         nets.push(SensorNetGeometry {
             name: "OSC".into(),
             segments,
+            curves: vec![],
+            splines: vec![],
             vias,
             trace_width_mm: c.tx_trace_width_mm,
             via_size_mm: c.tx_via_size_mm,
+            arc_step_mm: c.arc_step_mm,
         });
     }
 
@@ -1089,6 +1207,18 @@ pub fn generate_sensor(c: &SensorConfig) -> Result<SensorGeometry, String> {
             bounds[1] = bounds[1].min(via.position.y);
             bounds[2] = bounds[2].max(via.position.x);
             bounds[3] = bounds[3].max(via.position.y);
+        }
+        // Control hulls bound splines without flattening the stored geometry.
+        for p in net
+            .splines
+            .iter()
+            .flat_map(|s| &s.control_points)
+            .chain(net.curves.iter().flat_map(|a| [&a.start, &a.mid, &a.end]))
+        {
+            bounds[0] = bounds[0].min(p.x);
+            bounds[1] = bounds[1].min(p.y);
+            bounds[2] = bounds[2].max(p.x);
+            bounds[3] = bounds[3].max(p.y);
         }
     }
     for (_, p) in &terminal_markers {
@@ -1226,7 +1356,7 @@ mod tests {
     }
 
     #[test]
-    fn default_geometry_has_ordered_python_reference_counts() {
+    fn default_geometry_keeps_waves_and_bends_as_curves() {
         let geometry = generate_sensor(&SensorConfig::default()).unwrap();
         assert_eq!(
             geometry
@@ -1236,9 +1366,12 @@ mod tests {
                 .collect::<Vec<_>>(),
             ["CL1", "CL2", "OSC"]
         );
-        assert_eq!(geometry.nets[0].segments.len(), 2015);
+        assert_eq!(geometry.nets[0].segments.len(), 33);
+        assert_eq!(geometry.nets[0].curves.len(), 2);
+        assert_eq!(geometry.nets[0].splines.len(), 12);
         assert_eq!(geometry.nets[0].vias.len(), 12);
-        assert_eq!(geometry.nets[1].segments.len(), 1945);
+        assert_eq!(geometry.nets[1].segments.len(), 27);
+        assert_eq!(geometry.nets[1].splines.len(), 16);
         assert_eq!(geometry.nets[1].vias.len(), 12);
         assert_eq!(geometry.nets[2].segments.len(), 23);
         assert_eq!(geometry.nets[2].vias.len(), 3);
@@ -1247,16 +1380,47 @@ mod tests {
 
     #[test]
     fn every_receiver_chain_is_point_aligned_and_layer_changes_have_vias() {
-        let geometry = generate_sensor(&SensorConfig::default()).unwrap();
-        for net in &geometry.nets[..2] {
-            for pair in net.segments.windows(2) {
-                assert_eq!(pair[0].end, pair[1].start, "{} segment chain", net.name);
-                if pair[0].layer != pair[1].layer {
-                    assert!(net.vias.iter().any(|via| via.position == pair[0].end));
+        assert_receiver_chains(&SensorConfig::default());
+    }
+
+    fn assert_receiver_chains(config: &SensorConfig) {
+        let geometry = generate_sensor(config).unwrap();
+        for (net, elements) in geometry.nets.iter().zip([
+            make_cosine_elements(config).unwrap(),
+            make_sine_elements(config).unwrap(),
+        ]) {
+            let mut segments = net.segments.iter();
+            let mut arcs = net.curves.iter();
+            let mut splines = net.splines.iter();
+            let mut previous: Option<(Point, u32)> = None;
+            for element in elements {
+                let (a, b, layer) = match element {
+                    Element::Connector { .. } => {
+                        let s = segments.next().unwrap();
+                        (s.start, s.end, s.layer)
+                    }
+                    Element::Bulge { .. } => {
+                        let c = arcs.next().unwrap();
+                        (c.start, c.end, c.layer)
+                    }
+                    Element::Wave { x_start, x_end, .. } => {
+                        if x_start == x_end {
+                            continue;
+                        }
+                        let s = splines.next().unwrap();
+                        s.validate().unwrap();
+                        (s.point_at(0.0), s.point_at(1.0), s.layer)
+                    }
+                };
+                if let Some((p, old_layer)) = previous {
+                    assert_eq!(a, p, "{} chain", net.name);
+                    if old_layer != layer {
+                        assert!(net.vias.iter().any(|v| v.position == a));
+                    }
                 }
+                previous = Some((b, layer));
             }
-            assert!(net.segments.iter().all(|segment| segment.net == net.name));
-            assert!(net.vias.iter().all(|via| via.net == net.name));
+            assert!(segments.next().is_none() && arcs.next().is_none() && splines.next().is_none());
         }
     }
 
@@ -1282,9 +1446,7 @@ mod tests {
         let geometry = generate_sensor(&SensorConfig::default()).unwrap();
         // Fingerprints are generated from the Python prototype, rounding
         // coordinates to 1 nm before hashing to ignore libm last-bit noise.
-        assert_eq!(segment_hash(&geometry.nets[0].segments), 0x8ddb4ba52991ccc6);
         assert_eq!(via_hash(&geometry.nets[0].vias), 0x4f9274dfa19241b8);
-        assert_eq!(segment_hash(&geometry.nets[1].segments), 0x58199ed5cc38b87e);
         assert_eq!(via_hash(&geometry.nets[1].vias), 0xce2415f56dddbbec);
         assert_eq!(segment_hash(&geometry.nets[2].segments), 0xc5ddd3f717ccfb40);
         assert_eq!(via_hash(&geometry.nets[2].vias), 0xf7a47817bc5c7a2f);
@@ -1306,17 +1468,7 @@ mod tests {
                 turns,
                 ..SensorConfig::default()
             };
-            let geometry =
-                generate_sensor(&config).unwrap_or_else(|error| panic!("{turns} turns: {error}"));
-            for net in &geometry.nets[..2] {
-                assert!(
-                    net.segments
-                        .windows(2)
-                        .all(|pair| pair[0].end == pair[1].start),
-                    "{} must remain an ordered chain for {turns} turns",
-                    net.name
-                );
-            }
+            assert_receiver_chains(&config);
         }
     }
 
@@ -1333,19 +1485,74 @@ mod tests {
 
     #[test]
     fn rejects_unbounded_sampling_from_project_inputs() {
-        for config in [
-            SensorConfig {
-                arc_step_mm: 1e-300,
-                ..SensorConfig::default()
-            },
-            SensorConfig {
-                lambda_mm: 1e300,
-                ..SensorConfig::default()
-            },
-        ] {
-            assert!(generate_sensor(&config)
-                .unwrap_err()
-                .contains("sampling limit"));
+        let geometry = generate_sensor(&SensorConfig {
+            arc_step_mm: 1e-300,
+            ..SensorConfig::default()
+        })
+        .unwrap();
+        assert!(geometry.nets[0].splines[0]
+            .tessellate(1e-300)
+            .unwrap_err()
+            .contains("sampling limit"));
+        assert!(generate_sensor(&SensorConfig {
+            lambda_mm: 1e300,
+            ..SensorConfig::default()
+        })
+        .unwrap_err()
+        .contains("sampling limit"));
+    }
+
+    #[test]
+    fn wave_splines_match_analytic_offsets_and_ignore_export_sampling_step() {
+        let c = SensorConfig::default();
+        for kind in [WaveKind::Sine, WaveKind::Cosine] {
+            for side in [-1.0, 1.0] {
+                for strand in [0, 1] {
+                    for (start, end) in [(0.0, c.lambda_mm), (c.lambda_mm, 0.0)] {
+                        let first = leg_point(&c, kind, side, start, strand);
+                        let last = leg_point(&c, kind, side, end, strand);
+                        let (control_points, knots) =
+                            fit_wave_spline(&c, kind, side, start, end, strand, first, last)
+                                .unwrap();
+                        let s = RouteSpline {
+                            degree: 3,
+                            knots,
+                            control_points,
+                            weights: vec![],
+                            layer: 0,
+                            net: "test".into(),
+                            is_active: true,
+                        };
+                        s.validate().unwrap();
+                        let ta = t_for_x(&c, kind, start, strand);
+                        let tb = t_for_x(&c, kind, end, strand);
+                        for i in 0..=2000 {
+                            let u = i as f64 / 2000.0;
+                            let exact = wave_point(&c, kind, side, ta + (tb - ta) * u, strand);
+                            assert!(s.point_at(u).distance_to(exact) < SPLINE_TOLERANCE_MM * 1.05);
+                        }
+                        // Compare the prototype's original samples, too.
+                        let samples =
+                            wave_segments(&c, kind, side, start, end, strand, first, last).unwrap();
+                        for (i, (p, _)) in samples.iter().enumerate() {
+                            assert!(
+                                s.point_at(i as f64 / samples.len() as f64).distance_to(*p)
+                                    < SPLINE_TOLERANCE_MM * 1.05
+                            );
+                        }
+                    }
+                }
+            }
+        }
+        let a = generate_sensor(&c).unwrap();
+        let b = generate_sensor(&SensorConfig {
+            arc_step_mm: 5.0,
+            ..c
+        })
+        .unwrap();
+        for (a, b) in a.nets.iter().zip(b.nets) {
+            assert_eq!(a.splines, b.splines);
+            assert_eq!(a.curves, b.curves);
         }
     }
 

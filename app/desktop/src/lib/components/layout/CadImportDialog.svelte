@@ -6,6 +6,7 @@
   import type { ProjectStore } from "../../stores/project.svelte";
   import type { CadImportResult } from "../../types";
   import { joinCadPreviewEndpoints } from "../../cadPreview";
+  import { arcSvgPath, splineSvgPath } from "../../curvePaths";
   import { attachBackdropScrollGuard, lockPageScroll } from "../../utils/pageScrollLock";
   import { fitWorldToView, type WorldTransform } from "../../chart";
   import CoilPreviewControls from "../design/CoilPreviewControls.svelte";
@@ -82,6 +83,7 @@
     const points = [
       ...geometry.routing.segments.flatMap(({ start, end }) => [start, end]),
       ...geometry.routing.curves.flatMap(({ start, mid, end }) => [start, mid, end]),
+      ...(geometry.routing.splines ?? []).flatMap((spline) => spline.control_points),
       ...geometry.routing.vias.map(({ position }) => position),
     ];
     if (points.length === 0) return { minX: 0, minY: 0, maxX: 1, maxY: 1 };
@@ -396,7 +398,10 @@
                         <path d={`M ${segment.start.x} ${segment.start.y} L ${segment.end.x} ${segment.end.y}`} />
                       {/each}
                       {#each joinedPreview.curves.filter((curve) => curve.layer === layer) as curve (curve)}
-                        <path d={`M ${curve.start.x} ${curve.start.y} Q ${curve.mid.x} ${curve.mid.y} ${curve.end.x} ${curve.end.y}`} />
+                        <path d={arcSvgPath(curve)} />
+                      {/each}
+                      {#each (imported.geometry.routing.splines ?? []).filter((spline) => spline.layer === layer) as spline (spline)}
+                        <path d={splineSvgPath(spline)} />
                       {/each}
                     </g>
                   {/if}
@@ -433,6 +438,7 @@
           <p class="text-xs text-slate-300">
             {imported.geometry.routing.segments.length} line(s),
             {imported.geometry.routing.curves.length} arc(s),
+            {imported.geometry.routing.splines?.length ?? 0} spline(s),
             {imported.geometry.routing.vias.length} via(s).
             Drag to pan; pinch or ctrl-scroll to zoom. Review the preview, then open the design with this geometry.
           </p>

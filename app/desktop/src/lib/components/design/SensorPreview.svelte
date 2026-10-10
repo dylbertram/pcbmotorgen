@@ -6,6 +6,7 @@
   import { PREVIEW_W, PREVIEW_H } from "./coilPreviewCanvas";
   import CoilPreviewControls from "./CoilPreviewControls.svelte";
   import LayerVisibilityControls from "./LayerVisibilityControls.svelte";
+  import { arcSvgPath, splineSvgPath } from "../../curvePaths";
   import { Dialog } from "bits-ui";
   import { attachBackdropScrollGuard, lockPageScroll } from "../../utils/pageScrollLock";
 
@@ -74,7 +75,7 @@
       <span class="text-[11px] text-amber-300" role="status">Generating…</span>
     {:else if geometry}
       <span class="font-mono text-[11px] text-slate-400">
-        {geometry.nets.reduce((n, net) => n + net.segments.length, 0)} tracks
+        {geometry.nets.reduce((n, net) => n + net.segments.length + (net.curves?.length ?? 0) + (net.splines?.length ?? 0), 0)} traces
       </span>
     {/if}
     <button
@@ -132,6 +133,16 @@
               opacity={segment.layer === 0 ? 0.95 : 0.58}
               stroke-dasharray={segment.layer === 1 ? "0.8 0.55" : undefined}
             />
+            {/if}
+          {/each}
+          {#each net.curves ?? [] as curve, index (`${net.name}-arc-${index}`)}
+            {#if previewView.isLayerVisible(curve.layer)}
+              <path d={arcSvgPath(curve)} opacity={curve.layer === 0 ? 0.95 : 0.58} stroke-dasharray={curve.layer === 1 ? "0.8 0.55" : undefined} />
+            {/if}
+          {/each}
+          {#each net.splines ?? [] as spline, index (`${net.name}-spline-${index}`)}
+            {#if previewView.isLayerVisible(spline.layer)}
+              <path d={splineSvgPath(spline)} opacity={spline.layer === 0 ? 0.95 : 0.58} stroke-dasharray={spline.layer === 1 ? "0.8 0.55" : undefined} />
             {/if}
           {/each}
         </g>

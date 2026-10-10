@@ -1,11 +1,11 @@
-//! DXF export command (pure `pcbmotorgen-export` R12 ASCII export).
+//! ASCII DXF exchange, preserving arcs and splines where supported.
 
 use crate::ipc::*;
 use pcbmotorgen_export::cad_dxf::{
-    cad_geometry_to_3d_dxf, import_3d_dxf, phase_coils_to_cad_geometry, CadGeometry,
-    CadImportOptions,
+    cad_geometry_to_3d_dxf, import_3d_dxf, phase_coils_to_cad_geometry,
+    sensor_geometry_to_cad_geometry, CadGeometry, CadImportOptions,
 };
-use pcbmotorgen_routing::{RouteSegment, RoutingResult, SensorConfig, Via};
+use pcbmotorgen_routing::SensorConfig;
 
 // ===========================================================================
 // export_coils_dxf — REAL (pcbmotorgen-export pure DXF R12 ASCII export)
@@ -29,6 +29,8 @@ pub struct DxfExportResult {
 pub struct DxfExportSummary {
     pub total_lines: u32,
     pub total_arcs: u32,
+    #[serde(default)]
+    pub total_splines: u32,
     pub total_circles: u32,
     pub layer_count: u32,
 }
@@ -69,6 +71,7 @@ pub async fn export_coils_dxf(config: LinearMotorConfigIpc) -> Result<DxfExportR
             summary: DxfExportSummary {
                 total_lines,
                 total_arcs,
+                total_splines: geometry.routing.splines.len() as u32,
                 total_circles,
                 layer_count,
             },
@@ -89,36 +92,7 @@ pub async fn export_sensor_dxf(config: SensorConfig) -> Result<DxfExportResult, 
 
 fn build_sensor_dxf(config: &SensorConfig) -> Result<DxfExportResult, String> {
     let sensor = pcbmotorgen_routing::generate_sensor(config)?;
-    let mut routing = RoutingResult::default();
-    for net in &sensor.nets {
-        for segment in &net.segments {
-            // DXF's CAD contract indexes copper bottom-to-top. Sensor
-            // geometry uses F.Cu=0/B.Cu=1, so invert the two-layer IDs.
-            routing.segments.push(RouteSegment {
-                start: segment.start,
-                end: segment.end,
-                layer: 1 - segment.layer,
-                net: segment.net.clone(),
-                is_active: segment.is_active,
-            });
-        }
-        for via in &net.vias {
-            routing.vias.push(Via {
-                position: via.position,
-                from_layer: 0,
-                to_layer: 1,
-                net: via.net.clone(),
-            });
-        }
-    }
-    let trace_width_mm = config.trace_width_mm;
-    let geometry = CadGeometry {
-        routing,
-        // This prototype has no configurable board stack yet; use the
-        // conventional 1.6 mm two-layer substrate for 3D coordinates.
-        layer_z_mm: vec![-1.6, 0.0],
-        trace_width_mm,
-    };
+    let geometry = sensor_geometry_to_cad_geometry(&sensor);
     let dxf_content = cad_geometry_to_3d_dxf(&geometry)?;
     let total_lines = dxf_content.matches("0\nLINE\n").count() as u32;
     let total_arcs = dxf_content.matches("0\nARC\n").count() as u32;
@@ -128,6 +102,20 @@ fn build_sensor_dxf(config: &SensorConfig) -> Result<DxfExportResult, String> {
         .segments
         .iter()
         .map(|segment| format!("L{}_{}", segment.layer, segment.net))
+        .chain(
+            geometry
+                .routing
+                .curves
+                .iter()
+                .map(|c| format!("L{}_{}", c.layer, c.net)),
+        )
+        .chain(
+            geometry
+                .routing
+                .splines
+                .iter()
+                .map(|s| format!("L{}_{}", s.layer, s.net)),
+        )
         .chain(
             geometry
                 .routing
@@ -142,6 +130,7 @@ fn build_sensor_dxf(config: &SensorConfig) -> Result<DxfExportResult, String> {
         summary: DxfExportSummary {
             total_lines,
             total_arcs,
+            total_splines: geometry.routing.splines.len() as u32,
             total_circles,
             layer_count,
         },
@@ -156,7 +145,9 @@ mod sensor_tests {
     fn sensor_dxf_counts_tracks_and_vertical_vias_and_round_trips_layers() {
         let config = SensorConfig::default();
         let result = build_sensor_dxf(&config).unwrap();
-        assert_eq!(result.summary.total_lines, 2015 + 1945 + 23 + 27);
+        assert_eq!(result.summary.total_lines, 33 + 27 + 23 + 27);
+        assert_eq!(result.summary.total_splines, 28);
+        assert_eq!(result.summary.total_arcs, 2);
         assert_eq!(result.summary.total_circles, 0);
         assert_eq!(result.summary.layer_count, 9);
         let imported = import_3d_dxf(
@@ -172,7 +163,9 @@ mod sensor_tests {
         .unwrap();
         assert_eq!(imported.geometry.layer_z_mm, vec![-1.6, 0.0]);
         assert_eq!(imported.geometry.routing.vias.len(), 27);
-        assert_eq!(imported.geometry.routing.segments.len(), 2015 + 1945 + 23);
+        assert_eq!(imported.geometry.routing.segments.len(), 33 + 27 + 23);
+        assert_eq!(imported.geometry.routing.splines.len(), 28);
+        assert_eq!(imported.geometry.routing.curves.len(), 2);
     }
 }
 
@@ -219,6 +212,7 @@ pub async fn export_cad_geometry_dxf(geometry: CadGeometry) -> Result<DxfExportR
             summary: DxfExportSummary {
                 total_lines,
                 total_arcs,
+                total_splines: geometry.routing.splines.len() as u32,
                 total_circles,
                 layer_count,
             },

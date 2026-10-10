@@ -23,15 +23,24 @@ pub(crate) fn write_header(out: &mut Vec<String>) {
 /// output is deterministic). Default colour: white (7). Vias get a different
 /// colour for visual distinction.
 pub(crate) fn write_tables(out: &mut Vec<String>, layer_names: &[String]) {
+    write_tables_version(out, layer_names, false);
+}
+
+pub(crate) fn write_tables_version(out: &mut Vec<String>, layer_names: &[String], modern: bool) {
     dxf_group(out, 0, "SECTION");
     dxf_group(out, 2, "TABLES");
 
     dxf_group(out, 0, "TABLE");
     dxf_group(out, 2, "LAYER");
+    if modern { dxf_group(out, 100, "AcDbSymbolTable"); }
     dxf_group(out, 70, &layer_names.len().to_string());
 
     for (i, name) in layer_names.iter().enumerate() {
         dxf_group(out, 0, "LAYER");
+        if modern {
+            dxf_group(out, 100, "AcDbSymbolTableRecord");
+            dxf_group(out, 100, "AcDbLayerTableRecord");
+        }
         dxf_group(out, 2, name);
         dxf_group(out, 70, "0"); // not frozen, not locked
                                  // Default colour: white (7). Vias get a different colour for

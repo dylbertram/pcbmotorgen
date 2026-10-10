@@ -182,6 +182,8 @@ pub struct RoutingResult {
     pub format_version: u32,
     pub segments: Vec<RouteSegment>,
     pub curves: Vec<RouteCurve>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub splines: Vec<crate::RouteSpline>,
     pub vias: Vec<Via>,
     /// Pattern-defined pole regions, one entry per phase and pole pitch.
     #[serde(default)]
@@ -212,6 +214,7 @@ impl Default for RoutingResult {
             format_version: FORMAT_VERSION,
             segments: Vec::new(),
             curves: Vec::new(),
+            splines: Vec::new(),
             vias: Vec::new(),
             pole_regions: Vec::new(),
             leg_grid: None,
@@ -226,6 +229,7 @@ impl RoutingResult {
     pub fn is_empty(&self) -> bool {
         self.segments.is_empty()
             && self.curves.is_empty()
+            && self.splines.is_empty()
             && self.vias.is_empty()
             && self.io_pads.is_empty()
             && self.io_traces.is_empty()
@@ -236,6 +240,7 @@ impl RoutingResult {
     pub fn element_count(&self) -> usize {
         self.segments.len()
             + self.curves.len()
+            + self.splines.len()
             + self.vias.len()
             + self.io_pads.len()
             + self.io_traces.len()

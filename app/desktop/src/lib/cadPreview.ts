@@ -6,6 +6,7 @@ import type {
   CoilPathDto,
   PhaseCoilDto,
 } from "./types";
+import { sampleSpline, splinePointAt } from "./curvePaths";
 
 const M = 1e-3;
 
@@ -248,6 +249,16 @@ export function cadGeometryToPreview(geometry: CadGeometry): CoilPathDto {
     coil.corner_arcs!.push({ start, mid, end, is_active: curve.is_active });
     addBounds(coil, [[curve.start.x, curve.start.y], [curve.mid.x, curve.mid.y], [curve.end.x, curve.end.y]]);
   }
+  for (const spline of geometry.routing.splines ?? []) {
+    const coil = getGroup(spline.layer, spline.net);
+    (coil.splines ??= []).push({ ...spline, control_points: spline.control_points.map((p) => ({ x: p.x * M, y: p.y * M })) });
+    addBounds(coil, spline.control_points.map((p) => [p.x, p.y]));
+    const points = sampleSpline(spline);
+    const length = points.slice(1).reduce((sum, p, i) => sum + Math.hypot(p.x - points[i].x, p.y - points[i].y) * M, 0);
+    coil.total_length_m += length;
+    if (spline.is_active) coil.active_length_m += length;
+    else coil.end_turn_length_m += length;
+  }
   for (const via of geometry.routing.vias) {
     getGroup(via.from_layer, via.net).via_positions!.push([via.position.x * M, via.position.y * M]);
     getGroup(via.to_layer, via.net).via_positions!.push([via.position.x * M, via.position.y * M]);
@@ -258,8 +269,12 @@ export function cadGeometryToPreview(geometry: CadGeometry): CoilPathDto {
     coil.bounding_box = b;
     const first = coil.segments[0];
     const last = coil.segments[coil.segments.length - 1];
-    coil.terminal_start = first?.start ?? [b[0], b[1]];
-    coil.terminal_end = last?.end ?? [b[2], b[3]];
+    const firstSpline = coil.splines?.[0];
+    const lastSpline = coil.splines?.at(-1);
+    const splineStart = firstSpline ? splinePointAt(firstSpline, firstSpline.knots[firstSpline.degree]) : null;
+    const splineEnd = lastSpline ? splinePointAt(lastSpline, lastSpline.knots[lastSpline.control_points.length]) : null;
+    coil.terminal_start = first?.start ?? (splineStart ? [splineStart.x, splineStart.y] : [b[0], b[1]]);
+    coil.terminal_end = last?.end ?? (splineEnd ? [splineEnd.x, splineEnd.y] : [b[2], b[3]]);
   }
   return { phases, layer_count: Math.max(geometry.layer_z_mm.length, 1) };
 }

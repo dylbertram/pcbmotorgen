@@ -1,4 +1,5 @@
 /** Native inductive position sensor generator and preview contracts (mm). */
+import type { CadRouteCurve, CadRouteSpline } from "./dxf";
 export interface SensorConfig {
   lambda_mm: number;
   x_start_mm: number;
@@ -43,6 +44,8 @@ export interface SensorVia {
 export interface SensorNetGeometry {
   name: string;
   segments: SensorRouteSegment[];
+  curves?: CadRouteCurve[];
+  splines?: CadRouteSpline[];
   vias: SensorVia[];
   trace_width_mm: number;
   via_size_mm: number;

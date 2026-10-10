@@ -44,6 +44,7 @@ import {
   type PreviewGeometry,
 } from "../../previewGeometry";
 import type { WorldTransform } from "../../chart";
+import { arcSvgPath, splineSvgPath } from "../../curvePaths";
 
 /** Virtual drawing-space width (the canvas maps to 760 virtual px). */
 export const PREVIEW_W = 760;
@@ -309,10 +310,19 @@ export class CoilPreviewRenderer {
       for (const arc of arcs) {
         ctx.setLineDash(arc.is_active ? [] : [3 / s, 2 / s]);
         ctx.globalAlpha = layerOpacity * (arc.is_active ? 1 : 0.6);
-        ctx.beginPath();
-        ctx.moveTo(arc.start[0], arc.start[1]);
-        ctx.quadraticCurveTo(arc.mid[0], arc.mid[1], arc.end[0], arc.end[1]);
-        ctx.stroke();
+        ctx.stroke(new Path2D(arcSvgPath({
+          start: { x: arc.start[0], y: arc.start[1] },
+          mid: { x: arc.mid[0], y: arc.mid[1] },
+          end: { x: arc.end[0], y: arc.end[1] },
+          layer: ph.layer_idx, net: ph.phase_name, is_active: arc.is_active ?? false,
+        })));
+      }
+      for (const spline of ph.splines ?? []) {
+        ctx.setLineDash([]);
+        ctx.globalAlpha = layerOpacity;
+        ctx.lineWidth = 2.4 / s;
+        ctx.stroke(new Path2D(splineSvgPath(spline)));
+        segments += 1;
       }
     }
 

@@ -1,6 +1,7 @@
 /**
  * Generated coil geometry (generate_coils).
  */
+import type { CadRouteSpline } from "./dxf";
 
 export interface CoilSegmentDto {
   start: [number, number]; // (x, y) [m]
@@ -33,6 +34,8 @@ export interface PhaseCoilDto {
   terminal_end: [number, number];
   /** Rounded corners / curves (absent for straight-line-only patterns). */
   corner_arcs?: CoilArcDto[];
+  /** Editable imported splines; control point coordinates are metres here. */
+  splines?: CadRouteSpline[];
   /** Center positions of inter-layer vias, (x, y) [m]. */
   via_positions?: [number, number][];
 }

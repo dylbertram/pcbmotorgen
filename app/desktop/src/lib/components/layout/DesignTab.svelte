@@ -184,7 +184,7 @@
               <div>
                 <dt class="text-[10px] text-slate-500">Trace elements</dt>
                 <dd class="font-mono text-xs text-slate-200">
-                  {cadGeometry.routing.segments.length + cadGeometry.routing.curves.length}
+                  {cadGeometry.routing.segments.length + cadGeometry.routing.curves.length + (cadGeometry.routing.splines?.length ?? 0)}
                 </dd>
               </div>
               <div>

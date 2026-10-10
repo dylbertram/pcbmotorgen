@@ -275,7 +275,7 @@
               <div><dt class="text-[10px] uppercase tracking-wider text-slate-500">Desired travel</dt><dd class="mt-0.5 text-sm text-slate-100">{selectedProject.config.desired_travel_mm.toFixed(1)} mm</dd></div>
               <div><dt class="text-[10px] uppercase tracking-wider text-slate-500">Board width</dt><dd class="mt-0.5 text-sm text-slate-100">{selectedProject.config.active_area_width_mm.toFixed(1)} mm</dd></div>
               <div><dt class="text-[10px] uppercase tracking-wider text-slate-500">Magnets</dt><dd class="mt-0.5 text-sm text-slate-100">{selectedProject.config.magnet_count}</dd></div>
-              <div><dt class="text-[10px] uppercase tracking-wider text-slate-500">Geometry elements</dt><dd class="mt-0.5 text-sm text-slate-100">{selectedProject.cad_geometry ? selectedProject.cad_geometry.routing.segments.length + selectedProject.cad_geometry.routing.curves.length + selectedProject.cad_geometry.routing.vias.length : "Generated from settings"}</dd></div>
+              <div><dt class="text-[10px] uppercase tracking-wider text-slate-500">Geometry elements</dt><dd class="mt-0.5 text-sm text-slate-100">{selectedProject.cad_geometry ? selectedProject.cad_geometry.routing.segments.length + selectedProject.cad_geometry.routing.curves.length + (selectedProject.cad_geometry.routing.splines?.length ?? 0) + selectedProject.cad_geometry.routing.vias.length : "Generated from settings"}</dd></div>
             </dl>
           </div>
         {:else if !recentLoading && recentFiles.paths.length === 0}

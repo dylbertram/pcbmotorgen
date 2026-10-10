@@ -17,7 +17,22 @@ pub fn routing_result_to_phase_coils(result: &RoutingResult, pattern_id: &str) -
     let mut coils: Vec<PhaseCoil> = Vec::new();
     let mut index: BTreeMap<(u32, String), usize> = BTreeMap::new();
 
-    for s in &result.segments {
+    // The legacy force model consumes straight conductors. Keep the routing
+    // model untouched and tessellate spline copies only at this boundary.
+    let sampled: Vec<_> = result
+        .splines
+        .iter()
+        .flat_map(|s| {
+            let length: f64 = s
+                .control_points
+                .windows(2)
+                .map(|p| p[0].distance_to(p[1]))
+                .sum();
+            s.tessellate((length / 10_000.0).max(0.25))
+                .expect("routing splines must be validated before adapting to coils")
+        })
+        .collect();
+    for s in result.segments.iter().chain(&sampled) {
         let key = (s.layer, s.net.clone());
         let idx = *index.entry(key.clone()).or_insert_with(|| {
             coils.push(PhaseCoil {
@@ -57,7 +72,9 @@ pub fn routing_result_to_phase_coils(result: &RoutingResult, pattern_id: &str) -
     for v in &result.vias {
         let key = (v.from_layer, v.net.clone());
         if let Some(&idx) = index.get(&key) {
-            coils[idx].center_via_positions.push((v.position.x, v.position.y));
+            coils[idx]
+                .center_via_positions
+                .push((v.position.x, v.position.y));
         } else {
             // Via on a layer with no conductor — attach to a coil on that
             // layer+net if one exists later, else drop (preview only).

@@ -145,6 +145,19 @@ pub fn routing_result_to_dxf(
     active_area_length_mm: f64,
     centre_x: bool,
 ) -> String {
+    // This legacy entry point promises R12, which has no SPLINE entity.
+    // The app's CAD exchange writer preserves splines in DXF 2000 instead.
+    let mut flattened;
+    let result = if result.splines.is_empty() { result } else {
+        flattened = result.clone();
+        for spline in &result.splines {
+            let length: f64 = spline.control_points.windows(2).map(|p| p[0].distance_to(p[1])).sum();
+            flattened.segments.extend(spline.tessellate((length / 10_000.0).max(0.25))
+                .expect("routing splines must be validated before R12 export"));
+        }
+        flattened.splines.clear();
+        &flattened
+    };
     let x_offset_mm = if centre_x {
         active_area_length_mm / 2.0
     } else {

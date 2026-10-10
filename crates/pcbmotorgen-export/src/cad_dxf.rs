@@ -7,7 +7,9 @@
 
 use std::collections::BTreeSet;
 
-use pcbmotorgen_routing::{Point, RouteCurve, RouteSegment, RoutingResult, Via};
+use pcbmotorgen_routing::{
+    Point, RouteCurve, RouteSegment, RouteSpline, RoutingResult, SensorGeometry, Via,
+};
 use serde::{Deserialize, Serialize};
 
 use crate::{groups, sections};
@@ -70,9 +72,52 @@ struct PendingVia {
     net: String,
 }
 
+struct PendingSpline {
+    spline: RouteSpline,
+    z: f64,
+    layer_hint: Option<u32>,
+}
+
+/// Preserve sensor curves in the CAD model. Sensor layers are top-to-bottom;
+/// CAD layers are bottom-to-top. The sensor uses a fixed 1.6 mm stack.
+pub fn sensor_geometry_to_cad_geometry(sensor: &SensorGeometry) -> CadGeometry {
+    let mut routing = RoutingResult::default();
+    for net in &sensor.nets {
+        routing
+            .segments
+            .extend(net.segments.iter().cloned().map(|mut s| {
+                s.layer = 1 - s.layer;
+                s
+            }));
+        routing
+            .curves
+            .extend(net.curves.iter().cloned().map(|mut c| {
+                c.layer = 1 - c.layer;
+                c
+            }));
+        routing
+            .splines
+            .extend(net.splines.iter().cloned().map(|mut s| {
+                s.layer = 1 - s.layer;
+                s
+            }));
+        routing.vias.extend(net.vias.iter().cloned().map(|mut v| {
+            v.from_layer = 0;
+            v.to_layer = 1;
+            v
+        }));
+    }
+    CadGeometry {
+        routing,
+        layer_z_mm: vec![-1.6, 0.0],
+        trace_width_mm: sensor.nets[0].trace_width_mm,
+    }
+}
+
 /// Export 3D DXF with planar trace centerlines and vertical via centerlines.
 pub fn cad_geometry_to_3d_dxf(geometry: &CadGeometry) -> Result<String, String> {
     validate_geometry(geometry)?;
+    let modern = !geometry.routing.splines.is_empty();
     let mut layer_names = BTreeSet::new();
     for segment in &geometry.routing.segments {
         layer_names.insert(format!(
@@ -83,6 +128,13 @@ pub fn cad_geometry_to_3d_dxf(geometry: &CadGeometry) -> Result<String, String> 
     }
     for curve in &geometry.routing.curves {
         layer_names.insert(format!("L{}_{}", curve.layer, safe_layer_part(&curve.net)));
+    }
+    for spline in &geometry.routing.splines {
+        layer_names.insert(format!(
+            "L{}_{}",
+            spline.layer,
+            safe_layer_part(&spline.net)
+        ));
     }
     for via in &geometry.routing.vias {
         layer_names.insert(format!(
@@ -99,8 +151,19 @@ pub fn cad_geometry_to_3d_dxf(geometry: &CadGeometry) -> Result<String, String> 
         999,
         &format!("pcbmotorgen:trace_width_mm={:.9}", geometry.trace_width_mm),
     );
-    sections::write_header(&mut out);
-    sections::write_tables(&mut out, &layer_names);
+    if geometry.routing.splines.is_empty() {
+        sections::write_header(&mut out);
+    } else {
+        // SPLINE requires DXF R13 or newer, not the legacy R12 contract.
+        groups::dxf_group(&mut out, 0, "SECTION");
+        groups::dxf_group(&mut out, 2, "HEADER");
+        groups::dxf_group(&mut out, 9, "$ACADVER");
+        groups::dxf_group(&mut out, 1, "AC1015");
+        groups::dxf_group(&mut out, 9, "$INSUNITS");
+        groups::dxf_group(&mut out, 70, "4");
+        groups::dxf_group(&mut out, 0, "ENDSEC");
+    }
+    sections::write_tables_version(&mut out, &layer_names, modern);
     groups::dxf_group(&mut out, 0, "SECTION");
     groups::dxf_group(&mut out, 2, "ENTITIES");
 
@@ -112,6 +175,7 @@ pub fn cad_geometry_to_3d_dxf(geometry: &CadGeometry) -> Result<String, String> 
             &layer,
             (segment.start.x, segment.start.y, z),
             (segment.end.x, segment.end.y, z),
+            modern,
         );
     }
     for curve in &geometry.routing.curves {
@@ -124,6 +188,16 @@ pub fn cad_geometry_to_3d_dxf(geometry: &CadGeometry) -> Result<String, String> 
             (curve.mid.x, curve.mid.y),
             (curve.end.x, curve.end.y),
             z,
+            modern,
+        );
+    }
+    for spline in &geometry.routing.splines {
+        let layer = format!("L{}_{}", spline.layer, safe_layer_part(&spline.net));
+        write_3d_spline(
+            &mut out,
+            &layer,
+            spline,
+            geometry.layer_z_mm[spline.layer as usize],
         );
     }
     for via in &geometry.routing.vias {
@@ -146,6 +220,7 @@ pub fn cad_geometry_to_3d_dxf(geometry: &CadGeometry) -> Result<String, String> 
                 via.position.y,
                 geometry.layer_z_mm[via.to_layer as usize],
             ),
+            modern,
         );
     }
     groups::dxf_group(&mut out, 0, "ENDSEC");
@@ -260,6 +335,7 @@ pub fn import_3d_dxf(text: &str, options: CadImportOptions) -> Result<CadImportR
     let mut warnings = Vec::new();
     let mut segments = Vec::new();
     let mut curves = Vec::new();
+    let mut splines = Vec::new();
     let mut vias = Vec::new();
     let mut legacy_circles = 0usize;
 
@@ -267,6 +343,52 @@ pub fn import_3d_dxf(text: &str, options: CadImportOptions) -> Result<CadImportR
         let name = field(&entity, 8).unwrap_or("0");
         let (net, layer_hint) = decode_trace_layer(name);
         match entity.kind.as_str() {
+            "SPLINE" => {
+                let values = |code: i32| -> Result<Vec<f64>, String> {
+                    entity
+                        .fields
+                        .iter()
+                        .filter(|(c, _)| *c == code)
+                        .map(|(_, v)| {
+                            v.parse::<f64>()
+                                .map_err(|_| "DXF SPLINE has invalid numeric data".to_string())
+                        })
+                        .collect()
+                };
+                let xs = values(10)?;
+                let ys = values(20)?;
+                let zs = values(30)?;
+                if xs.len() != ys.len() || (!zs.is_empty() && zs.len() != xs.len()) {
+                    return Err("DXF SPLINE has mismatched control point coordinates".into());
+                }
+                let z = zs.first().copied().unwrap_or(0.0) * options.units_to_mm;
+                if zs.iter().any(|v| {
+                    !v.is_finite() || (v * options.units_to_mm - z).abs() > options.z_tolerance_mm
+                }) {
+                    return Err(format!(
+                        "Non-planar DXF SPLINE on layer '{name}' is not supported"
+                    ));
+                }
+                let spline = RouteSpline {
+                    degree: number(&entity, 71)? as usize,
+                    knots: values(40)?,
+                    weights: values(41)?,
+                    control_points: xs
+                        .iter()
+                        .zip(ys)
+                        .map(|(x, y)| Point::new(x * options.units_to_mm, y * options.units_to_mm))
+                        .collect(),
+                    layer: 0,
+                    net,
+                    is_active: true,
+                };
+                spline.validate()?;
+                splines.push(PendingSpline {
+                    spline,
+                    z,
+                    layer_hint,
+                });
+            }
             "LINE" => {
                 let point = |x_code, y_code, z_code| -> Result<(f64, f64, f64), String> {
                     Ok((
@@ -386,7 +508,7 @@ pub fn import_3d_dxf(text: &str, options: CadImportOptions) -> Result<CadImportR
             "Skipped {legacy_circles} 2D circle(s); circles do not encode via layer spans."
         ));
     }
-    if segments.is_empty() && curves.is_empty() && vias.is_empty() {
+    if segments.is_empty() && curves.is_empty() && splines.is_empty() && vias.is_empty() {
         return Err("DXF contained no supported trace or via centerlines".into());
     }
 
@@ -394,13 +516,15 @@ pub fn import_3d_dxf(text: &str, options: CadImportOptions) -> Result<CadImportR
         .iter()
         .map(|s| s.z)
         .chain(curves.iter().map(|c| c.z))
+        .chain(splines.iter().map(|s| s.z))
         .chain(vias.iter().flat_map(|v| [v.z0, v.z1]))
         .collect();
     let has_explicit_z = heights.iter().any(|z| z.abs() > 1e-9);
     let legacy_2d = !has_explicit_z
         && vias.is_empty()
         && (segments.iter().any(|s| s.layer_hint.is_some())
-            || curves.iter().any(|c| c.layer_hint.is_some()));
+            || curves.iter().any(|c| c.layer_hint.is_some())
+            || splines.iter().any(|s| s.layer_hint.is_some()));
     let legacy_layers = options
         .legacy_layer_count
         .max(
@@ -408,6 +532,7 @@ pub fn import_3d_dxf(text: &str, options: CadImportOptions) -> Result<CadImportR
                 .iter()
                 .filter_map(|s| s.layer_hint)
                 .chain(curves.iter().filter_map(|c| c.layer_hint))
+                .chain(splines.iter().filter_map(|s| s.layer_hint))
                 .max()
                 .map_or(1, |n| n + 1),
         )
@@ -461,6 +586,15 @@ pub fn import_3d_dxf(text: &str, options: CadImportOptions) -> Result<CadImportR
             is_active: true,
         });
     }
+    for mut pending in splines {
+        let layer = if legacy_2d {
+            pending.layer_hint.unwrap_or(0)
+        } else {
+            layer_for(pending.z)
+        };
+        pending.spline.layer = reconcile_layer_hint(layer, pending.layer_hint, &mut warnings);
+        routing.splines.push(pending.spline);
+    }
     for via in vias {
         let from_layer = layer_for(via.z0);
         let to_layer = layer_for(via.z1);
@@ -487,6 +621,17 @@ pub fn import_3d_dxf(text: &str, options: CadImportOptions) -> Result<CadImportR
                     && curve.net == via.net
                     && (curve.start.distance_to(via.position) <= options.z_tolerance_mm
                         || curve.end.distance_to(via.position) <= options.z_tolerance_mm)
+            }) || routing.splines.iter().any(|spline| {
+                spline.layer == endpoint
+                    && spline.net == via.net
+                    && [
+                        spline.knots[spline.degree],
+                        spline.knots[spline.control_points.len()],
+                    ]
+                    .iter()
+                    .any(|&t| {
+                        spline.point_at(t).distance_to(via.position) <= options.z_tolerance_mm
+                    })
             });
             if !connected {
                 warnings.push(format!(
@@ -532,6 +677,7 @@ fn validate_geometry(geometry: &CadGeometry) -> Result<(), String> {
         .iter()
         .map(|s| s.layer)
         .chain(geometry.routing.curves.iter().map(|c| c.layer))
+        .chain(geometry.routing.splines.iter().map(|s| s.layer))
         .chain(
             geometry
                 .routing
@@ -545,6 +691,9 @@ fn validate_geometry(geometry: &CadGeometry) -> Result<(), String> {
         }
     }
     let finite_point = |p: Point| p.x.is_finite() && p.y.is_finite();
+    for spline in &geometry.routing.splines {
+        spline.validate()?;
+    }
     if geometry
         .routing
         .segments
@@ -584,9 +733,44 @@ fn safe_layer_part(value: &str) -> String {
     }
 }
 
-fn write_3d_line(out: &mut Vec<String>, layer: &str, a: (f64, f64, f64), b: (f64, f64, f64)) {
-    groups::dxf_group(out, 0, "LINE");
+fn write_3d_spline(out: &mut Vec<String>, layer: &str, spline: &RouteSpline, z: f64) {
+    groups::dxf_group(out, 0, "SPLINE");
+    groups::dxf_group(out, 100, "AcDbEntity");
     groups::dxf_group(out, 8, layer);
+    groups::dxf_group(out, 100, "AcDbSpline");
+    groups::dxf_group(out, 70, if spline.weights.is_empty() { "8" } else { "12" });
+    groups::dxf_group(out, 71, &spline.degree.to_string());
+    groups::dxf_group(out, 72, &spline.knots.len().to_string());
+    groups::dxf_group(out, 73, &spline.control_points.len().to_string());
+    groups::dxf_group(out, 74, "0");
+    for knot in &spline.knots {
+        groups::dxf_group(out, 40, &knot.to_string());
+    }
+    for weight in &spline.weights {
+        groups::dxf_group(out, 41, &weight.to_string());
+    }
+    for p in &spline.control_points {
+        groups::dxf_group(out, 10, &format!("{:.12}", p.x));
+        groups::dxf_group(out, 20, &format!("{:.12}", p.y));
+        groups::dxf_group(out, 30, &format!("{z:.12}"));
+    }
+}
+
+fn write_3d_line(
+    out: &mut Vec<String>,
+    layer: &str,
+    a: (f64, f64, f64),
+    b: (f64, f64, f64),
+    modern: bool,
+) {
+    groups::dxf_group(out, 0, "LINE");
+    if modern {
+        groups::dxf_group(out, 100, "AcDbEntity");
+    }
+    groups::dxf_group(out, 8, layer);
+    if modern {
+        groups::dxf_group(out, 100, "AcDbLine");
+    }
     groups::dxf_group_f64(out, 10, a.0);
     groups::dxf_group_f64(out, 20, a.1);
     groups::dxf_group_f64(out, 30, a.2);
@@ -602,13 +786,14 @@ fn write_3d_arc(
     m: (f64, f64),
     b: (f64, f64),
     z: f64,
+    modern: bool,
 ) {
     let (ax, ay) = a;
     let (mx, my) = m;
     let (bx, by) = b;
     let d = 2.0 * (ax * (my - by) + mx * (by - ay) + bx * (ay - my));
     if d.abs() < 1e-12 {
-        write_3d_line(out, layer, (ax, ay, z), (bx, by, z));
+        write_3d_line(out, layer, (ax, ay, z), (bx, by, z), modern);
         return;
     }
     let aa = ax * ax + ay * ay;
@@ -625,11 +810,20 @@ fn write_3d_arc(
         std::mem::swap(&mut start, &mut end);
     }
     groups::dxf_group(out, 0, "ARC");
+    if modern {
+        groups::dxf_group(out, 100, "AcDbEntity");
+    }
     groups::dxf_group(out, 8, layer);
+    if modern {
+        groups::dxf_group(out, 100, "AcDbCircle");
+    }
     groups::dxf_group_f64(out, 10, cx);
     groups::dxf_group_f64(out, 20, cy);
     groups::dxf_group_f64(out, 30, z);
     groups::dxf_group_f64(out, 40, (ax - cx).hypot(ay - cy));
+    if modern {
+        groups::dxf_group(out, 100, "AcDbArc");
+    }
     groups::dxf_group_f64(out, 50, start);
     groups::dxf_group_f64(out, 51, end);
 }
@@ -792,6 +986,100 @@ fn reconcile_layer_hint(z_layer: u32, hint: Option<u32>, warnings: &mut Vec<Stri
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn sensor_dxf_preserves_editable_splines_arcs_and_layer_transitions() {
+        let sensor =
+            pcbmotorgen_routing::generate_sensor(&pcbmotorgen_routing::SensorConfig::default())
+                .unwrap();
+        let geometry = sensor_geometry_to_cad_geometry(&sensor);
+        let text = cad_geometry_to_3d_dxf(&geometry).unwrap();
+        assert!(text.contains("$ACADVER\n1\nAC1015"));
+        assert!(text.contains("100\nAcDbSpline"));
+        assert!(text.contains("100\nAcDbArc"));
+        assert_eq!(text.matches("0\nSPLINE\n").count(), 28);
+        assert_eq!(text.matches("0\nARC\n").count(), 2);
+        assert_eq!(text.matches("0\nLINE\n").count(), 110);
+        let imported = import_3d_dxf(
+            &text,
+            CadImportOptions {
+                units_to_mm: 1.0,
+                z_tolerance_mm: 0.01,
+                default_trace_width_mm: 0.15,
+                legacy_layer_count: 2,
+                legacy_pcb_thickness_mm: 1.6,
+            },
+        )
+        .unwrap();
+        assert!(imported.warnings.is_empty(), "{:?}", imported.warnings);
+        assert_eq!(imported.geometry.layer_z_mm, vec![-1.6, 0.0]);
+        assert_eq!(imported.geometry.routing.splines.len(), 28);
+        assert_eq!(imported.geometry.routing.curves.len(), 2);
+        assert_eq!(imported.geometry.routing.vias.len(), 27);
+        for (a, b) in geometry
+            .routing
+            .splines
+            .iter()
+            .zip(&imported.geometry.routing.splines)
+        {
+            assert_eq!(a.knots, b.knots);
+            assert_eq!(a.layer, b.layer);
+            assert_eq!(a.net, b.net);
+            assert_eq!(a.control_points.len(), b.control_points.len());
+            for i in 0..=100 {
+                assert!(
+                    a.point_at(i as f64 / 100.0)
+                        .distance_to(b.point_at(i as f64 / 100.0))
+                        < 1e-9
+                );
+            }
+        }
+        let again = cad_geometry_to_3d_dxf(&imported.geometry).unwrap();
+        assert_eq!(again.matches("0\nSPLINE\n").count(), 28);
+        assert_eq!(again.matches("0\nLINE\n").count(), 110);
+    }
+
+    #[test]
+    fn spline_only_dxf_round_trips_rational_control_points_with_unit_conversion() {
+        let spline = RouteSpline {
+            degree: 2,
+            knots: vec![0.0, 0.0, 0.0, 1.0, 1.0, 1.0],
+            control_points: vec![
+                Point::new(1.0, 0.0),
+                Point::new(1.0, 1.0),
+                Point::new(0.0, 1.0),
+            ],
+            weights: vec![1.0, 0.5_f64.sqrt(), 1.0],
+            layer: 0,
+            net: "RX".into(),
+            is_active: true,
+        };
+        let geometry = CadGeometry {
+            routing: RoutingResult {
+                splines: vec![spline.clone()],
+                ..RoutingResult::default()
+            },
+            layer_z_mm: vec![-1.0],
+            trace_width_mm: 0.15,
+        };
+        let text = cad_geometry_to_3d_dxf(&geometry).unwrap();
+        let imported = import_3d_dxf(
+            &text,
+            CadImportOptions {
+                units_to_mm: 25.4,
+                z_tolerance_mm: 0.01,
+                default_trace_width_mm: 0.15,
+                legacy_layer_count: 1,
+                legacy_pcb_thickness_mm: 1.6,
+            },
+        )
+        .unwrap();
+        let curve = &imported.geometry.routing.splines[0];
+        assert!(imported.geometry.routing.segments.is_empty());
+        assert_eq!(curve.knots, spline.knots);
+        assert_eq!(curve.weights, spline.weights);
+        assert!((curve.point_at(0.5).x - 25.4 * 0.5_f64.sqrt()).abs() < 1e-9);
+    }
 
     fn sample() -> CadGeometry {
         let mut routing = RoutingResult::default();

@@ -31,7 +31,7 @@
       <SensorParamField label="RX trace gap (mm)" id="sensor-rx-gap" value={store.config.trace_gap_mm} min={0} step={0.01} onCommit={(v) => store.set("trace_gap_mm", v)} />
       <SensorParamField label="Minimum clearance (mm)" id="sensor-clearance" value={store.config.min_clearance_mm} min={0} step={0.01} onCommit={(v) => store.set("min_clearance_mm", v)} />
       <SensorParamField label="RX via size (mm)" id="sensor-via-size" value={store.config.via_size_mm} min={0.1} step={0.05} onCommit={(v) => store.set("via_size_mm", v)} />
-      <SensorParamField label="Curve sample step (mm)" id="sensor-arc-step" value={store.config.arc_step_mm} min={0.02} step={0.05} onCommit={(v) => store.set("arc_step_mm", v)} />
+      <SensorParamField label="KiCad spline step (mm)" id="sensor-arc-step" value={store.config.arc_step_mm} min={0.02} step={0.05} onCommit={(v) => store.set("arc_step_mm", v)} />
       <SensorParamField label="Chip lead-in length (mm)" id="sensor-chip-lead" value={store.config.chip_lead_in_mm} min={1} step={1} onCommit={(v) => store.set("chip_lead_in_mm", v)} />
       <SensorParamField label="Bulge apex offset (mm)" id="sensor-bulge-offset" value={store.config.bulge_apex_offset_mm} step={0.1} onCommit={(v) => store.set("bulge_apex_offset_mm", v)} />
     </div>

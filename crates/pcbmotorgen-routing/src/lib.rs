@@ -68,6 +68,7 @@ pub use generate::{
     validate_routing_params, IoFanoutEdge, IoFanoutOptions,
 };
 pub use induction_sensor::{generate_sensor, SensorConfig, SensorGeometry, SensorNetGeometry};
+mod spline;
 pub use io::{IoPad, IoPadKind, IoTrace, IoTraceRole, PadSize};
 pub use model::{
     Layer, LegGrid, Net, PhaseBand, PhaseBandShape, Point, PoleRegion, RouteCurve, RouteSegment,
@@ -76,4 +77,5 @@ pub use model::{
 pub use pattern::{ParamType, PatternParameter, PluginMetadata, RoutingPattern};
 pub use registry::{RoutingErrorKind, RoutingRegistry};
 pub use report::RoutingReport;
+pub use spline::RouteSpline;
 pub use validator::Validator;

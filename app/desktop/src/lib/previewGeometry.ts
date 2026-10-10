@@ -88,6 +88,12 @@ export function computeFootprintBox(coils: CoilPathDto | null): ViewportBBox {
         minY = Math.min(minY, a.start[1], a.mid[1], a.end[1]);
         maxY = Math.max(maxY, a.start[1], a.mid[1], a.end[1]);
       }
+      for (const spline of ph.splines ?? []) {
+        for (const p of spline.control_points) {
+          minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x);
+          minY = Math.min(minY, p.y); maxY = Math.max(maxY, p.y);
+        }
+      }
       if (minX !== Infinity) boxes.push({ minX, minY, maxX, maxY });
     }
   }
