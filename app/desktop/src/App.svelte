@@ -11,6 +11,8 @@
     computeHeightStack,
     computeStackup,
     bindProjectMenuActions,
+    exportCadGeometryDxf,
+    exportCoilsDxf,
     debounce,
   } from "./lib/ipc";
   import type {
@@ -30,6 +32,7 @@
   import { recentFiles } from "./lib/stores/recentFiles.svelte";
   import { measureTrace } from "./lib/previewGeometry";
   import { cadGeometryToPreview } from "./lib/cadPreview";
+  import { saveTextToFile } from "./lib/files";
 
   import TabNav from "./lib/components/layout/TabNav.svelte";
   import TitleBar from "./lib/components/layout/TitleBar.svelte";
@@ -40,7 +43,7 @@
   import DesignDimensions from "./lib/components/design/DesignDimensions.svelte";
   import DesignTab from "./lib/components/layout/DesignTab.svelte";
   import SimulateTab from "./lib/components/layout/SimulateTab.svelte";
-  import ExportTab from "./lib/components/layout/ExportTab.svelte";
+  import KicadDialog from "./lib/components/layout/KicadDialog.svelte";
   import StartupScreen from "./lib/components/layout/StartupScreen.svelte";
   import CadImportDialog from "./lib/components/layout/CadImportDialog.svelte";
   import SensorTab from "./lib/components/layout/SensorTab.svelte";
@@ -51,6 +54,8 @@
   let startupOpen = $state(true);
   let startupRecentLoading = $state(true);
   let cadImportDialogOpen = $state(false);
+  let kicadDialogOpen = $state(false);
+  let exportingDxf = $state(false);
 
   // App init: populate the routing-pattern selector + magnet-grade reference
   // from the backend. Fire-and-forget — failures are swallowed inside the
@@ -86,6 +91,7 @@
   // backend behind save_project/load_project; this store is the interface
   // half (DTO mapping + dirty tracking + dialog flows).
   const projects = new ProjectStore(config, motion, recentFiles, sensorStore);
+  projects.markClean();
   let activeCoils = $derived(projects.cadGeometry ? cadGeometryToPreview(projects.cadGeometry) : coils);
   let measuredTrace = $derived.by(() => measureTrace(activeCoils, config));
 
@@ -98,12 +104,25 @@
     .catch(() => undefined)
     .finally(() => (startupRecentLoading = false));
 
-  // Native File menu (Open / Save / Save As / Import CAD, kata 0cgm; Open Recent +
-  // Clear Recent Files, kata eap8): menu clicks land here as Tauri events
+  // Native File menu: menu clicks land here as Tauri events
   // and dispatch into the same store flows. The store's busy guard
   // serializes overlapping menu events.
   $effect(() => {
     const unbind = bindProjectMenuActions({
+      newProject: () => {
+        void projects.newProject().then((created) => {
+          if (!created) return;
+          // Clear a focused field's local draft after the stores are reset.
+          if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+          startupOpen = false;
+          cadImportDialogOpen = false;
+          kicadDialogOpen = false;
+          clearSimulationResults();
+          selectTab("design");
+        });
+      },
+      exportDxf: () => void exportDxf(),
+      sendKicad: () => (kicadDialogOpen = true),
       open: () => {
         void projects.open().then((opened) => {
           if (opened) startupOpen = false;
@@ -129,6 +148,24 @@
       void unbind.then((done) => done());
     };
   });
+
+  // DXF currently has one format and no extra options, so go straight to Save.
+  async function exportDxf(): Promise<void> {
+    if (exportingDxf || projects.busy || startupOpen) return;
+    exportingDxf = true;
+    projects.clearMessages();
+    try {
+      const result = projects.cadGeometry
+        ? await exportCadGeometryDxf(projects.cadGeometry)
+        : await exportCoilsDxf(config.toIpc());
+      const path = await saveTextToFile(result.dxf_content, "coils.dxf", ["dxf"]);
+      if (path) projects.notice = `Exported DXF to ${path}.`;
+    } catch (e) {
+      projects.error = `DXF export failed: ${e instanceof Error ? e.message : String(e)}`;
+    } finally {
+      exportingDxf = false;
+    }
+  }
 
   // -----------------------------------------------------------------------
   // Design preview generation
@@ -319,7 +356,7 @@
   }
 
   // Touch every input used by the simulation calls. The active-tab check is
-  // intentionally inside the effect so config changes in Design or Export
+  // intentionally inside the effect so config changes outside Simulation
   // only invalidate/cancel a pending run; they never invoke simulation IPC.
   $effect(() => {
     void [
@@ -408,8 +445,6 @@
     drc.request();
   });
 
-  let drcReady = $derived(drc.ready);
-
   function tabStatus(tab: TabId): { label: string; className: string } {
     if (tab === "design") {
       return valid
@@ -430,11 +465,7 @@
         ? { label: "updating", className: "text-amber-300" }
         : { label: "ready", className: "text-emerald-300" };
     }
-    if (drc.loading) return { label: "checking", className: "text-amber-300" };
-    if (drcReady && drc.violations.length === 0) {
-      return { label: "ready", className: "text-emerald-300" };
-    }
-    return { label: "blocked", className: "text-rose-300" };
+    return { label: "ready", className: "text-emerald-300" };
   }
 
   function selectTab(tab: TabId): void {
@@ -457,7 +488,7 @@
       class="flex min-h-0 flex-1 flex-col"
     >
       <header class="shrink-0 bg-slate-900">
-        <TitleBar {projects} {loading} />
+        <TitleBar {projects} loading={loading || exportingDxf} {drc} />
         <TabNav tabs={TABS} statusFor={tabStatus} />
       </header>
 
@@ -587,23 +618,6 @@
           >
             <SensorTab store={sensorStore} />
           </Tabs.Content>
-
-          <Tabs.Content
-            value="export"
-            id="panel-export"
-            class="h-full overflow-y-auto p-4 lg:pr-0"
-          >
-            <ExportTab
-              {config}
-              {projects}
-              drcViolations={drc.violations}
-              drcLoading={drc.loading}
-              drcError={drc.error}
-              {drcReady}
-              drcLayoutKey={drc.currentLayoutKey}
-              onCheckDrc={() => drc.request()}
-            />
-          </Tabs.Content>
         </div>
       </div>
 
@@ -617,6 +631,8 @@
           onImportCad={() => (cadImportDialogOpen = true)}
         />
       {/if}
+
+      <KicadDialog bind:open={kicadDialogOpen} {config} {projects} {drc} />
 
       {#if cadImportDialogOpen}
         <CadImportDialog

@@ -31,6 +31,9 @@ fn main() {
             if matches!(
                 id,
                 menu::OPEN_ID
+                    | menu::NEW_ID
+                    | menu::EXPORT_DXF_ID
+                    | menu::SEND_KICAD_ID
                     | menu::SAVE_ID
                     | menu::SAVE_AS_ID
                     | menu::CLEAR_RECENT_ID
