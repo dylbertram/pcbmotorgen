@@ -5,6 +5,12 @@ test.describe("startup chooser and new-design setup", () => {
     await page.goto("/");
     const dialog = page.getByRole("dialog", { name: "Recent projects" });
     await expect(dialog).toBeVisible();
+    await expect(dialog).toBeFocused();
+    await expect(dialog).toHaveCSS("outline-style", "none");
+    await page.keyboard.press("Tab");
+    const openProject = dialog.getByRole("button", { name: "Open project…" });
+    await expect(openProject).toBeFocused();
+    await expect(openProject).not.toHaveCSS("outline-style", "none");
     await expect(dialog.getByText("No recent projects yet.")).toBeVisible();
     await expect(dialog.getByRole("button", { name: "Open project…" })).toBeEnabled();
     await expect(dialog.getByRole("button", { name: "New design" })).toBeVisible();
@@ -18,10 +24,12 @@ test.describe("startup chooser and new-design setup", () => {
 
     await expect(startup).toHaveAttribute("aria-labelledby", "startup-title");
     await expect(page.locator("#startup-pattern")).toBeVisible();
+    await expect(page.locator("#startup-layers")).toHaveValue("4");
     await expect(page.locator("#startup-source")).toHaveCount(0);
     await expect(startup.getByRole("button", { name: "Import CAD", exact: true })).toHaveCount(1);
 
     await page.locator("#startup-layers").selectOption("6");
+    await expect(page.locator("#startup-layers")).toHaveValue("6");
     await startup.getByRole("button", { name: "Create design" }).click();
     await expect(startup).toBeHidden();
     await expect(page.locator("#num-layers")).toContainText("6");
