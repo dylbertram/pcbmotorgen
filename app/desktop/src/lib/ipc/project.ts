@@ -76,11 +76,11 @@ export async function pickProjectSavePath(
 export async function confirmDiscardChanges(): Promise<boolean> {
   if (!isTauriAvailable()) {
     return window.confirm(
-      "You have unsaved changes. Discard them and open another project?",
+      "You have unsaved changes. Discard them and start another project?",
     );
   }
   return await confirm(
-    "You have unsaved changes. Discard them and open another project?",
+    "You have unsaved changes. Discard them and start another project?",
     {
       title: "Unsaved changes",
       okLabel: "Discard changes",
@@ -155,6 +155,9 @@ export async function fileExists(path: string): Promise<boolean> {
  * native menu).
  */
 export async function bindProjectMenuActions(handlers: {
+  newProject?: () => void;
+  exportDxf?: () => void;
+  sendKicad?: () => void;
   open: () => void;
   save: () => void;
   saveAs: () => void;
@@ -172,6 +175,9 @@ export async function bindProjectMenuActions(handlers: {
     return () => {};
   }
   const unlisteners = await Promise.all([
+    listen("menu:new-project", () => handlers.newProject?.()),
+    listen("menu:export-dxf", () => handlers.exportDxf?.()),
+    listen("menu:send-kicad", () => handlers.sendKicad?.()),
     listen("menu:open-project", handlers.open),
     listen("menu:save-project", handlers.save),
     listen("menu:save-project-as", handlers.saveAs),

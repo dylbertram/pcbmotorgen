@@ -47,6 +47,7 @@ function baseName(path: string): string {
 }
 
 export class ProjectStore {
+  private readonly initialState: ProjectState;
   /** Absolute path of the project file backing the current state. */
   currentPath = $state<string | null>(null);
   /** True while a save/open round-trip is in flight. */
@@ -75,7 +76,9 @@ export class ProjectStore {
      */
     private recents?: RecentFilesStore | null,
     private sensor?: SensorStore,
-  ) {}
+  ) {
+    this.initialState = JSON.parse(JSON.stringify(this.snapshotIpc()));
+  }
 
   // --- Derived state -----------------------------------------------------
 
@@ -220,6 +223,26 @@ export class ProjectStore {
   }
 
   // --- Operations ---------------------------------------------------------
+  /** Start an untitled design without replacing unsaved work silently. */
+  async newProject(): Promise<boolean> {
+    if (this.busy) return false;
+    this.busy = true;
+    try {
+      if (this.isDirty && !(await confirmDiscardChanges())) return false;
+      this.applyToState(this.initialState);
+      await this.config.loadRoutingParams(this.config.routing_pattern);
+      this.config.constrainLayersToPattern();
+      this.currentPath = null;
+      this.clearMessages();
+      this.markClean();
+      return true;
+    } catch (e) {
+      this.error = `New project failed: ${errorMessage(e)}`;
+      return false;
+    } finally {
+      this.busy = false;
+    }
+  }
 
   /**
    * Save the working state. With `saveAs` (or no current path) the native

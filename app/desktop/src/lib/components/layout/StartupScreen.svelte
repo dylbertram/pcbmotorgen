@@ -151,6 +151,7 @@
       await config.loadRoutingParams(selectedPattern);
       config.constrainLayersToPattern();
       projects.setCadGeometry(null);
+      projects.markClean();
       onComplete();
     } catch (e) {
       actionError = e instanceof Error ? e.message : String(e);
