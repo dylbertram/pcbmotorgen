@@ -85,6 +85,9 @@ export interface CoilPreviewDrawInput {
   /** Phase/layer trace visibility predicates (component presentation state). */
   isPhaseVisible: (phaseIdx: number) => boolean;
   isLayerVisible: (layerIdx: number) => boolean;
+  showVias: boolean;
+  viaDrillMm: number;
+  viaAnnularRingMm: number;
   /** Pole-pitch ruler + toggle (ruler null without a routing sidecar). */
   poleRuler: PolePitchRuler | null;
   showPolePitch: boolean;
@@ -300,23 +303,6 @@ export class CoilPreviewRenderer {
       ctx.stroke();
       ctx.setLineDash([]);
 
-      // c. Inter-layer vias — amber fill, dark ring. Hidden while `showVias`
-      //    is off (the vias counter stays 0 → data-vias reports 0).
-      if (input.showVias) {
-        ctx.fillStyle = "#fbbf24";
-        ctx.strokeStyle = "#0f172a";
-        ctx.lineWidth = 0.5 / s;
-        ctx.globalAlpha = layerOpacity;
-        for (const [vx, vy] of ph.via_positions ?? []) {
-          ctx.beginPath();
-          ctx.arc(vx, vy, 0.00035, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.stroke();
-          vias += 1;
-        }
-        ctx.setLineDash([]);
-      }
-
       // d. Corner arcs — quadratic Béziers, dashed unless active.
       ctx.strokeStyle = color;
       ctx.lineWidth = 1.6 / s;
@@ -327,6 +313,37 @@ export class CoilPreviewRenderer {
         ctx.moveTo(arc.start[0], arc.start[1]);
         ctx.quadraticCurveTo(arc.mid[0], arc.mid[1], arc.end[0], arc.end[1]);
         ctx.stroke();
+      }
+    }
+
+    // Paint pads and drill holes after all traces so other layers cannot
+    // obscure the holes. Shared via coordinates are drawn only once.
+    if (input.showVias) {
+      const seen = new Set<string>();
+      const drillRadius = Math.max(0, input.viaDrillMm / 2) * 1e-3;
+      const padRadius = drillRadius + Math.max(0, input.viaAnnularRingMm) * 1e-3;
+      ctx.setLineDash([]);
+      ctx.globalAlpha = 1;
+      ctx.strokeStyle = "#0f172a";
+      ctx.lineWidth = 0.000025;
+      for (const ph of input.coils.phases) {
+        if (!input.isPhaseVisible(ph.phase_idx) || !input.isLayerVisible(ph.layer_idx)) continue;
+        for (const [vx, vy] of ph.via_positions ?? []) {
+          const key = `${vx},${vy}`;
+          if (seen.has(key)) continue;
+          seen.add(key);
+          ctx.fillStyle = "#fbbf24";
+          ctx.beginPath();
+          ctx.arc(vx, vy, padRadius, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.stroke();
+          ctx.fillStyle = "#020617";
+          ctx.beginPath();
+          ctx.arc(vx, vy, drillRadius, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.stroke();
+          vias += 1;
+        }
       }
     }
 
