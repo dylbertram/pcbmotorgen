@@ -7,7 +7,7 @@ import { RecentFilesStore } from "./recentFiles.svelte";
 import type { ProjectState } from "../types";
 import type { CadGeometry } from "../types";
 import type { LoadProjectResult } from "../types";
-import { loadProject } from "../ipc";
+import { confirmDiscardChanges, loadProject } from "../ipc";
 
 // Track load calls without losing the real module's other exports (the
 // config store uses them for its routing-pattern/magnet-grade catalog).
@@ -264,6 +264,64 @@ describe("ProjectStore openPath (kata eap8)", () => {
     // The rejected open did not restore over the in-progress state.
     expect(motion.positionMm).toBe(42.5);
     expect(config.desired_travel_mm).toBe(60);
+  });
+});
+
+describe("ProjectStore newProject", () => {
+  beforeEach(() => {
+    vi.mocked(confirmDiscardChanges).mockReset();
+  });
+
+  it("resets motor, sensor, mover, file path, CAD, and messages", async () => {
+    const { config, motion, sensor, projects } = makeStores();
+    const defaults = projects.snapshotIpc();
+    editDesign(config, motion);
+    sensor.set("lambda_mm", 240);
+    projects.currentPath = "/saved.pmproj";
+    projects.cadGeometry = { trace_width_mm: 0.2 } as CadGeometry;
+    projects.error = "Previous failure";
+    projects.markClean();
+
+    expect(await projects.newProject()).toBe(true);
+    expect(projects.snapshotIpc().config.desired_travel_mm).toBe(defaults.config.desired_travel_mm);
+    expect(projects.snapshotIpc().sensor_config).toEqual(defaults.sensor_config);
+    expect(motion.positionMm).toBe(defaults.mover_position_mm);
+    expect(projects.currentPath).toBeNull();
+    expect(projects.cadGeometry).toBeNull();
+    expect(projects.error).toBeNull();
+    expect(projects.isDirty).toBe(false);
+    config.desired_travel_mm += 1;
+    expect(projects.isDirty).toBe(true);
+  });
+
+  it("keeps the entire working state when discard is cancelled", async () => {
+    const { config, projects } = makeStores();
+    projects.currentPath = "/saved.pmproj";
+    projects.markClean();
+    config.desired_travel_mm = 42;
+    const before = projects.snapshotJson;
+    vi.mocked(confirmDiscardChanges).mockResolvedValue(false);
+
+    expect(await projects.newProject()).toBe(false);
+    expect(confirmDiscardChanges).toHaveBeenCalledOnce();
+    expect(projects.snapshotJson).toBe(before);
+    expect(projects.currentPath).toBe("/saved.pmproj");
+    expect(projects.busy).toBe(false);
+  });
+
+  it("requires confirmation for unsaved changes and ignores overlapping New", async () => {
+    const { config, projects } = makeStores();
+    projects.markClean();
+    config.desired_travel_mm = 42;
+    let confirm!: (value: boolean) => void;
+    vi.mocked(confirmDiscardChanges).mockReturnValue(new Promise((resolve) => { confirm = resolve; }));
+    const pending = projects.newProject();
+    expect(projects.busy).toBe(true);
+    expect(await projects.newProject()).toBe(false);
+    confirm(true);
+    expect(await pending).toBe(true);
+    expect(projects.isDirty).toBe(false);
+    expect(projects.busy).toBe(false);
   });
 });
 

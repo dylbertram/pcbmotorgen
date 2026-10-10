@@ -1,6 +1,5 @@
 //! Native application menu (kata 0cgm, eap8) — the File dropdown carries
-//! the project actions (Open / Save / Save As / Import CAD) plus an "Open Recent"
-//! submenu; the top-bar buttons are gone.
+//! project actions, Open Recent, DXF export, and Send to KiCad.
 //!
 //! Rust owns the menu bar. Each project item's id equals the Tauri event
 //! name it is forwarded as (see `on_menu_event` in `main.rs`), where
@@ -24,6 +23,9 @@ use tauri::{
 
 /// Menu item id == webview event name for Open.
 pub const OPEN_ID: &str = "menu:open-project";
+pub const NEW_ID: &str = "menu:new-project";
+pub const EXPORT_DXF_ID: &str = "menu:export-dxf";
+pub const SEND_KICAD_ID: &str = "menu:send-kicad";
 /// Menu item id == webview event name for Save.
 pub const SAVE_ID: &str = "menu:save-project";
 /// Menu item id == webview event name for Save As.
@@ -95,16 +97,20 @@ pub fn install(app: &tauri::AppHandle) -> tauri::Result<()> {
     Ok(())
 }
 
-/// File menu — the project actions (kata 0cgm) plus the Open Recent
-/// submenu (kata eap8). The recents list starts empty and disabled; the
+/// File menu with project actions, import, and a shared export block.
+/// The recents list starts empty and disabled; the
 /// frontend pushes the real contents through `set_recent_files`.
 fn file_submenu(app: &tauri::AppHandle) -> tauri::Result<Submenu<Wry>> {
+    let new = MenuItem::with_id(app, NEW_ID, "New", true, Some("CmdOrCtrl+N"))?;
     let open = MenuItem::with_id(app, OPEN_ID, "Open…", true, Some("CmdOrCtrl+O"))?;
     let save = MenuItem::with_id(app, SAVE_ID, "Save", true, Some("CmdOrCtrl+S"))?;
     let save_as = MenuItem::with_id(app, SAVE_AS_ID, "Save As…", true, Some("CmdOrCtrl+Shift+S"))?;
     let sep = PredefinedMenuItem::separator(app)?;
     let import_cad = MenuItem::with_id(app, IMPORT_CAD_ID, "Import CAD…", true, None::<&str>)?;
-    let sep_after_recent = PredefinedMenuItem::separator(app)?;
+    let sep_after_import = PredefinedMenuItem::separator(app)?;
+    let dxf = MenuItem::with_id(app, EXPORT_DXF_ID, "DXF", true, None::<&str>)?;
+    let export = Submenu::with_id_and_items(app, "file:export", "Export as…", true, &[&dxf])?;
+    let send_kicad = MenuItem::with_id(app, SEND_KICAD_ID, "Send to KiCad", true, None::<&str>)?;
 
     // Placeholder until the first `set_recent_files` push — a disabled
     // item so the submenu shape is stable across rebuilds.
@@ -118,13 +124,16 @@ fn file_submenu(app: &tauri::AppHandle) -> tauri::Result<Submenu<Wry>> {
         "File",
         true,
         &[
+            &new,
             &open,
+            &recent,
             &save,
             &save_as,
             &sep,
-            &recent,
-            &sep_after_recent,
             &import_cad,
+            &sep_after_import,
+            &export,
+            &send_kicad,
         ],
     )
 }
