@@ -100,7 +100,7 @@
   // DOM events to the gesture class. `zoom` is CONTINUOUS (0.5…10): the
   // buttons step through ZOOM_STEPS, while pinches are continuous.
   const MIN_ZOOM = 0.5;
-  const MAX_ZOOM = 10;
+  const MAX_ZOOM = Infinity;
   const ZOOM_STEPS = [0.5, 1, 1.5, 2, 3, 4, 6, 8, 10] as const;
 
   /** One repeating unit of the winding = max(6, 2 × phases) conductors. */

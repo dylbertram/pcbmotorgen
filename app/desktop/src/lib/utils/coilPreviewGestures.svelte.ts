@@ -39,7 +39,7 @@ import type { WorldTransform } from "../chart";
 // ---------------------------------------------------------------------------
 
 /** Clamp a zoom level into [min, max]. */
-export function clampZoom(value: number, min = 0.5, max = 10): number {
+export function clampZoom(value: number, min = 0.5, max = Infinity): number {
   return Math.min(max, Math.max(min, value));
 }
 
@@ -48,14 +48,14 @@ export function formatZoom(value: number): string {
   return String(Math.round(value * 1000) / 1000);
 }
 
-/** Smallest zoom step strictly above `zoom`, or `max` when already at the top. */
+/** Use preset steps, then double the zoom until an optional maximum. */
 export function nextZoomStepUp(
   zoom: number,
   steps: readonly number[],
   max: number,
 ): number {
   const found = steps.find((step) => step > zoom + 1e-6);
-  return Math.min(found ?? max, max);
+  return Math.min(found ?? zoom * 2, max);
 }
 
 /** Largest zoom step strictly below `zoom`, or `min` when already at the bottom. */
@@ -64,6 +64,10 @@ export function nextZoomStepDown(
   steps: readonly number[],
   min: number,
 ): number {
+  const lastStep = steps[steps.length - 1];
+  if (lastStep !== undefined && zoom > lastStep + 1e-6) {
+    return Math.max(lastStep, zoom / 2, min);
+  }
   const found = [...steps].reverse().find((step) => step < zoom - 1e-6);
   return Math.max(found ?? min, min);
 }
@@ -142,13 +146,13 @@ export class CoilPreviewGestures {
 
   // --- public controls ------------------------------------------------------
   zoomIn = () => {
-    this.zoom = nextZoomStepUp(this.zoom, this.zoomSteps, this.maxZoom);
+    this.#zoomAtCenter(nextZoomStepUp(this.zoom, this.zoomSteps, this.maxZoom));
   };
   zoomOut = () => {
-    this.zoom = nextZoomStepDown(this.zoom, this.zoomSteps, this.minZoom);
+    this.#zoomAtCenter(nextZoomStepDown(this.zoom, this.zoomSteps, this.minZoom));
   };
   zoomReset = () => {
-    this.zoom = clampZoom(1, this.minZoom, this.maxZoom);
+    this.#zoomAtCenter(clampZoom(1, this.minZoom, this.maxZoom));
   };
   resetView = () => {
     this.zoom = clampZoom(1, this.minZoom, this.maxZoom);
@@ -157,11 +161,14 @@ export class CoilPreviewGestures {
   };
 
   // --- coordinate helpers -----------------------------------------------------
-  #clampPanX(value: number): number {
-    return Math.min(this.virtualW, Math.max(-this.virtualW, value));
-  }
-  #clampPanY(value: number): number {
-    return Math.min(this.virtualH, Math.max(-this.virtualH, value));
+  #zoomAtCenter(target: number): void {
+    if (!Number.isFinite(target) || target === this.zoom) return;
+    this.#anchorWorld(
+      this.virtualW / 2, this.virtualH / 2,
+      this.zoom, this.panX, this.panY,
+      this.virtualW / 2, this.virtualH / 2, target,
+    );
+    this.zoom = target;
   }
   #clientToVirtual(
     frame: HTMLDivElement,
@@ -198,8 +205,10 @@ export class CoilPreviewGestures {
     // screen = (tx + panX + s*wx, ty + panY − s*wy)
     const wx = (startVx - oldT.tx - startPanX) / oldT.s;
     const wy = (oldT.ty + startPanY - startVy) / oldT.s;
-    this.panX = this.#clampPanX(endVx - newT.tx - newT.s * wx);
-    this.panY = this.#clampPanY(endVy - newT.ty + newT.s * wy);
+    // Focal zoom at a trace end can require offsets many viewports wide.
+    // Clamping these offsets breaks the anchor and drags the view inward.
+    this.panX = endVx - newT.tx - newT.s * wx;
+    this.panY = endVy - newT.ty + newT.s * wy;
   }
 
   #beginPan(frame: HTMLDivElement | null | undefined, x: number, y: number): void {
@@ -238,8 +247,8 @@ export class CoilPreviewGestures {
     const sy = this.virtualH / frame.clientHeight;
     const dx = (x - this.#panStartClientX) * sx;
     const dy = (y - this.#panStartClientY) * sy;
-    this.panX = this.#clampPanX(this.#panStartPanX + dx);
-    this.panY = this.#clampPanY(this.#panStartPanY + dy);
+    this.panX = this.#panStartPanX + dx;
+    this.panY = this.#panStartPanY + dy;
   }
 
   #updatePinch(frame: HTMLDivElement, a: Point, b: Point): void {
@@ -253,6 +262,7 @@ export class CoilPreviewGestures {
       this.minZoom,
       this.maxZoom,
     );
+    if (!Number.isFinite(target)) return;
     this.zoom = target;
 
     // Focal-point anchoring: the world point under the pinch-start centroid
@@ -452,7 +462,7 @@ export class CoilPreviewGestures {
     // Continuous focal zoom: factor 2 per ~100px of ctrl-scroll.
     const factor = 2 ** (-e.deltaY / 100);
     const target = clampZoom(this.zoom * factor, this.minZoom, this.maxZoom);
-    if (target === this.zoom) return;
+    if (!Number.isFinite(target) || target === this.zoom) return;
     const v = this.#clientToVirtual(frame, e.clientX, e.clientY);
     this.#anchorWorld(v.x, v.y, this.zoom, this.panX, this.panY, v.x, v.y, target);
     this.zoom = target;

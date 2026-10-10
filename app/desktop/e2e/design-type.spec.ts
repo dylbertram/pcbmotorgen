@@ -71,6 +71,38 @@ test("sensor preview supports layer visibility, zoom, pan and reset", async ({ p
   await expect(preview.locator("line")).toHaveCount(2);
   const transform = preview.locator("svg > g");
   const initial = await transform.getAttribute("transform");
+  for (const x of [24, 736]) {
+    const frame = preview.getByRole("img");
+    const bounds = (await frame.boundingBox())!;
+    // MouseEvent coordinates are integer CSS pixels. Measure the anchor at
+    // the actual dispatched cursor, not its unrounded virtual position.
+    const clientX = Math.floor(bounds.x + x / 760 * bounds.width);
+    const clientY = Math.floor(bounds.y + 24 / 260 * bounds.height);
+    const vx = (clientX - bounds.x) / bounds.width * 760;
+    const vy = (clientY - bounds.y) / bounds.height * 260;
+    const anchorAt = async () => {
+      const matrix = (await transform.getAttribute("transform"))!
+        .slice(7, -1).split(" ").map(Number);
+      return { x: (vx - matrix[4]) / matrix[0], y: (vy - matrix[5]) / matrix[3] };
+    };
+    const originalAnchor = await anchorAt();
+    for (let i = 0; i < 8; i += 1) {
+      await frame.evaluate((element, cursor) => {
+        element.dispatchEvent(new WheelEvent("wheel", {
+          ctrlKey: true, deltaY: -100, cancelable: true,
+          clientX: cursor.clientX,
+          clientY: cursor.clientY,
+        }));
+      }, { clientX, clientY });
+      await expect(preview.getByRole("button", { name: "Reset zoom", exact: true }))
+        .toHaveText(`${2 ** (i + 1)}×`);
+      const anchor = await anchorAt();
+      expect(anchor.x).toBeCloseTo(originalAnchor.x, 6);
+      expect(anchor.y).toBeCloseTo(originalAnchor.y, 6);
+    }
+    await preview.getByRole("button", { name: "Reset zoom and pan" }).click();
+    await expect(transform).toHaveAttribute("transform", initial!);
+  }
   await preview.getByRole("button", { name: "Zoom in", exact: true }).click();
   await expect(preview.getByRole("button", { name: "Reset zoom", exact: true })).toHaveText("1.5×");
   await expect(transform).not.toHaveAttribute("transform", initial!);

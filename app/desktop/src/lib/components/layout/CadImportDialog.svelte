@@ -122,7 +122,7 @@
     virtualW: PREVIEW_W,
     virtualH: PREVIEW_H,
     minZoom: 0.5,
-    maxZoom: 10,
+    maxZoom: Infinity,
     zoomSteps: [0.5, 1, 1.5, 2, 3, 4, 6, 8, 10],
     getWorldTransform: worldTransformFor,
   });

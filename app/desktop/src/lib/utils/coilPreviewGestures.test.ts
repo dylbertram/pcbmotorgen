@@ -51,6 +51,12 @@ describe("formatZoom", () => {
 });
 
 describe("zoom button stepping", () => {
+  it("continues beyond the preset steps without an upper zoom limit", () => {
+    expect(nextZoomStepUp(10, STEPS, Infinity)).toBe(20);
+    expect(nextZoomStepUp(20, STEPS, Infinity)).toBe(40);
+    expect(nextZoomStepDown(40, STEPS, 0.5)).toBe(20);
+    expect(nextZoomStepDown(11, STEPS, 0.5)).toBe(10);
+  });
   it("climbs to the next step above the current (continuous) zoom", () => {
     expect(nextZoomStepUp(1, STEPS, 10)).toBe(1.5);
     expect(nextZoomStepUp(2.4, STEPS, 10)).toBe(3);
@@ -62,6 +68,90 @@ describe("zoom button stepping", () => {
     expect(nextZoomStepDown(2.4, STEPS, 0.5)).toBe(2);
     expect(nextZoomStepDown(10, STEPS, 0.5)).toBe(8);
     expect(nextZoomStepDown(0.4, STEPS, 0.5)).toBe(0.5); // min floor
+  });
+});
+
+// Event handlers only need these frame methods, not a browser DOM.
+const frame = {
+  clientWidth: 760,
+  clientHeight: 260,
+  getBoundingClientRect: () => ({ left: 0, top: 0, width: 760, height: 260 }),
+  setPointerCapture: () => {},
+  releasePointerCapture: () => {},
+} as unknown as HTMLDivElement;
+
+function wheel(g: CoilPreviewGestures, x: number, y: number, deltaY: number) {
+  g.handleWheel({
+    currentTarget: frame, ctrlKey: true, clientX: x, clientY: y,
+    deltaY, preventDefault: () => {},
+  } as unknown as WheelEvent);
+}
+
+function worldAt(g: CoilPreviewGestures, x: number, y: number) {
+  const t = g.getWorldTransform(g.zoom);
+  return { x: (x - t.tx - g.panX) / t.s, y: (t.ty + g.panY - y) / t.s };
+}
+
+describe("preview edge zoom anchoring", () => {
+  const centeredTransform = (zoom: number) => ({ s: zoom, tx: 380 - 380 * zoom, ty: 130 });
+
+  it.each([24, 736])("keeps the trace end under the wheel cursor at x=%s", (x) => {
+    const g = makeGestures({ maxZoom: Infinity, getWorldTransform: centeredTransform });
+    const original = worldAt(g, x, 24);
+    for (let i = 0; i < 8; i += 1) {
+      wheel(g, x, 24, -100);
+      expect(worldAt(g, x, 24).x).toBeCloseTo(original.x, 8);
+      expect(worldAt(g, x, 24).y).toBeCloseTo(original.y, 8);
+    }
+    expect(g.zoom).toBe(256);
+    expect(Math.abs(g.panX)).toBeGreaterThan(760);
+    expect(Math.abs(g.panY)).toBeGreaterThan(260);
+    for (let i = 0; i < 8; i += 1) wheel(g, x, 24, 100);
+    expect(g.zoom).toBe(1);
+    expect(g.panX).toBeCloseTo(0, 8);
+    expect(g.panY).toBeCloseTo(0, 8);
+  });
+
+  it.each([24, 736])("keeps the trace end anchored through a touch pinch at x=%s", (x) => {
+    const g = makeGestures({ maxZoom: Infinity, getWorldTransform: centeredTransform });
+    const original = worldAt(g, x, 24);
+    const touchEvent = (distance: number) => ({
+      currentTarget: frame,
+      touches: [
+        { identifier: 1, clientX: x - distance / 2, clientY: 24 },
+        { identifier: 2, clientX: x + distance / 2, clientY: 24 },
+      ],
+      preventDefault: () => {},
+    } as unknown as TouchEvent);
+    g.handleTouchStart(touchEvent(2));
+    g.handleTouchMove(touchEvent(128));
+    expect(g.zoom).toBe(64);
+    expect(worldAt(g, x, 24).x).toBeCloseTo(original.x, 8);
+    expect(worldAt(g, x, 24).y).toBeCloseTo(original.y, 8);
+  });
+
+  it("pans beyond a viewport and keeps the inspected center with zoom buttons", () => {
+    const g = makeGestures({ maxZoom: Infinity, getWorldTransform: centeredTransform });
+    const pointer = (x: number, y: number) => ({
+      currentTarget: frame, pointerId: 1, pointerType: "mouse", button: 0,
+      clientX: x, clientY: y, preventDefault: () => {},
+    } as unknown as PointerEvent);
+    g.handlePointerDown(pointer(380, 130));
+    g.handlePointerMove(pointer(2380, 1130));
+    g.handlePointerEnd(pointer(2380, 1130));
+    expect(g.panX).toBe(2000);
+    expect(g.panY).toBe(1000);
+    const original = worldAt(g, 380, 130);
+    for (let i = 0; i < 15; i += 1) g.zoomIn();
+    expect(g.zoom).toBeGreaterThan(10);
+    expect(worldAt(g, 380, 130)).toEqual(original);
+    g.zoomOut();
+    expect(worldAt(g, 380, 130)).toEqual(original);
+    g.zoomReset();
+    expect(worldAt(g, 380, 130)).toEqual(original);
+    g.resetView();
+    expect(g.panX).toBe(0);
+    expect(g.panY).toBe(0);
   });
 });
 
