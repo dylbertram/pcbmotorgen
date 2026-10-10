@@ -13,9 +13,13 @@
   let {
     config,
     cadGeometry = null,
+    onImportCad,
+    onUseGenerated,
   }: {
     config: ConfigStore;
     cadGeometry?: CadGeometry | null;
+    onImportCad: () => void;
+    onUseGenerated: () => void;
   } = $props();
 </script>
 
@@ -151,6 +155,7 @@
         Topology &amp; Board
       </h2>
       <div class="space-y-3">
+        <TopologySelector {config} cadGeometryActive={cadGeometry !== null} {onImportCad} {onUseGenerated} />
         {#if cadGeometry}
           <div
             class="rounded-md border border-sky-500/30 bg-sky-500/5 px-3 py-3"
@@ -160,7 +165,7 @@
             <div class="flex flex-wrap items-center justify-between gap-2">
               <div>
                 <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
-                  Routing pattern
+                  Routing source
                 </p>
                 <p class="mt-0.5 text-sm font-medium text-sky-200">Imported CAD pattern</p>
               </div>
@@ -169,7 +174,7 @@
               </span>
             </div>
             <p class="mt-2 text-[11px] leading-relaxed text-slate-400">
-              The DXF geometry is active. Generator topology and winding settings are hidden because they do not describe the imported traces. To return to a generated pattern, choose File → Import CAD → Use generated geometry.
+              The DXF geometry is active. Generator and winding settings are hidden because they do not describe the imported traces. Choose a generator in Routing source to return to generated geometry.
             </p>
             <dl class="mt-3 grid grid-cols-3 gap-2 border-t border-slate-700/70 pt-2">
               <div>
@@ -189,7 +194,6 @@
             </dl>
           </div>
         {:else}
-          <TopologySelector {config} />
           <TracesBoardPanel {config} />
         {/if}
       </div>

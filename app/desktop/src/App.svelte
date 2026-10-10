@@ -1,6 +1,6 @@
 <script lang="ts">
   import { config } from "./lib/stores/config.svelte";
-  import { BitsConfig, Tabs } from "bits-ui";
+  import { BitsConfig, Tabs, Select } from "bits-ui";
   import {
     evaluateForceSweep,
     generateCoils,
@@ -24,7 +24,7 @@
     StackupResultDto,
     SensorConfig,
   } from "./lib/types";
-  import { TABS, type TabId } from "./lib/ui";
+  import { TABS, type TabId, type DesignType } from "./lib/ui";
   import { DrcController } from "./lib/stores/drc.svelte";
   import { MotionStore } from "./lib/stores/motion.svelte";
   import { ProjectStore } from "./lib/stores/project.svelte";
@@ -51,6 +51,18 @@
 
   // Session-only navigation state; none of these values enter IPC.
   let activeTab = $state<TabId>("design");
+  let designType = $state<DesignType>("motor");
+  const designTypes = [
+    { value: "motor", label: "Motor coil" },
+    { value: "sensor", label: "Sensor" },
+  ];
+  let workflowTabs = $derived(TABS.filter((tab) => designType === "motor" || tab.id !== "simulate"));
+
+  function selectDesignType(value: string): void {
+    if (value !== "motor" && value !== "sensor") return;
+    designType = value;
+    if (value === "sensor" && activeTab === "simulate") selectTab("design");
+  }
   let startupOpen = $state(true);
   let startupRecentLoading = $state(true);
   let cadImportDialogOpen = $state(false);
@@ -446,7 +458,7 @@
   });
 
   function tabStatus(tab: TabId): { label: string; className: string } {
-    if (tab === "design") {
+    if (tab === "design" && designType === "motor") {
       return valid
         ? { label: "ready", className: "text-emerald-300" }
         : { label: "needs attention", className: "text-rose-300" };
@@ -457,7 +469,7 @@
         ? { label: "updating", className: "text-amber-300" }
         : { label: "ready", className: "text-emerald-300" };
     }
-    if (tab === "sensor") {
+    if (designType === "sensor") {
       if (sensorStore.error) {
         return { label: "needs attention", className: "text-rose-300" };
       }
@@ -489,7 +501,23 @@
     >
       <header class="shrink-0 bg-slate-900">
         <TitleBar {projects} loading={loading || exportingDxf} {drc} />
-        <TabNav tabs={TABS} statusFor={tabStatus} />
+        <div class="flex items-center gap-3 px-6 py-2">
+          <label for="design-type" class="text-xs text-slate-400">Design type</label>
+          <Select.Root type="single" value={designType} onValueChange={selectDesignType} items={designTypes}>
+            <Select.Trigger id="design-type" aria-label="Design type" class="flex min-w-40 items-center justify-between gap-3 rounded-md border border-slate-700 bg-slate-800 px-2.5 py-1.5 text-sm text-slate-100 focus:outline-none focus:border-emerald-500">
+              <Select.Value />
+              <span aria-hidden="true" class="text-slate-400">▾</span>
+            </Select.Trigger>
+            <Select.Portal>
+              <Select.Content class="z-50 min-w-[var(--bits-select-anchor-width)] rounded-md border border-slate-700 bg-slate-800 py-1 shadow-lg focus:outline-none">
+                {#each designTypes as type (type.value)}
+                  <Select.Item value={type.value} label={type.label} class="cursor-pointer px-2.5 py-2 text-sm text-slate-100 outline-none data-[selected]:bg-slate-700 data-[highlighted]:bg-slate-700/60 data-[highlighted]:text-emerald-200">{type.label}</Select.Item>
+                {/each}
+              </Select.Content>
+            </Select.Portal>
+          </Select.Root>
+        </div>
+        <TabNav tabs={workflowTabs} statusFor={tabStatus} />
       </header>
 
       {#if projects.error || projects.notice}
@@ -559,7 +587,7 @@
           aria-label="Persistent design reflection"
         >
           <ScrollArea class="h-full min-h-0">
-            {#if activeTab === "sensor"}
+            {#if designType === "sensor"}
               <SensorPreview store={sensorStore} />
             {:else}
               <TravelDiagram {config} {motion} {measuredTrace} />
@@ -579,7 +607,7 @@
         </aside>
 
         <div class="min-w-0 min-h-0 lg:h-full">
-          <!-- All three panels stay mounted so component-local controls retain
+          <!-- Workflow panels stay mounted so component-local controls retain
                their state — Bits Tabs.Content never unmounts inactive panels, it
                toggles the hidden attribute instead. Hidden Simulation content is
                still lifecycle-gated: its IPC effects only run while this tab is
@@ -590,7 +618,12 @@
             id="panel-design"
             class="h-full p-4 lg:pr-0"
           >
-              <DesignTab {config} cadGeometry={projects.cadGeometry} />
+            <div hidden={designType !== "motor"} class="h-full">
+              <DesignTab {config} cadGeometry={projects.cadGeometry} onImportCad={() => (cadImportDialogOpen = true)} onUseGenerated={() => projects.setCadGeometry(null)} />
+            </div>
+            <div hidden={designType !== "sensor"} class="h-full overflow-y-auto">
+              <SensorTab store={sensorStore} />
+            </div>
           </Tabs.Content>
 
           <Tabs.Content
@@ -609,14 +642,6 @@
                {error}
                cadGeometryActive={projects.cadGeometry !== null}
             />
-          </Tabs.Content>
-
-          <Tabs.Content
-            value="sensor"
-            id="panel-sensor"
-            class="h-full overflow-y-auto p-4 lg:pr-0"
-          >
-            <SensorTab store={sensorStore} />
           </Tabs.Content>
         </div>
       </div>

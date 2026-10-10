@@ -109,7 +109,7 @@ test.describe("Design constraints restructure", () => {
     await expect(numberField(page, "Active area width (mm)")).toBeEnabled();
   }, { tag: ["@constraints", "@desktop"] });
 
-  test("routing parameters are not nested in their own box; dropdown hangs left of the title", async ({
+  test("routing source shares an unboxed heading row with its dropdown", async ({
     page,
   }) => {
     await gotoDesignApp(page);
@@ -117,11 +117,11 @@ test.describe("Design constraints restructure", () => {
     // No nested bordered section for routing parameters; they are part of the
     // combined Topology & Board panel.
     await expect(
-      page.locator("section[aria-labelledby='routing-parameters-heading']"),
+      page.locator("section[aria-labelledby='routing-source-heading']"),
     ).toHaveCount(0);
 
     // The heading exists unboxed.
-    const heading = page.locator("#routing-parameters-heading");
+    const heading = page.locator("#routing-source-heading");
     await expect(heading).toBeVisible();
 
     // The pattern dropdown shares the title row: vertically centred against
