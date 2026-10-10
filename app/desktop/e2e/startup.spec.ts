@@ -1,6 +1,26 @@
 import { expect, test } from "@playwright/test";
 
 test.describe("startup chooser and new-design setup", () => {
+  test("clicking outside Import CAD cancels without applying draft settings", async ({ page }) => {
+    await page.goto("/");
+    const startup = page.getByRole("dialog", { name: "Recent projects" });
+    await startup.getByRole("button", { name: "Import CAD" }).click();
+    const importDialog = page.getByRole("dialog", { name: "Import CAD" });
+    const traceWidth = importDialog.getByLabel("Trace width (mm)");
+    const originalWidth = await traceWidth.inputValue();
+    await traceWidth.fill("0.321");
+    await expect(importDialog).toBeVisible();
+
+    await page.mouse.click(2, 2);
+    await expect(importDialog).toBeHidden();
+    await expect(startup).toBeVisible();
+
+    await startup.getByRole("button", { name: "Import CAD" }).click();
+    await expect(traceWidth).toHaveValue(originalWidth);
+    await importDialog.getByRole("button", { name: "Cancel" }).click();
+    await expect(startup).toBeVisible();
+  });
+
   test("immediately shows recents and keeps Open project available when the list is empty", async ({ page }) => {
     await page.goto("/");
     const dialog = page.getByRole("dialog", { name: "Recent projects" });

@@ -294,6 +294,9 @@
   bind:this={backdropRef}
   class="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm"
   role="presentation"
+  onclick={(event) => {
+    if (event.target === event.currentTarget && !busy) onClose();
+  }}
 >
   <div
     bind:this={dialogRef}
