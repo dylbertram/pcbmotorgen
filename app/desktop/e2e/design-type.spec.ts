@@ -2,9 +2,29 @@ import { test, expect, type Page } from "@playwright/test";
 import { gotoDesignApp } from "./helpers";
 
 async function selectDesignType(page: Page, name: string) {
-  await page.getByRole("button", { name: "Design type", exact: true }).click();
-  await page.getByRole("option", { name, exact: true }).click();
+  await page.getByRole("group", { name: "Design type", exact: true }).getByRole("radio", { name, exact: true }).check();
 }
+
+test("design type offers two visible labels and supports keyboard switching", async ({ page }) => {
+  await gotoDesignApp(page);
+  const group = page.getByRole("group", { name: "Design type", exact: true });
+  const motor = group.getByRole("radio", { name: "Motor coil", exact: true });
+  const sensor = group.getByRole("radio", { name: "Sensor", exact: true });
+  await expect(group.getByText("Motor coil", { exact: true })).toBeVisible();
+  await expect(group.getByText("Sensor", { exact: true })).toBeVisible();
+  await expect(motor).toBeChecked();
+  await expect(sensor).not.toBeChecked();
+  await expect(page.getByRole("button", { name: "Design type", exact: true })).toHaveCount(0);
+  await motor.focus();
+  await page.keyboard.press("ArrowRight");
+  await expect(sensor).toBeChecked();
+  await expect(sensor).toBeFocused();
+  await expect(page.getByRole("heading", { name: "Sensor dimensions" })).toBeVisible();
+  await page.keyboard.press("ArrowLeft");
+  await expect(motor).toBeChecked();
+  await expect(sensor).not.toBeChecked();
+  await expect(page.getByRole("heading", { name: "Magnets", exact: true })).toBeVisible();
+});
 
 test("motor magnet settings stay visible when clicking the section heading", async ({ page }) => {
   await gotoDesignApp(page);

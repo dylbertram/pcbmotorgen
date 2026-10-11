@@ -1,6 +1,6 @@
 <script lang="ts">
   import { config } from "./lib/stores/config.svelte";
-  import { BitsConfig, Tabs, Select } from "bits-ui";
+  import { BitsConfig, Tabs } from "bits-ui";
   import {
     evaluateForceSweep,
     generateCoils,
@@ -508,20 +508,22 @@
       <header class="shrink-0 bg-slate-900">
         <TitleBar {projects} loading={loading || exportingDxf} {drc} />
         <div class="flex items-center gap-3 px-6 py-2">
-          <label for="design-type" class="text-xs text-slate-400">Design type</label>
-          <Select.Root type="single" value={designType} onValueChange={selectDesignType} items={designTypes}>
-            <Select.Trigger id="design-type" aria-label="Design type" class="flex min-w-40 items-center justify-between gap-3 rounded-md border border-slate-700 bg-slate-800 px-2.5 py-1.5 text-sm text-slate-100 focus:outline-none focus:border-emerald-500">
-              <Select.Value />
-              <span aria-hidden="true" class="text-slate-400">▾</span>
-            </Select.Trigger>
-            <Select.Portal>
-              <Select.Content class="z-50 min-w-[var(--bits-select-anchor-width)] rounded-md border border-slate-700 bg-slate-800 py-1 shadow-lg focus:outline-none">
-                {#each designTypes as type (type.value)}
-                  <Select.Item value={type.value} label={type.label} class="cursor-pointer px-2.5 py-2 text-sm text-slate-100 outline-none data-[selected]:bg-slate-700 data-[highlighted]:bg-slate-700/60 data-[highlighted]:text-emerald-200">{type.label}</Select.Item>
-                {/each}
-              </Select.Content>
-            </Select.Portal>
-          </Select.Root>
+          <span id="design-type-label" class="shrink-0 text-xs text-slate-400">Design type</span>
+          <fieldset aria-labelledby="design-type-label" class="flex min-w-0 gap-0.5 rounded-md border border-slate-700 bg-slate-950/50 p-0.5">
+            {#each designTypes as type (type.value)}
+              <label class="relative">
+                <input
+                  type="radio"
+                  name="design-type"
+                  value={type.value}
+                  checked={designType === type.value}
+                  onchange={() => selectDesignType(type.value)}
+                  class="peer absolute inset-0 m-0 h-full w-full cursor-pointer appearance-none opacity-0"
+                />
+                <span class="block whitespace-nowrap rounded px-3 py-1.5 text-sm font-medium text-slate-400 peer-hover:bg-slate-800 peer-hover:text-slate-100 peer-checked:bg-emerald-500/15 peer-checked:text-emerald-200 peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-emerald-400">{type.label}</span>
+              </label>
+            {/each}
+          </fieldset>
         </div>
         <TabNav tabs={workflowTabs} statusFor={tabStatus} />
       </header>

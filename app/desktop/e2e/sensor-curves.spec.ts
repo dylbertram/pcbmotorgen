@@ -22,8 +22,7 @@ test("sensor curves stay curved in inline and expanded previews", async ({ page 
       export async function writeSensorToBoard() {}`,
   }));
   await gotoDesignApp(page);
-  await page.getByRole("button", { name: "Design type", exact: true }).click();
-  await page.getByRole("option", { name: "Sensor", exact: true }).click();
+  await page.getByRole("radio", { name: "Sensor", exact: true }).check();
   const preview = page.locator('section[aria-labelledby="sensor-preview-title"]');
   await expect(preview.locator("line")).toHaveCount(0);
   await expect(preview.locator("path")).toHaveCount(2);

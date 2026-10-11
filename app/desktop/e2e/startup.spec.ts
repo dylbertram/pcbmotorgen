@@ -102,8 +102,7 @@ test.describe("startup chooser and new-design setup", () => {
     await expect(page.getByRole("img", { name: "Imported sensor coil traces" })).toBeVisible();
     await expect(page.locator('section[aria-labelledby="sensor-preview-title"] line')).toHaveCount(1);
     await expect(page.getByRole("tab", { name: /^Simulate/ })).toHaveCount(0);
-    await page.getByRole("button", { name: "Design type", exact: true }).click();
-    await page.getByRole("option", { name: "Motor coil", exact: true }).click();
+    await page.getByRole("radio", { name: "Motor coil", exact: true }).check();
     await expect(page.locator("#num-layers")).toContainText("4");
   });
 
