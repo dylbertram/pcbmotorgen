@@ -8,12 +8,10 @@
   let { config }: { config: ConfigStore } = $props();
 </script>
 
-<details open class="overflow-hidden rounded-md border border-slate-700 bg-slate-800/30">
-  <summary class="cursor-pointer px-3 py-2 marker:text-slate-500 hover:text-emerald-300">
-    <span class="flex items-center justify-between gap-2">
-      <h3 class="text-xs font-semibold uppercase tracking-wider text-slate-200">Magnets</h3>
-    </span>
-  </summary>
+<section aria-labelledby="magnets-heading" class="overflow-hidden rounded-md border border-slate-700 bg-slate-800/30">
+  <header class="px-3 py-2">
+    <h3 id="magnets-heading" class="text-xs font-semibold uppercase tracking-wider text-slate-200">Magnets</h3>
+  </header>
 
   <Separator />
 
@@ -114,4 +112,4 @@
       </div>
     </div>
   </div>
-</details>
+</section>

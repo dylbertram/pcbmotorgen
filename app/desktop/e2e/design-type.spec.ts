@@ -6,6 +6,18 @@ async function selectDesignType(page: Page, name: string) {
   await page.getByRole("option", { name, exact: true }).click();
 }
 
+test("motor magnet settings stay visible when clicking the section heading", async ({ page }) => {
+  await gotoDesignApp(page);
+  const magnets = page.getByRole("region", { name: "Magnets", exact: true });
+  await expect(magnets.locator("details, summary")).toHaveCount(0);
+  await magnets.getByRole("heading", { name: "Magnets", exact: true }).click();
+  await expect(magnets.getByLabel("Magnet count", { exact: true })).toBeVisible();
+  await expect(magnets.getByLabel("X Length (mm), magnet length along the travel axis")).toBeVisible();
+  await expect(magnets.getByLabel("Y Width (mm), magnet width across the stator")).toBeVisible();
+  await expect(magnets.getByLabel("Z Thickness (mm), magnetisation-axis thickness")).toBeVisible();
+  await expect(magnets.getByRole("button", { name: "Magnet grade", exact: true })).toBeVisible();
+});
+
 test("sensor is a design type whose full workflow lives in the Design tab", async ({ page }) => {
   await gotoDesignApp(page);
   await expect(page.locator("#tab-sensor")).toHaveCount(0);
