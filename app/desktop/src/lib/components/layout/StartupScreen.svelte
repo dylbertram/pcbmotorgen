@@ -10,6 +10,7 @@
     patternLayerRange,
   } from "../../layerConstraints";
   import { attachBackdropScrollGuard, lockPageScroll } from "../../utils/pageScrollLock";
+  import GeneratorUploadPanel from "../plugins/GeneratorUploadPanel.svelte";
 
   let {
     config,
@@ -30,6 +31,9 @@
   type Screen = "home" | "new";
 
   let screen = $state<Screen>("home");
+  const LOAD_GENERATOR = "__load_generator__";
+  const LOAD_DESIGN = "__load_design_file__";
+  let generatorOpen = $state(false);
   let selectedPath = $state<string | null>(null);
   let selectedProject = $state<ProjectState | null>(null);
   let selectedPattern = $state("");
@@ -86,6 +90,18 @@
     if (choices.length > 0 && !choices.includes(selectedLayers)) {
       selectedLayers = nearestLayer(selectedLayers, choices);
     }
+  }
+
+  function updateRoutingSource(event: Event): void {
+    const select = event.currentTarget as HTMLSelectElement;
+    if (select.value === LOAD_GENERATOR || select.value === LOAD_DESIGN) {
+      const action = select.value;
+      select.value = selectedPattern;
+      if (action === LOAD_GENERATOR) generatorOpen = true;
+      else onImportCad();
+      return;
+    }
+    updatePattern(select.value);
   }
 
   async function inspectRecent(path: string): Promise<void> {
@@ -228,7 +244,7 @@
         <h2 class="mt-1 text-lg font-semibold text-slate-100">{detailTitle}</h2>
         <p class="mt-1 text-xs text-slate-400">
           {#if screen === "new"}
-            Configure the board stack and generated routing pattern.
+            Choose a routing source and configure the board stack.
           {:else if selectedPath}
             Project overview. Double-click its row or choose Open to continue.
           {:else}
@@ -248,10 +264,12 @@
               </select>
             </label>
             <label class="block text-xs font-medium text-slate-300" for="startup-pattern">
-              Routing pattern
-              <select id="startup-pattern" value={selectedPattern} onchange={(event) => updatePattern(event.currentTarget.value)} class="mt-1.5 w-full rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100">
+              Routing source
+              <select id="startup-pattern" aria-label="Routing source" value={selectedPattern} onchange={updateRoutingSource} class="mt-1.5 w-full rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100">
                 {#each config.routing_patterns as pattern (pattern.id)}<option value={pattern.id}>{pattern.display_name}</option>{/each}
                 {#if config.routing_patterns.length === 0}<option value={config.routing_pattern}>{config.routing_pattern}</option>{/if}
+                <option value={LOAD_GENERATOR}>Load new generator from file…</option>
+                <option value={LOAD_DESIGN}>Load new design from file…</option>
               </select>
             </label>
           </div>
@@ -310,3 +328,12 @@
     </main>
   </div>
 </div>
+
+{#if generatorOpen}
+  <GeneratorUploadPanel
+    {config}
+    zIndex={120}
+    onLoaded={updatePattern}
+    onClose={() => (generatorOpen = false)}
+  />
+{/if}

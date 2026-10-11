@@ -11,9 +11,13 @@
   let {
     config,
     onClose,
+    onLoaded,
+    zIndex = 50,
   }: {
     config: ConfigStore;
     onClose: () => void;
+    onLoaded?: (id: string) => void;
+    zIndex?: number;
   } = $props();
 
   let open = $state(true);
@@ -101,6 +105,7 @@
       await config.loadRoutingParams(newId);
       status = "success";
       message = `Registered "${newId}". Selected and ready.`;
+      onLoaded?.(newId);
       onClose();
     } catch (e) {
       status = "error";
@@ -132,10 +137,12 @@
     <Dialog.Overlay
       bind:ref={backdropRef}
       class="fixed inset-0 z-50 bg-black/60"
+      style={`z-index: ${zIndex}`}
     />
     <Dialog.Content
       preventScroll={false}
       aria-label="Load new generator"
+      style={`z-index: ${zIndex}`}
       class="fixed left-1/2 top-1/2 z-50 w-full max-w-md -translate-x-1/2 -translate-y-1/2 rounded-lg border border-slate-700 bg-slate-800 shadow-xl"
     >
       <!-- Header -->
@@ -250,5 +257,5 @@
      dialog (outside its Dialog.Root) so it paints above it; the
      refcounted scroll lock composes. -->
 {#if guideOpen}
-  <PluginAuthoringGuideModal onClose={() => (guideOpen = false)} />
+  <PluginAuthoringGuideModal zIndex={zIndex + 10} onClose={() => (guideOpen = false)} />
 {/if}

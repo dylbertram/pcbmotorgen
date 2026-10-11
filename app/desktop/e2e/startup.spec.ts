@@ -1,6 +1,71 @@
 import { expect, test } from "@playwright/test";
 
 test.describe("startup chooser and new-design setup", () => {
+  test("new-design routing source opens file loaders and preserves setup on cancel", async ({ page }) => {
+    await page.goto("/");
+    const startup = page.getByRole("dialog", { name: "Recent projects" });
+    await startup.getByRole("button", { name: "New design" }).click();
+    const source = startup.getByLabel("Routing source", { exact: true });
+    await expect(source).toBeVisible();
+    await expect(startup.getByText("Routing pattern", { exact: true })).toHaveCount(0);
+    await startup.getByLabel("Copper layers").selectOption("6");
+    const originalSource = await source.inputValue();
+
+    await source.selectOption({ label: "Load new generator from file…" });
+    const generator = page.getByRole("dialog", { name: "Load new generator", exact: true });
+    await expect(generator).toBeVisible();
+    await expect(generator).toHaveCSS("z-index", "120");
+    await generator.getByRole("button", { name: "How to write a plugin?" }).click();
+    const guide = page.getByRole("dialog", { name: "How to write a routing plugin", exact: true });
+    await expect(guide).toBeVisible();
+    await expect(guide).toHaveCSS("z-index", "130");
+    await page.keyboard.press("Escape");
+    await expect(guide).toBeHidden();
+    await generator.getByRole("button", { name: "Cancel", exact: true }).click();
+    await expect(source).toHaveValue(originalSource);
+
+    await source.selectOption({ label: "Load new design from file…" });
+    const cad = page.getByRole("dialog", { name: "Import CAD", exact: true });
+    await expect(cad.getByLabel("Coil type")).toBeVisible();
+    await cad.getByRole("button", { name: "Cancel", exact: true }).click();
+    await expect(source).toHaveValue(originalSource);
+    await expect(startup.getByLabel("Copper layers")).toHaveValue("6");
+    await startup.getByRole("button", { name: "Create design" }).click();
+    await expect(page.locator("#num-layers")).toContainText("6");
+  });
+
+  test("a generator loaded from startup becomes the selected routing source", async ({ page }) => {
+    await page.route("**/src/lib/ipc/dxf.ts", (route) => route.fulfill({
+      contentType: "application/javascript",
+      body: `export * from '/src/lib/ipc/dxf.ts?original';
+        export async function openFileDialog() { return '/custom.py'; }`,
+    }));
+    await page.route("**/src/lib/ipc/routing.ts", (route) => route.fulfill({
+      contentType: "application/javascript",
+      body: `let loaded = false;
+        export async function listRoutingPatterns() {
+          return [{ id: 'infinity-braid', display_name: 'Infinity Braid' },
+            ...(loaded ? [{ id: 'custom', display_name: 'Custom generator', min_layers: 6, max_layers: 6 }] : [])];
+        }
+        export async function registerRoutingPlugin() { loaded = true; return 'custom'; }
+        export async function routingPatternParameters() { return []; }
+        export async function loadInstalledPlugins() { return []; }
+        export async function checkCoilInterference() { return []; }`,
+    }));
+    await page.goto("/");
+    const startup = page.getByRole("dialog", { name: "Recent projects" });
+    await startup.getByRole("button", { name: "New design" }).click();
+    await startup.getByLabel("Routing source", { exact: true }).selectOption({ label: "Load new generator from file…" });
+    const generator = page.getByRole("dialog", { name: "Load new generator", exact: true });
+    await generator.getByRole("button", { name: "Browse…" }).click();
+    await generator.getByRole("button", { name: "Load generator", exact: true }).click();
+    await expect(generator).toBeHidden();
+    await expect(startup.getByLabel("Routing source", { exact: true })).toHaveValue("custom");
+    await expect(startup.getByLabel("Copper layers")).toHaveValue("6");
+    await startup.getByRole("button", { name: "Create design" }).click();
+    await expect(page.locator("#routing-pattern")).toContainText("Custom generator");
+  });
+
   test("coil type is an import option and cancelling keeps the motor workflow", async ({ page }) => {
     await page.goto("/");
     const startup = page.getByRole("dialog", { name: "Recent projects" });

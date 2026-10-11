@@ -7,7 +7,7 @@
   } from "../../utils/pageScrollLock";
   import Separator from "../ui/Separator.svelte";
 
-  let { onClose }: { onClose: () => void } = $props();
+  let { onClose, zIndex = 60 }: { onClose: () => void; zIndex?: number } = $props();
 
   let open = $state(true);
   let activeTabId = $state(GUIDE_TABS[0]?.id ?? "authoring");
@@ -51,11 +51,12 @@
      globally, so the upload panel underneath stays open. -->
 <Dialog.Root bind:open onOpenChange={(o) => { if (!o) onClose(); }}>
   <Dialog.Portal>
-    <Dialog.Overlay bind:ref={backdropRef} class="fixed inset-0 z-[60] bg-black/70" />
+    <Dialog.Overlay bind:ref={backdropRef} style={`z-index: ${zIndex}`} class="fixed inset-0 z-[60] bg-black/70" />
     <Dialog.Content
       bind:ref={panelRef}
       preventScroll={false}
       aria-label="How to write a routing plugin"
+      style={`z-index: ${zIndex}`}
       class="fixed left-1/2 top-1/2 z-[60] flex max-h-[85vh] w-full max-w-3xl -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-lg border border-slate-700 bg-slate-800 shadow-xl"
     >
       <!-- Header -->
