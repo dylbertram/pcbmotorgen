@@ -40,9 +40,10 @@
   <ScrollArea.Viewport class="w-full min-h-0 flex-1 {viewportClass}">
     {@render children()}
   </ScrollArea.Viewport>
+  <!-- Bits translates the thumb from the track's start; centering adds an unwanted offset. -->
   <ScrollArea.Scrollbar
     orientation="vertical"
-    class="h-full flex w-2.5 touch-none select-none flex-col justify-center rounded-md bg-transparent p-0.5 transition-colors data-[state=visible]:bg-slate-800/60"
+    class="h-full flex w-2.5 touch-none select-none flex-col justify-start rounded-md bg-transparent p-0.5 transition-colors data-[state=visible]:bg-slate-800/60"
   >
     <ScrollArea.Thumb class="relative rounded-full {scrollbarClass}" />
   </ScrollArea.Scrollbar>

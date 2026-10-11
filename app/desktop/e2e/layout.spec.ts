@@ -9,6 +9,33 @@ import {
 } from "./helpers";
 
 test.describe("Design tab layout geometry", () => {
+  test("scrollbar thumbs reach both ends without leaving their tracks", async ({ page }) => {
+    await page.setViewportSize({ width: page.viewportSize()!.width, height: 600 });
+    await gotoDesignApp(page);
+    for (const selector of [DESIGN_SCROLL, `${ASIDE} [data-scroll-area-root]`]) {
+      const root = page.locator(selector);
+      const viewport = root.locator("[data-scroll-area-viewport]");
+      const track = root.locator("[data-scroll-area-scrollbar]");
+      const thumb = track.locator("[data-scroll-area-thumb]");
+      await root.hover();
+      await expect(track).toBeVisible();
+      await expect(thumb).toBeVisible();
+      expect(await viewport.evaluate((el) => el.scrollHeight - el.clientHeight)).toBeGreaterThan(0);
+      await viewport.evaluate((el) => { el.scrollTop = 0; });
+      await expect.poll(async () => {
+        const bar = (await track.boundingBox())!;
+        const handle = (await thumb.boundingBox())!;
+        return Math.abs(handle.y - (bar.y + 2));
+      }).toBeLessThanOrEqual(1);
+      await viewport.evaluate((el) => { el.scrollTop = el.scrollHeight; });
+      await expect.poll(async () => {
+        const bar = (await track.boundingBox())!;
+        const handle = (await thumb.boundingBox())!;
+        return Math.abs(handle.y + handle.height - (bar.y + bar.height - 2));
+      }).toBeLessThanOrEqual(1);
+    }
+  });
+
   test("left column first card aligns with the right column content padding", async ({
     page,
   }) => {
