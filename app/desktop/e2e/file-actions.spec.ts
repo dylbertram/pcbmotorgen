@@ -4,7 +4,7 @@ import { gotoDesignApp } from "./helpers";
 test.beforeEach(async ({ page }) => {
   // The browser has no native menu. Replace only the menu-event transport,
   // leaving the real App handlers and export/DRC components under test.
-  await page.route("**/src/lib/ipc/project.ts", async (route) => {
+  await page.route(/\/src\/lib\/ipc\/project\.ts(?:\?t=\d+)?$/, async (route) => {
     const response = await route.fetch();
     const body = (await response.text()).replace(
       "export async function bindProjectMenuActions(handlers) {",

@@ -7,7 +7,7 @@ import { RecentFilesStore } from "./recentFiles.svelte";
 import type { ProjectState } from "../types";
 import type { CadGeometry } from "../types";
 import type { LoadProjectResult } from "../types";
-import { confirmDiscardChanges, loadProject } from "../ipc";
+import { confirmDiscardChanges, loadProject, saveProject, pickProjectSavePath, updateProjectVersion } from "../ipc";
 
 // Track load calls without losing the real module's other exports (the
 // config store uses them for its routing-pattern/magnet-grade catalog).
@@ -247,13 +247,15 @@ describe("ProjectStore openPath (kata eap8)", () => {
       source_format_version: 1,
       format_version: 1,
       validation: { errors: [], warnings: [] },
+      active_version_id: 1,
+      versions: [{ id: 1, description: "Original", created_at_unix_ms: 100, last_edited_at_unix_ms: 100 }],
     };
     vi.mocked(loadProject).mockResolvedValue(result);
 
     projects.markClean(); // clean: no discard-confirm path
     const ok = await projects.openPath("/home/user/motor-1.pmproj");
     expect(ok).toBe(true);
-    expect(loadProject).toHaveBeenCalledWith("/home/user/motor-1.pmproj");
+    expect(loadProject).toHaveBeenCalledWith("/home/user/motor-1.pmproj", null);
     expect(projects.currentPath).toBe("/home/user/motor-1.pmproj");
     expect(projects.error).toBeNull();
     expect(motion.positionMm).toBe(7);
@@ -347,6 +349,128 @@ describe("ProjectStore newProject", () => {
     expect(await pending).toBe(true);
     expect(projects.isDirty).toBe(false);
     expect(projects.busy).toBe(false);
+  });
+});
+
+describe("ProjectStore versions", () => {
+  const versions = [
+    { id: 1, description: "Original", created_at_unix_ms: 100, last_edited_at_unix_ms: 100 },
+    { id: 2, description: "Short track", created_at_unix_ms: 200, last_edited_at_unix_ms: 200 },
+  ];
+
+  beforeEach(() => {
+    vi.mocked(loadProject).mockReset();
+    vi.mocked(saveProject).mockReset();
+    vi.mocked(updateProjectVersion).mockReset();
+    vi.mocked(pickProjectSavePath).mockReset();
+    vi.mocked(confirmDiscardChanges).mockReset();
+  });
+
+  function savedStores() {
+    const stores = makeStores();
+    stores.projects.currentPath = "/project.pmproj";
+    stores.projects.versions = versions;
+    stores.projects.activeVersionId = 2;
+    stores.projects.markClean();
+    return stores;
+  }
+
+  function loadResult(project: ProjectState, id = 1, remaining = versions): LoadProjectResult {
+    return { project, active_version_id: id, versions: remaining, format_version: 2, source_format_version: 2, validation: { errors: [], warnings: [] } };
+  }
+
+  it("Save updates the selected version and Save new version forks it", async () => {
+    const { projects } = savedStores();
+    vi.mocked(saveProject).mockResolvedValue({ path: "/project.pmproj", format_version: 2, saved_at_unix_ms: 300, active_version_id: 2, versions });
+    expect(await projects.save()).toBe(true);
+    expect(saveProject).toHaveBeenLastCalledWith("/project.pmproj", projects.snapshotIpc(), { sourcePath: "/project.pmproj", activeVersionId: 2, newVersion: false, description: undefined });
+    const forked = [...versions, { ...versions[1], id: 3, description: "Experiment" }];
+    vi.mocked(saveProject).mockResolvedValue({ path: "/project.pmproj", format_version: 2, saved_at_unix_ms: 400, active_version_id: 3, versions: forked });
+    expect(await projects.save(false, true, "Experiment")).toBe(true);
+    expect(saveProject).toHaveBeenLastCalledWith("/project.pmproj", projects.snapshotIpc(), { sourcePath: "/project.pmproj", activeVersionId: 2, newVersion: true, description: "Experiment" });
+    expect(projects.activeVersionId).toBe(3);
+    expect(projects.versions).toEqual(forked);
+  });
+
+  it("Save As carries the source file so the backend preserves every version", async () => {
+    const { projects } = savedStores();
+    vi.mocked(pickProjectSavePath).mockResolvedValue("/copy.pmproj");
+    vi.mocked(saveProject).mockResolvedValue({ path: "/copy.pmproj", format_version: 2, saved_at_unix_ms: 300, active_version_id: 2, versions });
+    expect(await projects.save(true)).toBe(true);
+    expect(saveProject).toHaveBeenCalledWith("/copy.pmproj", projects.snapshotIpc(), expect.objectContaining({ sourcePath: "/project.pmproj" }));
+    expect(projects.currentPath).toBe("/copy.pmproj");
+    expect(projects.versions).toEqual(versions);
+  });
+
+  it("opening a version protects unsaved changes and does not touch disk on cancel", async () => {
+    const { config, projects } = savedStores();
+    const original = projects.snapshotIpc();
+    config.desired_travel_mm = 99;
+    vi.mocked(confirmDiscardChanges).mockResolvedValue(false);
+    expect(await projects.openVersion(1)).toBe(false);
+    expect(loadProject).not.toHaveBeenCalled();
+    expect(config.desired_travel_mm).toBe(99);
+    vi.mocked(confirmDiscardChanges).mockResolvedValue(true);
+    vi.mocked(loadProject).mockResolvedValue(loadResult(original));
+    expect(await projects.openVersion(1)).toBe(true);
+    expect(loadProject).toHaveBeenCalledWith("/project.pmproj", 1);
+    expect(projects.activeVersionId).toBe(1);
+    expect(projects.isDirty).toBe(false);
+  });
+
+  it("description edits and deleting an inactive version preserve the unsaved draft", async () => {
+    const { config, projects } = savedStores();
+    const saved = projects.snapshotIpc();
+    config.desired_travel_mm = 99;
+    const changed = [{ ...versions[0], description: "Edited", last_edited_at_unix_ms: 300 }, versions[1]];
+    vi.mocked(updateProjectVersion).mockResolvedValue(loadResult(saved, 2, changed));
+    expect(await projects.describeVersion(1, "Edited")).toBe(true);
+    expect(projects.versions[0].description).toBe("Edited");
+    expect(config.desired_travel_mm).toBe(99);
+    expect(projects.isDirty).toBe(true);
+    vi.mocked(updateProjectVersion).mockResolvedValue(loadResult(saved, 2, [versions[1]]));
+    expect(await projects.deleteVersion(1)).toBe(true);
+    expect(config.desired_travel_mm).toBe(99);
+    expect(projects.activeVersionId).toBe(2);
+    expect(projects.isDirty).toBe(true);
+    expect(await projects.deleteVersion(2)).toBe(false);
+  });
+
+  it("deleting the active version restores the remaining version", async () => {
+    const { config, projects } = savedStores();
+    const original = projects.snapshotIpc();
+    config.desired_travel_mm = 99;
+    vi.mocked(updateProjectVersion).mockResolvedValue(loadResult(original, 1, [versions[0]]));
+    expect(await projects.deleteVersion(2)).toBe(true);
+    expect(projects.activeVersionId).toBe(1);
+    expect(config.desired_travel_mm).toBe(original.config.desired_travel_mm);
+    expect(projects.isDirty).toBe(false);
+  });
+
+  it("failed version operations keep the current version and draft unchanged", async () => {
+    const { config, projects } = savedStores();
+    config.desired_travel_mm = 99;
+    vi.mocked(updateProjectVersion).mockRejectedValue(new Error("Disk unavailable"));
+    expect(await projects.deleteVersion(2)).toBe(false);
+    expect(await projects.describeVersion(1, "Edited")).toBe(false);
+    vi.mocked(saveProject).mockRejectedValue(new Error("Disk full"));
+    expect(await projects.save(false, true)).toBe(false);
+    expect(projects.activeVersionId).toBe(2);
+    expect(projects.versions).toEqual(versions);
+    expect(config.desired_travel_mm).toBe(99);
+    expect(projects.isDirty).toBe(true);
+  });
+
+  it("edits made during a save remain dirty and overlapping saves are ignored", async () => {
+    const { config, projects } = savedStores();
+    let finish!: (value: Awaited<ReturnType<typeof saveProject>>) => void;
+    vi.mocked(saveProject).mockImplementation(() => new Promise((resolve) => { finish = resolve; }));
+    const pending = projects.save();
+    expect(await projects.save()).toBe(false);
+    config.desired_travel_mm = 99;
+    finish({ path: "/project.pmproj", format_version: 2, saved_at_unix_ms: 300, active_version_id: 2, versions });
+    expect(await pending).toBe(true);
+    expect(projects.isDirty).toBe(true);
   });
 });
 

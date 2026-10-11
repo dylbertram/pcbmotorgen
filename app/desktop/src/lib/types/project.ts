@@ -101,6 +101,8 @@ export interface LoadProjectResult {
   /** Version after migration (= current on success). */
   format_version: number;
   validation: ProjectValidation;
+  active_version_id: number;
+  versions: ProjectVersionInfo[];
 }
 
 /** Result of the `save_project` command. */
@@ -108,4 +110,13 @@ export interface SaveProjectResult {
   path: string;
   format_version: number;
   saved_at_unix_ms: number;
+  active_version_id: number;
+  versions: ProjectVersionInfo[];
+}
+
+export interface ProjectVersionInfo {
+  id: number;
+  description: string;
+  created_at_unix_ms: number;
+  last_edited_at_unix_ms: number;
 }

@@ -48,6 +48,7 @@
   import CadImportDialog from "./lib/components/layout/CadImportDialog.svelte";
   import SensorTab from "./lib/components/layout/SensorTab.svelte";
   import SensorPreview from "./lib/components/design/SensorPreview.svelte";
+  import ProjectVersionsDialog from "./lib/components/layout/ProjectVersionsDialog.svelte";
 
   // Session-only navigation state; none of these values enter IPC.
   let activeTab = $state<TabId>("design");
@@ -68,6 +69,16 @@
   let cadImportDialogOpen = $state(false);
   let kicadDialogOpen = $state(false);
   let exportingDxf = $state(false);
+  let versionsDialogOpen = $state(false);
+  let creatingVersion = $state(false);
+  let versionsDialogGeneration = $state(0);
+
+  function showVersions(creating = false): void {
+    if (startupOpen || projects.busy) return;
+    creatingVersion = creating;
+    versionsDialogGeneration += 1;
+    versionsDialogOpen = true;
+  }
 
   // App init: populate the routing-pattern selector + magnet-grade reference
   // from the backend. Fire-and-forget — failures are swallowed inside the
@@ -129,6 +140,7 @@
           startupOpen = false;
           cadImportDialogOpen = false;
           kicadDialogOpen = false;
+          versionsDialogOpen = false;
           clearSimulationResults();
           selectTab("design");
         });
@@ -137,11 +149,15 @@
       sendKicad: () => (kicadDialogOpen = true),
       open: () => {
         void projects.open().then((opened) => {
-          if (opened) startupOpen = false;
+          if (opened) {
+            startupOpen = false;
+            versionsDialogOpen = false;
+          }
         });
       },
       save: () => void projects.save(false),
       saveAs: () => void projects.save(true),
+      saveNewVersion: () => showVersions(true),
       importCad: () => (cadImportDialogOpen = true),
       openRecent: (path) => {
         // Open-recent access point: refresh menu truth (the entry is pruned
@@ -151,7 +167,10 @@
         void recentFiles.dropMissing(path)
           .then(() => projects.openPath(path))
           .then((opened) => {
-            if (opened) startupOpen = false;
+            if (opened) {
+              startupOpen = false;
+              versionsDialogOpen = false;
+            }
           });
       },
       clearRecent: () => void recentFiles.clear(),
@@ -506,7 +525,7 @@
       class="flex min-h-0 flex-1 flex-col"
     >
       <header class="shrink-0 bg-slate-900">
-        <TitleBar {projects} loading={loading || exportingDxf} {drc} />
+        <TitleBar {projects} loading={loading || exportingDxf} {drc} onVersions={() => showVersions()} versionsDisabled={startupOpen} />
         <div class="flex items-center gap-3 px-6 py-2">
           <span id="design-type-label" class="shrink-0 text-xs text-slate-400">Design type</span>
           <fieldset aria-labelledby="design-type-label" class="flex min-w-0 gap-0.5 rounded-md border border-slate-700 bg-slate-950/50 p-0.5">
@@ -666,6 +685,12 @@
       {/if}
 
       <KicadDialog bind:open={kicadDialogOpen} {config} {projects} {drc} />
+
+      {#if versionsDialogOpen}
+        {#key versionsDialogGeneration}
+          <ProjectVersionsDialog {projects} creating={creatingVersion} onClose={() => (versionsDialogOpen = false)} />
+        {/key}
+      {/if}
 
       {#if cadImportDialogOpen}
         <CadImportDialog

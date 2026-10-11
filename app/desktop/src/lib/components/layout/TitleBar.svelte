@@ -9,10 +9,14 @@
     projects,
     loading,
     drc,
+    onVersions,
+    versionsDisabled = false,
   }: {
     projects: ProjectStore;
     loading: boolean;
     drc: DrcController;
+    onVersions: () => void;
+    versionsDisabled?: boolean;
   } = $props();
 </script>
 
@@ -40,8 +44,9 @@
       pcbmotorgen
     </span>
   </div>
-  <div class="min-w-0 justify-self-center" data-tauri-drag-region="deep">
+  <div class="flex min-w-0 items-center gap-2 justify-self-center">
     <ProjectControls {projects} />
+    <button type="button" onclick={onVersions} disabled={projects.busy || versionsDisabled} aria-label="Project versions" class="shrink-0 rounded border border-slate-700 bg-slate-800/50 px-2 py-1 text-[11px] text-slate-300 hover:border-emerald-500/50 hover:text-emerald-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400 disabled:opacity-50">{projects.activeVersionId !== null ? `Version ${projects.activeVersionId}` : "Versions"}</button>
   </div>
   <div class="flex items-center gap-2 justify-self-end pr-4">
     <DrcStatus {drc} cadGeometryActive={projects.cadGeometry !== null} />

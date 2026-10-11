@@ -13,6 +13,7 @@
 <div
   class="flex max-w-[280px] items-center gap-1.5 text-xs text-slate-300"
   aria-label="Project file"
+  data-tauri-drag-region="deep"
   title={projects.currentPath ?? "Not saved yet — use Save As"}
 >
   <span class="truncate">{projects.label}</span>

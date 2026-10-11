@@ -20,6 +20,7 @@ import type {
   LoadProjectResult,
   ProjectState,
   ProjectValidation,
+  ProjectVersionInfo,
 } from "../types";
 import { DEFAULT_SENSOR_CONFIG } from "../types";
 import {
@@ -29,6 +30,7 @@ import {
   pickProjectOpenPath,
   pickProjectSavePath,
   saveProject,
+  updateProjectVersion,
 } from "../ipc";
 import type { ConfigStore } from "./config.svelte";
 import type { MotionStore } from "./motion.svelte";
@@ -65,6 +67,9 @@ export class ProjectStore {
   savedSnapshot = $state<string | null>(null);
   /** Imported CAD geometry is authoritative until the user explicitly replaces it. */
   cadGeometry = $state.raw<CadGeometry | null>(null);
+  versions = $state.raw<ProjectVersionInfo[]>([]);
+  activeVersionId = $state<number | null>(null);
+  activeVersion = $derived(this.versions.find((v) => v.id === this.activeVersionId) ?? null);
 
   constructor(
     private config: ConfigStore,
@@ -235,6 +240,8 @@ export class ProjectStore {
       await this.config.loadRoutingParams(this.config.routing_pattern);
       this.config.constrainLayersToPattern();
       this.currentPath = null;
+      this.versions = [];
+      this.activeVersionId = null;
       this.clearMessages();
       this.markClean();
       return true;
@@ -252,8 +259,9 @@ export class ProjectStore {
    * Failures surface via `error` and leave both the in-memory state and
    * the previous artifact untouched (the backend writes atomically).
    */
-  async save(saveAs = false): Promise<boolean> {
+  async save(saveAs = false, newVersion = false, description?: string): Promise<boolean> {
     if (this.busy) return false;
+    this.busy = true;
     let path = this.currentPath;
     if (saveAs || path === null) {
       try {
@@ -262,22 +270,81 @@ export class ProjectStore {
         );
       } catch (e) {
         this.error = errorMessage(e);
+        this.busy = false;
         return false;
       }
       // User cancelled the dialog — not an error.
-      if (path === null) return false;
+      if (path === null) {
+        this.busy = false;
+        return false;
+      }
     }
 
-    this.busy = true;
     this.clearMessages();
     try {
-      const result = await saveProject(path, this.snapshotIpc());
+      const snapshot = this.snapshotIpc();
+      const savedSnapshot = JSON.stringify(snapshot);
+      const result = await saveProject(path, snapshot, {
+        sourcePath: this.currentPath, activeVersionId: this.activeVersionId, newVersion, description,
+      });
       this.currentPath = result.path;
-      this.markClean();
-      this.notice = `Saved ${baseName(result.path)}.`;
+      this.versions = result.versions ?? [];
+      this.activeVersionId = result.active_version_id ?? null;
+      this.savedSnapshot = savedSnapshot;
+      this.notice = `Saved ${baseName(result.path)}${newVersion ? ` as version ${this.activeVersionId ?? 1}` : ""}.`;
       return true;
     } catch (e) {
       this.error = `Save failed — ${errorMessage(e)}`;
+      return false;
+    } finally {
+      this.busy = false;
+    }
+  }
+
+  async openVersion(id: number): Promise<boolean> {
+    if (!this.currentPath || this.busy) return false;
+    if (id === this.activeVersionId) return true;
+    if (this.isDirty && !(await confirmDiscardChanges("open another version"))) return false;
+    return await this.loadFromPath(this.currentPath, id);
+  }
+
+  async describeVersion(id: number, description: string): Promise<boolean> {
+    if (!this.currentPath || this.busy) return false;
+    this.busy = true;
+    this.clearMessages();
+    try {
+      const result = await updateProjectVersion(this.currentPath, id, this.activeVersionId, { description });
+      this.versions = result.versions;
+      this.notice = `Updated description for version ${id}.`;
+      return true;
+    } catch (e) {
+      this.error = `Could not update version: ${errorMessage(e)}`;
+      return false;
+    } finally {
+      this.busy = false;
+    }
+  }
+
+  /** The dialog confirms deletion, including loss of an active unsaved draft. */
+  async deleteVersion(id: number): Promise<boolean> {
+    if (!this.currentPath || this.busy || this.versions.length <= 1) return false;
+    this.busy = true;
+    this.clearMessages();
+    try {
+      const result = await updateProjectVersion(this.currentPath, id, this.activeVersionId, { deleteVersion: true });
+      if (id === this.activeVersionId) {
+        this.applyToState(result.project);
+        await this.config.loadRoutingParams(result.project.config.routing_pattern);
+        this.config.constrainLayersToPattern();
+        this.activeVersionId = result.active_version_id;
+        this.loadIssues = result.validation.errors.length || result.validation.warnings.length ? result.validation : null;
+        this.markClean();
+      }
+      this.versions = result.versions;
+      this.notice = `Deleted version ${id}.`;
+      return true;
+    } catch (e) {
+      this.error = `Could not delete version: ${errorMessage(e)}`;
       return false;
     } finally {
       this.busy = false;
@@ -337,11 +404,11 @@ export class ProjectStore {
    * state restore, and (on success) the recents record (kata eap8).
    * Recents failures are swallowed — they only degrade the menu.
    */
-  private async loadFromPath(path: string): Promise<boolean> {
+  private async loadFromPath(path: string, versionId: number | null = null): Promise<boolean> {
     this.busy = true;
     this.clearMessages();
     try {
-      const result: LoadProjectResult = await loadProject(path);
+      const result: LoadProjectResult = await loadProject(path, versionId);
       // Backend accepted the artifact — only now replace in-memory state.
       this.applyToState(result.project);
       // Refresh the pattern catalog metadata for the restored pattern and
@@ -351,6 +418,8 @@ export class ProjectStore {
       );
       this.config.constrainLayersToPattern();
       this.currentPath = path;
+      this.versions = result.versions ?? [];
+      this.activeVersionId = result.active_version_id ?? null;
       this.markClean();
       const issues = result.validation;
       const issueCount = issues.errors.length + issues.warnings.length;

@@ -36,6 +36,7 @@ fn main() {
                     | menu::SEND_KICAD_ID
                     | menu::SAVE_ID
                     | menu::SAVE_AS_ID
+                    | menu::SAVE_NEW_VERSION_ID
                     | menu::CLEAR_RECENT_ID
                     | menu::IMPORT_CAD_ID
             ) {
@@ -78,6 +79,7 @@ fn main() {
             commands::dxf::export_cad_geometry_dxf,
             commands::project::save_project,
             commands::project::load_project,
+            commands::project::update_project_version,
             commands::project::set_recent_files,
             commands::project::file_exists,
             commands::routing_plugins::list_routing_patterns,

@@ -73,14 +73,13 @@ export async function pickProjectSavePath(
  * Ask before replacing in-progress work (Open with unsaved changes).
  * Uses the native dialog in the desktop app, `window.confirm` outside it.
  */
-export async function confirmDiscardChanges(): Promise<boolean> {
+export async function confirmDiscardChanges(action = "start another project"): Promise<boolean> {
+  const message = `You have unsaved changes. Discard them and ${action}?`;
   if (!isTauriAvailable()) {
-    return window.confirm(
-      "You have unsaved changes. Discard them and start another project?",
-    );
+    return window.confirm(message);
   }
   return await confirm(
-    "You have unsaved changes. Discard them and start another project?",
+    message,
     {
       title: "Unsaved changes",
       okLabel: "Discard changes",
@@ -98,13 +97,17 @@ export async function confirmDiscardChanges(): Promise<boolean> {
 export async function saveProject(
   path: string,
   project: ProjectState,
+  options: { sourcePath: string | null; activeVersionId: number | null; newVersion: boolean; description?: string } = { sourcePath: null, activeVersionId: null, newVersion: false },
 ): Promise<SaveProjectResult> {
   if (!isTauriAvailable()) {
     throw new Error(
       "Tauri backend unavailable — saving projects requires the desktop app",
     );
   }
-  return await invoke<SaveProjectResult>("save_project", { path, project });
+  return await invoke<SaveProjectResult>("save_project", {
+    path, project, sourcePath: options.sourcePath, activeVersionId: options.activeVersionId,
+    newVersion: options.newVersion, description: options.description ?? null,
+  });
 }
 
 /**
@@ -113,13 +116,20 @@ export async function saveProject(
  * for missing/corrupt/incompatible files — the caller must not touch the
  * in-progress state on rejection.
  */
-export async function loadProject(path: string): Promise<LoadProjectResult> {
+export async function loadProject(path: string, versionId: number | null = null): Promise<LoadProjectResult> {
   if (!isTauriAvailable()) {
     throw new Error(
       "Tauri backend unavailable — loading projects requires the desktop app",
     );
   }
-  return await invoke<LoadProjectResult>("load_project", { path });
+  return await invoke<LoadProjectResult>("load_project", { path, versionId });
+}
+
+export async function updateProjectVersion(path: string, versionId: number, activeVersionId: number | null, options: { description?: string; deleteVersion?: boolean }): Promise<LoadProjectResult> {
+  if (!isTauriAvailable()) throw new Error("Editing project versions requires the desktop app");
+  return await invoke<LoadProjectResult>("update_project_version", {
+    path, versionId, activeVersionId, description: options.description ?? null, deleteVersion: options.deleteVersion ?? false,
+  });
 }
 
 /**
@@ -161,6 +171,7 @@ export async function bindProjectMenuActions(handlers: {
   open: () => void;
   save: () => void;
   saveAs: () => void;
+  saveNewVersion?: () => void;
   /** The native File > Import CAD menu item was clicked. */
   importCad?: () => void;
   /**
@@ -181,6 +192,7 @@ export async function bindProjectMenuActions(handlers: {
     listen("menu:open-project", handlers.open),
     listen("menu:save-project", handlers.save),
     listen("menu:save-project-as", handlers.saveAs),
+    listen("menu:save-project-new-version", () => handlers.saveNewVersion?.()),
     listen("menu:import-cad", () => handlers.importCad?.()),
     // Open Recent (kata eap8): Rust resolves the entry id to the path that
     // was displayed and forwards it as the event payload. Registered even

@@ -25,7 +25,14 @@
 //!
 //! ## Format + version policy (house style: routing API.md §15)
 //!
-//! The artifact is pretty-printed JSON with a versioned envelope:
+//! Format v2 stores every design version in one archive, implemented in
+//! [`super::project_versions`]. Each version has a stable ID, a description,
+//! creation/edit timestamps, and its own complete [`ProjectStateIpc`].
+//! Opening an archive selects the version with the greatest last-edited time.
+//! The older single-state v1 envelope is still accepted and becomes version 1
+//! in memory. The next save writes v2 without losing its inputs or save time.
+//!
+//! The legacy v1 artifact looked like this:
 //!
 //! ```json
 //! {
@@ -44,7 +51,7 @@
 //!   (serde default behaviour) — a newer artifact's extra fields don't
 //!   break an older build's read path (forward tolerance on read).
 //! - **Breaking change** (units/semantics/field removal): bump
-//!   `PROJECT_FORMAT_VERSION` and add a step to the `migrate_value` chain.
+//!   `PROJECT_FORMAT_VERSION` and extend `parse_project_archive` migration.
 //! - **Version mismatches**: a file with `format_version` greater than
 //!   this build is REJECTED with a clear message (its semantics are
 //!   unknown — guessing would silently corrupt the user's design).
@@ -68,13 +75,13 @@ use pcbmotorgen_routing::SensorConfig;
 
 /// Current project-file format version. Bump on breaking changes and add
 /// a migration step (see the module docs).
-pub const PROJECT_FORMAT_VERSION: u32 = 1;
+pub const PROJECT_FORMAT_VERSION: u32 = 2;
 
 // ===========================================================================
-// Envelope (the on-disk artifact)
+// Legacy v1 envelope (read-only migration input)
 // ===========================================================================
 
-/// The versioned envelope written to disk. `format_version` and `state`
+/// The legacy single-state envelope. `format_version` and `state`
 /// are REQUIRED (no serde defaults): a file missing either is rejected as
 /// malformed rather than silently defaulted.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -91,11 +98,12 @@ pub struct ProjectFileEnvelope {
     pub state: ProjectStateIpc,
 }
 
+#[cfg(test)]
 impl ProjectFileEnvelope {
-    /// Build the current-version envelope around a state payload.
+    /// Legacy fixture for testing migration from single-state v1 files.
     pub fn build(state: &ProjectStateIpc, saved_at_unix_ms: i64) -> Self {
         Self {
-            format_version: PROJECT_FORMAT_VERSION,
+            format_version: 1,
             app_version: env!("CARGO_PKG_VERSION").to_string(),
             saved_at_unix_ms,
             state: state.clone(),
@@ -321,6 +329,8 @@ pub struct SaveProjectResultIpc {
     pub path: String,
     pub format_version: u32,
     pub saved_at_unix_ms: i64,
+    pub active_version_id: u32,
+    pub versions: Vec<super::project_versions::ProjectVersionInfoIpc>,
 }
 
 /// Design-level validation findings for a loaded artifact. These do NOT
@@ -344,6 +354,8 @@ pub struct LoadProjectResultIpc {
     /// Version after migration (always `PROJECT_FORMAT_VERSION` on success).
     pub format_version: u32,
     pub validation: ProjectValidationIpc,
+    pub active_version_id: u32,
+    pub versions: Vec<super::project_versions::ProjectVersionInfoIpc>,
 }
 
 // ===========================================================================
@@ -357,49 +369,10 @@ pub struct LoadProjectResultIpc {
 /// JSON, foreign content (missing version), newer format, or malformed
 /// state — the caller surfaces the message verbatim and the frontend
 /// leaves the in-progress work untouched.
+#[cfg(test)]
 pub fn parse_project_file(json: &str) -> Result<(ProjectStateIpc, u32), String> {
-    let value: serde_json::Value = serde_json::from_str(json)
-        .map_err(|e| format!("corrupt project file (invalid JSON): {e}"))?;
-    let obj = value
-        .as_object()
-        .ok_or("corrupt project file: expected a JSON object")?;
-
-    let version = obj
-        .get("format_version")
-        .ok_or("not a pcbmotorgen project file: missing format_version")?
-        .as_u64()
-        .ok_or("corrupt project file: format_version must be a non-negative integer")?
-        as u32;
-
-    if version > PROJECT_FORMAT_VERSION {
-        return Err(format!(
-            "project file was saved by a newer version of pcbmotorgen \
-             (format v{version}); this build supports up to v{PROJECT_FORMAT_VERSION}. \
-             Update the app to open this file."
-        ));
-    }
-
-    let migrated = migrate_value(value, version)?;
-    let envelope: ProjectFileEnvelope = serde_json::from_value(migrated)
-        .map_err(|e| format!("malformed project file (format v{version}): {e}"))?;
-    Ok((envelope.state, version))
-}
-
-/// Step-by-step migration chain. v1 is the current version (identity);
-/// each future breaking change appends a `from → from+1` step here.
-fn migrate_value(value: serde_json::Value, from: u32) -> Result<serde_json::Value, String> {
-    let mut value = value;
-    let mut v = from;
-    while v < PROJECT_FORMAT_VERSION {
-        value = match v {
-            // 1 → current: identity while v1 is current. When v2 lands,
-            // transform the v1 payload here (e.g. rename/move fields).
-            1 => value,
-            other => return Err(format!("no migration path from project format v{other}")),
-        };
-        v += 1;
-    }
-    Ok(value)
+    let (archive, source) = super::project_versions::parse_project_archive(json)?;
+    Ok((archive.latest().project.clone(), source))
 }
 
 /// Load-time design validation of the restored state, reusing the core
@@ -503,8 +476,11 @@ mod tests {
 
     /// Serialize through the real save path (envelope → pretty JSON).
     fn serialize(state: &ProjectStateIpc) -> String {
-        serde_json::to_string_pretty(&ProjectFileEnvelope::build(state, 1_790_000_000_000))
-            .expect("envelope serialize")
+        serde_json::to_string_pretty(&super::super::project_versions::ProjectArchive::new(
+            state.clone(),
+            1_790_000_000_000,
+        ))
+        .expect("envelope serialize")
     }
 
     #[test]
@@ -547,7 +523,7 @@ mod tests {
             "CL1"
         );
         let mut legacy: serde_json::Value = serde_json::from_str(&serialize(&state)).unwrap();
-        legacy["state"]
+        legacy["versions"][0]["project"]
             .as_object_mut()
             .unwrap()
             .remove("sensor_cad_geometry");
@@ -562,7 +538,7 @@ mod tests {
     fn older_project_without_sensor_settings_gets_sensor_defaults() {
         let mut value: serde_json::Value =
             serde_json::from_str(&serialize(&sample_state())).expect("json");
-        value["state"]
+        value["versions"][0]["project"]
             .as_object_mut()
             .unwrap()
             .remove("sensor_config");
@@ -608,7 +584,7 @@ mod tests {
         // add. Load must succeed: missing → app defaults, unknown → ignored.
         let json = format!(
             r#"{{
-                "format_version": {PROJECT_FORMAT_VERSION},
+                "format_version": 1,
                 "app_version": "0.4.0",
                 "saved_at_unix_ms": 123,
                 "state": {{
@@ -621,7 +597,7 @@ mod tests {
             }}"#
         );
         let (state, version) = parse_project_file(&json).expect("parse");
-        assert_eq!(version, PROJECT_FORMAT_VERSION);
+        assert_eq!(version, 1);
         assert_eq!(state.config.desired_travel_mm, 30.0);
         assert_eq!(state.mover_position_mm, 10.0);
         // Everything absent falls back to the app defaults, not zeroes.

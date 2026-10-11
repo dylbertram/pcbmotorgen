@@ -30,6 +30,7 @@ pub const SEND_KICAD_ID: &str = "menu:send-kicad";
 pub const SAVE_ID: &str = "menu:save-project";
 /// Menu item id == webview event name for Save As.
 pub const SAVE_AS_ID: &str = "menu:save-project-as";
+pub const SAVE_NEW_VERSION_ID: &str = "menu:save-project-new-version";
 /// Menu item id == webview event name for importing CAD geometry.
 pub const IMPORT_CAD_ID: &str = "menu:import-cad";
 
@@ -105,6 +106,13 @@ fn file_submenu(app: &tauri::AppHandle) -> tauri::Result<Submenu<Wry>> {
     let open = MenuItem::with_id(app, OPEN_ID, "Open…", true, Some("CmdOrCtrl+O"))?;
     let save = MenuItem::with_id(app, SAVE_ID, "Save", true, Some("CmdOrCtrl+S"))?;
     let save_as = MenuItem::with_id(app, SAVE_AS_ID, "Save As…", true, Some("CmdOrCtrl+Shift+S"))?;
+    let save_new_version = MenuItem::with_id(
+        app,
+        SAVE_NEW_VERSION_ID,
+        "Save new version…",
+        true,
+        None::<&str>,
+    )?;
     let sep = PredefinedMenuItem::separator(app)?;
     let import_cad = MenuItem::with_id(app, IMPORT_CAD_ID, "Import CAD…", true, None::<&str>)?;
     let sep_after_import = PredefinedMenuItem::separator(app)?;
@@ -129,6 +137,7 @@ fn file_submenu(app: &tauri::AppHandle) -> tauri::Result<Submenu<Wry>> {
             &recent,
             &save,
             &save_as,
+            &save_new_version,
             &sep,
             &import_cad,
             &sep_after_import,
