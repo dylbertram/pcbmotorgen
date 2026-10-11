@@ -14,6 +14,13 @@
     </p>
   </header>
 
+  {#if store.cadGeometry}
+    <section class="rounded-lg border border-emerald-500/40 bg-emerald-500/10 p-3" aria-label="Sensor geometry source">
+      <p class="text-xs text-emerald-100">Using imported sensor CAD. Generator settings below do not change the imported geometry.</p>
+      <button type="button" onclick={() => (store.cadGeometry = null)} class="mt-2 rounded-md border border-slate-700 px-3 py-2 text-xs text-slate-300 hover:bg-slate-800">Use generated sensor geometry</button>
+    </section>
+  {/if}
+
   <section class="rounded-lg border border-slate-700 bg-slate-800/40 p-3" aria-labelledby="sensor-dimensions-heading">
     <h2 id="sensor-dimensions-heading" class="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-200">Sensor dimensions</h2>
     <div class="grid gap-x-4 gap-y-2 sm:grid-cols-2">

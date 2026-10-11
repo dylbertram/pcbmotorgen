@@ -26,7 +26,7 @@
     };
   });
   const previewView = new CoilPreviewViewState();
-  const previewLayers = [{ idx: 0 }, { idx: 1 }];
+  let previewLayers = $derived(Array.from({ length: store.cadGeometry?.layer_z_mm.length ?? 2 }, (_, idx) => ({ idx })));
   let previewBounds = $derived.by(() => {
     if (!geometry) return { minX: -12, minY: -9, maxX: 132, maxY: 9 };
     const [minX, minY, maxX, maxY] = geometry.board_bounds_mm;
@@ -68,7 +68,7 @@
       <h2 id="sensor-preview-title" class="text-xs font-semibold uppercase tracking-wider text-slate-200">
         Induction sensor preview
       </h2>
-      <p class="mt-0.5 text-[11px] text-slate-500">Top-down · F.Cu and B.Cu overlaid</p>
+      <p class="mt-0.5 text-[11px] text-slate-500">{store.cadGeometry ? "Imported sensor CAD · copper layers overlaid" : "Top-down · F.Cu and B.Cu overlaid"}</p>
     </div>
     <div class="flex items-center gap-3">
     {#if store.loading}
@@ -99,7 +99,7 @@
     {@attach attachWheel}
     class="relative w-full touch-none select-none overflow-hidden bg-slate-950/70 {gestures.isPanning ? 'cursor-grabbing' : 'cursor-grab'}"
     role="img"
-    aria-label="Generated two-layer induction position sensor traces"
+    aria-label={store.cadGeometry ? "Imported sensor coil traces" : "Generated two-layer induction position sensor traces"}
     style={`aspect-ratio: ${PREVIEW_W} / ${PREVIEW_H}`}
     onpointerdown={gestures.handlePointerDown}
     onpointermove={gestures.handlePointerMove}

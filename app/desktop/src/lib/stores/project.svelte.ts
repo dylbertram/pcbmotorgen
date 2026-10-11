@@ -152,6 +152,7 @@ export class ProjectStore {
       mover_position_mm: this.motion.positionMm,
       cad_geometry: this.cadGeometry,
       sensor_config: this.sensor?.toIpc() ?? { ...DEFAULT_SENSOR_CONFIG },
+      sensor_cad_geometry: this.sensor?.cadGeometry ?? null,
     };
   }
 
@@ -204,6 +205,7 @@ export class ProjectStore {
     this.motion.positionMm = state.mover_position_mm;
     this.cadGeometry = state.cad_geometry ?? null;
     this.sensor?.apply(state.sensor_config);
+    if (this.sensor) this.sensor.cadGeometry = state.sensor_cad_geometry ?? null;
   }
 
   setCadGeometry(geometry: CadGeometry | null): void {

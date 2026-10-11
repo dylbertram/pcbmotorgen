@@ -82,6 +82,8 @@ export interface ProjectState {
   cad_geometry?: CadGeometry | null;
   /** Dedicated induction-sensor workflow settings; missing in older files. */
   sensor_config?: SensorConfig;
+  /** Imported sensor geometry, separate from motor CAD geometry. */
+  sensor_cad_geometry?: CadGeometry | null;
 }
 
 /** Design-level validation findings reported by the backend on load.

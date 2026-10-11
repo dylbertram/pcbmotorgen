@@ -85,6 +85,31 @@ function editDesign(config: ConfigStore, motion: MotionStore): void {
 }
 
 describe("ProjectStore snapshot mapping", () => {
+  it("persists sensor CAD separately and clears it when loading older projects", () => {
+    const { config, sensor, projects } = makeStores();
+    const legacy = projects.snapshotIpc();
+    delete legacy.sensor_cad_geometry;
+    projects.markClean();
+    const geometry: CadGeometry = {
+      routing: { format_version: 1, segments: [{ start: { x: 0, y: 0 }, end: { x: 20, y: 2 }, layer: 0, net: "CL1", is_active: true }], curves: [], vias: [] },
+      layer_z_mm: [-0.8, 0.8], trace_width_mm: 0.2,
+    };
+    sensor.cadGeometry = geometry;
+    expect(projects.isDirty).toBe(true);
+    expect(projects.cadGeometry).toBeNull();
+    expect(config.num_layers).toBe(4);
+    const state = projects.snapshotIpc();
+    const restored = makeStores();
+    restored.projects.applyToState(state);
+    expect(restored.sensor.cadGeometry).toEqual(geometry);
+    expect(restored.sensor.geometry?.nets[0].name).toBe("CL1");
+    expect(restored.sensor.geometry?.board_bounds_mm).toEqual([0, 0, 20, 2]);
+    restored.sensor.set("lambda_mm", 240);
+    expect(restored.sensor.geometry?.nets[0].segments).toEqual(geometry.routing.segments);
+    restored.projects.applyToState(legacy);
+    expect(restored.sensor.cadGeometry).toBeNull();
+  });
+
   it("uses sensor defaults when no sensor store is supplied", () => {
     const config = new ConfigStore();
     const motion = new MotionStore(config);

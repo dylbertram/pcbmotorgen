@@ -1,9 +1,10 @@
 <script lang="ts">
-  import { onDestroy } from "svelte";
+  import { onDestroy, untrack } from "svelte";
   import { confirm } from "@tauri-apps/plugin-dialog";
   import { importCadDxf, pickCadDxfPath } from "../../ipc";
   import type { ConfigStore } from "../../stores/config.svelte";
   import type { ProjectStore } from "../../stores/project.svelte";
+  import type { SensorStore } from "../../stores/sensor.svelte";
   import type { CadImportResult } from "../../types";
   import { joinCadPreviewEndpoints } from "../../cadPreview";
   import { arcSvgPath, splineSvgPath } from "../../curvePaths";
@@ -21,15 +22,21 @@
   let {
     config,
     projects,
+    sensor,
+    initialCoilType = "motor",
     onClose,
     onComplete,
   }: {
     config: ConfigStore;
     projects: ProjectStore;
+    sensor: SensorStore;
+    initialCoilType?: "motor" | "sensor";
     onClose: () => void;
-    onComplete: () => void;
+    onComplete: (coilType: "motor" | "sensor") => void;
   } = $props();
 
+  let coilType = $state(untrack(() => initialCoilType));
+  let existingGeometry = $derived(coilType === "sensor" ? sensor.cadGeometry : projects.cadGeometry);
   let unitsToMm = $state("1");
   let zToleranceDraft = $state("0.05");
   let zToleranceParsed = $derived(parseNumberDraft(zToleranceDraft));
@@ -55,7 +62,7 @@
     viaAnnularRingParsed !== null && viaAnnularRingParsed > 0,
   );
   let selectedLayersOverride = $state<number | null>(null);
-  let selectedLayers = $derived(selectedLayersOverride ?? config.num_layers);
+  let selectedLayers = $derived(selectedLayersOverride ?? (coilType === "sensor" ? 2 : config.num_layers));
   let selectedPath = $state<string | null>(null);
   let imported = $state<CadImportResult | null>(null);
   let importedOptions = $state("");
@@ -246,6 +253,12 @@
     if (traceWidthValid) schedulePreviewRefresh();
   }
 
+  function updateCoilType(event: Event): void {
+    coilType = (event.currentTarget as HTMLSelectElement).value as "motor" | "sensor";
+    selectedLayersOverride = null;
+    schedulePreviewRefresh();
+  }
+
   function updateZTolerance(event: Event): void {
     const input = event.currentTarget as HTMLInputElement;
     zToleranceDraft = input.value;
@@ -264,21 +277,25 @@
 
   async function useImportedGeometry(): Promise<void> {
     if (!imported || !previewIsCurrent || !viaSizingValid || busy) return;
-    if (projects.cadGeometry) {
+    if (existingGeometry) {
       const replace = await confirm(
-        "Replace the currently imported CAD geometry? The project copy is preserved only if you save it first.",
+        `Replace the currently imported ${coilType === "sensor" ? "sensor" : "motor coil"} CAD geometry? The project copy is preserved only if you save it first.`,
         { title: "Replace custom geometry", kind: "warning", okLabel: "Replace", cancelLabel: "Keep current" },
       );
       if (!replace) return;
     }
-    config.num_layers = imported.geometry.layer_z_mm.length;
+    if (coilType === "motor") config.num_layers = imported.geometry.layer_z_mm.length;
     config.min_via_drill_mm = viaDrill;
     config.min_via_annular_ring_mm = viaAnnularRing;
-    projects.setCadGeometry(imported.geometry);
+    if (coilType === "sensor") {
+      sensor.set("via_size_mm", viaDrill + 2 * viaAnnularRing);
+      sensor.cadGeometry = imported.geometry;
+    }
+    else projects.setCadGeometry(imported.geometry);
     if (imported.warnings.length > 0) {
       projects.notice = `Imported ${baseName(selectedPath ?? "CAD file")} with ${imported.warnings.length} warning(s): ${imported.warnings.slice(0, 3).join(" ")}`;
     }
-    onComplete();
+    onComplete(coilType);
   }
 
   async function useGeneratedGeometry(): Promise<void> {
@@ -287,8 +304,9 @@
       { title: "Use generated geometry", kind: "warning", okLabel: "Use generated", cancelLabel: "Keep import" },
     );
     if (!useGenerated) return;
-    projects.setCadGeometry(null);
-    onComplete();
+    if (coilType === "sensor") sensor.cadGeometry = null;
+    else projects.setCadGeometry(null);
+    onComplete(coilType);
   }
 </script>
 
@@ -317,6 +335,13 @@
     <div class="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain px-5 py-4 md:px-7">
       <section class="rounded-md border border-slate-700 bg-slate-950/50 p-4" aria-label="CAD import options">
         <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <label class="text-xs font-medium text-slate-300" for="cad-coil-type">
+            Coil type
+            <select id="cad-coil-type" value={coilType} onchange={updateCoilType} disabled={busy} class="mt-1.5 w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 disabled:opacity-50">
+              <option value="motor">Motor coil</option>
+              <option value="sensor">Sensor coil</option>
+            </select>
+          </label>
           <label class="text-xs font-medium text-slate-300" for="cad-units">
             DXF units
             <select id="cad-units" aria-label="DXF units" bind:value={unitsToMm} onchange={schedulePreviewRefresh} disabled={busy} class="mt-1.5 w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 disabled:opacity-50">
@@ -473,7 +498,7 @@
     <footer class="flex shrink-0 flex-wrap items-center justify-between gap-2 border-t border-slate-800 px-5 py-3 md:px-7">
       <div class="flex flex-wrap gap-2">
         <button type="button" onclick={onClose} disabled={busy} class="rounded-md px-3 py-2 text-xs text-slate-400 hover:bg-slate-800 hover:text-slate-100 disabled:opacity-50">Cancel</button>
-        {#if projects.cadGeometry}
+        {#if existingGeometry}
           <button type="button" onclick={useGeneratedGeometry} disabled={busy} class="rounded-md border border-amber-500/40 px-3 py-2 text-xs text-amber-200 hover:bg-amber-500/10 disabled:opacity-50">Use generated geometry</button>
         {/if}
       </div>

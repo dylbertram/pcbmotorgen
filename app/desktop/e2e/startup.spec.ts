@@ -1,6 +1,47 @@
 import { expect, test } from "@playwright/test";
 
 test.describe("startup chooser and new-design setup", () => {
+  test("coil type is an import option and cancelling keeps the motor workflow", async ({ page }) => {
+    await page.goto("/");
+    const startup = page.getByRole("dialog", { name: "Recent projects" });
+    await startup.getByRole("button", { name: "Import CAD" }).click();
+    const dialog = page.getByRole("dialog", { name: "Import CAD" });
+    await expect(dialog.getByLabel("Coil type")).toHaveValue("motor");
+    await dialog.getByLabel("Coil type").selectOption("sensor");
+    await expect(dialog.getByLabel("DXF units")).toBeVisible();
+    await expect(dialog.getByRole("tab")).toHaveCount(0);
+    await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
+    await startup.getByRole("button", { name: "Import CAD" }).click();
+    await expect(dialog.getByLabel("Coil type")).toHaveValue("motor");
+  });
+
+  test("sensor imports open the sensor preview without replacing motor geometry", async ({ page }) => {
+    await page.route("**/src/lib/ipc/dxf.ts", (route) => route.fulfill({
+      contentType: "application/javascript",
+      body: `export async function pickCadDxfPath() { return '/sensor.dxf'; }
+        export async function importCadDxf(path, units, tolerance, width) {
+          return { warnings: [], geometry: { trace_width_mm: width, layer_z_mm: [-0.8, 0.8],
+            routing: { format_version: 1, segments: [{ start: {x: 0, y: 0}, end: {x: 40, y: 2}, layer: 0, net: 'CL1', is_active: true }], curves: [], vias: [] } } };
+        }
+        export async function openFileDialog() {}
+        export async function exportCoilsDxf() {}
+        export async function exportCadGeometryDxf() {}`,
+    }));
+    await page.goto("/");
+    await page.getByRole("button", { name: "Import CAD", exact: true }).click();
+    const dialog = page.getByRole("dialog", { name: "Import CAD" });
+    await dialog.getByLabel("Coil type").selectOption("sensor");
+    await dialog.getByRole("button", { name: "Choose DXF…" }).click();
+    await dialog.getByRole("button", { name: "Open with this geometry" }).click();
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    await expect(page.getByRole("img", { name: "Imported sensor coil traces" })).toBeVisible();
+    await expect(page.locator('section[aria-labelledby="sensor-preview-title"] line')).toHaveCount(1);
+    await expect(page.getByRole("tab", { name: /^Simulate/ })).toHaveCount(0);
+    await page.getByRole("button", { name: "Design type", exact: true }).click();
+    await page.getByRole("option", { name: "Motor coil", exact: true }).click();
+    await expect(page.locator("#num-layers")).toContainText("4");
+  });
+
   test("clicking outside Import CAD cancels without applying draft settings", async ({ page }) => {
     await page.goto("/");
     const startup = page.getByRole("dialog", { name: "Recent projects" });

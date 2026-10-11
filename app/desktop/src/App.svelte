@@ -167,8 +167,9 @@
     exportingDxf = true;
     projects.clearMessages();
     try {
-      const result = projects.cadGeometry
-        ? await exportCadGeometryDxf(projects.cadGeometry)
+      const cadGeometry = designType === "sensor" ? sensorStore.cadGeometry : projects.cadGeometry;
+      const result = cadGeometry
+        ? await exportCadGeometryDxf(cadGeometry)
         : await exportCoilsDxf(config.toIpc());
       const path = await saveTextToFile(result.dxf_content, "coils.dxf", ["dxf"]);
       if (path) projects.notice = `Exported DXF to ${path}.`;
@@ -213,10 +214,10 @@
     sensorStore.error = null;
     try {
       const result = await generateSensorGeometry(request);
-      if (generation === sensorGeneration) sensorStore.geometry = result;
+      if (generation === sensorGeneration) sensorStore.generatedGeometry = result;
     } catch (e) {
       if (generation === sensorGeneration) {
-        sensorStore.geometry = null;
+        sensorStore.generatedGeometry = null;
         sensorStore.error = e instanceof Error ? e.message : String(e);
       }
     } finally {
@@ -226,8 +227,13 @@
 
   // Keep sensor geometry independent of motor travel and motor routing state.
   $effect(() => {
-    const request = sensorStore.toIpc();
     const generation = ++sensorGeneration;
+    if (sensorStore.cadGeometry) {
+      sensorStore.loading = false;
+      sensorStore.error = null;
+      return;
+    }
+    const request = sensorStore.toIpc();
     sensorStore.loading = true;
     sensorStore.error = null;
     scheduleSensorGeometry(generation, request);
@@ -663,8 +669,12 @@
         <CadImportDialog
           {config}
           {projects}
+          sensor={sensorStore}
+          initialCoilType={designType}
           onClose={() => (cadImportDialogOpen = false)}
-          onComplete={() => {
+          onComplete={(coilType) => {
+            selectDesignType(coilType);
+            selectTab("design");
             cadImportDialogOpen = false;
             startupOpen = false;
           }}

@@ -123,6 +123,9 @@ pub struct ProjectStateIpc {
     /// artifacts, in which case the generator defaults are restored.
     #[serde(default)]
     pub sensor_config: SensorConfig,
+    /// Imported sensor centerlines, independent of motor CAD geometry.
+    #[serde(default)]
+    pub sensor_cad_geometry: Option<CadGeometry>,
 }
 
 impl Default for ProjectStateIpc {
@@ -132,6 +135,7 @@ impl Default for ProjectStateIpc {
             mover_position_mm: 60.0,
             cad_geometry: None,
             sensor_config: SensorConfig::default(),
+            sensor_cad_geometry: None,
         }
     }
 }
@@ -493,6 +497,7 @@ mod tests {
                 trace_width_mm: 0.2,
             }),
             sensor_config: SensorConfig::default(),
+            sensor_cad_geometry: None,
         }
     }
 
@@ -528,6 +533,29 @@ mod tests {
         assert_eq!(geometry.trace_width_mm, 0.2);
         assert_eq!(geometry.routing.segments[0].net, "A");
         assert_eq!(loaded.sensor_config, SensorConfig::default());
+    }
+
+    #[test]
+    fn sensor_cad_round_trip_is_independent_of_motor_cad() {
+        let mut state = sample_state();
+        state.sensor_cad_geometry = state.cad_geometry.clone();
+        state.sensor_cad_geometry.as_mut().unwrap().routing.segments[0].net = "CL1".into();
+        let (loaded, _) = parse_project_file(&serialize(&state)).expect("parse");
+        assert_eq!(loaded.cad_geometry.unwrap().routing.segments[0].net, "A");
+        assert_eq!(
+            loaded.sensor_cad_geometry.unwrap().routing.segments[0].net,
+            "CL1"
+        );
+        let mut legacy: serde_json::Value = serde_json::from_str(&serialize(&state)).unwrap();
+        legacy["state"]
+            .as_object_mut()
+            .unwrap()
+            .remove("sensor_cad_geometry");
+        assert!(parse_project_file(&legacy.to_string())
+            .unwrap()
+            .0
+            .sensor_cad_geometry
+            .is_none());
     }
 
     #[test]
