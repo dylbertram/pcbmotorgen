@@ -56,6 +56,8 @@ for (const action of ["recent", "selected recent", "browse"] as const) {
       await startup.getByRole("button", { name: "Open project…" }).click();
     }
     await expect(startup).toBeHidden();
+    await expect(page.getByRole("status", { name: "Project notification" })).toHaveCount(0);
+    await expect(page.getByText(/^Opened /)).toHaveCount(0);
     expect(await page.evaluate(() => (window as any).__discardPrompts)).toBe(0);
     await expect(page.locator("#magnet-count")).toHaveValue("8");
     await expect(page.getByLabel("Unsaved changes", { exact: true })).toHaveCount(0);

@@ -317,11 +317,13 @@ describe("ProjectStore openPath (kata eap8)", () => {
     vi.mocked(loadProject).mockResolvedValue(result);
 
     projects.markClean(); // clean: no discard-confirm path
+    projects.notice = "Previous notification";
     const ok = await projects.openPath("/home/user/motor-1.pmproj");
     expect(ok).toBe(true);
     expect(loadProject).toHaveBeenCalledWith("/home/user/motor-1.pmproj", null);
     expect(projects.currentPath).toBe("/home/user/motor-1.pmproj");
     expect(projects.error).toBeNull();
+    expect(projects.notice).toBeNull();
     expect(motion.positionMm).toBe(7);
     expect(config.desired_travel_mm).toBe(60);
 
@@ -329,6 +331,21 @@ describe("ProjectStore openPath (kata eap8)", () => {
     await new Promise((r) => setTimeout(r, 0));
     expect(saved).toEqual([["/home/user/motor-1.pmproj"]]);
     expect(synced).toEqual([[], ["/home/user/motor-1.pmproj"]]);
+  });
+
+  it("keeps restored-project warnings without an opened-file notification", async () => {
+    const { projects } = makeStores();
+    vi.mocked(loadProject).mockResolvedValue({
+      project: projects.snapshotIpc(),
+      source_format_version: 2,
+      format_version: 2,
+      active_version_id: 1,
+      versions: [],
+      validation: { errors: [], warnings: ["Check the imported geometry"] },
+    });
+    expect(await projects.openPath("/warned.pmproj")).toBe(true);
+    expect(projects.notice).toBeNull();
+    expect(projects.loadIssues?.warnings).toEqual(["Check the imported geometry"]);
   });
 
   it("on backend failure: error UX, no recents record, state untouched", async () => {
