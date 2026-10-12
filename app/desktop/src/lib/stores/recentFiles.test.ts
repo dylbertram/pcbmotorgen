@@ -48,12 +48,12 @@ async function flush(): Promise<void> {
 }
 
 describe("RecentFilesStore — load", () => {
-  it("no persisted list: nothing to sync (the menu already opens disabled)", async () => {
+  it("no persisted list: syncs the disabled menu without rewriting storage", async () => {
     const port = makePort();
     const store = new RecentFilesStore(port);
     await store.load();
     expect(store.paths).toEqual([]);
-    expect(port.syncCalls).toEqual([]);
+    expect(port.syncCalls).toEqual([[]]);
     expect(port.persistCalls).toEqual([]);
   });
 
@@ -62,7 +62,7 @@ describe("RecentFilesStore — load", () => {
     const store = new RecentFilesStore(port);
     await store.load();
     expect(store.paths).toEqual([]);
-    expect(port.syncCalls).toEqual([]);
+    expect(port.syncCalls).toEqual([[]]);
   });
 
   it("loads the persisted list most-recent-first and drops malformed entries", async () => {
@@ -72,6 +72,18 @@ describe("RecentFilesStore — load", () => {
     const store = new RecentFilesStore(port);
     await store.load();
     expect(store.paths).toEqual(["/b.pmproj", "/a.pmproj"]);
+    expect(port.syncCalls).toEqual([["/b.pmproj", "/a.pmproj"]]);
+    expect(port.persistCalls).toEqual([]);
+  });
+
+  it("syncs an unchanged persisted list once, including concurrent startup loads", async () => {
+    const port = makePort({ stored: ["/live.pmproj"] });
+    const store = new RecentFilesStore(port);
+    await Promise.all([store.load(), store.load()]);
+    await store.load();
+    expect(port.syncCalls).toEqual([["/live.pmproj"]]);
+    expect(port.persistCalls).toEqual([]);
+    expect(port.load).toHaveBeenCalledTimes(1);
   });
 
   it("prunes persisted entries whose file vanished on the first access", async () => {
@@ -85,7 +97,16 @@ describe("RecentFilesStore — load", () => {
     // Prune result is persisted + mirrored in the same access.
     await flush();
     expect(store.paths).toEqual(["/live.pmproj"]);
-    expect(port.syncCalls).toContainEqual(["/live.pmproj"]);
+    expect(port.syncCalls).toEqual([["/live.pmproj"]]);
+  });
+
+  it("disables the menu if every persisted project has vanished", async () => {
+    const port = makePort({ stored: ["/deleted.pmproj"], exists: () => false });
+    const store = new RecentFilesStore(port);
+    await store.load();
+    expect(store.paths).toEqual([]);
+    expect(port.syncCalls).toEqual([[]]);
+    expect(port.persistCalls).toEqual([[]]);
   });
 });
 
@@ -144,7 +165,7 @@ describe("RecentFilesStore — record", () => {
     const store = new RecentFilesStore(port);
     await store.record("/a.pmproj");
     expect(port.persistCalls).toEqual([["/a.pmproj"]]);
-    expect(port.syncCalls).toEqual([["/a.pmproj"]]);
+    expect(port.syncCalls).toEqual([[], ["/a.pmproj"]]);
   });
 });
 

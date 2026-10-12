@@ -33,6 +33,16 @@ const PROJECT_FILE_FILTERS = [
 /** Default artifact file name offered by the Save As dialog. */
 export const DEFAULT_PROJECT_FILE_NAME = "untitled.pmproj";
 
+export async function pickProjectDirectory(defaultPath?: string): Promise<string | null> {
+  if (!isTauriAvailable()) throw new Error("Choosing a project folder requires the desktop app");
+  return await openDialog({ title: "Choose project location", directory: true, multiple: false, defaultPath });
+}
+
+export async function relocateProject(sourcePath: string | null, directory: string, name: string, project: ProjectState, activeVersionId: number | null): Promise<SaveProjectResult> {
+  if (!isTauriAvailable()) throw new Error("Renaming or moving projects requires the desktop app");
+  return await invoke<SaveProjectResult>("relocate_project", { sourcePath, directory, name, project, activeVersionId });
+}
+
 /**
  * Open the native file picker restricted to `.pmproj` project files.
  * Resolves with the chosen absolute path, or `null` when cancelled.

@@ -16,6 +16,7 @@ serde_json = { workspace = true }
 tauri = { version = "2", features = [] }
 tauri-plugin-dialog = "2"
 tauri-plugin-fs = "2"
+tempfile = "3"
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }

@@ -31,6 +31,7 @@ import {
   pickProjectOpenPath,
   pickProjectSavePath,
   saveProject,
+  relocateProject,
   updateProjectVersion,
 } from "../ipc";
 import type { ConfigStore } from "./config.svelte";
@@ -108,6 +109,12 @@ export class ProjectStore {
 
   /** Header label: file name, or the untitled placeholder. */
   label = $derived(this.fileName ?? "untitled design");
+
+  directory = $derived.by(() => {
+    if (!this.currentPath) return null;
+    const index = Math.max(this.currentPath.lastIndexOf("/"), this.currentPath.lastIndexOf("\\"));
+    return index < 0 ? null : this.currentPath.slice(0, index + 1);
+  });
 
   // --- DTO mapping (interface only — no persistence logic) ---------------
 
@@ -231,6 +238,37 @@ export class ProjectStore {
   }
 
   // --- Operations ---------------------------------------------------------
+  async relocate(name: string, directory: string): Promise<boolean> {
+    if (this.busy) return false;
+    this.busy = true;
+    this.clearMessages();
+    const source = this.currentPath;
+    try {
+      const snapshot = this.snapshotIpc();
+      const savedSnapshot = JSON.stringify(snapshot);
+      const result = await relocateProject(source, directory, name, snapshot, this.activeVersionId);
+      this.currentPath = result.path;
+      if (source === null) {
+        this.versions = result.versions ?? [];
+        this.activeVersionId = result.active_version_id ?? null;
+        this.savedSnapshot = savedSnapshot;
+      }
+      this.notice = `${source === null ? "Saved" : "Moved"} ${baseName(result.path)}.`;
+      if (this.recents) {
+        try {
+          await this.recents.record(result.path);
+          if (source !== null && source !== result.path) await this.recents.remove(source);
+        } catch { /* Recents must not turn a successful move into a failure. */ }
+      }
+      return true;
+    } catch (e) {
+      this.error = `Could not change project name or location: ${errorMessage(e)}`;
+      return false;
+    } finally {
+      this.busy = false;
+    }
+  }
+
   /** Start an untitled design without replacing unsaved work silently. */
   async newProject(): Promise<boolean> {
     if (this.busy) return false;

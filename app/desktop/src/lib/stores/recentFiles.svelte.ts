@@ -113,7 +113,10 @@ export class RecentFilesStore {
         // Loading IS an access: the initial menu build prunes entries whose
         // file disappeared since the last run (not a background scan —
         // bounded to the ≤10 stored entries).
-        await this.pruneNow();
+        const missing = await this.pruneNow();
+        // The native menu starts empty on every launch, even when the stored
+        // list is unchanged. Pruning already syncs when it removes entries.
+        if (missing.length === 0) await this.port.syncMenu(this.paths);
       })().catch((e) => {
         this.loadPromise = null; // allow a retry on the next access
         throw e;

@@ -175,9 +175,17 @@ pub fn rebuild_recent_submenu(
     let menu = app
         .menu()
         .ok_or_else(|| "application menu not installed".to_string())?;
-    let kind = menu
+    // Menu::get only searches direct children. Open Recent is inside File,
+    // not a top-level menu-bar item.
+    let file_kind = menu
+        .get("file")
+        .ok_or_else(|| "File menu missing from the menu bar".to_string())?;
+    let file = file_kind
+        .as_submenu()
+        .ok_or_else(|| "File id is not a submenu".to_string())?;
+    let kind = file
         .get(RECENT_SUBMENU_ID)
-        .ok_or_else(|| "Open Recent submenu missing from the menu bar".to_string())?;
+        .ok_or_else(|| "Open Recent submenu missing from the File menu".to_string())?;
     let submenu = kind
         .as_submenu()
         .ok_or_else(|| "Open Recent id is not a submenu".to_string())?;

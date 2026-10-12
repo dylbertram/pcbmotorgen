@@ -79,6 +79,7 @@ fn main() {
             commands::dxf::import_cad_dxf,
             commands::dxf::export_cad_geometry_dxf,
             commands::project::save_project,
+            commands::project::relocate_project,
             commands::project::load_project,
             commands::project::update_project_version,
             commands::project::set_recent_files,

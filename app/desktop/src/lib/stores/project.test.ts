@@ -7,7 +7,7 @@ import { RecentFilesStore } from "./recentFiles.svelte";
 import type { ProjectState } from "../types";
 import type { CadGeometry } from "../types";
 import type { LoadProjectResult } from "../types";
-import { confirmDiscardChanges, loadProject, saveProject, pickProjectSavePath, updateProjectVersion } from "../ipc";
+import { confirmDiscardChanges, loadProject, saveProject, pickProjectSavePath, updateProjectVersion, relocateProject } from "../ipc";
 
 // Track load calls without losing the real module's other exports (the
 // config store uses them for its routing-pattern/magnet-grade catalog).
@@ -26,6 +26,70 @@ function makeStores(recents?: RecentFilesStore) {
   const projects = new ProjectStore(config, motion, recents, sensor);
   return { config, motion, sensor, projects };
 }
+
+describe("title-bar project name and location", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("moves the artifact without saving the draft or changing the active version", async () => {
+    const { recents } = makeRecents();
+    await recents.record("/old/design.pmproj");
+    const { config, projects } = makeStores(recents);
+    projects.currentPath = "/old/design.pmproj";
+    projects.activeVersionId = 3;
+    projects.versions = [{ id: 3, description: "Original", created_at_unix_ms: 1, last_edited_at_unix_ms: 2 }];
+    projects.markClean();
+    const baseline = projects.savedSnapshot;
+    config.magnet_count = 8;
+    vi.mocked(relocateProject).mockResolvedValue({ path: "/new/renamed.pmproj", active_version_id: 3, versions: [], format_version: 2, saved_at_unix_ms: 2 });
+
+    expect(await projects.relocate("renamed", "/new")).toBe(true);
+    expect(relocateProject).toHaveBeenCalledWith("/old/design.pmproj", "/new", "renamed", projects.snapshotIpc(), 3);
+    expect(projects.currentPath).toBe("/new/renamed.pmproj");
+    expect(projects.directory).toBe("/new/");
+    expect(projects.activeVersionId).toBe(3);
+    expect(projects.versions).toHaveLength(1);
+    expect(projects.savedSnapshot).toBe(baseline);
+    expect(projects.isDirty).toBe(true);
+    expect(config.magnet_count).toBe(8);
+    expect(recents.paths).toEqual(["/new/renamed.pmproj"]);
+    expect(saveProject).not.toHaveBeenCalled();
+  });
+
+  it("creates an untitled project's first saved version", async () => {
+    const { projects } = makeStores();
+    vi.mocked(relocateProject).mockResolvedValue({ path: "/design.pmproj", active_version_id: 1, versions: [{ id: 1, description: "", created_at_unix_ms: 1, last_edited_at_unix_ms: 1 }], format_version: 2, saved_at_unix_ms: 1 });
+    expect(projects.directory).toBeNull();
+    expect(await projects.relocate("design", "/")).toBe(true);
+    expect(projects.directory).toBe("/");
+    expect(projects.label).toBe("design.pmproj");
+    expect(projects.activeVersionId).toBe(1);
+    expect(projects.versions).toHaveLength(1);
+    expect(projects.isDirty).toBe(false);
+    expect(projects.savedSnapshot).not.toBeNull();
+  });
+
+  it("keeps the original path, draft and baseline after a failure", async () => {
+    const { projects, config } = makeStores();
+    projects.currentPath = "/old.pmproj";
+    projects.markClean();
+    const baseline = projects.savedSnapshot;
+    config.magnet_count = 8;
+    vi.mocked(relocateProject).mockRejectedValue(new Error("Destination already exists"));
+    expect(await projects.relocate("new", "/")).toBe(false);
+    expect(projects.currentPath).toBe("/old.pmproj");
+    expect(projects.savedSnapshot).toBe(baseline);
+    expect(projects.isDirty).toBe(true);
+    expect(projects.error).toContain("Destination already exists");
+    expect(projects.busy).toBe(false);
+  });
+
+  it("serializes moves with other file operations", async () => {
+    const { projects } = makeStores();
+    projects.busy = true;
+    expect(await projects.relocate("design", "/")).toBe(false);
+    expect(relocateProject).not.toHaveBeenCalled();
+  });
+});
 
 /** Recents store over a fake port (exposes saved/synced snapshots). */
 function makeRecents() {
@@ -264,7 +328,7 @@ describe("ProjectStore openPath (kata eap8)", () => {
     // The recents record happens in the background — flush it.
     await new Promise((r) => setTimeout(r, 0));
     expect(saved).toEqual([["/home/user/motor-1.pmproj"]]);
-    expect(synced).toEqual([["/home/user/motor-1.pmproj"]]);
+    expect(synced).toEqual([[], ["/home/user/motor-1.pmproj"]]);
   });
 
   it("on backend failure: error UX, no recents record, state untouched", async () => {
