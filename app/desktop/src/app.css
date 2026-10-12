@@ -2,6 +2,47 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Shared surface tokens also theme dialogs rendered outside the app root. */
+:root {
+  color-scheme: dark;
+  --slate-50: 248 250 252;
+  --slate-100: 241 245 249;
+  --slate-200: 226 232 240;
+  --slate-300: 203 213 225;
+  --slate-400: 148 163 184;
+  --slate-500: 100 116 139;
+  --slate-600: 71 85 105;
+  --slate-700: 51 65 85;
+  --slate-800: 30 41 59;
+  --slate-900: 15 23 42;
+  --slate-950: 2 6 23;
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+  --slate-50: 2 6 23;
+  --slate-100: 15 23 42;
+  --slate-200: 30 41 59;
+  --slate-300: 51 65 85;
+  --slate-400: 71 85 105;
+  --slate-500: 100 116 139;
+  --slate-600: 148 163 184;
+  --slate-700: 203 213 225;
+  --slate-800: 226 232 240;
+  --slate-900: 248 250 252;
+  --slate-950: 255 255 255;
+}
+
+/* Preserve the dimmed backdrop rather than turning it into a white veil. */
+[data-dialog-overlay] { background-color: rgb(2 6 23 / 0.65) !important; }
+
+@layer utilities {
+  :root[data-theme="light"] :is(.text-emerald-100, .text-emerald-200, .text-emerald-300, .text-emerald-400) { color: #047857; }
+  :root[data-theme="light"] :is(.text-amber-100, .text-amber-200, .text-amber-300, .text-amber-400) { color: #92400e; }
+  :root[data-theme="light"] :is(.text-rose-100, .text-rose-200, .text-rose-300, .text-rose-400, .text-red-300, .text-red-400) { color: #be123c; }
+  :root[data-theme="light"] :is(.text-blue-200, .text-blue-300, .text-blue-400, .text-sky-300, .text-sky-400) { color: #1d4ed8; }
+}
+
 /*
  * Desktop app shell: lock the root scroller at `lg` so the page height is
  * fixed (header + flex columns + footer always fill the viewport). Only the

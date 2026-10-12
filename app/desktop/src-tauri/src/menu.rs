@@ -31,6 +31,7 @@ pub const SAVE_ID: &str = "menu:save-project";
 /// Menu item id == webview event name for Save As.
 pub const SAVE_AS_ID: &str = "menu:save-project-as";
 pub const SAVE_NEW_VERSION_ID: &str = "menu:save-project-new-version";
+pub const SETTINGS_ID: &str = "menu:settings";
 /// Menu item id == webview event name for importing CAD geometry.
 pub const IMPORT_CAD_ID: &str = "menu:import-cad";
 
@@ -92,7 +93,11 @@ pub fn install(app: &tauri::AppHandle) -> tauri::Result<()> {
         Menu::with_items(app, &[&app_menu, &file, &edit])?
     };
     #[cfg(not(target_os = "macos"))]
-    let menu = Menu::with_items(app, &[&file, &edit])?;
+    let menu = {
+        let settings = MenuItem::with_id(app, SETTINGS_ID, "Settings…", true, Some("CmdOrCtrl+,"))?;
+        let app_menu = Submenu::with_id_and_items(app, "app", "pcbmotorgen", true, &[&settings])?;
+        Menu::with_items(app, &[&app_menu, &file, &edit])?
+    };
 
     app.set_menu(menu)?;
     Ok(())
@@ -267,6 +272,8 @@ fn edit_submenu(app: &tauri::AppHandle) -> tauri::Result<Submenu<Wry>> {
 fn app_submenu(app: &tauri::AppHandle) -> tauri::Result<Submenu<Wry>> {
     let about = PredefinedMenuItem::about(app, None, None)?;
     let sep1 = PredefinedMenuItem::separator(app)?;
+    let settings = MenuItem::with_id(app, SETTINGS_ID, "Settings…", true, Some("CmdOrCtrl+,"))?;
+    let settings_sep = PredefinedMenuItem::separator(app)?;
     let services = PredefinedMenuItem::services(app, None)?;
     let sep2 = PredefinedMenuItem::separator(app)?;
     let hide = PredefinedMenuItem::hide(app, None)?;
@@ -282,6 +289,8 @@ fn app_submenu(app: &tauri::AppHandle) -> tauri::Result<Submenu<Wry>> {
         &[
             &about,
             &sep1,
+            &settings,
+            &settings_sep,
             &services,
             &sep2,
             &hide,

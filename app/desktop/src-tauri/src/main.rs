@@ -37,6 +37,7 @@ fn main() {
                     | menu::SAVE_ID
                     | menu::SAVE_AS_ID
                     | menu::SAVE_NEW_VERSION_ID
+                    | menu::SETTINGS_ID
                     | menu::CLEAR_RECENT_ID
                     | menu::IMPORT_CAD_ID
             ) {

@@ -21,8 +21,13 @@ import {
   patternLayerRange,
 } from "../layerConstraints";
 import { mm, listRoutingPatterns, routingPatternParameters, loadInstalledPlugins, fetchMagnetGrades } from "../ipc";
+import { readPreferences } from "../preferences";
 
 export class ConfigStore {
+  constructor() {
+    Object.assign(this, readPreferences().rules);
+  }
+
   // --- Topology ----------------------------------------------------------
   topology = $state<"linear" | "radial">("linear");
 

@@ -1,4 +1,16 @@
-# Project versions
+# Settings
+
+Open **pcbmotorgen > Settings…** with the menu bar or **Cmd/Ctrl+,**.
+Choose Light, Dark, or Auto appearance. Auto follows system appearance changes.
+Settings persist on this device, separately from project versions.
+
+DRC rules set minimum motor trace width, clearance, via drill, and annular ring
+in millimetres. Saving settings applies these values to the current motor
+design and uses them for new designs. Opened projects retain their saved rules.
+Rule changes update routing, DRC, and export together, and mark a saved design
+as edited. Cancel leaves appearance and rules unchanged.
+
+## Project versions
 
 Each `.pmproj` file stores all of its saved design versions, including motor
 settings, sensor settings, imported CAD geometry, and mover position.

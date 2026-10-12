@@ -49,6 +49,7 @@
   import SensorTab from "./lib/components/layout/SensorTab.svelte";
   import SensorPreview from "./lib/components/design/SensorPreview.svelte";
   import ProjectVersionsDialog from "./lib/components/layout/ProjectVersionsDialog.svelte";
+  import PreferencesDialog from "./lib/components/layout/PreferencesDialog.svelte";
 
   // Session-only navigation state; none of these values enter IPC.
   let activeTab = $state<TabId>("design");
@@ -70,6 +71,7 @@
   let kicadDialogOpen = $state(false);
   let exportingDxf = $state(false);
   let versionsDialogOpen = $state(false);
+  let preferencesOpen = $state(false);
   let creatingVersion = $state(false);
   let versionsDialogGeneration = $state(0);
 
@@ -158,6 +160,7 @@
       save: () => void projects.save(false),
       saveAs: () => void projects.save(true),
       saveNewVersion: () => showVersions(true),
+      settings: () => { preferencesOpen = true; },
       importCad: () => (cadImportDialogOpen = true),
       openRecent: (path) => {
         // Open-recent access point: refresh menu truth (the entry is pruned
@@ -685,6 +688,9 @@
       {/if}
 
       <KicadDialog bind:open={kicadDialogOpen} {config} {projects} {drc} />
+      {#if preferencesOpen}
+        <PreferencesDialog {config} disabled={projects.busy} onClose={() => (preferencesOpen = false)} />
+      {/if}
 
       {#if versionsDialogOpen}
         {#key versionsDialogGeneration}

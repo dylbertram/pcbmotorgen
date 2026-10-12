@@ -172,6 +172,7 @@ export async function bindProjectMenuActions(handlers: {
   save: () => void;
   saveAs: () => void;
   saveNewVersion?: () => void;
+  settings?: () => void;
   /** The native File > Import CAD menu item was clicked. */
   importCad?: () => void;
   /**
@@ -193,6 +194,7 @@ export async function bindProjectMenuActions(handlers: {
     listen("menu:save-project", handlers.save),
     listen("menu:save-project-as", handlers.saveAs),
     listen("menu:save-project-new-version", () => handlers.saveNewVersion?.()),
+    listen("menu:settings", () => handlers.settings?.()),
     listen("menu:import-cad", () => handlers.importCad?.()),
     // Open Recent (kata eap8): Rust resolves the entry id to the path that
     // was displayed and forwards it as the event payload. Registered even

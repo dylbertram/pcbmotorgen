@@ -23,6 +23,7 @@ import type {
   ProjectVersionInfo,
 } from "../types";
 import { DEFAULT_SENSOR_CONFIG } from "../types";
+import { readPreferences } from "../preferences";
 import {
   DEFAULT_PROJECT_FILE_NAME,
   confirmDiscardChanges,
@@ -237,6 +238,7 @@ export class ProjectStore {
     try {
       if (this.isDirty && !(await confirmDiscardChanges())) return false;
       this.applyToState(this.initialState);
+      Object.assign(this.config, readPreferences().rules);
       await this.config.loadRoutingParams(this.config.routing_pattern);
       this.config.constrainLayersToPattern();
       this.currentPath = null;

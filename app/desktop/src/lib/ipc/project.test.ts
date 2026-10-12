@@ -15,7 +15,7 @@ describe("native File menu actions", () => {
     vi.mocked(listen).mockResolvedValue(unlisten);
     const handlers = {
       newProject: vi.fn(), exportDxf: vi.fn(), sendKicad: vi.fn(),
-      open: vi.fn(), save: vi.fn(), saveAs: vi.fn(), saveNewVersion: vi.fn(),
+      open: vi.fn(), save: vi.fn(), saveAs: vi.fn(), saveNewVersion: vi.fn(), settings: vi.fn(),
     };
     const unbind = await bindProjectMenuActions(handlers);
     for (const [eventName, handler] of [
@@ -23,6 +23,7 @@ describe("native File menu actions", () => {
       ["menu:export-dxf", handlers.exportDxf],
       ["menu:send-kicad", handlers.sendKicad],
       ["menu:save-project-new-version", handlers.saveNewVersion],
+      ["menu:settings", handlers.settings],
     ] as const) {
       const registration = vi.mocked(listen).mock.calls.find(([name]) => name === eventName);
       expect(registration).toBeDefined();
