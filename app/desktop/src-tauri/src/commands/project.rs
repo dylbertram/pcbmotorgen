@@ -40,6 +40,118 @@ fn write_archive(path: &str, archive: &ProjectArchive) -> Result<(), String> {
     write_project_atomic(Path::new(path), &json)
 }
 
+/// Publish a complete file without replacing an existing destination. The
+/// temporary file lives in the destination folder, including cross-volume moves.
+fn publish_project(path: &Path, bytes: &[u8], source: Option<&Path>) -> Result<(), String> {
+    use std::io::Write;
+    let parent = path.parent().ok_or("Choose a project folder")?;
+    let mut temp = tempfile::NamedTempFile::new_in(parent)
+        .map_err(|e| format!("Could not write to this folder: {e}"))?;
+    temp.write_all(bytes)
+        .map_err(|e| format!("Could not write project: {e}"))?;
+    if let Some(source) = source {
+        let permissions = std::fs::metadata(source)
+            .map_err(|e| e.to_string())?
+            .permissions();
+        temp.as_file()
+            .set_permissions(permissions)
+            .map_err(|e| e.to_string())?;
+    }
+    temp.as_file().sync_all().map_err(|e| e.to_string())?;
+    temp.persist_noclobber(path).map_err(|e| {
+        if e.error.kind() == std::io::ErrorKind::AlreadyExists {
+            "A file with this name already exists in that folder. Choose another name or folder."
+                .into()
+        } else {
+            format!("Could not create project: {}", e.error)
+        }
+    })?;
+    if let Some(source) = source {
+        if let Err(e) = std::fs::remove_file(source) {
+            let cleanup = std::fs::remove_file(path);
+            return Err(format!(
+                "Could not remove the original project: {e}. {}",
+                if cleanup.is_ok() {
+                    "The original file is unchanged."
+                } else {
+                    "A copy also remains in the chosen folder."
+                }
+            ));
+        }
+    }
+    Ok(())
+}
+
+/// Move the saved artifact byte-for-byte, leaving the working draft untouched.
+/// For an untitled project, create its first archive at the chosen location.
+#[tauri::command]
+pub async fn relocate_project(
+    source_path: Option<String>,
+    directory: String,
+    name: String,
+    project: ProjectStateIpc,
+    active_version_id: Option<u32>,
+) -> Result<SaveProjectResultIpc, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let _guard = PROJECT_FILES_LOCK
+            .lock()
+            .map_err(|_| "Project file lock failed")?;
+        let name = name.trim();
+        if name.is_empty()
+            || name == "."
+            || name == ".."
+            || name
+                .chars()
+                .any(|c| c.is_control() || matches!(c, '/' | '\\' | ':'))
+        {
+            return Err("Enter a file name without slashes, colons, or control characters.".into());
+        }
+        let name = if name.to_lowercase().ends_with(".pmproj") {
+            name.to_string()
+        } else {
+            format!("{name}.pmproj")
+        };
+        if name.eq_ignore_ascii_case(".pmproj") {
+            return Err("Enter a project name before .pmproj.".into());
+        }
+        let folder = std::fs::canonicalize(&directory)
+            .map_err(|e| format!("Could not open project folder: {e}"))?;
+        if !folder.is_dir() {
+            return Err("Choose a folder for the project.".into());
+        }
+        let target = folder.join(name);
+        let source = source_path
+            .as_deref()
+            .map(std::fs::canonicalize)
+            .transpose()
+            .map_err(|e| format!("Could not open original project: {e}"))?;
+        let (archive, bytes) = if let Some(source) = &source {
+            let bytes = std::fs::read(source).map_err(|e| e.to_string())?;
+            let archive =
+                parse_project_archive(std::str::from_utf8(&bytes).map_err(|e| e.to_string())?)?.0;
+            (archive, bytes)
+        } else {
+            let archive = ProjectArchive::new(project, now_ms());
+            let bytes = serde_json::to_vec_pretty(&archive).map_err(|e| e.to_string())?;
+            (archive, bytes)
+        };
+        let id = active_version_id.unwrap_or(archive.latest().info.id);
+        archive.version(id)?;
+        if source.as_deref() != Some(target.as_path()) {
+            publish_project(&target, &bytes, source.as_deref())?;
+        }
+        Ok(SaveProjectResultIpc {
+            path: target.to_string_lossy().into_owned(),
+            format_version: archive.format_version,
+            saved_at_unix_ms: archive.saved_at_unix_ms,
+            active_version_id: id,
+            versions: archive.summaries(),
+        })
+    })
+    .await
+    .map_err(|e| format!("relocate_project worker failed: {e}"))?
+}
+
 fn loaded_version(
     archive: &ProjectArchive,
     source: u32,
@@ -220,6 +332,120 @@ pub fn file_exists(path: String) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn relocate_preserves_archive_bytes_and_never_overwrites() {
+        tauri::async_runtime::block_on(async {
+            let root = tempfile::tempdir().unwrap();
+            let folder = root.path().to_string_lossy().into_owned();
+            let created = relocate_project(
+                None,
+                folder.clone(),
+                "Original".into(),
+                ProjectStateIpc::default(),
+                None,
+            )
+            .await
+            .unwrap();
+            assert_eq!(created.active_version_id, 1);
+            let second = save_project(
+                created.path.clone(),
+                ProjectStateIpc::default(),
+                Some(created.path.clone()),
+                Some(1),
+                Some(true),
+                Some("Alternative".into()),
+            )
+            .await
+            .unwrap();
+            let before = std::fs::read(&second.path).unwrap();
+            let dest_folder = root.path().join("Moved");
+            std::fs::create_dir(&dest_folder).unwrap();
+            let moved = relocate_project(
+                Some(second.path.clone()),
+                dest_folder.to_string_lossy().into_owned(),
+                "Renamed.pmproj".into(),
+                ProjectStateIpc::default(),
+                Some(1),
+            )
+            .await
+            .unwrap();
+            assert!(!Path::new(&second.path).exists());
+            assert_eq!(std::fs::read(&moved.path).unwrap(), before);
+            assert_eq!(moved.versions.len(), 2);
+            assert_eq!(moved.active_version_id, 1);
+
+            let collision = root.path().join("Existing.pmproj");
+            std::fs::write(&collision, b"Do not replace").unwrap();
+            let failed = relocate_project(
+                Some(moved.path.clone()),
+                folder.clone(),
+                "Existing".into(),
+                ProjectStateIpc::default(),
+                Some(1),
+            )
+            .await;
+            assert!(failed.unwrap_err().contains("already exists"));
+            assert_eq!(std::fs::read(&collision).unwrap(), b"Do not replace");
+            assert_eq!(std::fs::read(&moved.path).unwrap(), before);
+            assert!(relocate_project(
+                None,
+                folder.clone(),
+                "Existing".into(),
+                ProjectStateIpc::default(),
+                None
+            )
+            .await
+            .is_err());
+
+            let noop = relocate_project(
+                Some(moved.path.clone()),
+                dest_folder.to_string_lossy().into_owned(),
+                "Renamed".into(),
+                ProjectStateIpc::default(),
+                Some(1),
+            )
+            .await
+            .unwrap();
+            assert_eq!(noop.path, moved.path);
+            assert_eq!(std::fs::read(&moved.path).unwrap(), before);
+            for name in [
+                "",
+                ".",
+                "..",
+                "../escape",
+                "nested/file",
+                "bad\\name",
+                "bad:name",
+                ".pmproj",
+                "bad\nname",
+            ] {
+                assert!(
+                    relocate_project(
+                        Some(moved.path.clone()),
+                        folder.clone(),
+                        name.into(),
+                        ProjectStateIpc::default(),
+                        Some(1)
+                    )
+                    .await
+                    .is_err(),
+                    "Accepted invalid name {name:?}"
+                );
+            }
+            assert_eq!(std::fs::read(&moved.path).unwrap(), before);
+            assert!(relocate_project(
+                Some(moved.path.clone()),
+                root.path().join("missing").to_string_lossy().into_owned(),
+                "Design".into(),
+                ProjectStateIpc::default(),
+                Some(1)
+            )
+            .await
+            .is_err());
+            assert_eq!(std::fs::read(&moved.path).unwrap(), before);
+        });
+    }
 
     #[test]
     fn file_round_trip_save_as_edit_and_delete_preserve_history() {

@@ -27,11 +27,11 @@
   macOS 26.6 (calibrated against a real screenshot): trafficLightPosition x
   lands on the button's left edge directly, and the light's center renders at
   y − 2.25 — wry only resizes the title-bar container to button height + y
-  and never touches the button's vertical frame, so AppKit's natural rest
+   and never touches the button's vertical frame, so AppKit's natural rest
   origin.y ≈ 9.25 inside the container wins. y=21.5 therefore puts the light
   center at 19.25, the optical center of the 12px uppercase title glyphs, so
-   the title reads as centered on the lights. The title and project name are
-   drag regions; the DRC button and tab strip remain interactive.
+   the title reads as centered on the lights. The app name is a drag region;
+   the project title, DRC button and tab strip remain interactive.
 -->
 <div
   class="grid h-9 grid-cols-[1fr_auto_1fr] items-center"
