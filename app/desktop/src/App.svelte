@@ -116,7 +116,9 @@
   // backend behind save_project/load_project; this store is the interface
   // half (DTO mapping + dirty tracking + dialog flows).
   const projects = new ProjectStore(config, motion, recentFiles, sensorStore);
-  projects.markClean();
+  // Startup has no active project yet. Catalog loading can adjust defaults,
+  // but those adjustments are not user edits. Open/create/import establish
+  // the first baseline when the user leaves the startup chooser.
   let activeCoils = $derived(projects.cadGeometry ? cadGeometryToPreview(projects.cadGeometry) : coils);
   let measuredTrace = $derived.by(() => measureTrace(activeCoils, config));
 
@@ -706,6 +708,7 @@
           initialCoilType={designType}
           onClose={() => (cadImportDialogOpen = false)}
           onComplete={(coilType) => {
+            if (startupOpen) projects.markClean();
             selectDesignType(coilType);
             selectTab("design");
             cadImportDialogOpen = false;
