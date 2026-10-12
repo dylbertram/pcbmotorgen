@@ -58,7 +58,7 @@ export class ProjectStore {
   busy = $state(false);
   /** Last failed-operation message (cleared by the next action/dismiss). */
   error = $state<string | null>(null);
-  /** Last successful-operation notice (cleared by the next action/dismiss). */
+  /** Temporary operation notice (cleared by timeout, next action, or dismiss). */
   notice = $state<string | null>(null);
   /** Design-level findings the backend reported for the last load. */
   loadIssues = $state<ProjectValidation | null>(null);
@@ -464,11 +464,6 @@ export class ProjectStore {
       const issues = result.validation;
       const issueCount = issues.errors.length + issues.warnings.length;
       this.loadIssues = issueCount > 0 ? issues : null;
-      this.notice =
-        `Opened ${baseName(path)}` +
-        (issueCount > 0
-          ? ` — ${issues.errors.length} error(s), ${issues.warnings.length} warning(s) in the restored design.`
-          : ".");
       // Record the recents entry in the background (kata eap8): the store's
       // port never rejects by contract; the catch is belt-and-braces so a
       // persistence hiccup cannot break an already-successful open.

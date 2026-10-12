@@ -37,6 +37,7 @@
   import TabNav from "./lib/components/layout/TabNav.svelte";
   import TitleBar from "./lib/components/layout/TitleBar.svelte";
   import StatusBanner from "./lib/components/ui/StatusBanner.svelte";
+  import ProjectNotification from "./lib/components/ui/ProjectNotification.svelte";
   import ScrollArea from "./lib/components/ui/ScrollArea.svelte";
   import TravelDiagram from "./lib/components/design/TravelDiagram.svelte";
   import CoilPreview from "./lib/components/design/CoilPreview.svelte";
@@ -552,32 +553,25 @@
         <TabNav tabs={workflowTabs} statusFor={tabStatus} />
       </header>
 
-      {#if projects.error || projects.notice}
+      {#if projects.error}
         <div class="px-4 pt-3">
-          {#if projects.error}
-            <StatusBanner level="error">
-              <div class="flex items-start justify-between gap-3">
-                <p>{projects.error}</p>
-                <button
-                  type="button"
-                  class="shrink-0 underline underline-offset-2 hover:brightness-125"
-                  onclick={() => projects.clearMessages()}>Dismiss</button
-                >
-              </div>
-            </StatusBanner>
-          {:else if projects.notice}
-            <StatusBanner level="info">
-              <div class="flex items-start justify-between gap-3">
-                <p>{projects.notice}</p>
-                <button
-                  type="button"
-                  class="shrink-0 underline underline-offset-2 hover:brightness-125"
-                  onclick={() => projects.clearMessages()}>Dismiss</button
-                >
-              </div>
-            </StatusBanner>
-          {/if}
+          <StatusBanner level="error">
+            <div class="flex items-start justify-between gap-3">
+              <p>{projects.error}</p>
+              <button
+                type="button"
+                class="shrink-0 underline underline-offset-2 hover:brightness-125"
+                onclick={() => projects.clearMessages()}>Dismiss</button
+              >
+            </div>
+          </StatusBanner>
         </div>
+      {/if}
+
+      {#if projects.notice}
+        {#key projects.notice}
+          <ProjectNotification message={projects.notice} onDismiss={() => (projects.notice = null)} />
+        {/key}
       {/if}
 
       {#if projects.loadIssues}
