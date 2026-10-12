@@ -28,12 +28,6 @@ impl SimulationInput {
                 self.magnet_count
             )));
         }
-        if self.magnet_count % 2 != 0 {
-            return Err(SimulationError(format!(
-                "magnet_count must be even for alternating poles, got {}",
-                self.magnet_count
-            )));
-        }
         if self.magnet_pitch_m <= 0.0 {
             return Err(SimulationError(format!(
                 "magnet_pitch_m must be positive, got {}",
@@ -238,5 +232,21 @@ mod tests {
     #[test]
     fn test_default_validates() {
         assert!(SimulationInput::default().validate().is_ok());
+    }
+
+    #[test]
+    fn odd_and_even_magnet_counts_validate() {
+        for magnet_count in [2, 3, 5, 8, 9] {
+            let input = SimulationInput { magnet_count, ..SimulationInput::default() };
+            assert!(input.new().is_ok(), "Rejected {magnet_count} magnets");
+        }
+    }
+
+    #[test]
+    fn fewer_than_two_magnets_are_rejected() {
+        for magnet_count in [0, 1] {
+            let input = SimulationInput { magnet_count, ..SimulationInput::default() };
+            assert!(input.validate().unwrap_err().to_string().contains("magnet_count must be ≥ 2"));
+        }
     }
 }

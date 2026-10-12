@@ -37,12 +37,6 @@ impl LinearMotorConfig {
                 self.magnet_count
             )));
         }
-        if self.magnet_count % 2 != 0 {
-            return Err(ConfigError(format!(
-                "magnet_count must be even for alternating poles, got {}",
-                self.magnet_count
-            )));
-        }
         if self.magnet_pitch_m <= 0.0 {
             return Err(ConfigError(format!(
                 "magnet_pitch_m must be positive, got {}",
@@ -286,15 +280,19 @@ mod tests {
     }
 
     #[test]
-    fn test_odd_magnet_count_raises() {
-        let cfg = LinearMotorConfig { magnet_count: 9, ..LinearMotorConfig::default() };
-        assert!(cfg.validate().is_err());
+    fn test_odd_and_even_magnet_counts_validate() {
+        for magnet_count in [2, 3, 5, 8, 9] {
+            let cfg = LinearMotorConfig { magnet_count, ..LinearMotorConfig::default() };
+            assert!(cfg.validate().is_ok(), "Rejected {magnet_count} magnets");
+        }
     }
 
     #[test]
-    fn test_magnet_count_one_raises() {
-        let cfg = LinearMotorConfig { magnet_count: 1, ..LinearMotorConfig::default() };
-        assert!(cfg.validate().is_err());
+    fn test_magnet_count_below_two_raises() {
+        for magnet_count in [0, 1] {
+            let cfg = LinearMotorConfig { magnet_count, ..LinearMotorConfig::default() };
+            assert!(cfg.validate().unwrap_err().to_string().contains("magnet_count must be ≥ 2"));
+        }
     }
 
     #[test]
