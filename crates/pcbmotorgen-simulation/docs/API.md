@@ -82,7 +82,7 @@ derived as `active_area_length − the magnet array span`.
 pub struct SimulationInput {
     // Magnet parameters
     pub magnet_dims_m: [f64; 3],        // (width_travel, width_cross, height) [m]
-    pub magnet_count: u32,              // must be even, ≥ 2
+    pub magnet_count: u32,              // ≥ 2; odd and even counts supported
     pub magnet_pitch_m: f64,            // centre-to-centre spacing = pole pitch [m]
     pub magnet_remanence_t: f64,        // Br at 20 °C [T]
 
@@ -134,7 +134,7 @@ SimulationInput::validate(&self) -> Result<(), SimulationError>
 ```
 
 Validation rejects (first error wins): non-positive or non-3-tuple magnet dims,
-`magnet_count < 2` or odd, non-positive pitch or negative `pitch − width`,
+`magnet_count < 2`, non-positive pitch or negative `pitch − width`,
 `remanence ∉ (0, 2.5]`, `phases < 1`, `spacing_ratio ∉ (0, 2]`, non-positive
 current / voltage / trace / space / via sizes, negative air gap, odd or < 2
 layer counts, `num_layers > max_layers`, non-positive drive /

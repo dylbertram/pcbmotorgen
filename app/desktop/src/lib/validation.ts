@@ -58,11 +58,11 @@ export function validateDesign(config: DesignConfigInput): Finding[] {
     });
   }
 
-  if (config.magnet_count < 2 || config.magnet_count % 2 !== 0) {
+  if (!Number.isInteger(config.magnet_count) || config.magnet_count < 2) {
     next.push({
       id: "magnet-count",
       level: "error",
-      message: `Magnet count must be an even number ≥ 2 (got ${config.magnet_count}).`,
+      message: `Magnet count must be an integer ≥ 2 (got ${config.magnet_count}).`,
     });
   }
 

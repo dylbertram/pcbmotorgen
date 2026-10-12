@@ -37,10 +37,18 @@ describe("validateDesign", () => {
     expect(ids(validConfig({ travel_mm: Number.NaN }))).toContain("travel-negative");
   });
 
-  it("requires an even magnet count ≥ 2", () => {
-    expect(ids(validConfig({ magnet_count: 1 }))).toContain("magnet-count");
-    expect(ids(validConfig({ magnet_count: 9 }))).toContain("magnet-count");
-    expect(ids(validConfig({ magnet_count: 8 }))).not.toContain("magnet-count");
+  it("accepts both odd and even magnet counts ≥ 2", () => {
+    for (const magnet_count of [2, 3, 5, 8, 9]) {
+      expect(ids(validConfig({ magnet_count }))).not.toContain("magnet-count");
+    }
+  });
+
+  it("rejects magnet counts below two or non-integer counts", () => {
+    for (const magnet_count of [-1, 0, 1, 2.5, Number.NaN, Infinity]) {
+      const finding = validateDesign(validConfig({ magnet_count })).find((f) => f.id === "magnet-count");
+      expect(finding?.level).toBe("error");
+      expect(finding?.message).toContain("integer ≥ 2");
+    }
   });
 
   it("requires a positive electrical pitch", () => {

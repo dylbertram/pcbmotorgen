@@ -25,7 +25,7 @@
             value={config.magnet_count}
             min={2}
             max={64}
-            step={2}
+            step={1}
             integer
             ariaLabel="Magnet count"
             class="w-24 shrink-0 px-2 py-1 text-xs font-mono text-emerald-200"

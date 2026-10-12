@@ -79,7 +79,7 @@ pub struct SimulationInput {
     // --- Magnet parameters ---
     /// (width_travel, width_cross, height) of one magnet [m].
     pub magnet_dims_m: [f64; 3],
-    /// Number of magnets in the array (must be even, ≥ 2).
+    /// Number of magnets in the array (≥ 2; odd and even counts are supported).
     pub magnet_count: u32,
     /// Centre-to-centre magnet spacing = pole pitch [m].
     pub magnet_pitch_m: f64,
