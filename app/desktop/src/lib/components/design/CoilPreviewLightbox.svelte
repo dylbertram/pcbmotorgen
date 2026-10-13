@@ -5,7 +5,7 @@
   Hosts the Bits UI Dialog (Dialog.Root/Portal/Overlay/Content) with the
   expanded frame + canvas pair, ALL interactive presentation toggles —
   per-phase, per-layer, via, pole-pitch, band-width and pole-region
-  visibility, the pole-region phase picker, and the one-section hint — and
+   visibility, the pole-region phase picker, and the one-section toggle — and
   the measure-ruler toolbar. Those two UI clusters are components of their
   own (extracted in kata 426r — each renders exactly once, here):
      - ./CoilPreviewVisibilityPanel.svelte — the right-hand Layers panel controls,
@@ -68,7 +68,6 @@
     gestures,
     measure,
     stats,
-    oneSectionConductorCount,
     uniquePhases,
     uniqueLayers,
     hasPolePitchData,
@@ -87,7 +86,6 @@
     measure: CoilPreviewMeasure;
     /** Header stat line ("N phases · N layers · N coil groups"), precomputed. */
     stats: string;
-    oneSectionConductorCount: number;
     uniquePhases: { idx: number; name: string; colorIdx: number }[];
     uniqueLayers: { idx: number }[];
     hasPolePitchData: boolean;
@@ -193,7 +191,7 @@
       <!-- Header row -->
       <div class="flex items-center justify-between flex-wrap gap-2">
         <Dialog.Title level={3} class="text-sm font-semibold text-slate-200">
-          Coil Preview — expanded
+          Coil Preview
         </Dialog.Title>
         <div class="flex items-center gap-3 flex-wrap">
           <span class="text-xs text-slate-400">
@@ -205,6 +203,10 @@
             >×</Dialog.Close
           >
         </div>
+      </div>
+
+      <div role="toolbar" aria-label="Coil preview tools" class="border-y border-slate-700 py-2">
+        <CoilPreviewMeasureToolbar {measure} />
       </div>
 
       <div class="viewer-layout">
@@ -256,41 +258,26 @@
 
       </div>
       <aside class="layers-panel" aria-label="Layers panel">
-        <h4 class="border-b border-slate-700 px-3 py-2 text-sm font-semibold text-slate-200">Layers</h4>
-        <div class="p-3">
+        <h4 class="shrink-0 border-b border-slate-700 px-3 py-2 text-sm font-semibold text-slate-200">Layers</h4>
+        <div class="layers-body p-3">
           <CoilPreviewVisibilityPanel
             {view} {uniquePhases} {uniqueLayers} {hasPolePitchData}
             {hasBandWidthData} {hasPoleRegionData} {poleRegionPhases}
           />
-          <div class="mt-4 border-t border-slate-700 pt-3">
-            <CoilPreviewMeasureToolbar {measure} />
-          </div>
         </div>
       </aside>
       </div>
 
-      <!-- Modal note -->
-      <p class="text-xs text-slate-500">
-        Traces show actual copper width. In centerline mode, dashed lines show end-turns. Magnet poles
-        overlay along the top edge. Layers are overlaid at true coordinates;
-        use the layer toggles to inspect each copper layer. Pole-pitch,
-        band-width and pole-region annotations come from the
-        routing-dimensions sidecar (pole-region x boundaries are
-        pattern-owned).{#if view.oneSection}
-          <span class="text-amber-300"
-            >Showing only the first {oneSectionConductorCount} conductors (one
-            repeating section).</span
-          >{/if} Drag to pan; pinch or use the zoom controls below.
-      </p>
     </Dialog.Content>
   </Dialog.Portal>
 </Dialog.Root>
 
 <style>
-  .viewer-layout { display: grid; grid-template-columns: minmax(0, 1fr) 15rem; gap: 1rem; align-items: start; }
-  .layers-panel { max-height: 65vh; overflow-y: auto; overscroll-behavior: contain; border: 1px solid rgb(var(--slate-700)); border-radius: 6px; background: rgb(var(--slate-900)); }
+  .viewer-layout { display: grid; grid-template-columns: minmax(0, 1fr) 15rem; gap: 1rem; align-items: stretch; }
+  .layers-panel { contain: size; display: flex; flex-direction: column; min-height: 0; border: 1px solid rgb(var(--slate-700)); border-radius: 6px; background: rgb(var(--slate-900)); }
+  .layers-body { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
   @media (max-width: 640px) {
     .viewer-layout { grid-template-columns: minmax(0, 1fr); }
-    .layers-panel { max-height: none; }
+    .layers-panel { contain: none; max-height: 24rem; }
   }
 </style>
