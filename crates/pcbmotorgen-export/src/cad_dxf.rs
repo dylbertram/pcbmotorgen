@@ -17,6 +17,9 @@ use crate::{groups, sections};
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CadGeometry {
     pub routing: RoutingResult,
+    /// Imported CAD basename, retained by project persistence.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_file_name: Option<String>,
     /// Copper plane heights in mm, indexed bottom-to-top.
     pub layer_z_mm: Vec<f64>,
     pub trace_width_mm: f64,
@@ -130,6 +133,7 @@ pub fn sensor_geometry_to_cad_geometry(sensor: &SensorGeometry) -> CadGeometry {
         layer_z_mm: vec![-1.6, 0.0],
         trace_width_mm: sensor.nets[0].trace_width_mm,
         source_layer_coils: BTreeMap::new(),
+        source_file_name: None,
         coil_terminals: BTreeMap::new(),
     }
 }
@@ -314,6 +318,7 @@ pub fn phase_coils_to_cad_geometry(
         layer_z_mm,
         trace_width_mm,
         source_layer_coils: BTreeMap::new(),
+        source_file_name: None,
         coil_terminals: BTreeMap::new(),
     };
     validate_geometry(&geometry)?;
@@ -804,6 +809,7 @@ pub fn import_3d_dxf_with_coils(
         layer_z_mm,
         trace_width_mm: embedded_width.unwrap_or(options.default_trace_width_mm),
         source_layer_coils,
+        source_file_name: None,
         coil_terminals: BTreeMap::new(),
     };
     validate_geometry(&geometry)?;
@@ -1249,6 +1255,7 @@ mod tests {
             layer_z_mm: vec![-1.0],
             trace_width_mm: 0.15,
             source_layer_coils: BTreeMap::new(),
+            source_file_name: None,
             coil_terminals: BTreeMap::new(),
         };
         let text = cad_geometry_to_3d_dxf(&geometry).unwrap();
@@ -1305,6 +1312,7 @@ mod tests {
             layer_z_mm: vec![-1.6, 0.0],
             trace_width_mm: 0.2,
             source_layer_coils: BTreeMap::new(),
+            source_file_name: None,
             coil_terminals: BTreeMap::new(),
         }
     }
@@ -1344,6 +1352,25 @@ mod tests {
             "unexpected import warnings: {:?}",
             imported.warnings
         );
+    }
+
+    #[test]
+    fn source_filename_is_preserved_in_json_and_optional_for_legacy_geometry() {
+        let mut geometry = sample();
+        geometry.source_file_name = Some("motor-coils.dxf".into());
+        let json = serde_json::to_string(&geometry).unwrap();
+        let loaded: CadGeometry = serde_json::from_str(&json).unwrap();
+        assert_eq!(loaded.source_file_name.as_deref(), Some("motor-coils.dxf"));
+
+        let mut legacy = serde_json::to_value(&geometry).unwrap();
+        legacy.as_object_mut().unwrap().remove("source_file_name");
+        let loaded: CadGeometry = serde_json::from_value(legacy).unwrap();
+        assert_eq!(loaded.source_file_name, None);
+        assert!(!serde_json::to_value(sample())
+            .unwrap()
+            .as_object()
+            .unwrap()
+            .contains_key("source_file_name"));
     }
 
     #[test]

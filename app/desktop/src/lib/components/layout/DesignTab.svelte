@@ -155,7 +155,7 @@
         Topology &amp; Board
       </h2>
       <div class="space-y-3">
-        <TopologySelector {config} cadGeometryActive={cadGeometry !== null} {onImportCad} {onUseGenerated} />
+        <TopologySelector {config} cadGeometryActive={cadGeometry !== null} cadSourceFileName={cadGeometry?.source_file_name} {onImportCad} {onUseGenerated} />
         {#if cadGeometry}
           <div
             class="rounded-md border border-sky-500/30 bg-sky-500/5 px-3 py-3"

@@ -309,3 +309,18 @@ test("generated motor geometry becomes editable only after confirmation", async 
   await clickTrace(page, .5, 0);
   await expect(selection).toContainText("1 selected");
 });
+
+test("routing source shows the imported filename in its trigger and dropdown after edits", async ({ page }) => {
+  const dialog = await openImport(page);
+  await dialog.getByRole("button", { name: "Open with this geometry" }).click();
+  const source = page.getByRole("button", { name: "Routing source", exact: true });
+  await expect(source).toContainText("coil-leads.dxf");
+  await source.click();
+  await expect(page.getByRole("option", { name: "coil-leads.dxf", exact: true })).toBeVisible();
+  await page.keyboard.press("Escape");
+  await page.getByRole("button", { name: "Expand coil preview" }).click();
+  const tools = page.getByRole("toolbar", { name: "Coil preview tools" });
+  await tools.getByRole("button", { name: "Simplify lines", exact: true }).click();
+  await page.getByRole("button", { name: "Close coil preview" }).click();
+  await expect(source).toContainText("coil-leads.dxf");
+});

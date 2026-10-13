@@ -468,6 +468,7 @@ mod tests {
                 },
                 layer_z_mm: vec![-0.8, 0.8],
                 trace_width_mm: 0.2,
+                source_file_name: Some("motor-coils.dxf".into()),
                 source_layer_coils: std::collections::BTreeMap::from([(
                     "Bottom winding".into(),
                     "A".into(),
@@ -524,6 +525,7 @@ mod tests {
         let geometry = loaded.cad_geometry.expect("saved CAD geometry");
         assert_eq!(geometry.layer_z_mm, vec![-0.8, 0.8]);
         assert_eq!(geometry.trace_width_mm, 0.2);
+        assert_eq!(geometry.source_file_name.as_deref(), Some("motor-coils.dxf"));
         assert_eq!(geometry.routing.segments[0].net, "A");
         assert_eq!(loaded.sensor_config, SensorConfig::default());
     }

@@ -228,6 +228,7 @@
           geometry: {
             ...(simplifyLines ? simplifyCadLines(result.geometry) : result.geometry),
             trace_width_mm: requestedTraceWidth,
+            source_file_name: baseName(path),
           },
         };
         importedOptions = requestedOptions;

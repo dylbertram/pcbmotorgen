@@ -61,6 +61,8 @@ export interface CadRoutingResult {
 /** Saved/imported centerline geometry. All coordinates and elevations are mm. */
 export interface CadGeometry {
   routing: CadRoutingResult;
+  /** Imported CAD basename, retained with saved geometry. Absent in older projects. */
+  source_file_name?: string;
   /** Copper plane heights ordered bottom-to-top. */
   layer_z_mm: number[];
   trace_width_mm: number;
