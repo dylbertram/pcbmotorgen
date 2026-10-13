@@ -22,13 +22,99 @@ test.beforeEach(async ({ page }) => {
           segments: ['A', 'B'].flatMap((coil, row) => [0, 1].map(x => ({
             start: { x, y: row * 2 }, end: { x: x + 1, y: row * 2 },
             layer: 0, net: source_layer_coils['L0_' + coil], is_active: true,
-          }))),
+          }))).concat(window.__cadLayered ? [{ start: { x: 0, y: 0 }, end: { x: 2, y: 0 }, layer: 1, net: source_layer_coils.L0_A, is_active: true }] : []),
           vias: [{ position: { x: 2, y: 0 }, from_layer: 0, to_layer: 1, net: source_layer_coils.holes }],
         },
       }};
     }`);
     await route.fulfill({ response, body });
   });
+});
+
+async function openTerminalTool(page: Page) {
+  const dialog = await openImport(page);
+  await dialog.getByLabel("Coil for source layer holes").fill("A");
+  await expect(dialog.getByRole("checkbox", { name: "Coil holes", exact: true })).toHaveCount(0);
+  await dialog.getByRole("button", { name: "Open with this geometry" }).click();
+  await page.getByRole("button", { name: "Expand coil preview" }).click();
+  const tools = page.getByRole("toolbar", { name: "Coil preview tools" });
+  await tools.getByRole("button", { name: "Set coil terminals", exact: true }).click();
+  const command = page.getByRole("region", { name: "Set coil terminals", exact: true });
+  await command.getByLabel("Coil for terminal selection").selectOption("A");
+  await command.getByRole("button", { name: "Select IN", exact: true }).click();
+  return { command, tools };
+}
+
+test("terminal command advances IN to OUT to review and preserves confirmed labels through simplify", async ({ page }, testInfo) => {
+  const { command, tools } = await openTerminalTool(page);
+  const input = page.getByRole("button", { name: "Endpoint coil A, L0, X 0 mm, Y 0 mm", exact: true });
+  await expect(command.getByRole("status")).toContainText("Click the IN endpoint");
+  const box = (await input.boundingBox())!;
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width / 2 + 40, box.y + box.height / 2);
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.up();
+  await expect(command.getByRole("status")).toContainText("Click the IN endpoint");
+  await input.click();
+  await expect(command.getByRole("status")).toContainText("Click the OUT endpoint");
+  await input.click();
+  await expect(command.getByRole("alert")).toContainText("different from IN");
+  await page.getByRole("button", { name: "Endpoint coil A, L0, X 2 mm, Y 0 mm", exact: true }).click();
+  await expect(command.getByRole("status")).toContainText("Review the highlighted");
+  await expect(page.getByRole("region", { name: "Configured coil terminals" })).toHaveCount(0);
+  await expect(tools.getByRole("button", { name: "Simplify lines", exact: true })).toBeDisabled();
+  await page.screenshot({ path: testInfo.outputPath("coil-terminal-review.png") });
+  await command.getByRole("button", { name: "Done", exact: true }).click();
+  const summary = page.getByRole("region", { name: "Configured coil terminals" });
+  await expect(summary).toContainText("IN L0, X 0 mm");
+  await expect(summary).toContainText("OUT L0, X 2 mm");
+  await tools.getByRole("button", { name: "Simplify lines", exact: true }).click();
+  await expect(summary).toContainText("OUT L0, X 2 mm");
+  await page.getByRole("button", { name: "Close coil preview" }).click();
+  await page.getByRole("button", { name: "Expand coil preview" }).click();
+  await expect(summary).toContainText("IN L0, X 0 mm");
+});
+
+test("terminal drafts support Back, Cancel, Escape and switching to Measure", async ({ page }) => {
+  const { command, tools } = await openTerminalTool(page);
+  const input = () => page.getByRole("button", { name: "Endpoint coil A, L0, X 0 mm, Y 0 mm", exact: true });
+  const output = () => page.getByRole("button", { name: "Endpoint coil A, L0, X 2 mm, Y 0 mm", exact: true });
+  await input().click(); await output().click();
+  await command.getByRole("button", { name: "Back", exact: true }).click();
+  await expect(command.getByRole("status")).toContainText("Click the OUT endpoint");
+  await command.getByRole("button", { name: "Back", exact: true }).click();
+  await expect(command.getByRole("status")).toContainText("Click the IN endpoint");
+  await input().click();
+  await command.getByRole("button", { name: "Cancel", exact: true }).click();
+  await expect(command).toHaveCount(0);
+  await expect(page.getByRole("region", { name: "Configured coil terminals" })).toHaveCount(0);
+  await tools.getByRole("button", { name: "Set coil terminals", exact: true }).click();
+  await command.getByLabel("Coil for terminal selection").selectOption("A");
+  await command.getByRole("button", { name: "Select IN", exact: true }).click();
+  await input().click(); await output().click();
+  await page.keyboard.press("Escape");
+  await expect(command).toHaveCount(0);
+  await expect(tools).toBeVisible();
+  await tools.getByRole("button", { name: "Set coil terminals", exact: true }).click();
+  await tools.getByRole("button", { name: "Toggle measure tool" }).click();
+  await expect(command).toHaveCount(0);
+  await expect(page.getByRole("region", { name: "Configured coil terminals" })).toHaveCount(0);
+});
+
+test("overlapping endpoints are disambiguated by copper layer and support keyboard selection", async ({ page }) => {
+  await page.addInitScript("window.__cadLayered = true;");
+  const { command } = await openTerminalTool(page);
+  await page.getByRole("button", { name: "Endpoint coil A, L0, X 0 mm, Y 0 mm", exact: true }).click();
+  await command.getByLabel("Copper layer for terminal selection").selectOption("1");
+  await expect(page.getByRole("button", { name: /Endpoint coil A, L0/ })).toHaveCount(0);
+  const output = page.getByRole("button", { name: "Endpoint coil A, L1, X 2 mm, Y 0 mm", exact: true });
+  await output.focus(); await page.keyboard.press("Enter");
+  await expect(command.getByRole("status")).toContainText("Review the highlighted");
+  await command.getByRole("button", { name: "Done", exact: true }).click();
+  const summary = page.getByRole("region", { name: "Configured coil terminals" });
+  await expect(summary).toContainText("IN L0, X 0 mm");
+  await expect(summary).toContainText("OUT L1, X 2 mm");
 });
 
 async function openImport(page: Page) {

@@ -21,7 +21,7 @@
   import { computeMeasureRuler, formatMetresMm } from "../../previewGeometry";
   import type { CoilPreviewMeasure } from "../../utils/coilPreviewMeasure.svelte";
 
-  let { measure }: { measure: CoilPreviewMeasure } = $props();
+  let { measure, onToggle }: { measure: CoilPreviewMeasure; onToggle?: () => void } = $props();
 </script>
 
 <div class="flex items-center gap-3 flex-wrap">
@@ -33,7 +33,7 @@
         : 'bg-slate-800 border-slate-700 text-slate-300 hover:text-pink-300 hover:border-pink-600'}"
       aria-pressed={measure.mode}
       aria-label="Toggle measure tool"
-      onclick={() => measure.toggleMode()}
+      onclick={() => onToggle ? onToggle() : measure.toggleMode()}
     >Measure</button>
     {#if measure.mode}
       <button

@@ -472,6 +472,19 @@ mod tests {
                     "Bottom winding".into(),
                     "A".into(),
                 )]),
+                coil_terminals: std::collections::BTreeMap::from([(
+                    "A".into(),
+                    pcbmotorgen_export::cad_dxf::CadCoilTerminals {
+                        input: pcbmotorgen_export::cad_dxf::CadTerminal {
+                            position: pcbmotorgen_routing::Point::new(1.0, 2.0),
+                            layer: 0,
+                        },
+                        output: pcbmotorgen_export::cad_dxf::CadTerminal {
+                            position: pcbmotorgen_routing::Point::new(3.0, 2.0),
+                            layer: 0,
+                        },
+                    },
+                )]),
             }),
             sensor_config: SensorConfig::default(),
             sensor_cad_geometry: None,

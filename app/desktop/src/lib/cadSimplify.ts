@@ -1,4 +1,5 @@
 import type { CadGeometry, CadRouteSegment } from "./types";
+import { sameTerminal } from "./cadTerminals";
 
 // Numerical roundoff only, deliberately independent of the import Z/XY tolerance.
 const EPS_MM = 1e-9;
@@ -37,6 +38,13 @@ export function simplifyCadLines(geometry: CadGeometry): CadGeometry {
     for (let i = 0; i < segments.length;) {
       const combined = i < insertAt ? merge(segments[i], candidate) : merge(candidate, segments[i]);
       if (!combined) { i += 1; continue; }
+      const terminals = geometry.coil_terminals && Object.hasOwn(geometry.coil_terminals, combined.net) ? geometry.coil_terminals[combined.net] : undefined;
+      // Explicit IN/OUT points must remain endpoints after simplification.
+      if (terminals && [terminals.input, terminals.output].some((terminal) =>
+        terminal.layer === combined.layer &&
+        [segments[i].start, segments[i].end, candidate.start, candidate.end].some((position) => sameTerminal(terminal, { position, layer: combined.layer })) &&
+        ![combined.start, combined.end].some((position) => sameTerminal(terminal, { position, layer: combined.layer }))
+      )) { i += 1; continue; }
       candidate = combined;
       insertAt = Math.min(insertAt, i);
       segments.splice(i, 1);

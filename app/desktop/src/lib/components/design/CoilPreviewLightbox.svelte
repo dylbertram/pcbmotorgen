@@ -47,6 +47,13 @@
   import type { ConfigStore } from "../../stores/config.svelte";
   import type { MotionStore } from "../../stores/motion.svelte";
   import { Dialog } from "bits-ui";
+  import { onDestroy } from "svelte";
+  import type { CadGeometry } from "../../types";
+  import type { WorldTransform } from "../../chart";
+  import type { CoilTerminalTool } from "../../utils/coilTerminalTool.svelte";
+  import CoilTerminalPanel from "./CoilTerminalPanel.svelte";
+  import CoilTerminalOverlay from "./CoilTerminalOverlay.svelte";
+  import { terminalDescription } from "../../cadTerminals";
   import type { CoilPreviewGestures } from "../../utils/coilPreviewGestures.svelte";
   import type { CoilPreviewMeasure } from "../../utils/coilPreviewMeasure.svelte";
   import {
@@ -70,6 +77,11 @@
     onSimplify,
     onUndoSimplify,
     simplifyNotice = "",
+    terminalTool,
+    onStartTerminals,
+    importedGeometry = null,
+    worldTransform,
+    isTerminalVisible,
     stats,
     uniquePhases,
     uniqueLayers,
@@ -90,6 +102,11 @@
     onSimplify?: () => void;
     onUndoSimplify?: () => void;
     simplifyNotice?: string;
+    terminalTool?: CoilTerminalTool;
+    onStartTerminals?: () => void;
+    importedGeometry?: CadGeometry | null;
+    worldTransform: WorldTransform;
+    isTerminalVisible: (coil: string, layer: number) => boolean;
     /** Header stat line ("N phases · N layers · N coil groups"), precomputed. */
     stats: string;
     uniquePhases: { idx: number; name: string; colorIdx: number }[];
@@ -107,6 +124,7 @@
   // keeps the same 760:260 aspect ratio as the old SVG viewBox).
   const W = PREVIEW_W;
   const H = PREVIEW_H;
+  onDestroy(() => terminalTool?.cancel());
 
   let backdropRef: HTMLDivElement | null = $state(null);
   let modalPanelRef: HTMLDivElement | null = $state(null);
@@ -191,6 +209,7 @@
     <Dialog.Content
       bind:ref={modalPanelRef}
       preventScroll={false}
+      onEscapeKeydown={(event) => { if (terminalTool?.active) { event.preventDefault(); terminalTool.cancel(); } }}
       aria-label="Coil Preview — expanded"
       class="fixed left-1/2 top-1/2 z-50 flex max-h-[calc(100vh-2rem)] w-[calc(100%-2rem)] max-w-7xl -translate-x-1/2 -translate-y-1/2 flex-col gap-3 overflow-y-auto overscroll-contain rounded-lg border border-slate-700 bg-slate-900 p-4 shadow-2xl"
     >
@@ -212,12 +231,16 @@
       </div>
 
       <div role="toolbar" aria-label="Coil preview tools" class="border-y border-slate-700 py-2">
-        <CoilPreviewMeasureToolbar {measure} />
+        <CoilPreviewMeasureToolbar {measure} onToggle={() => { terminalTool?.cancel(); measure.toggleMode(); }} />
         {#if onSimplify}
           <div class="mt-2 flex flex-wrap items-center gap-2">
-            <button type="button" onclick={onSimplify} class="rounded border border-slate-700 bg-slate-800 px-2 py-1 text-xs text-slate-300 hover:text-emerald-300" title="Merge collinear lines in saved and exported geometry">Simplify lines</button>
-            {#if onUndoSimplify}<button type="button" onclick={onUndoSimplify} class="px-2 py-1 text-xs text-slate-400 hover:text-slate-100">Undo simplify</button>{/if}
+            <button type="button" onclick={onSimplify} disabled={terminalTool?.active} class="rounded border border-slate-700 bg-slate-800 px-2 py-1 text-xs text-slate-300 hover:text-emerald-300 disabled:opacity-40" title="Merge collinear lines in saved and exported geometry">Simplify lines</button>
+            {#if onUndoSimplify}<button type="button" onclick={onUndoSimplify} disabled={terminalTool?.active} class="px-2 py-1 text-xs text-slate-400 hover:text-slate-100 disabled:opacity-40">Undo simplify</button>{/if}
             <span role="status" class="text-xs text-slate-400">{simplifyNotice}</span>
+            {#if terminalTool && onStartTerminals}
+              <button type="button" onclick={onStartTerminals} aria-pressed={terminalTool.active} class="rounded border border-slate-700 bg-slate-800 px-2 py-1 text-xs text-slate-300 hover:text-emerald-300">Set coil terminals</button>
+              {#if terminalTool.notice}<span role="status" class="text-xs text-slate-400">{terminalTool.notice}</span>{/if}
+            {/if}
           </div>
         {/if}
       </div>
@@ -232,10 +255,10 @@
         bind:this={modalFrameRef}
         class="relative w-full touch-none select-none {gestures.isPanning
           ? 'cursor-grabbing'
-          : measure.mode
+           : measure.mode || terminalTool?.active
             ? 'cursor-crosshair'
             : 'cursor-grab'}"
-        role="img"
+        role={terminalTool?.active ? "group" : "img"}
         aria-label="Coil preview — expanded"
         style="aspect-ratio: {W} / {H};"
         onpointerdown={onModalPointerDown}
@@ -250,6 +273,9 @@
       >
         <canvas bind:this={modalCanvasRef} class="block h-full w-full"
         ></canvas>
+        {#if importedGeometry}
+          <CoilTerminalOverlay geometry={importedGeometry} tool={terminalTool} transform={worldTransform} panX={gestures.panX} panY={gestures.panY} width={W} height={H} isVisible={isTerminalVisible} />
+        {/if}
       </div>
 
       <!-- Zoom + reset view below the expanded canvas, same layout as the
@@ -271,12 +297,26 @@
 
       </div>
       <aside class="layers-panel" aria-label="Layers panel">
+        {#if terminalTool?.active}<CoilTerminalPanel tool={terminalTool} />{/if}
         <h4 class="shrink-0 border-b border-slate-700 px-3 py-2 text-sm font-semibold text-slate-200">Layers</h4>
         <div class="layers-body p-3">
           <CoilPreviewVisibilityPanel
             {view} {uniquePhases} {uniqueLayers} {hasPolePitchData}
             {hasBandWidthData} {hasPoleRegionData} {poleRegionPhases}
           />
+          {#if importedGeometry && Object.keys(importedGeometry.coil_terminals ?? {}).length}
+            <section class="mt-4 border-t border-slate-700 pt-3" aria-label="Configured coil terminals">
+              <h4 class="mb-2 text-xs font-semibold text-slate-300">Coil terminals</h4>
+              {#each Object.entries(importedGeometry.coil_terminals ?? {}) as [coil, terminals] (coil)}
+                <div class="mb-3 space-y-1 text-[11px] text-slate-400">
+                  <p class="font-semibold text-slate-200">Coil {coil}</p>
+                  <p>IN {terminalDescription(terminals.input)}</p>
+                  <p>OUT {terminalDescription(terminals.output)}</p>
+                  <button type="button" disabled={terminalTool?.active} onclick={() => { onStartTerminals?.(); terminalTool?.chooseCoil(coil); terminalTool?.next(); }} class="text-xs text-emerald-300 disabled:opacity-40" aria-label={`Edit coil ${coil} terminals`}>Edit terminals</button>
+                </div>
+              {/each}
+            </section>
+          {/if}
         </div>
       </aside>
       </div>
@@ -287,7 +327,7 @@
 
 <style>
   .viewer-layout { display: grid; grid-template-columns: minmax(0, 1fr) 15rem; gap: 1rem; align-items: stretch; }
-  .layers-panel { contain: size; display: flex; flex-direction: column; min-height: 0; border: 1px solid rgb(var(--slate-700)); border-radius: 6px; background: rgb(var(--slate-900)); }
+  .layers-panel { contain: size; display: flex; flex-direction: column; min-height: 0; overflow-y: auto; overscroll-behavior: contain; border: 1px solid rgb(var(--slate-700)); border-radius: 6px; background: rgb(var(--slate-900)); }
   .layers-body { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
   @media (max-width: 640px) {
     .viewer-layout { grid-template-columns: minmax(0, 1fr); }
