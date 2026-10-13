@@ -32,6 +32,7 @@
   ═══════════════════════════════════════════════════════════════════════
 -->
 <script lang="ts">
+  import { GitMerge, Plug, Undo2 } from "@lucide/svelte";
   import { confirm } from "@tauri-apps/plugin-dialog";
   import { editableCoilGeometry } from "../../ipc/dxf";
   import type { ConfigStore } from "../../stores/config.svelte";
@@ -589,9 +590,9 @@
   <div class="mt-2">
     {#if importedGeometry && onGeometryChange}
       <div class="mb-2 flex flex-wrap items-center gap-2" role="group" aria-label="Imported geometry tools">
-        <button type="button" onclick={simplifyImportedLines} disabled={terminalTool.active} class="rounded border border-slate-700 bg-slate-800 px-2 py-1 text-xs text-slate-300 hover:text-emerald-300 disabled:opacity-40" title="Merge collinear lines in saved and exported geometry">Simplify lines</button>
-        <button type="button" onclick={startTerminalTool} class="rounded border border-slate-700 bg-slate-800 px-2 py-1 text-xs text-slate-300 hover:text-emerald-300">Set coil terminals</button>
-        {#if canUndoSimplify}<button type="button" onclick={undoSimplify} class="px-2 py-1 text-xs text-slate-400 hover:text-slate-100">Undo simplify</button>{/if}
+        <button type="button" aria-label="Simplify lines" onclick={simplifyImportedLines} disabled={terminalTool.active} class="inline-flex h-8 w-8 items-center justify-center rounded border border-slate-700 bg-slate-800 text-slate-300 hover:text-emerald-300 disabled:opacity-40" title="Simplify lines: merge collinear lines in saved and exported geometry."><GitMerge size={16} aria-hidden="true" /></button>
+        <button type="button" aria-label="Set coil terminals" onclick={() => startTerminalTool()} class="inline-flex h-8 w-8 items-center justify-center rounded border border-slate-700 bg-slate-800 text-slate-300 hover:text-emerald-300" title="Set coil terminals: review open ends, change either endpoint, or flip IN and OUT."><Plug size={16} aria-hidden="true" /></button>
+        {#if canUndoSimplify}<button type="button" aria-label="Undo simplify" title="Undo line simplification." onclick={undoSimplify} class="inline-flex h-8 w-8 items-center justify-center rounded border border-slate-700 text-slate-400 hover:text-slate-100"><Undo2 size={16} aria-hidden="true" /></button>{/if}
         <span role="status" class="text-xs text-slate-400">{simplifyNotice}</span>
         {#if terminalTool.notice}<span role="status" class="text-xs text-slate-400">{terminalTool.notice}</span>{/if}
       </div>

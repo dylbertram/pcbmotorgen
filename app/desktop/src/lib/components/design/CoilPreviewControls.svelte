@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { Minus, Plus, Scan } from "@lucide/svelte";
   /**
    * CoilPreviewControls.svelte — presentation-only zoom/reset button group.
    *
@@ -30,9 +31,10 @@
     type="button"
     class="px-2 py-0.5 text-xs rounded bg-slate-800 border border-slate-700 text-slate-300 hover:text-emerald-300 hover:border-emerald-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
     aria-label="Zoom out"
+    title="Zoom out"
     disabled={canZoomOut}
     onclick={onZoomOut}
-  >−</button>
+  ><Minus size={16} aria-hidden="true" /></button>
   <button
     type="button"
     class="px-2 py-0.5 text-xs font-mono rounded bg-slate-800 border border-slate-700 text-slate-300 hover:text-emerald-300 hover:border-emerald-600 transition-colors"
@@ -44,14 +46,20 @@
     type="button"
     class="px-2 py-0.5 text-xs rounded bg-slate-800 border border-slate-700 text-slate-300 hover:text-emerald-300 hover:border-emerald-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
     aria-label="Zoom in"
+    title="Zoom in"
     disabled={canZoomIn}
     onclick={onZoomIn}
-  >+</button>
+  ><Plus size={16} aria-hidden="true" /></button>
   <button
     type="button"
     class="ml-1 px-2 py-0.5 text-xs rounded bg-slate-800 border border-slate-700 text-slate-300 hover:text-emerald-300 hover:border-emerald-600 transition-colors"
     aria-label="Reset zoom and pan"
     title="Reset zoom and pan"
     onclick={onResetView}
-  >Reset View</button>
+   ><Scan size={16} aria-hidden="true" /></button>
 </div>
+
+<style>
+  button { display: inline-flex; align-items: center; justify-content: center; min-width: 2rem; min-height: 2rem; }
+  button:focus-visible { outline: 2px solid #34d399; outline-offset: 2px; }
+</style>

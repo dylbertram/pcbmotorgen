@@ -318,6 +318,11 @@ test("keyboard selection and short tooltips work at mobile size", async ({ page 
   await page.setViewportSize({ width: 390, height: 844 });
   const dialog = await openImport(page);
   const tools = dialog.getByRole("group", { name: "Segment selection tools" });
+  for (const name of ["Pan", "Select", "Chain", "Box"]) {
+    const button = tools.getByRole("button", { name, exact: true });
+    await expect(button.locator("svg")).toHaveAttribute("aria-hidden", "true");
+    expect((await button.boundingBox())!.width).toBeLessThanOrEqual(36);
+  }
   await tools.getByRole("button", { name: "Select", exact: true }).click();
   const preview = page.getByRole("listbox", { name: "Segment selection preview" });
   await preview.focus(); await page.keyboard.press("ArrowRight"); await page.keyboard.press("Enter");

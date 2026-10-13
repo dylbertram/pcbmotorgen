@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { ArrowRightLeft } from "@lucide/svelte";
   import type { CoilTerminalTool } from "../../utils/coilTerminalTool.svelte";
   import { terminalDescription } from "../../cadTerminals";
   let { tool }: { tool: CoilTerminalTool } = $props();
@@ -32,7 +33,7 @@
         <dd class="mt-1">{tool.output ? terminalDescription(tool.output) : "Not selected"}</dd>
       </div>
     </dl>
-    <button type="button" onclick={tool.flip} disabled={!tool.input || !tool.output} title="Swap IN and OUT without choosing the points again." class="mt-3 rounded border border-slate-700 px-2 py-1 text-xs text-slate-300 disabled:opacity-40">Flip</button>
+    <button type="button" onclick={tool.flip} disabled={!tool.input || !tool.output} title="Swap IN and OUT without choosing the points again." class="mt-3 inline-flex items-center gap-1.5 rounded border border-slate-700 px-2 py-1 text-xs text-slate-300 disabled:opacity-40"><ArrowRightLeft size={14} aria-hidden="true" />Flip</button>
     {#if tool.step === "input" || tool.step === "output"}
       <label class="mt-3 block text-xs text-slate-300">
         Copper layer
