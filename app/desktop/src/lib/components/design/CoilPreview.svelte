@@ -61,7 +61,6 @@
   import { CoilPreviewMeasure } from "../../utils/coilPreviewMeasure.svelte";
   import CoilPreviewControls from "./CoilPreviewControls.svelte";
   import CoilPreviewLightbox from "./CoilPreviewLightbox.svelte";
-  import MoverPositionControls from "./MoverPositionControls.svelte";
   import {
     PREVIEW_H,
     PREVIEW_W,
@@ -414,6 +413,8 @@
       isPhaseVisible: (phaseIdx) => view.isPhaseVisible(phaseIdx),
       isLayerVisible: (layerIdx) => view.isLayerVisible(layerIdx),
       showVias: view.showVias,
+      traceMode: view.traceMode,
+      traceWidthMm: config.min_trace_mm,
       viaDrillMm: config.min_via_drill_mm,
       viaAnnularRingMm: config.min_via_annular_ring_mm,
       poleRuler,
