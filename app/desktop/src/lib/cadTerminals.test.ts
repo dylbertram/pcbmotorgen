@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { assignCadTerminals, cadTerminalCandidates } from "./cadTerminals";
+import { assignCadTerminals, cadTerminalCandidates, defaultCadTerminals } from "./cadTerminals";
 import { cadGeometryToPreview } from "./cadPreview";
 import { simplifyCadLines } from "./cadSimplify";
 import type { CadGeometry, CadTerminal } from "./types";
@@ -57,5 +57,58 @@ describe("CAD terminals", () => {
     // A selected junction stays an endpoint, rather than disappearing into a merged line.
     const junction = assignCadTerminals(original, "A", { input: terminal(1), output: terminal(2) });
     expect(simplifyCadLines(junction).routing.segments).toHaveLength(4);
+  });
+  it("defaults to the two free ends of a continuous coil across its internal via", () => {
+    const geometry = terminalFixture();
+    expect(defaultCadTerminals(geometry, "A")).toEqual({ input: terminal(2), output: terminal(1, 1) });
+    geometry.routing.segments.reverse();
+    for (const segment of geometry.routing.segments) [segment.start, segment.end] = [segment.end, segment.start];
+    expect(defaultCadTerminals(geometry, "A")).toEqual({ input: terminal(2), output: terminal(1, 1) });
+    expect(defaultCadTerminals(geometry, "B")).toEqual({ input: terminal(0, 0, 2), output: terminal(1, 0, 2) });
+  });
+  it("includes curve and evaluated spline endpoints in a continuous chain", () => {
+    const geometry = terminalFixture();
+    geometry.routing.curves.push({ start: { x: 2, y: 0 }, mid: { x: 3, y: 1 }, end: { x: 4, y: 0 }, net: "A", layer: 0, is_active: true });
+    geometry.routing.splines = [{ degree: 2, knots: [0, 0, 0, 1, 1, 1], control_points: [{ x: 4, y: 0 }, { x: 5, y: 2 }, { x: 6, y: 0 }], weights: [1, .5, 1], net: "A", layer: 0, is_active: true }];
+    expect(defaultCadTerminals(geometry, "A")).toEqual({ input: terminal(6), output: terminal(1, 1) });
+  });
+  it("does not infer for branches, closed loops, disconnected chains or dangling vias", () => {
+    const branch = terminalFixture();
+    branch.routing.segments.push({ start: { x: 1, y: 0 }, end: { x: 1, y: 1 }, layer: 0, net: "A", is_active: true });
+    expect(defaultCadTerminals(branch, "A")).toBeNull();
+    const loop = terminalFixture();
+    loop.routing.vias = [];
+    loop.routing.segments = loop.routing.segments.filter((s) => s.layer === 0 && s.net === "A");
+    loop.routing.segments.push({ start: { x: 2, y: 0 }, end: { x: 0, y: 0 }, layer: 0, net: "A", is_active: true });
+    expect(defaultCadTerminals(loop, "A")).toBeNull();
+    const disconnected = terminalFixture();
+    disconnected.routing.vias = [];
+    expect(defaultCadTerminals(disconnected, "A")).toBeNull();
+    const dangling = terminalFixture();
+    dangling.routing.vias.push({ position: { x: 2, y: 0 }, from_layer: 0, to_layer: 1, net: "A" });
+    expect(defaultCadTerminals(dangling, "A")).toBeNull();
+    const orphan = terminalFixture();
+    orphan.routing.vias.push({ position: { x: 20, y: 0 }, from_layer: 0, to_layer: 1, net: "A" });
+    expect(defaultCadTerminals(orphan, "A")).toBeNull();
+  });
+  it("rejects a disconnected closed component even if another component has exactly two free ends", () => {
+    const geometry = terminalFixture();
+    geometry.routing.segments.push(
+      { start: { x: 10, y: 0 }, end: { x: 11, y: 0 }, layer: 0, net: "A", is_active: true },
+      { start: { x: 11, y: 0 }, end: { x: 10, y: 0 }, layer: 0, net: "A", is_active: true },
+    );
+    expect(defaultCadTerminals(geometry, "A")).toBeNull();
+  });
+  it("does not default a coil linked to another net by a shared endpoint or via", () => {
+    const shared = terminalFixture();
+    shared.routing.segments.push({ start: { x: 2, y: 0 }, end: { x: 3, y: 0 }, layer: 0, net: "B", is_active: true });
+    expect(defaultCadTerminals(shared, "A")).toBeNull();
+    const linked = terminalFixture();
+    linked.routing.vias[0].net = "B";
+    expect(defaultCadTerminals(linked, "A")).toBeNull();
+    const otherLayer = terminalFixture();
+    otherLayer.routing.segments.push({ start: { x: 2, y: 0 }, end: { x: 3, y: 0 }, layer: 1, net: "B", is_active: true });
+    expect(defaultCadTerminals(otherLayer, "A")).not.toBeNull();
+    expect(defaultCadTerminals(otherLayer, "missing")).toBeNull();
   });
 });

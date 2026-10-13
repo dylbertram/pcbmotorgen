@@ -138,16 +138,16 @@
       const phase = coils?.phases.find((p) => p.phase_name === coil);
       if (phase) view.phaseVisibility[phase.phase_idx] = true;
       view.layerVisibility = { ...view.layerVisibility, [layer]: true };
-      gestures.resetView();
     },
+    onFit: () => gestures.resetView(),
   });
-  function startTerminalTool(): void {
+  function startTerminalTool(coil?: string): void {
     if (!importedGeometry || !onGeometryChange) return;
     measure.mode = false;
     measure.clear();
     view.oneSection = false;
     expanded = true;
-    terminalTool.begin();
+    terminalTool.begin(coil);
   }
   function isTerminalVisible(coil: string, layer: number): boolean {
     const phase = coils?.phases.find((p) => p.phase_name === coil);

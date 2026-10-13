@@ -53,7 +53,7 @@
   import type { CoilTerminalTool } from "../../utils/coilTerminalTool.svelte";
   import CoilTerminalPanel from "./CoilTerminalPanel.svelte";
   import CoilTerminalOverlay from "./CoilTerminalOverlay.svelte";
-  import { terminalDescription } from "../../cadTerminals";
+  import { assignCadTerminals, terminalDescription } from "../../cadTerminals";
   import type { CoilPreviewGestures } from "../../utils/coilPreviewGestures.svelte";
   import type { CoilPreviewMeasure } from "../../utils/coilPreviewMeasure.svelte";
   import {
@@ -108,7 +108,7 @@
     onUndoSimplify?: () => void;
     simplifyNotice?: string;
     terminalTool?: CoilTerminalTool;
-    onStartTerminals?: () => void;
+    onStartTerminals?: (coil?: string) => void;
     importedGeometry?: CadGeometry | null;
     onGeometryChange?: (geometry: CadGeometry) => void;
     onStartSegmentEditing?: () => Promise<boolean>;
@@ -262,7 +262,7 @@
             {#if onUndoSimplify}<button type="button" onclick={() => { selection.clear(); onUndoSimplify?.(); }} disabled={terminalTool?.active} class="px-2 py-1 text-xs text-slate-400 hover:text-slate-100 disabled:opacity-40">Undo simplify</button>{/if}
             <span role="status" class="text-xs text-slate-400">{simplifyNotice}</span>
             {#if terminalTool && onStartTerminals}
-              <button type="button" onclick={() => { selection.setMode("pan"); onStartTerminals?.(); }} aria-pressed={terminalTool.active} class="rounded border border-slate-700 bg-slate-800 px-2 py-1 text-xs text-slate-300 hover:text-emerald-300">Set coil terminals</button>
+              <button type="button" onclick={() => { selection.setMode("pan"); onStartTerminals?.(); }} aria-pressed={terminalTool.active} title="Review detected open ends, change either endpoint, or flip IN and OUT." class="rounded border border-slate-700 bg-slate-800 px-2 py-1 text-xs text-slate-300 hover:text-emerald-300">Set coil terminals</button>
               {#if terminalTool.notice}<span role="status" class="text-xs text-slate-400">{terminalTool.notice}</span>{/if}
             {/if}
           </div>
@@ -339,7 +339,10 @@
                   <p class="font-semibold text-slate-200">Coil {coil}</p>
                   <p>IN {terminalDescription(terminals.input)}</p>
                   <p>OUT {terminalDescription(terminals.output)}</p>
-                  <button type="button" disabled={terminalTool?.active} onclick={() => { onStartTerminals?.(); terminalTool?.chooseCoil(coil); terminalTool?.next(); }} class="text-xs text-emerald-300 disabled:opacity-40" aria-label={`Edit coil ${coil} terminals`}>Edit terminals</button>
+                  <div class="flex gap-3">
+                    <button type="button" disabled={terminalTool?.active} onclick={() => { selection.setMode("pan"); onStartTerminals?.(coil); }} class="text-xs text-emerald-300 disabled:opacity-40" aria-label={`Edit coil ${coil} terminals`}>Edit terminals</button>
+                    {#if onGeometryChange}<button type="button" disabled={terminalTool?.active} onclick={() => { if (importedGeometry) onGeometryChange?.(assignCadTerminals(importedGeometry, coil, { input: terminals.output, output: terminals.input })); }} class="text-xs text-emerald-300 disabled:opacity-40" aria-label={`Flip coil ${coil} terminals`} title="Swap this coil's IN and OUT terminals.">Flip</button>{/if}
+                  </div>
                 </div>
               {/each}
             </section>
