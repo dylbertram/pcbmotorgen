@@ -34,7 +34,8 @@
 <script lang="ts">
   import type { ConfigStore } from "../../stores/config.svelte";
   import type { MotionStore } from "../../stores/motion.svelte";
-  import type { CoilPathDto } from "../../types";
+  import type { CadGeometry, CoilPathDto } from "../../types";
+  import { simplifyCadLines } from "../../cadSimplify";
   import {
     clientToVirtual,
     computePreviewGeometry,
@@ -73,8 +74,32 @@
     config,
     coils,
     motion,
-  }: { config: ConfigStore; coils: CoilPathDto | null; motion: MotionStore } =
+    importedGeometry = null,
+    onGeometryChange,
+  }: { config: ConfigStore; coils: CoilPathDto | null; motion: MotionStore; importedGeometry?: CadGeometry | null; onGeometryChange?: (geometry: CadGeometry) => void } =
     $props();
+
+  let beforeSimplify = $state.raw<CadGeometry | null>(null);
+  let simplifiedGeometry = $state.raw<CadGeometry | null>(null);
+  let canUndoSimplify = $derived(Boolean(beforeSimplify && importedGeometry === simplifiedGeometry));
+  let simplifyNotice = $state("");
+  function simplifyImportedLines(): void {
+    if (!importedGeometry || !onGeometryChange) return;
+    const simplified = simplifyCadLines(importedGeometry);
+    const removed = importedGeometry.routing.segments.length - simplified.routing.segments.length;
+    simplifyNotice = removed ? `${removed} line(s) merged. Save the project to keep this change.` : "No collinear lines to merge.";
+    if (!removed) return;
+    beforeSimplify = importedGeometry;
+    simplifiedGeometry = simplified;
+    onGeometryChange(simplified);
+  }
+  function undoSimplify(): void {
+    if (!canUndoSimplify || !beforeSimplify || !onGeometryChange) return;
+    onGeometryChange(beforeSimplify);
+    beforeSimplify = null;
+    simplifiedGeometry = null;
+    simplifyNotice = "Line simplification undone.";
+  }
 
   // Virtual drawing space. The CSS box keeps the same 760:260 aspect ratio as
   // the old SVG viewBox; every overlay (legend, disclaimer) is laid out in
@@ -510,6 +535,13 @@
 
   <!-- Zoom + reset view, pinned to the bottom-right of the preview. -->
   <div class="mt-2">
+    {#if importedGeometry && onGeometryChange}
+      <div class="mb-2 flex flex-wrap items-center gap-2" role="group" aria-label="Imported geometry tools">
+        <button type="button" onclick={simplifyImportedLines} class="rounded border border-slate-700 bg-slate-800 px-2 py-1 text-xs text-slate-300 hover:text-emerald-300" title="Merge collinear lines in saved and exported geometry">Simplify lines</button>
+        {#if canUndoSimplify}<button type="button" onclick={undoSimplify} class="px-2 py-1 text-xs text-slate-400 hover:text-slate-100">Undo simplify</button>{/if}
+        <span role="status" class="text-xs text-slate-400">{simplifyNotice}</span>
+      </div>
+    {/if}
     <CoilPreviewControls
       zoomLabel={gestures.zoomLabel}
       canZoomIn={gestures.canZoomIn}
@@ -538,6 +570,9 @@
       {view}
       {gestures}
       {measure}
+      onSimplify={importedGeometry && onGeometryChange ? simplifyImportedLines : undefined}
+      onUndoSimplify={canUndoSimplify ? undoSimplify : undefined}
+      {simplifyNotice}
       {stats}
       {uniquePhases}
       {uniqueLayers}

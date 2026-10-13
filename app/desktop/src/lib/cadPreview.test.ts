@@ -7,6 +7,27 @@ import {
 import type { CadGeometry } from "./types";
 
 describe("cadGeometryToPreview", () => {
+  it("keeps coils distinct even when their centerlines occupy the same copper plane", () => {
+    const geometry: CadGeometry = {
+      layer_z_mm: [-1.6, 0], trace_width_mm: 0.4,
+      routing: { format_version: 2, curves: [],
+        segments: ["A", "B", "C"].flatMap((net) => [0, 1].map((layer) => ({
+          start: { x: 0, y: 0 }, end: { x: 1, y: 0 }, net, layer, is_active: true,
+        }))),
+        vias: ["A", "B", "C"].map((net) => ({ position: { x: 1, y: 0 }, net, from_layer: 0, to_layer: 1 })),
+      },
+    };
+    const preview = cadGeometryToPreview(geometry);
+    expect(preview.phases).toHaveLength(6);
+    expect(new Set(preview.phases.map((coil) => coil.phase_idx)).size).toBe(3);
+    for (const coil of preview.phases) {
+      expect(coil.segments).toHaveLength(1);
+      expect(coil.via_positions).toHaveLength(1);
+    }
+    const shuffled = cadGeometryToPreview({ ...geometry, routing: { ...geometry.routing, segments: [...geometry.routing.segments].reverse() } });
+    expect(shuffled.phases.find((coil) => coil.phase_name === "A")?.phase_idx).toBe(0);
+    expect(shuffled.phases.find((coil) => coil.phase_name === "C")?.phase_idx).toBe(2);
+  });
   it("groups centerlines and preserves layer/net/via positions", () => {
     const geometry: CadGeometry = {
       layer_z_mm: [-0.8, 0.8],

@@ -5,7 +5,7 @@
 //! names carry the logical net and layer index as helpful metadata, but Z is
 //! the physical source of truth when importing.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 use pcbmotorgen_routing::{
     Point, RouteCurve, RouteSegment, RouteSpline, RoutingResult, SensorGeometry, Via,
@@ -20,6 +20,9 @@ pub struct CadGeometry {
     /// Copper plane heights in mm, indexed bottom-to-top.
     pub layer_z_mm: Vec<f64>,
     pub trace_width_mm: f64,
+    /// Original DXF layer names and their assigned coil/net identity.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub source_layer_coils: BTreeMap<String, String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -111,6 +114,7 @@ pub fn sensor_geometry_to_cad_geometry(sensor: &SensorGeometry) -> CadGeometry {
         routing,
         layer_z_mm: vec![-1.6, 0.0],
         trace_width_mm: sensor.nets[0].trace_width_mm,
+        source_layer_coils: BTreeMap::new(),
     }
 }
 
@@ -293,17 +297,31 @@ pub fn phase_coils_to_cad_geometry(
         routing,
         layer_z_mm,
         trace_width_mm,
+        source_layer_coils: BTreeMap::new(),
     };
     validate_geometry(&geometry)?;
     Ok(geometry)
 }
 
-/// Import 3D DXF lines and planar arcs as centerline geometry.
+/// Import DXF lines, classic/lightweight polylines, and planar curves as centerlines.
 ///
 /// Old app DXFs with 2D traces remain importable through their `L<idx>_<net>`
 /// layer names. 2D via circles are deliberately reported because they do not
 /// identify which copper planes the via connects.
 pub fn import_3d_dxf(text: &str, options: CadImportOptions) -> Result<CadImportResult, String> {
+    import_3d_dxf_with_coils(text, options, &BTreeMap::new())
+}
+
+/// Assign source DXF layers, including via layers, to coil identities.
+/// Copper planes still come from Z, or named layer indices for legacy 2D files.
+pub fn import_3d_dxf_with_coils(
+    text: &str,
+    options: CadImportOptions,
+    assignments: &BTreeMap<String, String>,
+) -> Result<CadImportResult, String> {
+    if assignments.values().any(|coil| coil.trim().is_empty()) {
+        return Err("Every source layer assignment needs a non-empty coil name".into());
+    }
     if !options.units_to_mm.is_finite() || options.units_to_mm <= 0.0 {
         return Err("DXF unit conversion must be a positive finite value".into());
     }
@@ -332,6 +350,23 @@ pub fn import_3d_dxf(text: &str, options: CadImportOptions) -> Result<CadImportR
         .filter(|width| width.is_finite() && *width > 0.0)
         .map(|width| width * options.units_to_mm);
     let entities = entities_section(&pairs)?;
+    let source_layer_coils = entities
+        .iter()
+        .filter(|e| {
+            matches!(
+                e.kind.as_str(),
+                "LINE" | "ARC" | "SPLINE" | "POLYLINE" | "LWPOLYLINE"
+            )
+        })
+        .map(|e| {
+            let name = field(e, 8).unwrap_or("0");
+            let coil = assignments
+                .get(name)
+                .map(|s| s.trim().to_string())
+                .unwrap_or_else(|| decode_trace_layer(name).0);
+            (name.to_string(), coil)
+        })
+        .collect::<BTreeMap<_, _>>();
     let mut warnings = Vec::new();
     let mut segments = Vec::new();
     let mut curves = Vec::new();
@@ -339,10 +374,105 @@ pub fn import_3d_dxf(text: &str, options: CadImportOptions) -> Result<CadImportR
     let mut vias = Vec::new();
     let mut legacy_circles = 0usize;
 
-    for entity in entities {
+    let mut entities = entities.into_iter().peekable();
+    while let Some(entity) = entities.next() {
         let name = field(&entity, 8).unwrap_or("0");
-        let (net, layer_hint) = decode_trace_layer(name);
+        let (default_net, layer_hint) = decode_trace_layer(name);
+        let net = source_layer_coils.get(name).cloned().unwrap_or(default_net);
         match entity.kind.as_str() {
+            "POLYLINE" => {
+                // Classic polylines store their points in following VERTEX
+                // entities, terminated by SEQEND. Consume the sequence even
+                // when unsupported so its records do not become extra warnings.
+                let mut vertices = Vec::new();
+                while entities.peek().is_some_and(|e| e.kind == "VERTEX") {
+                    vertices.push(entities.next().unwrap());
+                }
+                if !entities.peek().is_some_and(|e| e.kind == "SEQEND") {
+                    warnings.push(format!(
+                        "Skipped malformed DXF POLYLINE on layer '{name}': missing SEQEND."
+                    ));
+                    continue;
+                }
+                entities.next();
+                let flags = optional_number(&entity, 70).unwrap_or(0.0) as i32;
+                if flags & (2 | 4 | 16 | 32 | 64) != 0 {
+                    warnings.push(format!(
+                        "Skipped unsupported fitted or mesh DXF POLYLINE on layer '{name}'."
+                    ));
+                    continue;
+                }
+                if [(210, 0.0), (220, 0.0), (230, 1.0)]
+                    .iter()
+                    .any(|&(code, default)| {
+                        (optional_number(&entity, code).unwrap_or(default) - default).abs() > 1e-12
+                    })
+                {
+                    warnings.push(format!(
+                        "Skipped DXF POLYLINE with unsupported extrusion on layer '{name}'."
+                    ));
+                    continue;
+                }
+                if vertices.len() < 2 {
+                    warnings.push(format!(
+                        "Skipped malformed DXF POLYLINE on layer '{name}': fewer than two vertices."
+                    ));
+                    continue;
+                }
+                if vertices.iter().any(|v| {
+                    optional_number(v, 70).unwrap_or(0.0) as i32 & (1 | 2 | 8 | 16 | 64 | 128) != 0
+                        || optional_number(v, 42).unwrap_or(0.0).abs() > 1e-12
+                }) {
+                    warnings.push(format!(
+                        "Skipped unsupported fitted, mesh, or bulged DXF POLYLINE vertices on layer '{name}'."
+                    ));
+                    continue;
+                }
+                let elevation = optional_number(&entity, 30).unwrap_or(0.0);
+                let points = vertices
+                    .iter()
+                    .map(|v| {
+                        Ok((
+                            number(v, 10)? * options.units_to_mm,
+                            number(v, 20)? * options.units_to_mm,
+                            if flags & 8 != 0 {
+                                optional_number(v, 30).unwrap_or(0.0)
+                            } else {
+                                elevation
+                            } * options.units_to_mm,
+                        ))
+                    })
+                    .collect::<Result<Vec<_>, String>>()?;
+                let edge_count = points.len() - 1 + usize::from(flags & 1 != 0);
+                for i in 0..edge_count {
+                    let a = points[i];
+                    let b = points[(i + 1) % points.len()];
+                    let dz = b.2 - a.2;
+                    if (b.0 - a.0).hypot(b.1 - a.1) <= options.z_tolerance_mm
+                        && dz.abs() > options.z_tolerance_mm
+                    {
+                        vias.push(PendingVia {
+                            x: (a.0 + b.0) / 2.0,
+                            y: (a.1 + b.1) / 2.0,
+                            z0: a.2,
+                            z1: b.2,
+                            net: net.clone(),
+                        });
+                    } else if dz.abs() <= options.z_tolerance_mm {
+                        segments.push(PendingSegment {
+                            start: Point::new(a.0, a.1),
+                            end: Point::new(b.0, b.1),
+                            z: (a.2 + b.2) / 2.0,
+                            net: net.clone(),
+                            layer_hint,
+                        });
+                    } else {
+                        warnings.push(format!(
+                            "Skipped non-planar DXF POLYLINE segment on layer '{name}'."
+                        ));
+                    }
+                }
+            }
             "SPLINE" => {
                 let values = |code: i32| -> Result<Vec<f64>, String> {
                     entity
@@ -656,6 +786,7 @@ pub fn import_3d_dxf(text: &str, options: CadImportOptions) -> Result<CadImportR
         routing,
         layer_z_mm,
         trace_width_mm: embedded_width.unwrap_or(options.default_trace_width_mm),
+        source_layer_coils,
     };
     validate_geometry(&geometry)?;
     Ok(CadImportResult { geometry, warnings })
@@ -1061,6 +1192,7 @@ mod tests {
             },
             layer_z_mm: vec![-1.0],
             trace_width_mm: 0.15,
+            source_layer_coils: BTreeMap::new(),
         };
         let text = cad_geometry_to_3d_dxf(&geometry).unwrap();
         let imported = import_3d_dxf(
@@ -1115,6 +1247,7 @@ mod tests {
             routing,
             layer_z_mm: vec![-1.6, 0.0],
             trace_width_mm: 0.2,
+            source_layer_coils: BTreeMap::new(),
         }
     }
 
@@ -1218,6 +1351,224 @@ mod tests {
             imported.geometry.routing.segments[0].end,
             imported.geometry.routing.segments[1].start
         );
+    }
+
+    fn import_polyline_fixture(entities: &str) -> CadImportResult {
+        import_3d_dxf(
+            &format!("0\nSECTION\n2\nENTITIES\n{entities}0\nENDSEC\n0\nEOF\n"),
+            CadImportOptions {
+                units_to_mm: 2.0,
+                z_tolerance_mm: 0.001,
+                default_trace_width_mm: 0.4,
+                legacy_layer_count: 2,
+                legacy_pcb_thickness_mm: 1.6,
+            },
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn imports_rhino_two_point_classic_polyline_leads() {
+        // Minimal AcDb2dPolyline records matching the missing Rhino input leads.
+        let mut entities = String::new();
+        for (net, x) in [("A", "4.333333"), ("B", "6.333333")] {
+            entities.push_str(&format!(
+                "0\nPOLYLINE\n100\nAcDbEntity\n8\nL1_{net}\n100\nAcDb2dPolyline\n66\n1\n10\n0\n20\n0\n30\n0\n0\nVERTEX\n8\nL1_{net}\n100\nAcDbVertex\n100\nAcDb2dVertex\n10\n{x}\n20\n8\n30\n0\n0\nVERTEX\n8\nL1_{net}\n10\n{x}\n20\n8.444444\n30\n0\n0\nSEQEND\n8\nL1_{net}\n"
+            ));
+        }
+        let imported = import_polyline_fixture(&entities);
+        assert_eq!(imported.geometry.routing.segments.len(), 2);
+        for (segment, net, x) in [
+            (&imported.geometry.routing.segments[0], "A", 4.333333),
+            (&imported.geometry.routing.segments[1], "B", 6.333333),
+        ] {
+            assert_eq!(segment.net, net);
+            assert_eq!(segment.layer, 1);
+            assert_eq!(segment.start, Point::new(x * 2.0, 16.0));
+            assert_eq!(segment.end, Point::new(x * 2.0, 16.888888));
+        }
+        assert!(!imported.warnings.iter().any(|w| w.contains("unsupported")));
+    }
+
+    #[test]
+    fn assigns_nonstandard_trace_and_via_layers_to_separate_coils() {
+        let mut records = Vec::new();
+        for (coil, x) in [("A", 0.0), ("B", 2.0)] {
+            write_3d_line(
+                &mut records,
+                &format!("bottom-{coil}"),
+                (x, 0.0, -1.6),
+                (x, 1.0, -1.6),
+                true,
+            );
+            write_3d_line(
+                &mut records,
+                &format!("top-{coil}"),
+                (x, 1.0, 0.0),
+                (x, 2.0, 0.0),
+                true,
+            );
+            write_3d_line(
+                &mut records,
+                &format!("holes-{coil}"),
+                (x, 1.0, -1.6),
+                (x, 1.0, 0.0),
+                true,
+            );
+        }
+        let text = format!(
+            "0\nSECTION\n2\nENTITIES\n{}\n0\nENDSEC\n0\nEOF\n",
+            records.join("\n")
+        );
+        let assignments = BTreeMap::from([
+            ("bottom-A".into(), "A".into()),
+            ("top-A".into(), "A".into()),
+            ("holes-A".into(), "A".into()),
+            ("bottom-B".into(), "B".into()),
+            ("top-B".into(), "B".into()),
+            ("holes-B".into(), "B".into()),
+        ]);
+        let options = CadImportOptions {
+            units_to_mm: 1.0,
+            z_tolerance_mm: 0.01,
+            default_trace_width_mm: 0.4,
+            legacy_layer_count: 2,
+            legacy_pcb_thickness_mm: 1.6,
+        };
+        let imported = import_3d_dxf_with_coils(&text, options, &assignments).unwrap();
+        assert!(imported.warnings.is_empty());
+        assert_eq!(imported.geometry.routing.segments.len(), 4);
+        assert_eq!(imported.geometry.routing.vias.len(), 2);
+        assert_eq!(imported.geometry.source_layer_coils, assignments);
+        assert_eq!(
+            imported
+                .geometry
+                .routing
+                .segments
+                .iter()
+                .map(|s| s.net.as_str())
+                .collect::<Vec<_>>(),
+            vec!["A", "A", "B", "B"]
+        );
+        assert_eq!(imported.geometry.routing.vias[1].net, "B");
+        assert_eq!(imported.geometry.routing.vias[1].to_layer, 1);
+        let saved = serde_json::to_string(&imported.geometry).unwrap();
+        assert_eq!(
+            serde_json::from_str::<CadGeometry>(&saved).unwrap(),
+            imported.geometry
+        );
+        let mut legacy: serde_json::Value = serde_json::from_str(&saved).unwrap();
+        legacy.as_object_mut().unwrap().remove("source_layer_coils");
+        assert!(serde_json::from_value::<CadGeometry>(legacy)
+            .unwrap()
+            .source_layer_coils
+            .is_empty());
+        assert!(import_3d_dxf_with_coils(
+            &text,
+            options,
+            &BTreeMap::from([("top-A".into(), " ".into())])
+        )
+        .is_err());
+        let unassigned = import_3d_dxf(&text, options).unwrap();
+        assert_eq!(unassigned.geometry.routing.segments[0].net, "bottom-A");
+        assert_eq!(unassigned.geometry.routing.vias[0].net, "holes-A");
+    }
+
+    #[test]
+    fn standard_layer_names_preserve_coils_across_copper_planes_and_export() {
+        let imported = import_polyline_fixture("0\nLINE\n8\nL0_A\n10\n0\n20\n0\n30\n-1\n11\n1\n21\n0\n31\n-1\n0\nLINE\n8\nL1_A\n10\n1\n20\n0\n30\n0\n11\n2\n21\n0\n31\n0\n0\nLINE\n8\nVia_L0_L1_A\n10\n1\n20\n0\n30\n-1\n11\n1\n21\n0\n31\n0\n0\nLINE\n8\nL0_B\n10\n0\n20\n2\n30\n-1\n11\n1\n21\n2\n31\n-1\n");
+        assert!(imported.warnings.is_empty());
+        assert_eq!(imported.geometry.source_layer_coils["Via_L0_L1_A"], "A");
+        assert_eq!(imported.geometry.source_layer_coils["L0_B"], "B");
+        assert_eq!(imported.geometry.routing.segments[2].net, "B");
+        let exported = cad_geometry_to_3d_dxf(&imported.geometry).unwrap();
+        assert!(exported.contains("L0_B"));
+        assert!(exported.contains("Via_L0_L1_A"));
+    }
+
+    #[test]
+    fn imports_closed_classic_polyline_with_header_elevation() {
+        let imported = import_polyline_fixture("0\nPOLYLINE\n8\nL0_A\n70\n1\n30\n0.5\n0\nVERTEX\n10\n0\n20\n0\n30\n0\n0\nVERTEX\n10\n1\n20\n0\n0\nVERTEX\n10\n1\n20\n1\n0\nSEQEND\n0\nLINE\n8\nL1_B\n10\n0\n20\n2\n30\n1\n11\n1\n21\n2\n31\n1\n");
+        assert_eq!(imported.geometry.routing.segments.len(), 4);
+        assert_eq!(imported.geometry.layer_z_mm, vec![-1.0, 0.0]);
+        assert_eq!(
+            imported.geometry.routing.segments[2].end,
+            imported.geometry.routing.segments[0].start
+        );
+        assert!(imported.warnings.is_empty());
+    }
+
+    #[test]
+    fn imports_3d_polyline_traces_and_vertical_via() {
+        let imported = import_polyline_fixture("0\nPOLYLINE\n8\nL0_A\n70\n8\n0\nVERTEX\n70\n32\n10\n0\n20\n0\n30\n0\n0\nVERTEX\n70\n32\n10\n1\n20\n0\n30\n0\n0\nVERTEX\n70\n32\n10\n1\n20\n0\n30\n1\n0\nVERTEX\n70\n32\n10\n2\n20\n0\n30\n1\n0\nSEQEND\n");
+        assert_eq!(imported.geometry.routing.segments.len(), 2);
+        assert_eq!(imported.geometry.routing.vias.len(), 1);
+        assert_eq!(imported.geometry.layer_z_mm, vec![-2.0, 0.0]);
+        assert_eq!(imported.geometry.routing.segments[1].layer, 1);
+        assert_eq!(
+            imported.geometry.routing.vias[0].position,
+            Point::new(2.0, 0.0)
+        );
+        assert!(
+            imported.warnings.iter().all(|w| w.contains("layer name")),
+            "{:?}",
+            imported.warnings
+        );
+    }
+
+    #[test]
+    fn unsupported_classic_polylines_warn_once_and_preserve_following_line() {
+        for extra in ["70\n16\n", "70\n64\n", "70\n2\n", "210\n1\n230\n0\n"] {
+            let imported = import_polyline_fixture(&format!("0\nPOLYLINE\n8\nL1_A\n{extra}0\nVERTEX\n10\n0\n20\n0\n0\nVERTEX\n10\n1\n20\n0\n0\nSEQEND\n0\nLINE\n8\nL1_A\n10\n0\n20\n0\n30\n1\n11\n1\n21\n0\n31\n1\n"));
+            assert_eq!(imported.geometry.routing.segments.len(), 1);
+            assert_eq!(
+                imported
+                    .warnings
+                    .iter()
+                    .filter(|w| w.contains("POLYLINE"))
+                    .count(),
+                1
+            );
+            assert!(!imported
+                .warnings
+                .iter()
+                .any(|w| w.contains("VERTEX") || w.contains("SEQEND entity")));
+        }
+    }
+
+    #[test]
+    fn reports_sloped_3d_polyline_edges_without_flattening_them() {
+        let imported = import_polyline_fixture("0\nPOLYLINE\n8\nA\n70\n8\n0\nVERTEX\n10\n0\n20\n0\n30\n0\n0\nVERTEX\n10\n1\n20\n0\n30\n1\n0\nVERTEX\n10\n2\n20\n0\n30\n1\n0\nSEQEND\n");
+        assert_eq!(imported.geometry.routing.segments.len(), 1);
+        assert!(imported.geometry.routing.vias.is_empty());
+        assert_eq!(
+            imported.geometry.routing.segments[0].start,
+            Point::new(2.0, 0.0)
+        );
+        assert_eq!(
+            imported.warnings,
+            vec!["Skipped non-planar DXF POLYLINE segment on layer 'A'."]
+        );
+    }
+
+    #[test]
+    fn malformed_and_bulged_polylines_do_not_swallow_following_geometry() {
+        for vertices in [
+            "0\nVERTEX\n10\n0\n20\n0\n0\nVERTEX\n10\n1\n20\n0\n", // No SEQEND.
+            "0\nVERTEX\n10\n0\n20\n0\n0\nSEQEND\n",               // Too few points.
+            "0\nVERTEX\n10\n0\n20\n0\n42\n1\n0\nVERTEX\n10\n1\n20\n0\n0\nSEQEND\n",
+        ] {
+            let imported = import_polyline_fixture(&format!("0\nPOLYLINE\n8\nL1_A\n{vertices}0\nLINE\n8\nL1_A\n10\n0\n20\n0\n30\n1\n11\n1\n21\n0\n31\n1\n"));
+            assert_eq!(imported.geometry.routing.segments.len(), 1);
+            assert_eq!(
+                imported
+                    .warnings
+                    .iter()
+                    .filter(|w| w.contains("POLYLINE"))
+                    .count(),
+                1
+            );
+        }
     }
 
     #[test]

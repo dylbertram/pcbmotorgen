@@ -2,7 +2,7 @@
 
 use crate::ipc::*;
 use pcbmotorgen_export::cad_dxf::{
-    cad_geometry_to_3d_dxf, import_3d_dxf, phase_coils_to_cad_geometry,
+    cad_geometry_to_3d_dxf, import_3d_dxf_with_coils, phase_coils_to_cad_geometry,
     sensor_geometry_to_cad_geometry, CadGeometry, CadImportOptions,
 };
 use pcbmotorgen_routing::SensorConfig;
@@ -150,7 +150,7 @@ mod sensor_tests {
         assert_eq!(result.summary.total_arcs, 2);
         assert_eq!(result.summary.total_circles, 0);
         assert_eq!(result.summary.layer_count, 9);
-        let imported = import_3d_dxf(
+        let imported = pcbmotorgen_export::cad_dxf::import_3d_dxf(
             &result.dxf_content,
             CadImportOptions {
                 units_to_mm: 1.0,
@@ -178,11 +178,12 @@ pub async fn import_cad_dxf(
     default_trace_width_mm: f64,
     legacy_layer_count: u32,
     legacy_pcb_thickness_mm: f64,
+    source_layer_coils: Option<std::collections::BTreeMap<String, String>>,
 ) -> Result<pcbmotorgen_export::cad_dxf::CadImportResult, String> {
     tauri::async_runtime::spawn_blocking(move || {
         let text = std::fs::read_to_string(&path)
             .map_err(|e| format!("could not read CAD file \"{path}\": {e}"))?;
-        import_3d_dxf(
+        import_3d_dxf_with_coils(
             &text,
             CadImportOptions {
                 units_to_mm,
@@ -191,6 +192,7 @@ pub async fn import_cad_dxf(
                 legacy_layer_count,
                 legacy_pcb_thickness_mm,
             },
+            &source_layer_coils.unwrap_or_default(),
         )
         .map_err(|e| format!("DXF import failed: {e}"))
     })
