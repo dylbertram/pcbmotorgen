@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { gotoDesignApp } from "./helpers";
+import { fileURLToPath } from "node:url";
 
 test.beforeEach(async ({ page }) => {
   await page.route(/\/src\/lib\/ipc\/project\.ts(?:\?t=\d+)?$/, async route => {
@@ -21,6 +22,42 @@ async function settings(page: Page) {
   await expect(dialog).toBeVisible();
   return dialog;
 }
+
+test("KiCad rules import previews supported limits and only applies on save", async ({ page }) => {
+  await gotoDesignApp(page);
+  let dialog = await settings(page);
+  const example = fileURLToPath(new URL("./fixtures/pcbway.kicad_dru", import.meta.url));
+  await dialog.getByLabel("Import KiCad DRC rules (.kicad_dru)").setInputFiles(example);
+  await expect(dialog.getByRole("status")).toContainText("Imported pcbway.kicad_dru");
+  await expect(dialog.getByLabel("Minimum via drill (mm)")).toHaveValue("0.3");
+  await expect(dialog.getByLabel("Minimum via annular ring (mm)")).toHaveValue("0.1");
+  await expect(dialog.getByRole("list", { name: "Import limitations" })).toContainText("Skipped conditional");
+  await dialog.getByRole("button", { name: "Cancel" }).click();
+  await expect(page.getByLabel("Unsaved changes", { exact: true })).toHaveCount(0);
+  dialog = await settings(page);
+  await expect(dialog.getByLabel("Minimum via drill (mm)")).toHaveValue("0.2");
+  await dialog.getByLabel("Import KiCad DRC rules (.kicad_dru)").setInputFiles(example);
+  await expect(dialog.getByLabel("Minimum via drill (mm)")).toHaveValue("0.3");
+  await dialog.getByRole("button", { name: "Save settings" }).click();
+  await expect(page.getByLabel("Unsaved changes", { exact: true })).toBeVisible();
+  await page.reload();
+  dialog = await settings(page);
+  await expect(dialog.getByLabel("Minimum via drill (mm)")).toHaveValue("0.3");
+});
+
+test("invalid rules leave draft limits intact and can be retried", async ({ page }) => {
+  await gotoDesignApp(page);
+  const dialog = await settings(page);
+  await dialog.getByLabel("Minimum clearance (mm)").fill("0.25");
+  const upload = dialog.getByLabel("Import KiCad DRC rules (.kicad_dru)");
+  await upload.setInputFiles({ name: "invalid.kicad_dru", mimeType: "text/plain", buffer: Buffer.from("(version 1) (rule") });
+  await expect(dialog.getByRole("alert")).toContainText("Could not import rules");
+  await expect(dialog.getByLabel("Minimum clearance (mm)")).toHaveValue("0.25");
+  await upload.setInputFiles({ name: "valid.kicad_dru", mimeType: "text/plain", buffer: Buffer.from('(version 1) (rule "clearance" (constraint clearance (min .2mm)))') });
+  await expect(dialog.getByRole("alert")).toHaveCount(0);
+  await expect(dialog.getByLabel("Minimum clearance (mm)")).toHaveValue("0.2");
+  await expect(dialog.getByLabel("Minimum via drill (mm)")).toHaveValue("0.2");
+});
 
 test("appearance saves, persists, and follows system changes in Auto", async ({ page }, testInfo) => {
   await page.emulateMedia({ colorScheme: "dark" });

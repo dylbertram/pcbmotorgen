@@ -6,12 +6,8 @@
   let { config }: { config: ConfigStore } = $props();
 </script>
 
-<details open class="overflow-hidden rounded-md border border-slate-700 bg-slate-800/30">
-  <summary class="cursor-pointer px-3 py-2 marker:text-slate-500 hover:text-emerald-300">
-    <span class="flex items-center justify-between gap-2">
-      <h3 class="text-xs font-semibold uppercase tracking-wider text-slate-200">Drive &amp; Force Targets</h3>
-    </span>
-  </summary>
+<section aria-labelledby="drive-targets-heading" class="overflow-hidden rounded-md border border-slate-700 bg-slate-800/30">
+  <h3 id="drive-targets-heading" class="px-3 py-2 text-xs font-semibold uppercase tracking-wider text-slate-200">Drive &amp; Force Targets</h3>
 
   <Separator />
 
@@ -78,4 +74,4 @@
       </label>
     </div>
   </div>
-</details>
+</section>

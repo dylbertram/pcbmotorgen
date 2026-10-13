@@ -153,5 +153,10 @@ test.describe("Design constraints restructure", () => {
     await expect(
       page.locator("#panel-simulate").getByText("Drive & Force Targets", { exact: true }),
     ).toBeVisible();
+    const targets = page.getByRole("region", { name: "Drive & Force Targets" });
+    await expect(targets.locator("summary")).toHaveCount(0);
+    await targets.getByRole("heading").click();
+    await expect(targets.getByRole("spinbutton", { name: "Phase current (A)", exact: true })).toBeVisible();
+    await expect(targets.getByRole("spinbutton", { name: "Continuous target force (N)", exact: true })).toBeVisible();
   }, { tag: ["@constraints", "@desktop"] });
 });

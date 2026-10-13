@@ -4,6 +4,7 @@
   import type { ConfigStore } from "../../stores/config.svelte";
   import { DEFAULT_RULES, RULE_FIELDS, readPreferences, writePreferences, validRules, type Appearance, type DrcRules } from "../../preferences";
   import { attachBackdropScrollGuard, lockPageScroll } from "../../utils/pageScrollLock";
+  import { importKicadDrc } from "../../kicadDrc";
 
   let { config, disabled = false, onClose }: { config: ConfigStore; disabled?: boolean; onClose: () => void } = $props();
   let open = $state(true);
@@ -15,6 +16,9 @@
     min_via_annular_ring_mm: config.min_via_annular_ring_mm,
   })));
   let error = $state<string | null>(null);
+  let importing = $state(false);
+  let importName = $state<string | null>(null);
+  let importWarnings = $state<string[]>([]);
   let valid = $derived(validRules(rules));
   let backdropRef = $state<HTMLDivElement | null>(null);
   let panelRef = $state<HTMLDivElement | null>(null);
@@ -27,9 +31,32 @@
     return () => { detach(); unlock(); };
   });
 
+  async function uploadRules(event: Event): Promise<void> {
+    const input = event.currentTarget as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file || disabled || importing) return;
+    importing = true;
+    error = null;
+    importName = null;
+    importWarnings = [];
+    try {
+      if (!file.name.toLowerCase().endsWith(".kicad_dru")) throw new Error("Choose a .kicad_dru rules file.");
+      if (file.size > 1024 * 1024) throw new Error("Rules files must be smaller than 1 MB.");
+      const imported = importKicadDrc(await file.text(), rules);
+      rules = { ...rules, ...imported.rules };
+      importName = file.name;
+      importWarnings = imported.warnings;
+    } catch (reason) {
+      error = `Could not import rules. ${reason instanceof Error ? reason.message : String(reason)}`;
+    } finally {
+      importing = false;
+      input.value = "";
+    }
+  }
+
   function save(event: SubmitEvent): void {
     event.preventDefault();
-    if (!valid || disabled) return;
+    if (!valid || disabled || importing) return;
     try {
       writePreferences({ appearance, rules: { ...rules } });
       Object.assign(config, rules);
@@ -63,9 +90,19 @@
             <p class="mt-2 text-xs text-slate-400">Auto follows your system's light or dark appearance.</p>
           </fieldset>
 
-          <fieldset disabled={disabled}>
+          <fieldset disabled={disabled || importing}>
             <legend class="text-sm font-semibold">DRC rules</legend>
             <p class="mb-4 mt-2 text-xs leading-relaxed text-slate-400">Applied to the current motor design and saved as defaults for new designs. Opened projects keep their saved rules. These values also control routing and via sizing.</p>
+            <label for="settings-kicad-rules" class="block text-xs text-slate-300">Import KiCad DRC rules (.kicad_dru)</label>
+            <input id="settings-kicad-rules" type="file" accept=".kicad_dru" onchange={uploadRules} class="mt-2 block w-full min-w-0 text-xs text-slate-300 file:mr-3 file:rounded-md file:border file:border-slate-700 file:bg-slate-800 file:px-3 file:py-2 file:text-slate-200" />
+            <p class="mb-4 mt-2 text-xs text-slate-400">Imports supported minimum limits only, not full KiCad DRC checks. Review the values, then save to apply them.</p>
+            {#if importing}<p role="status" class="mb-3 text-xs text-slate-400">Reading rules file...</p>{/if}
+            {#if importName}
+              <p role="status" class="mb-2 break-words text-xs text-emerald-300">Imported {importName}. Review the limits below before saving.</p>
+              <ul aria-label="Import limitations" class="mb-4 list-disc space-y-1 pl-4 text-xs text-amber-200">
+                {#each importWarnings as warning (warning)}<li>{warning}</li>{/each}
+              </ul>
+            {/if}
             <div class="space-y-3">
               {#each RULE_FIELDS as field (field.key)}
                 <div class="flex items-center justify-between gap-3">
@@ -74,14 +111,14 @@
                 </div>
               {/each}
             </div>
-            <button type="button" onclick={() => { rules = { ...DEFAULT_RULES }; }} class="mt-4 text-xs text-slate-400 underline decoration-slate-600 underline-offset-4 hover:text-slate-200">Restore default rules</button>
+            <button type="button" onclick={() => { rules = { ...DEFAULT_RULES }; importName = null; importWarnings = []; error = null; }} class="mt-4 text-xs text-slate-400 underline decoration-slate-600 underline-offset-4 hover:text-slate-200">Restore default rules</button>
             {#if !valid}<p class="mt-3 text-xs text-rose-300" role="alert">Enter a positive number for every rule.</p>{/if}
           </fieldset>
           {#if error}<p role="alert" class="text-xs text-rose-300">{error}</p>{/if}
         </div>
         <footer class="flex shrink-0 justify-end gap-2 border-t border-slate-700 px-5 py-3">
           <Dialog.Close class="rounded-md border border-slate-700 px-4 py-2 text-xs text-slate-300 hover:bg-slate-800">Cancel</Dialog.Close>
-          <button type="submit" disabled={!valid || disabled} class="rounded-md border border-emerald-500/40 bg-emerald-600/20 px-4 py-2 text-xs font-medium text-emerald-300 hover:bg-emerald-600/30 disabled:opacity-50">Save settings</button>
+          <button type="submit" disabled={!valid || disabled || importing} class="rounded-md border border-emerald-500/40 bg-emerald-600/20 px-4 py-2 text-xs font-medium text-emerald-300 hover:bg-emerald-600/30 disabled:opacity-50">Save settings</button>
         </footer>
       </form>
     </Dialog.Content>

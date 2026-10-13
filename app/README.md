@@ -10,6 +10,18 @@ design and uses them for new designs. Opened projects retain their saved rules.
 Rule changes update routing, DRC, and export together, and mark a saved design
 as edited. Cancel leaves appearance and rules unchanged.
 
+Use **Import KiCad DRC rules** in Settings to upload a `.kicad_dru` file.
+Review the imported values and limitations, then save to apply them. The importer
+reads minimum trace width, clearance, via drill, annular width, and via diameter
+in mm, mil, or inches. Via diameter is converted to annular ring width using the
+imported or current minimum drill.
+
+The app uses uniform limits, so it takes the strictest imported minimum across
+layers. Only unconditional rules and simple track-only or via-only conditions
+are imported. Other conditions, unsupported checks, and maximum or preferred
+values are reported but not applied. This does not run KiCad's full DRC engine.
+Fields absent from the file keep their current values.
+
 ## Project versions
 
 Each `.pmproj` file stores all of its saved design versions, including motor
