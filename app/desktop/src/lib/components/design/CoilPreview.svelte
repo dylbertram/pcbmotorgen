@@ -234,9 +234,10 @@
           g.magnetTop,
           0.003,
         ),
-        view.showPolePitch ? poleRuler : null,
-        view.showBandWidths ? bandRows : [],
-        view.showPoleRegions ? visiblePoleRegionZones : [],
+        // Keep the camera independent of overlay visibility and phase selection.
+        poleRuler,
+        bandRows,
+        poleRegionZones,
         g.boardRect.y,
         g.boardRect.y + g.boardRect.h,
       );
@@ -538,7 +539,6 @@
       {gestures}
       {measure}
       {stats}
-      {oneSectionConductorCount}
       {uniquePhases}
       {uniqueLayers}
       {hasPolePitchData}
