@@ -4,6 +4,11 @@ import { gotoDesignApp } from "./helpers";
 // Exercise the real dialog, store and preview with a deterministic IPC boundary.
 // Parsing and coil assignments themselves are covered by Rust DXF fixtures.
 test.beforeEach(async ({ page }) => {
+  await page.route(/\/@tauri-apps_plugin-dialog\.js(?:\?.*)?$/, async route => {
+    const response = await route.fetch();
+    const body = (await response.text()).replace(/async function confirm\(message2, options\) \{[\s\S]*?\n\}/, "async function confirm() { return window.__cadConfirmResult ?? false; }");
+    await route.fulfill({ response, body });
+  });
   await page.route(/\/src\/lib\/ipc\/project\.ts(?:\?t=\d+)?$/, async route => {
     const response = await route.fetch();
     const body = (await response.text()).replace("export async function bindProjectMenuActions(handlers) {", `export async function bindProjectMenuActions(handlers) {
@@ -27,6 +32,7 @@ test.beforeEach(async ({ page }) => {
         },
       }};
     }`);
+    body = body.replace(/export async function editableCoilGeometry\([\s\S]*?\n\}/, "export async function editableCoilGeometry() { return (await importCadDxf('', 1, .05, .4, 2, 1.6)).geometry; }");
     await route.fulfill({ response, body });
   });
 });
@@ -129,21 +135,21 @@ async function openImport(page: Page) {
 
 test("source-layer assignments preserve coil visibility and import simplification is reversible", async ({ page }, testInfo) => {
   const dialog = await openImport(page);
-  const summary = dialog.getByText(/\d+ line\(s\),/);
-  await expect(summary).toContainText("4 line(s)");
+  const summary = dialog.getByText(/\d+ lines,/);
+  await expect(summary).toContainText("4 lines");
   await expect(dialog.getByRole("checkbox", { name: "Simplify collinear lines on import" })).not.toBeChecked();
   await dialog.getByLabel("Coil for source layer holes").fill("A");
   await expect(dialog.getByRole("checkbox", { name: "Coil holes", exact: true })).toHaveCount(0);
-  const preview = dialog.locator('svg[aria-hidden="true"]');
+  const preview = dialog.locator('div[role="img"][aria-label="CAD import preview"] > svg');
   expect(await preview.locator("path").evaluateAll(paths => new Set(paths.map(p => p.getAttribute("stroke"))).size)).toBe(2);
   await dialog.getByRole("checkbox", { name: "Coil B", exact: true }).uncheck();
   await expect(preview.locator("path")).toHaveCount(2);
   await dialog.getByRole("checkbox", { name: "Coil B", exact: true }).check();
   await dialog.getByRole("checkbox", { name: "Simplify collinear lines on import" }).check();
-  await expect(summary).toContainText("2 line(s)");
+  await expect(summary).toContainText("2 lines");
   await page.screenshot({ path: testInfo.outputPath("cad-layer-assignments.png") });
   await dialog.getByRole("checkbox", { name: "Simplify collinear lines on import" }).uncheck();
-  await expect(summary).toContainText("4 line(s)");
+  await expect(summary).toContainText("4 lines");
   await dialog.getByLabel("Coil for source layer L0_B").fill("");
   await expect(dialog.getByRole("alert").filter({ hasText: "coil name" })).toBeVisible();
   await expect(dialog.getByRole("button", { name: "Open with this geometry" })).toHaveCount(0);
@@ -160,10 +166,146 @@ test("imported motor preview simplifies saved geometry and supports undo beside 
   await page.getByRole("button", { name: "Expand coil preview" }).click();
   const tools = page.getByRole("toolbar", { name: "Coil preview tools" });
   await tools.getByRole("button", { name: "Simplify lines", exact: true }).click();
-  await expect(tools.getByRole("status")).toContainText("2 line(s) merged");
+  await expect(tools.getByRole("status").filter({ hasText: "merged" })).toContainText("2 line(s) merged");
   await page.screenshot({ path: testInfo.outputPath("cad-simplify-toolbar.png") });
   await tools.getByRole("button", { name: "Undo simplify" }).click();
-  await expect(tools.getByRole("status")).toContainText("undone");
+  await expect(tools.getByRole("status").filter({ hasText: "undone" })).toBeVisible();
   await tools.getByRole("button", { name: "Simplify lines", exact: true }).click();
-  await expect(tools.getByRole("status")).toContainText("2 line(s) merged");
+  await expect(tools.getByRole("status").filter({ hasText: "merged" })).toContainText("2 line(s) merged");
+});
+
+async function tracePoint(page: Page, x: number, y: number) {
+  return await page.getByRole("listbox", { name: "Segment selection preview" }).locator("svg > g").evaluate((group, point) => {
+    const matrix = (group as SVGGraphicsElement).getScreenCTM()!;
+    const screen = new DOMPoint(point.x, point.y).matrixTransform(matrix);
+    return { x: screen.x, y: screen.y };
+  }, { x, y });
+}
+
+async function clickTrace(page: Page, x: number, y: number, shift = false) {
+  const point = await tracePoint(page, x, y);
+  if (shift) await page.keyboard.down("Shift");
+  await page.mouse.click(point.x, point.y);
+  if (shift) await page.keyboard.up("Shift");
+}
+
+async function dragBox(page: Page, a: [number, number], b: [number, number]) {
+  const start = await tracePoint(page, ...a), end = await tracePoint(page, ...b);
+  await page.mouse.move(start.x, start.y); await page.mouse.down();
+  await page.mouse.move(end.x, end.y, { steps: 8 }); await page.mouse.up();
+}
+
+test("import selection toggles segments, reassigns coil and layer, and supports undo", async ({ page }, testInfo) => {
+  const dialog = await openImport(page);
+  const tools = dialog.getByRole("group", { name: "Segment selection tools" });
+  await tools.getByRole("button", { name: "Select", exact: true }).click();
+  await clickTrace(page, .5, 0); await clickTrace(page, 1.5, 0, true);
+  await expect(tools).toContainText("2 selected");
+  await clickTrace(page, .5, 0, true);
+  await expect(tools).toContainText("1 selected");
+  await tools.getByLabel("Assign selected segments to coil").fill("C");
+  await tools.getByLabel("Assign selected segments to layer").selectOption("1");
+  await tools.getByRole("button", { name: "Assign", exact: true }).click();
+  await expect(dialog.getByRole("checkbox", { name: "Coil C", exact: true })).toBeVisible();
+  await expect(dialog.getByRole("option", { name: /Segment 2, coil C, layer 1/ })).toHaveCount(1);
+  await page.screenshot({ path: testInfo.outputPath("cad-segment-selection.png") });
+  await tools.getByRole("button", { name: "Undo assignment" }).click();
+  await expect(dialog.getByRole("checkbox", { name: "Coil C", exact: true })).toHaveCount(0);
+  await expect(dialog.getByRole("option", { name: /Segment 2, coil A, layer 0/ })).toHaveCount(1);
+});
+
+test("chain assignments persist into the motor preview and selection tools work there too", async ({ page }, testInfo) => {
+  const dialog = await openImport(page);
+  const tools = dialog.getByRole("group", { name: "Segment selection tools" });
+  await tools.getByRole("button", { name: "Chain", exact: true }).click();
+  await clickTrace(page, .5, 0); await clickTrace(page, 1.5, 0);
+  await expect(tools).toContainText("2 selected");
+  await tools.getByLabel("Assign selected segments to coil").fill("D");
+  await tools.getByRole("button", { name: "Assign", exact: true }).click();
+  await dialog.getByRole("button", { name: "Open with this geometry" }).click();
+  await page.getByRole("button", { name: "Expand coil preview" }).click();
+  const modalTools = page.getByRole("group", { name: "Segment selection tools" });
+  await modalTools.getByRole("button", { name: "Chain", exact: true }).click();
+  await clickTrace(page, .5, 0); await clickTrace(page, 1.5, 0);
+  await expect(modalTools).toContainText("2 selected");
+  await modalTools.getByLabel("Assign selected segments to coil").fill("E");
+  await modalTools.getByLabel("Assign selected segments to layer").selectOption("1");
+  await modalTools.getByRole("button", { name: "Assign", exact: true }).click();
+  await expect(page.getByRole("option", { name: /Segment 1, coil E, layer 1/ })).toHaveCount(1);
+  await page.screenshot({ path: testInfo.outputPath("coil-segment-selection.png") });
+  await page.getByRole("button", { name: "Close coil preview" }).click();
+  await page.getByRole("button", { name: "Expand coil preview" }).click();
+  await page.getByRole("group", { name: "Segment selection tools" }).getByRole("button", { name: "Select", exact: true }).click();
+  await expect(page.getByRole("option", { name: /Segment 1, coil E, layer 1/ })).toHaveCount(1);
+});
+
+test("box selection supports crossing, contained, add and remove without moving the preview", async ({ page }) => {
+  const dialog = await openImport(page);
+  const tools = dialog.getByRole("group", { name: "Segment selection tools" });
+  await tools.getByRole("button", { name: "Box", exact: true }).click();
+  await dragBox(page, [.1, -.1], [1.1, .1]);
+  await expect(tools).toContainText("2 selected");
+  await tools.getByLabel("Box coverage").selectOption({ label: "Contained" });
+  await dragBox(page, [-.1, -.1], [1.1, .1]);
+  await expect(tools).toContainText("1 selected");
+  await tools.getByLabel("Box selection action").selectOption("add");
+  await dragBox(page, [.9, -.1], [2.1, .1]);
+  await expect(tools).toContainText("2 selected");
+  await tools.getByLabel("Box selection action").selectOption("remove");
+  await dragBox(page, [-.1, -.1], [1.1, .1]);
+  await expect(tools).toContainText("1 selected");
+  const preview = dialog.getByRole("region", { name: "CAD import preview" });
+  const before = await preview.boundingBox();
+  await dialog.getByLabel("Import settings").evaluate((element) => element.scrollTo(0, element.scrollHeight));
+  expect(await preview.boundingBox()).toEqual(before);
+  expect(await dialog.evaluate((element) => element.scrollHeight <= element.clientHeight)).toBe(true);
+});
+
+test("keyboard selection and short tooltips work at mobile size", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const dialog = await openImport(page);
+  const tools = dialog.getByRole("group", { name: "Segment selection tools" });
+  await tools.getByRole("button", { name: "Select", exact: true }).click();
+  const preview = page.getByRole("listbox", { name: "Segment selection preview" });
+  await preview.focus(); await page.keyboard.press("ArrowRight"); await page.keyboard.press("Enter");
+  await page.keyboard.press("ArrowRight"); await page.keyboard.press("Shift+Enter");
+  await expect(tools).toContainText("2 selected");
+  await page.keyboard.press("Shift+Enter"); await expect(tools).toContainText("1 selected");
+  await page.keyboard.press("Escape"); await expect(tools).toContainText("0 selected");
+  const titles = await dialog.locator("[title]").evaluateAll((elements) => elements.map((e) => e.getAttribute("title")!));
+  expect(titles.every((title) => title.length <= 140)).toBe(true);
+  expect(await dialog.evaluate((element) => element.scrollWidth <= element.clientWidth && element.scrollHeight <= element.clientHeight)).toBe(true);
+});
+
+test("reimport waits for confirmation before discarding segment assignments", async ({ page }) => {
+  const dialog = await openImport(page);
+  const tools = dialog.getByRole("group", { name: "Segment selection tools" });
+  await tools.getByRole("button", { name: "Select", exact: true }).click();
+  await clickTrace(page, .5, 0);
+  await tools.getByLabel("Assign selected segments to coil").fill("C");
+  await tools.getByRole("button", { name: "Assign", exact: true }).click();
+  await dialog.getByLabel("Trace width (mm)", { exact: true }).fill("0.5");
+  await expect(dialog.getByRole("button", { name: "Reimport", exact: true })).toBeVisible();
+  await dialog.getByRole("button", { name: "Reimport", exact: true }).click();
+  await expect(dialog.getByRole("checkbox", { name: "Coil C", exact: true })).toBeVisible();
+  await page.evaluate(() => { (window as any).__cadConfirmResult = true; });
+  await dialog.getByRole("button", { name: "Reimport", exact: true }).click();
+  await expect(dialog.getByRole("checkbox", { name: "Coil C", exact: true })).toHaveCount(0);
+  await expect(tools).toContainText("0 selected");
+  await expect(dialog.getByRole("button", { name: "Open with this geometry" })).toBeVisible();
+});
+
+test("generated motor geometry becomes editable only after confirmation", async ({ page }) => {
+  await gotoDesignApp(page);
+  await page.getByRole("button", { name: "Expand coil preview" }).click();
+  const tools = page.getByRole("toolbar", { name: "Coil preview tools" });
+  await tools.getByRole("button", { name: "Edit segments", exact: true }).click();
+  await expect(tools.getByRole("button", { name: "Edit segments", exact: true })).toBeEnabled();
+  await expect(page.getByRole("group", { name: "Segment selection tools" })).toHaveCount(0);
+  await page.evaluate(() => { (window as any).__cadConfirmResult = true; });
+  await tools.getByRole("button", { name: "Edit segments", exact: true }).click();
+  const selection = page.getByRole("group", { name: "Segment selection tools" });
+  await expect(selection.getByRole("button", { name: "Select", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await clickTrace(page, .5, 0);
+  await expect(selection).toContainText("1 selected");
 });

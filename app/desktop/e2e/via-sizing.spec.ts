@@ -35,6 +35,7 @@ test("CAD import shares the same via sizing guide and help", async ({ page }) =>
   await page.goto("/");
   await page.getByRole("dialog", { name: "Recent projects" }).getByRole("button", { name: "Import CAD" }).click();
   const dialog = page.getByRole("dialog", { name: "Import CAD" });
+  await dialog.getByText("Via sizes", { exact: true }).click();
   await dialog.getByRole("textbox", { name: "Via hole size (mm)", exact: true }).fill("0.2");
   await dialog.getByRole("textbox", { name: "Annular ring width (mm)", exact: true }).fill("0.075");
   const guide = dialog.getByRole("figure", { name: "Via sizing guide" });

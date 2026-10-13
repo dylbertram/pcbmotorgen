@@ -78,6 +78,7 @@ fn main() {
             commands::dxf::export_sensor_dxf,
             commands::dxf::import_cad_dxf,
             commands::dxf::export_cad_geometry_dxf,
+            commands::dxf::editable_coil_geometry,
             commands::project::save_project,
             commands::project::relocate_project,
             commands::project::load_project,

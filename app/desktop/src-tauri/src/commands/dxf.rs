@@ -35,6 +35,23 @@ pub struct DxfExportSummary {
     pub layer_count: u32,
 }
 
+/// Freeze generated routing as editable centerlines using the same conversion as DXF export.
+#[tauri::command]
+pub async fn editable_coil_geometry(config: LinearMotorConfigIpc) -> Result<CadGeometry, String> {
+    let core = config.to_core();
+    tauri::async_runtime::spawn_blocking(move || {
+        let coils = core.generate_coils_for_board();
+        phase_coils_to_cad_geometry(
+            &coils,
+            core.num_layers,
+            core.pcb_thickness_m * 1e3,
+            core.design_rules().min_trace_mm,
+        )
+    })
+    .await
+    .map_err(|e| format!("editable_coil_geometry worker failed: {e}"))?
+}
+
 /// Generate coil geometry from the config and return it as a DXF R12 ASCII
 /// string suitable for mechanical CAD / CAM import.
 ///

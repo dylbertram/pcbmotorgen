@@ -32,6 +32,8 @@
   ═══════════════════════════════════════════════════════════════════════
 -->
 <script lang="ts">
+  import { confirm } from "@tauri-apps/plugin-dialog";
+  import { editableCoilGeometry } from "../../ipc/dxf";
   import type { ConfigStore } from "../../stores/config.svelte";
   import type { MotionStore } from "../../stores/motion.svelte";
   import type { CadGeometry, CoilPathDto } from "../../types";
@@ -85,6 +87,17 @@
   let simplifiedGeometry = $state.raw<CadGeometry | null>(null);
   let canUndoSimplify = $derived(Boolean(beforeSimplify && importedGeometry === simplifiedGeometry));
   let simplifyNotice = $state("");
+  async function startSegmentEditing(): Promise<boolean> {
+    if (!onGeometryChange) return false;
+    const accepted = await confirm("Create editable geometry from this design? Segment edits will no longer follow routing settings. You can return to generated geometry from Import CAD.", { title: "Edit generated segments", kind: "warning", okLabel: "Create editable geometry", cancelLabel: "Keep generated" });
+    if (!accepted) return false;
+    const requested = config.toIpc();
+    const requestedKey = JSON.stringify(requested);
+    const geometry = await editableCoilGeometry(requested);
+    if (requestedKey !== JSON.stringify(config.toIpc()) || importedGeometry) throw new Error("The design changed. Try editing segments again.");
+    onGeometryChange(geometry);
+    return true;
+  }
   function simplifyImportedLines(): void {
     if (!importedGeometry || !onGeometryChange) return;
     const simplified = simplifyCadLines(importedGeometry);
@@ -617,6 +630,8 @@
       terminalTool={importedGeometry && onGeometryChange ? terminalTool : undefined}
       onStartTerminals={startTerminalTool}
       {importedGeometry}
+      {onGeometryChange}
+      onStartSegmentEditing={onGeometryChange ? startSegmentEditing : undefined}
       {worldTransform}
       isTerminalVisible={isTerminalVisible}
       {stats}

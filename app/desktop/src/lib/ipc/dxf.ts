@@ -74,3 +74,8 @@ export async function exportCadGeometryDxf(geometry: CadGeometry): Promise<DxfEx
   if (!isTauriAvailable()) throw new Error("CAD export requires the desktop app");
   return await invoke<DxfExportResult>("export_cad_geometry_dxf", { geometry });
 }
+
+export async function editableCoilGeometry(config: LinearMotorConfig): Promise<CadGeometry> {
+  if (!isTauriAvailable()) throw new Error("Editing generated segments requires the desktop app");
+  return await invoke<CadGeometry>("editable_coil_geometry", { config });
+}
