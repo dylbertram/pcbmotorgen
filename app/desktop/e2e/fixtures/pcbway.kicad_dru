@@ -1,0 +1,60 @@
+(version 1)
+# Representative rules from KiCAD_Custom_DRC_Rules_for_PCBWay.
+# Keep inactive alternatives to test that commented rules are not imported.
+
+# 2oz copper, inactive
+#(rule "Minimum Trace Width and Spacing (outer layer)"
+#(constraint track_width (min 0.1524mm))
+#(constraint clearance (min 0.1778mm))
+#(layer outer)
+#(condition "A.Type == 'track'"))
+
+# 2-layer, 1oz copper
+(rule "Minimum Trace Width and Spacing (outer layer)"
+  (constraint track_width (min 0.127mm))
+  (constraint clearance (min 0.127mm))
+  (layer outer)
+  (condition "A.Type == 'track'"))
+(rule "Minimum Trace Width and Spacing (inner layer)"
+  (constraint track_width (min 0.1mm))
+  (constraint clearance (min 0.1mm))
+  (layer inner)
+  (condition "A.Type == 'track'"))
+
+(rule "drill hole size (mechanical)"
+  (constraint hole_size (min 0.15mm) (max 6.3mm)))
+(rule "Minimum Via Diameter and Hole Size"
+  (constraint hole_size (min 0.3mm))
+  (constraint via_diameter (min 0.5mm))
+  (condition "A.Type == 'via'"))
+#(rule "Minimum Via Diameter and Hole Size"
+#(constraint hole_size (min 0.2mm))
+#(constraint via_diameter (min 0.35mm))
+#(condition "A.Type == 'via'"))
+
+(rule "PTH Hole Size"
+  (constraint hole_size (min 0.2mm) (max 6.35mm))
+  (condition "A.Type != 'Via' && A.isPlated()"))
+(rule "Minimum Non-plated Hole Size"
+  (constraint hole_size (min 0.5mm))
+  (condition "A.Type == 'pad' && !A.isPlated()"))
+(rule "Pad Size"
+  (constraint hole_size (min 0.5mm))
+  (constraint annular_width (min 0.25mm))
+  (condition "A.Type == 'Pad' && A.isPlated()"))
+(rule "hole to hole clearance (different nets)"
+  (constraint hole_to_hole (min 0.5mm))
+  (condition "A.Net != B.Net"))
+(rule "via to track clearance"
+  (constraint hole_clearance (min 0.254mm))
+  (condition "A.Type == 'via' && B.Type == 'track'"))
+(rule "Pad to Track clearance"
+  (constraint clearance (min 0.2mm))
+  (condition "A.isPlated() && A.Type != 'Via' && B.Type == 'track'"))
+(rule "Trace to Outline"
+  (constraint edge_clearance (min 0.3mm))
+  (condition "A.Type == 'track'"))
+(rule "Minimum Text"
+  (constraint text_thickness (min 0.15mm))
+  (constraint text_height (min 0.8mm))
+  (layer "?.Silkscreen"))
