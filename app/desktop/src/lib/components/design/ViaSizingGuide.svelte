@@ -14,7 +14,7 @@
     <dl>
       <div><dt>Via diameter<HelpTag
         label="About via diameter"
-        tip="Via diameter = hole size + 2 × ring width. Allow at least 0.10 mm extra diameter; 0.15 mm preferred. A 0.20 mm hole gives a 0.30 mm via, or 0.35 mm preferred. These use a 0.05 mm or 0.075 mm ring on each side. Check your fabricator's limits."
+        tip="Via diameter = hole size + 2 × ring width. Allow at least 0.10 mm extra diameter; 0.15 mm preferred."
       /></dt><dd>{mm(diameterMm)}</dd></div>
     </dl>
   </figcaption>

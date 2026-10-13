@@ -15,7 +15,7 @@ test("copper width is zoom-independent in world units; centerlines remain thin",
   });
   await gotoDesignApp(page);
   await page.getByRole("button", { name: "Expand coil preview" }).click();
-  const dialog = page.getByRole("dialog", { name: "Coil Preview — expanded" });
+  const dialog = page.getByRole("dialog", { name: "Coil Preview", exact: true });
   const canvas = dialog.locator("canvas");
   await expect(canvas).toHaveAttribute("data-trace-mode", "traces");
   await expect(canvas).toHaveAttribute("data-test-world-width", /\d/);
@@ -34,7 +34,7 @@ test("copper width is zoom-independent in world units; centerlines remain thin",
 test("all toggles live in the right-hand Layers panel and survive reopening", async ({ page }) => {
   await gotoDesignApp(page);
   await page.getByRole("button", { name: "Expand coil preview" }).click();
-  const dialog = page.getByRole("dialog", { name: "Coil Preview — expanded" });
+  const dialog = page.getByRole("dialog", { name: "Coil Preview", exact: true });
   const panel = dialog.getByRole("complementary", { name: "Layers panel" });
   const canvasBox = await dialog.locator("canvas").boundingBox();
   const panelBox = await panel.boundingBox();
@@ -70,7 +70,7 @@ test("overlay visibility and phase selection do not change the camera", async ({
   });
   await gotoDesignApp(page);
   await page.getByRole("button", { name: "Expand coil preview" }).click();
-  const dialog = page.getByRole("dialog", { name: "Coil Preview — expanded" });
+  const dialog = page.getByRole("dialog", { name: "Coil Preview", exact: true });
   const canvas = dialog.locator("canvas");
   await dialog.getByRole("button", { name: "Zoom in", exact: true }).click();
   const frame = dialog.getByRole("img", { name: "Coil preview — expanded", exact: true });

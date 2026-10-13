@@ -21,6 +21,9 @@
   } from "../../utils/coilPreviewGestures.svelte";
   import HelpTag from "../ui/HelpTag.svelte";
   import ViaSizingGuide from "../design/ViaSizingGuide.svelte";
+  import { CadSelectionTool } from "../../utils/cadSelectionTool.svelte";
+  import CadSelectionToolbar from "../design/CadSelectionToolbar.svelte";
+  import CadSelectionOverlay from "../design/CadSelectionOverlay.svelte";
 
   let {
     config,
@@ -67,7 +70,13 @@
   let selectedLayersOverride = $state<number | null>(null);
   let selectedLayers = $derived(selectedLayersOverride ?? (coilType === "sensor" ? 2 : config.num_layers));
   let selectedPath = $state<string | null>(null);
-  let imported = $state<CadImportResult | null>(null);
+  let imported = $state.raw<CadImportResult | null>(null);
+  let edited = $state(false);
+  const selection = new CadSelectionTool({
+    getGeometry: () => imported?.geometry ?? null,
+    onChange: (geometry) => { if (imported) { imported = { ...imported, geometry }; edited = true; } },
+    tolerance: () => zTolerance,
+  });
   let importedOptions = $state("");
   let simplifyLines = $state(false);
   let sourceLayerCoils = $state<Record<string, string>>({});
@@ -189,6 +198,7 @@
     if (!selectedPath) return;
     if (!importSettingsValid) return;
     if (previewRefreshTimer) clearTimeout(previewRefreshTimer);
+    if (edited) { refreshScheduled = false; return; }
     refreshScheduled = true;
     previewRefreshTimer = setTimeout(() => {
       previewRefreshTimer = undefined;
@@ -221,6 +231,10 @@
           },
         };
         importedOptions = requestedOptions;
+        edited = false;
+        selection.clear();
+        selection.before = null;
+        selection.after = null;
       } else if (path === selectedPath) {
         schedulePreviewRefresh();
       }
@@ -242,10 +256,14 @@
       const path = await pickCadDxfPath();
       if (!path) return;
       selectedPath = path;
+      edited = false;
       imported = null;
       importedOptions = "";
       sourceLayerCoils = {};
       hiddenCoils = {};
+      selection.clear();
+      selection.before = null;
+      selection.after = null;
       gestures.resetView();
       previewView.layerVisibility = {};
       await readPreview(path);
@@ -258,6 +276,7 @@
 
   async function refreshPreview(): Promise<void> {
     if (busy || !selectedPath || !importSettingsValid) return;
+    if (edited && !await confirm("Reimporting replaces your segment assignments. Reimport with the new settings?", { title: "Replace preview edits", okLabel: "Reimport", cancelLabel: "Keep edits", kind: "warning" })) return;
     busy = true;
     try {
       await readPreview(selectedPath);
@@ -344,21 +363,21 @@
 >
   <div
     bind:this={dialogRef}
-    class="flex max-h-[min(760px,calc(100dvh-2rem))] w-full max-w-4xl flex-col overflow-hidden rounded-xl border border-slate-700 bg-slate-900 shadow-2xl shadow-black/50"
+    class="flex h-[calc(100dvh-2rem)] max-h-[900px] w-full max-w-7xl flex-col overflow-hidden rounded-xl border border-slate-700 bg-slate-900 shadow-2xl shadow-black/50"
     role="dialog"
     aria-modal="true"
     aria-labelledby="cad-import-title"
     tabindex="-1"
   >
-    <header class="shrink-0 border-b border-slate-800 px-5 py-4 md:px-7">
-      <p class="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-500">File · Import</p>
-      <h2 id="cad-import-title" class="mt-1 text-lg font-semibold text-slate-100">Import CAD</h2>
-      <p class="mt-1 text-xs text-slate-400">Set import options, inspect the geometry preview, then open it in the design.</p>
+    <header class="flex shrink-0 items-center justify-between gap-3 border-b border-slate-800 px-4 py-3">
+      <h2 id="cad-import-title" class="text-sm font-semibold text-slate-100">Import CAD</h2>
+      <span class="truncate text-xs text-slate-400">{selectedPath ? baseName(selectedPath) : "Choose a DXF file"}</span>
     </header>
 
-    <div class="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain px-5 py-4 md:px-7">
-      <section class="rounded-md border border-slate-700 bg-slate-950/50 p-4" aria-label="CAD import options">
-        <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+    <div class="import-layout min-h-0 flex-1">
+      <aside class="import-settings space-y-3 overflow-y-auto overscroll-contain border-r border-slate-700 p-3" aria-label="Import settings">
+      <section aria-label="CAD import options">
+        <div class="grid grid-cols-2 gap-3">
           <label class="text-xs font-medium text-slate-300" for="cad-coil-type">
             Coil type
             <select id="cad-coil-type" value={coilType} onchange={updateCoilType} disabled={busy} class="mt-1.5 w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 disabled:opacity-50">
@@ -366,25 +385,17 @@
               <option value="sensor">Sensor coil</option>
             </select>
           </label>
-          <label class="text-xs font-medium text-slate-300" for="cad-units">
-            DXF units
-            <select id="cad-units" aria-label="DXF units" bind:value={unitsToMm} onchange={schedulePreviewRefresh} disabled={busy} class="mt-1.5 w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 disabled:opacity-50">
-              <option value="1">Millimetres</option>
-              <option value="25.4">Inches</option>
-            </select>
-          </label>
           <label class="text-xs font-medium text-slate-300" for="cad-z-tolerance">
-            <span class="inline-flex items-center">Z tolerance (mm)<HelpTag label="About Z tolerance" tip="Controls how close Z heights must be to count as one copper layer. It also allows small XY offsets when recognizing vertical via centerlines and matching via endpoints to traces. Lower it if nearby layers merge; raise it only to accommodate coordinate noise." /></span>
+            <span class="inline-flex items-center">Z tolerance (mm)<HelpTag label="About Z tolerance" tip="Groups nearby Z heights into copper layers and matches via endpoints. Lower it if separate layers merge." /></span>
             <input id="cad-z-tolerance" aria-label="Z tolerance (mm)" type="text" inputmode="decimal" value={zToleranceDraft} oninput={updateZTolerance} disabled={busy} class="mt-1.5 w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 disabled:opacity-50" />
           </label>
           <label class="text-xs font-medium text-slate-300" for="cad-trace-width">
-            <span class="inline-flex items-center">Trace width (mm)<HelpTag label="About trace width" tip="Applied uniformly to imported trace centerlines. This value controls their preview width and overrides embedded global trace-width metadata." /></span>
+            <span class="inline-flex items-center">Trace width (mm)<HelpTag label="About trace width" tip="Sets the width of all imported traces in previews and exports. Overrides the DXF trace-width metadata." /></span>
             <input id="cad-trace-width" aria-label="Trace width (mm)" type="text" inputmode="decimal" value={traceWidthText} oninput={updateTraceWidth} disabled={busy} class="mt-1.5 w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 disabled:opacity-50" />
           </label>
-          <div class="flex items-end">
-            <p class="pb-2 text-[11px] leading-relaxed text-slate-500">3D layer positions are detected from Z heights. Via sizes use the project manufacturing defaults.</p>
-          </div>
         </div>
+        <details class="mt-3 text-xs text-slate-300">
+        <summary class="cursor-pointer" title="Set the drilled hole and copper ring sizes for imported vias.">Via sizes</summary>
         <ViaSizingGuide holeMm={viaDrill} ringMm={viaAnnularRing}>
           <label class="flex items-center justify-between gap-2 text-xs font-medium text-slate-300" for="cad-via-drill">
             <span>Via hole size (mm)<HelpTag label="About via hole size" tip="The diameter of the drilled hole, excluding the surrounding copper ring. This is not the outer via diameter." /></span>
@@ -395,11 +406,11 @@
             <input id="cad-via-annular-ring" aria-label="Annular ring width (mm)" type="text" inputmode="decimal" value={viaAnnularRingText} oninput={updateViaAnnularRing} disabled={busy} class="w-24 shrink-0 rounded-md border border-slate-700 bg-slate-900 px-2 py-1 text-xs text-slate-100 disabled:opacity-50" />
           </label>
         </ViaSizingGuide>
+        </details>
         <label class="mt-3 flex items-center gap-2 text-xs text-slate-300">
-          <input type="checkbox" aria-label="Simplify collinear lines on import" checked={simplifyLines} disabled={busy} onchange={(event) => { simplifyLines = event.currentTarget.checked; schedulePreviewRefresh(); }} />
-          Simplify collinear lines on import
+          <input type="checkbox" aria-label="Simplify collinear lines on import" title="Merge touching straight lines in the same coil and layer. Gaps are kept." checked={simplifyLines} disabled={busy} onchange={(event) => { simplifyLines = event.currentTarget.checked; schedulePreviewRefresh(); }} />
+          Simplify lines
         </label>
-        <p class="mt-1 text-[11px] text-slate-500">Merges touching or overlapping straight lines within the same coil and copper layer. Does not bridge gaps.</p>
         {#if !importSettingsValid}
           <p role="alert" class="mt-3 text-xs text-rose-200">Enter a positive trace width and a non-negative Z tolerance to import.</p>
         {/if}
@@ -419,10 +430,9 @@
       {/if}
 
       {#if imported}
-        <section class="rounded-md border border-slate-700 bg-slate-950/50 p-4" aria-label="Source layer coil assignments">
-          <h3 class="text-sm font-medium text-slate-100">Assign source layers to coils</h3>
-          <p class="mt-1 text-xs text-slate-400">Trace and via layers with the same coil name belong together. Standard L0_A and Via_L0_L1_A names default to coil A. Copper planes still come from Z heights.</p>
-          <div class="mt-3 grid gap-2 sm:grid-cols-2">
+        <section class="border-t border-slate-700 pt-3" aria-label="Source layer coil assignments">
+          <h3 class="text-xs font-medium text-slate-100" title="Source layers with the same coil name belong together. Copper layers come from Z heights.">Source coils</h3>
+          <div class="mt-3 grid gap-2">
             {#each Object.entries(imported.geometry.source_layer_coils ?? {}) as [name, coil] (name)}
               <label class="flex items-center justify-between gap-3 text-xs text-slate-300">
                 <span class="min-w-0 break-all font-mono">{name}</span>
@@ -434,14 +444,16 @@
             <p role="alert" class="mt-2 text-xs text-rose-200">Enter a coil name for every source layer assignment.</p>
           {/if}
         </section>
-        <section class="space-y-3" aria-label="CAD import preview">
-          <div class="flex flex-wrap items-baseline justify-between gap-2">
-            <h3 class="text-sm font-medium text-slate-100">Preview · {baseName(selectedPath ?? "CAD file")}</h3>
-            <span class="text-[11px] text-slate-400">{imported.geometry.layer_z_mm.length} copper layer(s)</span>
-          </div>
+      {/if}
+      </aside>
+      <main class="flex min-h-0 min-w-0 flex-col overflow-hidden p-3">
+      {#if imported}
+        <section class="flex min-h-0 flex-1 flex-col gap-3" aria-label="CAD import preview">
+          <CadSelectionToolbar tool={selection} geometry={imported.geometry} disabled={busy || !previewIsCurrent} />
+          <div class="flex min-h-0 flex-1 items-center overflow-hidden rounded-md border border-slate-700 bg-slate-950">
           <div
             bind:this={previewFrameRef}
-            class="relative w-full touch-none select-none overflow-hidden rounded-md border border-slate-700 bg-slate-950 {gestures.isPanning ? 'cursor-grabbing' : 'cursor-grab'}"
+            class="relative w-full touch-none select-none overflow-hidden bg-slate-950 {gestures.isPanning ? 'cursor-grabbing' : 'cursor-grab'}"
             role="img"
             aria-label="CAD import preview"
             style={`aspect-ratio: ${PREVIEW_W} / ${PREVIEW_H}`}
@@ -489,6 +501,8 @@
                 </g>
               </g>
             </svg>
+            <CadSelectionOverlay geometry={imported.geometry} tool={selection} transform={worldTransform} panX={gestures.panX} panY={gestures.panY} width={PREVIEW_W} height={PREVIEW_H} isVisible={(coil, layer) => !coilHidden(coil) && previewView.isLayerVisible(layer)} disabled={busy || !previewIsCurrent} />
+          </div>
           </div>
           <div class="flex flex-wrap gap-3" role="group" aria-label="Coil visibility">
             {#each previewCoils as coil (coil)}
@@ -515,29 +529,19 @@
               onResetView={gestures.resetView}
             />
           </div>
-          <p class="text-xs text-slate-300">
-            {imported.geometry.routing.segments.length} line(s),
-            {imported.geometry.routing.curves.length} arc(s),
-            {imported.geometry.routing.splines?.length ?? 0} spline(s),
-            {imported.geometry.routing.vias.length} via(s).
-            Drag to pan; pinch or ctrl-scroll to zoom. Review the preview, then open the design with this geometry.
-          </p>
-          <p class="text-[11px] text-slate-500">
-            Nearby endpoints are aligned for display only. Simplification, when enabled, also updates saved and exported lines; remaining endpoints keep their DXF coordinates.
-          </p>
           {#if !viaSizingValid}
             <p role="alert" class="text-xs text-rose-200">Via drill and annular ring must be positive values.</p>
           {/if}
           {#if !previewIsCurrent}
-            <p role="status" class="text-xs text-amber-200">{refreshScheduled || busy ? "Updating preview for changed options…" : "Preview settings changed; preview will refresh automatically."}</p>
+            <p role="status" class="text-xs text-amber-200">{edited ? "Settings changed. Reimport to replace your segment edits." : "Updating preview…"}</p>
           {/if}
           {#if imported.warnings.length > 0}
-            <div class="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-100">
-              <p>{imported.warnings.length} import warning(s)</p>
+            <details class="max-h-24 shrink-0 overflow-y-auto rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-100">
+              <summary class="cursor-pointer">{imported.warnings.length} import warnings</summary>
               <ul class="mt-1 list-inside list-disc text-[11px] text-amber-200/80">
                 {#each imported.warnings.slice(0, 3) as warning (warning)}<li>{warning}</li>{/each}
               </ul>
-            </div>
+            </details>
           {/if}
         </section>
       {:else if !busy && !error}
@@ -548,8 +552,17 @@
       {:else if busy}
         <p class="rounded-md border border-slate-700 bg-slate-950/50 px-4 py-5 text-sm text-slate-400">Importing and preparing preview…</p>
       {/if}
+      </main>
     </div>
 
+    <div class="flex shrink-0 flex-wrap items-center gap-3 border-t border-slate-700 px-4 py-2 text-xs text-slate-400">
+      <label class="flex items-center gap-2">DXF units
+        <select id="cad-units" aria-label="DXF units" bind:value={unitsToMm} onchange={schedulePreviewRefresh} disabled={busy} title="Choose the units used in the source DXF. Imported geometry is stored in millimetres." class="rounded border border-slate-700 bg-slate-950 px-2 py-1 text-xs text-slate-200">
+          <option value="1">Millimetres</option><option value="25.4">Inches</option>
+        </select>
+      </label>
+      {#if imported}<span>{imported.geometry.routing.segments.length} lines, {imported.geometry.routing.curves.length} arcs, {imported.geometry.routing.splines?.length ?? 0} splines, {imported.geometry.routing.vias.length} vias</span><span>{imported.geometry.layer_z_mm.length} copper layers</span>{/if}
+    </div>
     <footer class="flex shrink-0 flex-wrap items-center justify-between gap-2 border-t border-slate-800 px-5 py-3 md:px-7">
       <div class="flex flex-wrap gap-2">
         <button type="button" onclick={onClose} disabled={busy} class="rounded-md px-3 py-2 text-xs text-slate-400 hover:bg-slate-800 hover:text-slate-100 disabled:opacity-50">Cancel</button>
@@ -565,7 +578,7 @@
           <button type="button" onclick={refreshPreview} disabled={busy || !importSettingsValid} class="rounded-md border border-sky-500/50 bg-sky-600/30 px-4 py-2 text-xs font-medium text-sky-100 hover:bg-sky-500/40 disabled:opacity-50">{busy ? "Retrying…" : "Retry import"}</button>
           <button type="button" onclick={chooseCadFile} disabled={busy} class="rounded-md border border-slate-700 px-3 py-2 text-xs text-slate-300 hover:bg-slate-800 disabled:opacity-50">Choose another file…</button>
         {:else if selectedPath}
-          <span role="status" class="px-3 py-2 text-xs text-slate-400">{busy || refreshScheduled ? "Updating preview…" : "Preview updates automatically when settings change."}</span>
+          {#if edited}<button type="button" onclick={refreshPreview} disabled={busy || !importSettingsValid} class="rounded-md border border-amber-500/40 px-3 py-2 text-xs text-amber-200">Reimport</button>{:else}<span role="status" class="px-3 py-2 text-xs text-slate-400">Updating preview…</span>{/if}
         {:else}
           <button type="button" onclick={chooseCadFile} disabled={busy || !importSettingsValid} class="rounded-md border border-sky-500/50 bg-sky-600/30 px-4 py-2 text-xs font-medium text-sky-100 hover:bg-sky-500/40 disabled:opacity-50">{busy ? "Preparing preview…" : "Choose DXF…"}</button>
         {/if}
@@ -573,3 +586,14 @@
     </footer>
   </div>
 </div>
+
+<style>
+  .import-layout { display: grid; grid-template-columns: 17rem minmax(0, 1fr); }
+  .import-settings :global(.via-guide) { grid-template-columns: minmax(0, 1fr) 5rem; gap: .5rem; }
+  .import-settings :global(.via-inputs label) { flex-direction: column; align-items: flex-start; }
+  .import-settings :global(.via-inputs input) { width: 100%; }
+  @media (max-width: 640px) {
+    .import-layout { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 8rem) minmax(0, 1fr); }
+    .import-settings { border-right: 0; border-bottom: 1px solid rgb(var(--slate-700)); }
+  }
+</style>

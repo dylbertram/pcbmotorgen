@@ -66,6 +66,9 @@
   import MoverPositionControls from "./MoverPositionControls.svelte";
   import { PREVIEW_H, PREVIEW_W } from "./coilPreviewCanvas";
   import type { CoilPreviewViewState } from "./coilPreviewViewState.svelte";
+  import { CadSelectionTool } from "../../utils/cadSelectionTool.svelte";
+  import CadSelectionToolbar from "./CadSelectionToolbar.svelte";
+  import CadSelectionOverlay from "./CadSelectionOverlay.svelte";
 
   let {
     expanded = $bindable(false),
@@ -80,6 +83,8 @@
     terminalTool,
     onStartTerminals,
     importedGeometry = null,
+    onGeometryChange,
+    onStartSegmentEditing,
     worldTransform,
     isTerminalVisible,
     stats,
@@ -105,6 +110,8 @@
     terminalTool?: CoilTerminalTool;
     onStartTerminals?: () => void;
     importedGeometry?: CadGeometry | null;
+    onGeometryChange?: (geometry: CadGeometry) => void;
+    onStartSegmentEditing?: () => Promise<boolean>;
     worldTransform: WorldTransform;
     isTerminalVisible: (coil: string, layer: number) => boolean;
     /** Header stat line ("N phases · N layers · N coil groups"), precomputed. */
@@ -124,6 +131,17 @@
   // keeps the same 760:260 aspect ratio as the old SVG viewBox).
   const W = PREVIEW_W;
   const H = PREVIEW_H;
+  const selection = new CadSelectionTool({ getGeometry: () => importedGeometry, onChange: (geometry) => onGeometryChange?.(geometry) });
+  function activateSelection() { terminalTool?.cancel(); measure.mode = false; view.oneSection = false; }
+  let preparingSegments = $state(false);
+  let selectionError = $state("");
+  async function prepareSegments() {
+    preparingSegments = true;
+    selectionError = "";
+    try { if (await onStartSegmentEditing?.()) { activateSelection(); selection.setMode("select"); } }
+    catch (e) { selectionError = e instanceof Error ? e.message : String(e); }
+    finally { preparingSegments = false; }
+  }
   onDestroy(() => terminalTool?.cancel());
 
   let backdropRef: HTMLDivElement | null = $state(null);
@@ -209,7 +227,7 @@
     <Dialog.Content
       bind:ref={modalPanelRef}
       preventScroll={false}
-      onEscapeKeydown={(event) => { if (terminalTool?.active) { event.preventDefault(); terminalTool.cancel(); } }}
+      onEscapeKeydown={(event) => { if (selection.mode !== "pan") { event.preventDefault(); selection.clear(); selection.setMode("pan"); } else if (terminalTool?.active) { event.preventDefault(); terminalTool.cancel(); } }}
       aria-label="Coil Preview — expanded"
       class="fixed left-1/2 top-1/2 z-50 flex max-h-[calc(100vh-2rem)] w-[calc(100%-2rem)] max-w-7xl -translate-x-1/2 -translate-y-1/2 flex-col gap-3 overflow-y-auto overscroll-contain rounded-lg border border-slate-700 bg-slate-900 p-4 shadow-2xl"
     >
@@ -231,14 +249,20 @@
       </div>
 
       <div role="toolbar" aria-label="Coil preview tools" class="border-y border-slate-700 py-2">
-        <CoilPreviewMeasureToolbar {measure} onToggle={() => { terminalTool?.cancel(); measure.toggleMode(); }} />
+        {#if importedGeometry && onGeometryChange}
+          <CadSelectionToolbar tool={selection} geometry={importedGeometry} onActivate={activateSelection} />
+        {:else if onStartSegmentEditing}
+          <button type="button" onclick={prepareSegments} disabled={preparingSegments} class="rounded border border-slate-700 bg-slate-800 px-2 py-1 text-xs text-slate-300 disabled:opacity-40" title="Create editable geometry to select and reassign segments. Edits stop following the routing settings.">{preparingSegments ? "Preparing segments…" : "Edit segments"}</button>
+        {/if}
+        {#if selectionError}<p role="alert" class="text-xs text-rose-200">{selectionError}</p>{/if}
+        <CoilPreviewMeasureToolbar {measure} onToggle={() => { selection.setMode("pan"); terminalTool?.cancel(); measure.toggleMode(); }} />
         {#if onSimplify}
           <div class="mt-2 flex flex-wrap items-center gap-2">
-            <button type="button" onclick={onSimplify} disabled={terminalTool?.active} class="rounded border border-slate-700 bg-slate-800 px-2 py-1 text-xs text-slate-300 hover:text-emerald-300 disabled:opacity-40" title="Merge collinear lines in saved and exported geometry">Simplify lines</button>
-            {#if onUndoSimplify}<button type="button" onclick={onUndoSimplify} disabled={terminalTool?.active} class="px-2 py-1 text-xs text-slate-400 hover:text-slate-100 disabled:opacity-40">Undo simplify</button>{/if}
+            <button type="button" onclick={() => { selection.clear(); selection.setMode("pan"); onSimplify?.(); }} disabled={terminalTool?.active} class="rounded border border-slate-700 bg-slate-800 px-2 py-1 text-xs text-slate-300 hover:text-emerald-300 disabled:opacity-40" title="Merge collinear lines in saved and exported geometry">Simplify lines</button>
+            {#if onUndoSimplify}<button type="button" onclick={() => { selection.clear(); onUndoSimplify?.(); }} disabled={terminalTool?.active} class="px-2 py-1 text-xs text-slate-400 hover:text-slate-100 disabled:opacity-40">Undo simplify</button>{/if}
             <span role="status" class="text-xs text-slate-400">{simplifyNotice}</span>
             {#if terminalTool && onStartTerminals}
-              <button type="button" onclick={onStartTerminals} aria-pressed={terminalTool.active} class="rounded border border-slate-700 bg-slate-800 px-2 py-1 text-xs text-slate-300 hover:text-emerald-300">Set coil terminals</button>
+              <button type="button" onclick={() => { selection.setMode("pan"); onStartTerminals?.(); }} aria-pressed={terminalTool.active} class="rounded border border-slate-700 bg-slate-800 px-2 py-1 text-xs text-slate-300 hover:text-emerald-300">Set coil terminals</button>
               {#if terminalTool.notice}<span role="status" class="text-xs text-slate-400">{terminalTool.notice}</span>{/if}
             {/if}
           </div>
@@ -275,6 +299,9 @@
         ></canvas>
         {#if importedGeometry}
           <CoilTerminalOverlay geometry={importedGeometry} tool={terminalTool} transform={worldTransform} panX={gestures.panX} panY={gestures.panY} width={W} height={H} isVisible={isTerminalVisible} />
+          {#if onGeometryChange}
+            <CadSelectionOverlay geometry={importedGeometry} tool={selection} transform={worldTransform} panX={gestures.panX} panY={gestures.panY} width={W} height={H} worldScale={1e-3} isVisible={isTerminalVisible} disabled={measure.mode || terminalTool?.active || view.oneSection} />
+          {/if}
         {/if}
       </div>
 
