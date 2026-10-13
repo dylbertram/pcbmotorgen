@@ -6,9 +6,10 @@
   import RoutingParamsPanel from "./RoutingParamsPanel.svelte";
   import GeneratorUploadPanel from "../plugins/GeneratorUploadPanel.svelte";
 
-  let { config, cadGeometryActive = false, onImportCad, onUseGenerated }: {
+  let { config, cadGeometryActive = false, cadSourceFileName, onImportCad, onUseGenerated }: {
     config: ConfigStore;
     cadGeometryActive?: boolean;
+    cadSourceFileName?: string;
     onImportCad: () => void;
     onUseGenerated: () => void;
   } = $props();
@@ -17,6 +18,7 @@
   const LOAD_VALUE = "__load_generator__";
   const FILE_VALUE = "__load_design_file__";
   const IMPORTED_VALUE = "__imported_design__";
+  const importedLabel = $derived(cadSourceFileName?.trim() || "Imported DXF design");
 
   let modalOpen = $state(false);
 
@@ -59,7 +61,7 @@
   // native-style typeahead on the closed trigger.
   const patternItems = $derived(
     [
-          ...(cadGeometryActive ? [{ value: IMPORTED_VALUE, label: "Imported DXF design" }] : []),
+          ...(cadGeometryActive ? [{ value: IMPORTED_VALUE, label: importedLabel }] : []),
           ...config.routing_patterns.map((p) => ({
             value: p.id,
             label: p.display_name,
@@ -105,7 +107,7 @@
         aria-label="Routing source"
         class="min-w-0 flex-1 rounded-md border border-slate-700 bg-slate-800 px-2.5 py-1.5 text-xs text-slate-100 focus:border-emerald-500 focus:outline-none disabled:cursor-not-allowed disabled:opacity-60 flex items-center justify-between gap-1 text-left"
       >
-        <Select.Value placeholder="Loading patterns…" />
+        <span class="min-w-0 truncate" title={cadGeometryActive ? importedLabel.slice(0, 140) : undefined}><Select.Value placeholder="Loading patterns…" /></span>
         <svg
           viewBox="0 0 12 12"
           class="h-3 w-3 shrink-0 text-slate-500"
@@ -122,7 +124,7 @@
           class="z-50 max-h-72 min-w-[var(--bits-select-anchor-width)] overflow-y-auto rounded-md border border-slate-700 bg-slate-800 py-1 shadow-lg shadow-black/40 focus:outline-none"
         >
           {#if cadGeometryActive}
-            <Select.Item value={IMPORTED_VALUE} label="Imported DXF design" class="px-2.5 py-1.5 text-xs text-sky-200 outline-none data-[highlighted]:bg-slate-700/60">Imported DXF design</Select.Item>
+            <Select.Item value={IMPORTED_VALUE} label={importedLabel} class="px-2.5 py-1.5 text-xs text-sky-200 outline-none data-[highlighted]:bg-slate-700/60">{importedLabel}</Select.Item>
           {/if}
           {#each config.routing_patterns as pattern (pattern.id)}
             <Select.Item

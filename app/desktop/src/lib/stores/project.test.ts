@@ -273,6 +273,7 @@ describe("ProjectStore dirty tracking", () => {
       routing: { format_version: 2, segments: [], curves: [], vias: [] },
       layer_z_mm: [-0.8, 0.8],
       trace_width_mm: 0.2,
+      source_file_name: "motor-coils.dxf",
     };
     projects.setCadGeometry(geometry);
     expect(projects.isDirty).toBe(true);
@@ -280,6 +281,7 @@ describe("ProjectStore dirty tracking", () => {
     target.applyToState(projects.snapshotIpc());
     expect(target.cadGeometry).toEqual(geometry);
     expect(target.snapshotIpc().cad_geometry).toEqual(geometry);
+    expect(target.cadGeometry?.source_file_name).toBe("motor-coils.dxf");
   });
 
   it("reports the file name and untitled label", () => {

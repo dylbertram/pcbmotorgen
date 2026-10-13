@@ -55,12 +55,14 @@ describe("CAD selection geometry", () => {
   });
   it("reassigns only selected primitives, preserves vias, and clears only affected terminals", () => {
     const original = fixture();
+    original.source_file_name = "motor-coils.dxf";
     const changed = reassignTraces(original, ["segments:0", "curves:0", "splines:0"], "D", 1);
     expect(changed.routing.segments[0]).toMatchObject({ net: "D", layer: 1 });
     expect(changed.routing.segments[1]).toBe(original.routing.segments[1]);
     expect(changed.routing.curves[0]).toMatchObject({ net: "D", layer: 1 });
     expect(changed.routing.splines![0]).toMatchObject({ net: "D", layer: 1 });
     expect(changed.routing.vias).toBe(original.routing.vias);
+    expect(changed.source_file_name).toBe("motor-coils.dxf");
     expect(Object.keys(changed.coil_terminals!)).toEqual(["C"]);
     expect(original.routing.segments[0].net).toBe("A");
     expect(Object.keys(original.coil_terminals!)).toEqual(["A", "B", "C"]);
