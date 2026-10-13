@@ -23,6 +23,21 @@ pub struct CadGeometry {
     /// Original DXF layer names and their assigned coil/net identity.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub source_layer_coils: BTreeMap<String, String>,
+    /// Explicit terminal positions in mm, keyed by coil/net identity.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub coil_terminals: BTreeMap<String, CadCoilTerminals>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct CadTerminal {
+    pub position: Point,
+    pub layer: u32,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct CadCoilTerminals {
+    pub input: CadTerminal,
+    pub output: CadTerminal,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -115,6 +130,7 @@ pub fn sensor_geometry_to_cad_geometry(sensor: &SensorGeometry) -> CadGeometry {
         layer_z_mm: vec![-1.6, 0.0],
         trace_width_mm: sensor.nets[0].trace_width_mm,
         source_layer_coils: BTreeMap::new(),
+        coil_terminals: BTreeMap::new(),
     }
 }
 
@@ -298,6 +314,7 @@ pub fn phase_coils_to_cad_geometry(
         layer_z_mm,
         trace_width_mm,
         source_layer_coils: BTreeMap::new(),
+        coil_terminals: BTreeMap::new(),
     };
     validate_geometry(&geometry)?;
     Ok(geometry)
@@ -787,6 +804,7 @@ pub fn import_3d_dxf_with_coils(
         layer_z_mm,
         trace_width_mm: embedded_width.unwrap_or(options.default_trace_width_mm),
         source_layer_coils,
+        coil_terminals: BTreeMap::new(),
     };
     validate_geometry(&geometry)?;
     Ok(CadImportResult { geometry, warnings })
@@ -842,6 +860,44 @@ fn validate_geometry(geometry: &CadGeometry) -> Result<(), String> {
             .any(|v| !finite_point(v.position))
     {
         return Err("CAD geometry coordinates must be finite".into());
+    }
+    for (coil, terminals) in &geometry.coil_terminals {
+        for (label, terminal) in [("IN", &terminals.input), ("OUT", &terminals.output)] {
+            if !finite_point(terminal.position)
+                || terminal.layer as usize >= geometry.layer_z_mm.len()
+            {
+                return Err(format!(
+                    "Coil '{coil}' {label} terminal has invalid coordinates or copper layer"
+                ));
+            }
+            let matches = |point: Point| point.distance_to(terminal.position) <= 1e-9;
+            let endpoint = geometry.routing.segments.iter().any(|s| {
+                s.net == *coil && s.layer == terminal.layer && (matches(s.start) || matches(s.end))
+            }) || geometry.routing.curves.iter().any(|s| {
+                s.net == *coil && s.layer == terminal.layer && (matches(s.start) || matches(s.end))
+            }) || geometry.routing.splines.iter().any(|s| {
+                s.net == *coil
+                    && s.layer == terminal.layer
+                    && (matches(s.point_at(s.knots[s.degree]))
+                        || matches(s.point_at(s.knots[s.control_points.len()])))
+            });
+            if !endpoint {
+                return Err(format!(
+                    "Coil '{coil}' {label} terminal must be a trace endpoint on its copper layer"
+                ));
+            }
+        }
+        if terminals.input.layer == terminals.output.layer
+            && terminals
+                .input
+                .position
+                .distance_to(terminals.output.position)
+                <= 1e-9
+        {
+            return Err(format!(
+                "Coil '{coil}' IN and OUT must be different endpoints"
+            ));
+        }
     }
     Ok(())
 }
@@ -1193,6 +1249,7 @@ mod tests {
             layer_z_mm: vec![-1.0],
             trace_width_mm: 0.15,
             source_layer_coils: BTreeMap::new(),
+            coil_terminals: BTreeMap::new(),
         };
         let text = cad_geometry_to_3d_dxf(&geometry).unwrap();
         let imported = import_3d_dxf(
@@ -1248,6 +1305,7 @@ mod tests {
             layer_z_mm: vec![-1.6, 0.0],
             trace_width_mm: 0.2,
             source_layer_coils: BTreeMap::new(),
+            coil_terminals: BTreeMap::new(),
         }
     }
 
@@ -1286,6 +1344,56 @@ mod tests {
             "unexpected import warnings: {:?}",
             imported.warnings
         );
+    }
+
+    #[test]
+    fn explicit_terminals_round_trip_in_projects_and_validate_coil_and_layer() {
+        let mut geometry = sample();
+        geometry.coil_terminals.insert(
+            "A".into(),
+            CadCoilTerminals {
+                input: CadTerminal {
+                    position: Point::new(1.0, 2.0),
+                    layer: 0,
+                },
+                output: CadTerminal {
+                    position: Point::new(8.0, 4.0),
+                    layer: 1,
+                },
+            },
+        );
+        validate_geometry(&geometry).unwrap();
+        let json = serde_json::to_string(&geometry).unwrap();
+        assert_eq!(
+            serde_json::from_str::<CadGeometry>(&json).unwrap(),
+            geometry
+        );
+        let mut legacy: serde_json::Value = serde_json::from_str(&json).unwrap();
+        legacy.as_object_mut().unwrap().remove("coil_terminals");
+        assert!(serde_json::from_value::<CadGeometry>(legacy)
+            .unwrap()
+            .coil_terminals
+            .is_empty());
+        let mut bad = geometry.clone();
+        bad.coil_terminals.get_mut("A").unwrap().input.layer = 1;
+        assert!(validate_geometry(&bad)
+            .unwrap_err()
+            .contains("trace endpoint"));
+        let mut bad = geometry.clone();
+        let pair = bad.coil_terminals.get_mut("A").unwrap();
+        pair.output = pair.input.clone();
+        assert!(validate_geometry(&bad)
+            .unwrap_err()
+            .contains("different endpoints"));
+        let mut bad = geometry.clone();
+        bad.coil_terminals.get_mut("A").unwrap().input.position.x = f64::NAN;
+        assert!(validate_geometry(&bad).is_err());
+        let mut bad = geometry.clone();
+        let pair = bad.coil_terminals.remove("A").unwrap();
+        bad.coil_terminals.insert("B".into(), pair);
+        assert!(validate_geometry(&bad)
+            .unwrap_err()
+            .contains("trace endpoint"));
     }
 
     #[test]

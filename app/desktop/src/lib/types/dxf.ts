@@ -43,6 +43,14 @@ export interface CadRouteSpline {
 export interface CadVia {
   position: CadPoint; from_layer: number; to_layer: number; net: string;
 }
+export interface CadTerminal {
+  position: CadPoint;
+  layer: number;
+}
+export interface CadCoilTerminals {
+  input: CadTerminal;
+  output: CadTerminal;
+}
 export interface CadRoutingResult {
   format_version: number;
   segments: CadRouteSegment[];
@@ -58,6 +66,8 @@ export interface CadGeometry {
   trace_width_mm: number;
   /** Original DXF source layer → assigned coil/net. Absent in older projects. */
   source_layer_coils?: Record<string, string>;
+  /** Explicit IN/OUT selections keyed by coil/net; coordinates are mm. */
+  coil_terminals?: Record<string, CadCoilTerminals>;
 }
 export interface CadImportResult {
   geometry: CadGeometry;

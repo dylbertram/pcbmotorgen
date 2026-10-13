@@ -285,6 +285,11 @@ export function cadGeometryToPreview(geometry: CadGeometry): CoilPathDto {
     const splineEnd = lastSpline ? splinePointAt(lastSpline, lastSpline.knots[lastSpline.control_points.length]) : null;
     coil.terminal_start = first?.start ?? (splineStart ? [splineStart.x, splineStart.y] : [b[0], b[1]]);
     coil.terminal_end = last?.end ?? (splineEnd ? [splineEnd.x, splineEnd.y] : [b[2], b[3]]);
+    const terminals = geometry.coil_terminals && Object.hasOwn(geometry.coil_terminals, coil.phase_name) ? geometry.coil_terminals[coil.phase_name] : undefined;
+    if (terminals) {
+      coil.terminal_start = [terminals.input.position.x * M, terminals.input.position.y * M];
+      coil.terminal_end = [terminals.output.position.x * M, terminals.output.position.y * M];
+    }
   }
   return { phases, layer_count: Math.max(geometry.layer_z_mm.length, 1), trace_width_m: geometry.trace_width_mm * M };
 }

@@ -93,3 +93,33 @@ straight line and imports as one trace. Vertical lines or polyline edges encode
 via spans. Fitted or mesh polylines, classic bulged vertices, non-default classic
 polyline extrusion, and sloped 3D edges are reported as unsupported. Review these
 warnings before accepting an import.
+
+### Set coil IN and OUT
+
+For imported motor geometry, choose **Set coil terminals** below the coil preview
+or in its expanded toolbar. The command panel guides the selection:
+
+1. Choose a coil, then choose **Select IN**.
+2. Click the coil's IN endpoint. The tool advances to OUT.
+3. Click the OUT endpoint. It must be different from IN.
+4. Review the labelled points and coordinates, then choose **Done**.
+
+The view fits the selected coil. The **Pick on copper layer** selector separates
+points that overlap in the top-down view, including terminals on different
+planes. Only original trace endpoints of the chosen coil and layer are
+selectable, including arc ends and evaluated spline ends. Via centres and spline
+control points are not independent terminal candidates. Shared trace junctions
+are also selectable, so choose the actual ends of the winding rather than an
+internal connection. Pan or zoom on the preview background to reach nearby
+points. Endpoints also support keyboard focus and Enter or Space.
+
+Use **Back** to revise a selection. **Cancel** or Escape discards the current
+draft; closing the expanded preview or switching to Measure also discards it.
+The project changes only when you choose **Done**. Repeat the command for each
+coil, or use **Edit terminals** in the saved terminal summary. Confirmed points
+show IN/OUT labels on both previews and retain their original coordinates and
+copper-layer identities. Save the `.pmproj` file to retain these assignments.
+Simplifying lines preserves both assignments and any segment boundary carrying
+a terminal. Projects without explicit assignments keep their existing preview
+defaults. DXF export remains centerline geometry and does not carry IN/OUT
+assignments; these labels do not add pads or route controller connections.

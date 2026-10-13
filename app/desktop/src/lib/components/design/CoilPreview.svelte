@@ -36,6 +36,8 @@
   import type { MotionStore } from "../../stores/motion.svelte";
   import type { CadGeometry, CoilPathDto } from "../../types";
   import { simplifyCadLines } from "../../cadSimplify";
+  import { CoilTerminalTool } from "../../utils/coilTerminalTool.svelte";
+  import CoilTerminalOverlay from "./CoilTerminalOverlay.svelte";
   import {
     clientToVirtual,
     computePreviewGeometry,
@@ -116,6 +118,28 @@
   // reads the same instance, so a flip there repaints the schematic.
   // -------------------------------------------------------------------
   const view = new CoilPreviewViewState();
+  const terminalTool = new CoilTerminalTool({
+    getGeometry: () => importedGeometry,
+    onChange: (geometry) => onGeometryChange?.(geometry),
+    onReveal: (coil, layer) => {
+      const phase = coils?.phases.find((p) => p.phase_name === coil);
+      if (phase) view.phaseVisibility[phase.phase_idx] = true;
+      view.layerVisibility = { ...view.layerVisibility, [layer]: true };
+      gestures.resetView();
+    },
+  });
+  function startTerminalTool(): void {
+    if (!importedGeometry || !onGeometryChange) return;
+    measure.mode = false;
+    measure.clear();
+    view.oneSection = false;
+    expanded = true;
+    terminalTool.begin();
+  }
+  function isTerminalVisible(coil: string, layer: number): boolean {
+    const phase = coils?.phases.find((p) => p.phase_name === coil);
+    return Boolean(phase && view.isPhaseVisible(phase.phase_idx) && view.isLayerVisible(layer));
+  }
 
   // -------------------------------------------------------------------
   // Zoom bounds + button steps. The actual zoom state, pan, pinch and
@@ -148,6 +172,18 @@
    *  `routing_dimensions` overlay geometry (pole-pitch ruler, band-width
    *  rows, pole regions) so the camera never clips an annotation. */
   function worldTransformFor(zoom: number): WorldTransform {
+    // A command focuses the selected coil, not the unrelated magnet array.
+    if (terminalTool.active && terminalTool.coil) {
+      const points = terminalTool.candidates.map((p) => p.position);
+      if (points.length) {
+        const xs = points.map((p) => p.x * 1e-3);
+        const ys = points.map((p) => p.y * 1e-3);
+        const minX = Math.min(...xs), maxX = Math.max(...xs);
+        const minY = Math.min(...ys), maxY = Math.max(...ys);
+        const pad = Math.max(maxX - minX, maxY - minY, 0.001) * 0.08;
+        return fitWorldToView({ minX: minX - pad, minY: minY - pad, maxX: maxX + pad, maxY: maxY + pad }, W, H, PAD, zoom);
+      }
+    }
     return fitWorldToView(overlayFitBounds, W, H, PAD, zoom);
   }
 
@@ -531,15 +567,20 @@
          renderer (canvas.dataset in coilPreviewCanvas.ts), NOT bound
          reactively — see the counter comment there. -->
     <canvas bind:this={canvasRef} class="block h-full w-full"></canvas>
+    {#if importedGeometry}
+      <CoilTerminalOverlay geometry={importedGeometry} transform={worldTransform} panX={gestures.panX} panY={gestures.panY} width={W} height={H} isVisible={isTerminalVisible} />
+    {/if}
   </div>
 
   <!-- Zoom + reset view, pinned to the bottom-right of the preview. -->
   <div class="mt-2">
     {#if importedGeometry && onGeometryChange}
       <div class="mb-2 flex flex-wrap items-center gap-2" role="group" aria-label="Imported geometry tools">
-        <button type="button" onclick={simplifyImportedLines} class="rounded border border-slate-700 bg-slate-800 px-2 py-1 text-xs text-slate-300 hover:text-emerald-300" title="Merge collinear lines in saved and exported geometry">Simplify lines</button>
+        <button type="button" onclick={simplifyImportedLines} disabled={terminalTool.active} class="rounded border border-slate-700 bg-slate-800 px-2 py-1 text-xs text-slate-300 hover:text-emerald-300 disabled:opacity-40" title="Merge collinear lines in saved and exported geometry">Simplify lines</button>
+        <button type="button" onclick={startTerminalTool} class="rounded border border-slate-700 bg-slate-800 px-2 py-1 text-xs text-slate-300 hover:text-emerald-300">Set coil terminals</button>
         {#if canUndoSimplify}<button type="button" onclick={undoSimplify} class="px-2 py-1 text-xs text-slate-400 hover:text-slate-100">Undo simplify</button>{/if}
         <span role="status" class="text-xs text-slate-400">{simplifyNotice}</span>
+        {#if terminalTool.notice}<span role="status" class="text-xs text-slate-400">{terminalTool.notice}</span>{/if}
       </div>
     {/if}
     <CoilPreviewControls
@@ -573,6 +614,11 @@
       onSimplify={importedGeometry && onGeometryChange ? simplifyImportedLines : undefined}
       onUndoSimplify={canUndoSimplify ? undoSimplify : undefined}
       {simplifyNotice}
+      terminalTool={importedGeometry && onGeometryChange ? terminalTool : undefined}
+      onStartTerminals={startTerminalTool}
+      {importedGeometry}
+      {worldTransform}
+      isTerminalVisible={isTerminalVisible}
       {stats}
       {uniquePhases}
       {uniqueLayers}
