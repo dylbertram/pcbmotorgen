@@ -44,6 +44,7 @@
   ═══════════════════════════════════════════════════════════════════════
 -->
 <script lang="ts">
+  import { GitMerge, Undo2, Plug, X } from "@lucide/svelte";
   import type { ConfigStore } from "../../stores/config.svelte";
   import type { MotionStore } from "../../stores/motion.svelte";
   import { Dialog } from "bits-ui";
@@ -243,12 +244,12 @@
           <Dialog.Close
             class="px-2 py-0.5 text-xs rounded bg-slate-800 border border-slate-700 text-slate-300 hover:text-emerald-300 hover:border-emerald-600 transition-colors"
             aria-label="Close coil preview"
-            >×</Dialog.Close
+            ><X size={16} aria-hidden="true" /></Dialog.Close
           >
         </div>
       </div>
 
-      <div role="toolbar" aria-label="Coil preview tools" class="border-y border-slate-700 py-2">
+      <div role="toolbar" aria-label="Coil preview tools" class="flex flex-wrap items-start gap-2 border-y border-slate-700 py-2">
         {#if importedGeometry && onGeometryChange}
           <CadSelectionToolbar tool={selection} geometry={importedGeometry} onActivate={activateSelection} />
         {:else if onStartSegmentEditing}
@@ -257,12 +258,12 @@
         {#if selectionError}<p role="alert" class="text-xs text-rose-200">{selectionError}</p>{/if}
         <CoilPreviewMeasureToolbar {measure} onToggle={() => { selection.setMode("pan"); terminalTool?.cancel(); measure.toggleMode(); }} />
         {#if onSimplify}
-          <div class="mt-2 flex flex-wrap items-center gap-2">
-            <button type="button" onclick={() => { selection.clear(); selection.setMode("pan"); onSimplify?.(); }} disabled={terminalTool?.active} class="rounded border border-slate-700 bg-slate-800 px-2 py-1 text-xs text-slate-300 hover:text-emerald-300 disabled:opacity-40" title="Merge collinear lines in saved and exported geometry">Simplify lines</button>
-            {#if onUndoSimplify}<button type="button" onclick={() => { selection.clear(); onUndoSimplify?.(); }} disabled={terminalTool?.active} class="px-2 py-1 text-xs text-slate-400 hover:text-slate-100 disabled:opacity-40">Undo simplify</button>{/if}
+          <div class="flex flex-wrap items-center gap-2">
+            <button type="button" aria-label="Simplify lines" onclick={() => { selection.clear(); selection.setMode("pan"); onSimplify?.(); }} disabled={terminalTool?.active} class="icon-tool rounded border border-slate-700 bg-slate-800 text-slate-300 hover:text-emerald-300 disabled:opacity-40" title="Simplify lines: merge collinear lines in saved and exported geometry."><GitMerge size={16} aria-hidden="true" /></button>
+            {#if onUndoSimplify}<button type="button" aria-label="Undo simplify" title="Undo line simplification." onclick={() => { selection.clear(); onUndoSimplify?.(); }} disabled={terminalTool?.active} class="icon-tool rounded border border-slate-700 text-slate-400 hover:text-slate-100 disabled:opacity-40"><Undo2 size={16} aria-hidden="true" /></button>{/if}
             <span role="status" class="text-xs text-slate-400">{simplifyNotice}</span>
             {#if terminalTool && onStartTerminals}
-              <button type="button" onclick={() => { selection.setMode("pan"); onStartTerminals?.(); }} aria-pressed={terminalTool.active} title="Review detected open ends, change either endpoint, or flip IN and OUT." class="rounded border border-slate-700 bg-slate-800 px-2 py-1 text-xs text-slate-300 hover:text-emerald-300">Set coil terminals</button>
+              <button type="button" aria-label="Set coil terminals" onclick={() => { selection.setMode("pan"); onStartTerminals?.(); }} aria-pressed={terminalTool.active} title="Set coil terminals: review open ends, change either endpoint, or flip IN and OUT." class="icon-tool rounded border border-slate-700 bg-slate-800 text-slate-300 hover:text-emerald-300"><Plug size={16} aria-hidden="true" /></button>
               {#if terminalTool.notice}<span role="status" class="text-xs text-slate-400">{terminalTool.notice}</span>{/if}
             {/if}
           </div>
@@ -356,6 +357,9 @@
 </Dialog.Root>
 
 <style>
+  .icon-tool { display: inline-flex; align-items: center; justify-content: center; width: 2rem; height: 2rem; }
+  .icon-tool[aria-pressed="true"] { border-color: #34d399; color: #6ee7b7; background: #064e3b; }
+  .icon-tool:focus-visible { outline: 2px solid #34d399; outline-offset: 2px; }
   .viewer-layout { display: grid; grid-template-columns: minmax(0, 1fr) 15rem; gap: 1rem; align-items: stretch; }
   .layers-panel { contain: size; display: flex; flex-direction: column; min-height: 0; overflow-y: auto; overscroll-behavior: contain; border: 1px solid rgb(var(--slate-700)); border-radius: 6px; background: rgb(var(--slate-900)); }
   .layers-body { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }

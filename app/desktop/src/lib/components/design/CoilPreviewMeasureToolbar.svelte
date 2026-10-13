@@ -20,6 +20,7 @@
 <script lang="ts">
   import { computeMeasureRuler, formatMetresMm } from "../../previewGeometry";
   import type { CoilPreviewMeasure } from "../../utils/coilPreviewMeasure.svelte";
+  import { Ruler, RotateCcw } from "@lucide/svelte";
 
   let { measure, onToggle }: { measure: CoilPreviewMeasure; onToggle?: () => void } = $props();
 </script>
@@ -33,15 +34,17 @@
         : 'bg-slate-800 border-slate-700 text-slate-300 hover:text-pink-300 hover:border-pink-600'}"
       aria-pressed={measure.mode}
       aria-label="Toggle measure tool"
+      title="Measure: click two points to measure their distance. Click again to clear."
       onclick={() => onToggle ? onToggle() : measure.toggleMode()}
-    >Measure</button>
+    ><Ruler size={16} aria-hidden="true" /></button>
     {#if measure.mode}
       <button
         type="button"
         class="px-2 py-0.5 text-xs rounded bg-slate-800 border border-slate-700 text-slate-300 hover:text-rose-300 hover:border-rose-600 transition-colors"
         aria-label="Clear measurement"
+        title="Clear the current measurement."
         onclick={() => measure.clear()}
-      >Reset</button>
+      ><RotateCcw size={16} aria-hidden="true" /></button>
     {/if}
   </div>
   {#if measure.mode}
@@ -62,3 +65,8 @@
     </span>
   {/if}
 </div>
+
+<style>
+  button { display: inline-flex; align-items: center; justify-content: center; width: 2rem; height: 2rem; padding: 0; }
+  button:focus-visible { outline: 2px solid #f472b6; outline-offset: 2px; }
+</style>
