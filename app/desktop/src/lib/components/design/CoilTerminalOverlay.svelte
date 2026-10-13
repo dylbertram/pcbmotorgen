@@ -68,9 +68,17 @@
     </button>
   {/each}
   {#each labels as label (`${label.coil}:${label.role}`)}
-    <span role="img" class="absolute -translate-x-1/2 -translate-y-1/2" style={location(label.point)} aria-label={`Coil ${label.coil} ${label.role}, ${terminalDescription(label.point)}${label.draft ? ", preview" : ""}`}>
-      <span class="block h-3 w-3 rounded-full border-2 border-slate-950" style:background-color={label.role === "IN" ? "#34d399" : "#fbbf24"}></span>
-      <span class="absolute bottom-4 left-0 whitespace-nowrap rounded border border-slate-600 bg-slate-950/95 px-1.5 py-0.5 text-[10px] font-semibold text-slate-100">{label.coil} {label.role} · L{label.point.layer}</span>
+    <span class="absolute -translate-x-1/2 -translate-y-1/2" style={location(label.point)}>
+      <span role="img" aria-label={`Coil ${label.coil} ${label.role}, ${terminalDescription(label.point)}${label.draft ? ", preview" : ""}`} class="block h-3 w-3 rounded-full border-2 border-slate-950" style:background-color={label.role === "IN" ? "#34d399" : "#fbbf24"}></span>
+      {#if label.draft}
+        <button type="button" class="pointer-events-auto absolute {label.role === 'IN' ? 'bottom-4' : 'top-4'} left-0 whitespace-nowrap rounded border border-slate-600 bg-slate-950/95 px-1.5 py-0.5 text-[10px] font-semibold text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-400" aria-label={`Change ${label.role} for coil ${label.coil}`} title={`Choose a different ${label.role} endpoint in the preview.`}
+          onpointerdown={pointerDown} onpointermove={pointerMove} onpointerup={pointerUp}
+          onpointercancel={(event) => { event.stopPropagation(); downs.delete(event.pointerId); suppressClick = true; }}
+          ontouchstart={(event) => event.stopPropagation()} ontouchmove={(event) => event.stopPropagation()} ontouchend={(event) => event.stopPropagation()}
+          onclick={(event) => { event.stopPropagation(); if (event.detail === 0 || !suppressClick) tool?.change(label.role === "IN" ? "input" : "output"); }}>{label.coil} {label.role} · L{label.point.layer}</button>
+      {:else}
+        <span class="absolute {label.role === 'IN' ? 'bottom-4' : 'top-4'} left-0 whitespace-nowrap rounded border border-slate-600 bg-slate-950/95 px-1.5 py-0.5 text-[10px] font-semibold text-slate-100">{label.coil} {label.role} · L{label.point.layer}</span>
+      {/if}
     </span>
   {/each}
 </div>
