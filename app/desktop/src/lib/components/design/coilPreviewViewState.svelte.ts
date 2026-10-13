@@ -17,6 +17,8 @@
 export class CoilPreviewViewState {
   /** Copper uses physical widths; centerlines use a thin screen-width stroke. */
   traceMode = $state<"traces" | "centerlines">("traces");
+  /** Phase waveform below the mover slider in the expanded preview. */
+  showWaveform = $state(true);
   // --- schematic presentation toggles (lightbox controls only) -------------
   /** Show only one repeating electrical period of the winding. Start OFF so
    *  the full winding is visible. */
