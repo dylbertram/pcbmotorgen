@@ -47,3 +47,49 @@ and deletion of an inactive version do not save or discard the working draft.
 Older single-design project files load as version 1 and migrate to the new
 format on their next save. Builds that only support the older format cannot
 open files saved in the new format.
+
+## CAD import and coil assignments
+
+Use **File > Import CAD** to preview a DXF before replacing the design geometry.
+Choose the drawing units, trace width, and via sizes. Review any import warnings.
+
+Source DXF layer names determine coil identity, independently of copper planes:
+
+| Source layer | Default assignment |
+| --- | --- |
+| `L0_A`, `L1_A` | Coil `A`, on the indicated copper layers for legacy 2D files |
+| `L0_B`, `L1_B` | Coil `B` |
+| `Via_L0_L1_A` | Vias belonging to coil `A` |
+| Nonstandard names | Separate coil per source layer name until assigned |
+
+In **Assign source layers to coils**, give all trace and via layers belonging to
+one coil the same name. For example, assign `Bottom winding`, `Top winding`, and
+`Drilled connections` to `A`. Use different coil names for separate windings.
+Names are case-sensitive. Copper planes and via spans in 3D drawings still come
+from Z coordinates, not from the coil assignment. Do not put several coils on
+one source DXF layer if you need to assign them separately.
+
+Coils have separate preview colours and visibility controls. Assignments and
+source-layer names are stored with imported geometry in the project. DXF export
+uses the standard layer names with the assigned coil identities.
+
+Enable **Simplify collinear lines on import** to merge touching or overlapping
+straight segments within the same coil, copper layer, and active-conductor role.
+It is off by default. It does not bridge gaps, merge parallel offset lines, or
+change arcs, splines, or vias. The Z tolerance is not a simplification tolerance.
+Only numerical roundoff up to 1e-9 mm is allowed when testing collinearity.
+
+After importing a motor coil, use **Simplify lines** below the coil preview or
+beside the Measure tool in the expanded preview. This updates actual geometry,
+including what is saved and exported, rather than just its display. **Undo
+simplify** restores the previous geometry while that preview is open and no
+other geometry has replaced it. Save the project to keep the result. Import-time
+simplification can be turned off before confirming; after import, reimport the
+DXF without simplification to recover its original segmentation.
+
+Supported trace entities include `LINE`, planar `ARC` and `SPLINE`, `LWPOLYLINE`,
+and classic 2D/3D `POLYLINE` sequences. A two-point polyline can look like a single
+straight line and imports as one trace. Vertical lines or polyline edges encode
+via spans. Fitted or mesh polylines, classic bulged vertices, non-default classic
+polyline extrusion, and sloped 3D edges are reported as unsupported. Review these
+warnings before accepting an import.

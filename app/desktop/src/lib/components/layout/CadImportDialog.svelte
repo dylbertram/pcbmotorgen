@@ -6,7 +6,9 @@
   import type { ProjectStore } from "../../stores/project.svelte";
   import type { SensorStore } from "../../stores/sensor.svelte";
   import type { CadImportResult } from "../../types";
-  import { joinCadPreviewEndpoints } from "../../cadPreview";
+  import { cadCoilNames, joinCadPreviewEndpoints } from "../../cadPreview";
+  import { simplifyCadLines } from "../../cadSimplify";
+  import { PHASE_COLORS } from "../design/coilPreviewCanvas";
   import { arcSvgPath, splineSvgPath } from "../../curvePaths";
   import { attachBackdropScrollGuard, lockPageScroll } from "../../utils/pageScrollLock";
   import { fitWorldToView, type WorldTransform } from "../../chart";
@@ -67,6 +69,16 @@
   let selectedPath = $state<string | null>(null);
   let imported = $state<CadImportResult | null>(null);
   let importedOptions = $state("");
+  let simplifyLines = $state(false);
+  let sourceLayerCoils = $state<Record<string, string>>({});
+  let hiddenCoils = $state<Record<string, boolean>>({});
+  let previewCoils = $derived(imported ? cadCoilNames(imported.geometry) : []);
+  function coilColor(net: string): string {
+    return PHASE_COLORS[previewCoils.indexOf(net) % PHASE_COLORS.length];
+  }
+  function coilHidden(net: string): boolean {
+    return hiddenCoils[net] === true;
+  }
   const previewView = new CoilPreviewViewState();
   const previewPad = 24;
   let error = $state<string | null>(null);
@@ -79,9 +91,9 @@
   let previewRefreshTimer: ReturnType<typeof setTimeout> | undefined;
 
   let optionsKey = $derived(
-    [unitsToMm, zTolerance, traceWidth, selectedLayers, config.pcb_thickness_mm].join("|"),
+    [unitsToMm, zTolerance, traceWidth, selectedLayers, config.pcb_thickness_mm, simplifyLines, JSON.stringify(sourceLayerCoils)].join("|"),
   );
-  let importSettingsValid = $derived(zToleranceValid && traceWidthValid);
+  let importSettingsValid = $derived(zToleranceValid && traceWidthValid && Object.values(sourceLayerCoils).every((coil) => coil.trim() !== ""));
   let previewIsCurrent = $derived(
     Boolean(imported && importedOptions === optionsKey && importSettingsValid),
   );
@@ -198,11 +210,15 @@
         traceWidth,
         selectedLayers,
         config.pcb_thickness_mm,
+        sourceLayerCoils,
       );
       if (path === selectedPath && requestedOptions === optionsKey) {
         imported = {
           ...result,
-          geometry: { ...result.geometry, trace_width_mm: requestedTraceWidth },
+          geometry: {
+            ...(simplifyLines ? simplifyCadLines(result.geometry) : result.geometry),
+            trace_width_mm: requestedTraceWidth,
+          },
         };
         importedOptions = requestedOptions;
       } else if (path === selectedPath) {
@@ -228,6 +244,8 @@
       selectedPath = path;
       imported = null;
       importedOptions = "";
+      sourceLayerCoils = {};
+      hiddenCoils = {};
       gestures.resetView();
       previewView.layerVisibility = {};
       await readPreview(path);
@@ -252,6 +270,11 @@
     const input = event.currentTarget as HTMLInputElement;
     traceWidthDraft = input.value;
     if (traceWidthValid) schedulePreviewRefresh();
+  }
+
+  function assignSourceLayer(name: string, coil: string): void {
+    sourceLayerCoils = { ...sourceLayerCoils, [name]: coil };
+    schedulePreviewRefresh();
   }
 
   function updateCoilType(event: Event): void {
@@ -372,6 +395,11 @@
             <input id="cad-via-annular-ring" aria-label="Annular ring width (mm)" type="text" inputmode="decimal" value={viaAnnularRingText} oninput={updateViaAnnularRing} disabled={busy} class="w-24 shrink-0 rounded-md border border-slate-700 bg-slate-900 px-2 py-1 text-xs text-slate-100 disabled:opacity-50" />
           </label>
         </ViaSizingGuide>
+        <label class="mt-3 flex items-center gap-2 text-xs text-slate-300">
+          <input type="checkbox" aria-label="Simplify collinear lines on import" checked={simplifyLines} disabled={busy} onchange={(event) => { simplifyLines = event.currentTarget.checked; schedulePreviewRefresh(); }} />
+          Simplify collinear lines on import
+        </label>
+        <p class="mt-1 text-[11px] text-slate-500">Merges touching or overlapping straight lines within the same coil and copper layer. Does not bridge gaps.</p>
         {#if !importSettingsValid}
           <p role="alert" class="mt-3 text-xs text-rose-200">Enter a positive trace width and a non-negative Z tolerance to import.</p>
         {/if}
@@ -391,6 +419,21 @@
       {/if}
 
       {#if imported}
+        <section class="rounded-md border border-slate-700 bg-slate-950/50 p-4" aria-label="Source layer coil assignments">
+          <h3 class="text-sm font-medium text-slate-100">Assign source layers to coils</h3>
+          <p class="mt-1 text-xs text-slate-400">Trace and via layers with the same coil name belong together. Standard L0_A and Via_L0_L1_A names default to coil A. Copper planes still come from Z heights.</p>
+          <div class="mt-3 grid gap-2 sm:grid-cols-2">
+            {#each Object.entries(imported.geometry.source_layer_coils ?? {}) as [name, coil] (name)}
+              <label class="flex items-center justify-between gap-3 text-xs text-slate-300">
+                <span class="min-w-0 break-all font-mono">{name}</span>
+                <input aria-label={`Coil for source layer ${name}`} value={Object.hasOwn(sourceLayerCoils, name) ? sourceLayerCoils[name] : coil} oninput={(event) => assignSourceLayer(name, event.currentTarget.value)} disabled={busy} class="w-28 shrink-0 rounded-md border border-slate-700 bg-slate-900 px-2 py-1 text-xs text-slate-100" />
+              </label>
+            {/each}
+          </div>
+          {#if Object.values(sourceLayerCoils).some((coil) => !coil.trim())}
+            <p role="alert" class="mt-2 text-xs text-rose-200">Enter a coil name for every source layer assignment.</p>
+          {/if}
+        </section>
         <section class="space-y-3" aria-label="CAD import preview">
           <div class="flex flex-wrap items-baseline justify-between gap-2">
             <h3 class="text-sm font-medium text-slate-100">Preview · {baseName(selectedPath ?? "CAD file")}</h3>
@@ -421,31 +464,40 @@
               <g transform={`matrix(${worldTransform.s} 0 0 ${-worldTransform.s} ${worldTransform.tx + gestures.panX} ${worldTransform.ty + gestures.panY})`}>
                 {#each imported.geometry.layer_z_mm as _, layer (layer)}
                   {#if previewView.isLayerVisible(layer)}
-                    <g fill="none" stroke={['#34d399', '#38bdf8', '#c084fc', '#fbbf24', '#fb7185', '#a3e635'][layer % 6]} stroke-width={previewStrokeWidth} stroke-linecap="round" stroke-linejoin="round">
-                      {#each joinedPreview.segments.filter((segment) => segment.layer === layer) as segment (segment)}
-                        <path d={`M ${segment.start.x} ${segment.start.y} L ${segment.end.x} ${segment.end.y}`} />
+                    <g fill="none" stroke-width={previewStrokeWidth} stroke-linecap="round" stroke-linejoin="round">
+                      {#each joinedPreview.segments.filter((segment) => segment.layer === layer && !coilHidden(segment.net)) as segment (segment)}
+                        <path stroke={coilColor(segment.net)} d={`M ${segment.start.x} ${segment.start.y} L ${segment.end.x} ${segment.end.y}`} />
                       {/each}
-                      {#each joinedPreview.curves.filter((curve) => curve.layer === layer) as curve (curve)}
-                        <path d={arcSvgPath(curve)} />
+                      {#each joinedPreview.curves.filter((curve) => curve.layer === layer && !coilHidden(curve.net)) as curve (curve)}
+                        <path stroke={coilColor(curve.net)} d={arcSvgPath(curve)} />
                       {/each}
-                      {#each (imported.geometry.routing.splines ?? []).filter((spline) => spline.layer === layer) as spline (spline)}
-                        <path d={splineSvgPath(spline)} />
+                      {#each (imported.geometry.routing.splines ?? []).filter((spline) => spline.layer === layer && !coilHidden(spline.net)) as spline (spline)}
+                        <path stroke={coilColor(spline.net)} d={splineSvgPath(spline)} />
                       {/each}
                     </g>
                   {/if}
                 {/each}
                 <g fill="#fbbf24" stroke="#0f172a" stroke-width={previewStrokeWidth * 0.25}>
-                  {#each imported.geometry.routing.vias as via (via)}
-                    <circle cx={via.position.x} cy={via.position.y} r={viaPadRadius} />
+                  {#each imported.geometry.routing.vias.filter((via) => !coilHidden(via.net) && (previewView.isLayerVisible(via.from_layer) || previewView.isLayerVisible(via.to_layer))) as via (via)}
+                    <circle fill={coilColor(via.net)} cx={via.position.x} cy={via.position.y} r={viaPadRadius} />
                   {/each}
                 </g>
                 <g fill="#020617" stroke="#0f172a" stroke-width={previewStrokeWidth * 0.2}>
-                  {#each imported.geometry.routing.vias as via (via)}
+                  {#each imported.geometry.routing.vias.filter((via) => !coilHidden(via.net) && (previewView.isLayerVisible(via.from_layer) || previewView.isLayerVisible(via.to_layer))) as via (via)}
                     <circle cx={via.position.x} cy={via.position.y} r={viaDrillRadius} />
                   {/each}
                 </g>
               </g>
             </svg>
+          </div>
+          <div class="flex flex-wrap gap-3" role="group" aria-label="Coil visibility">
+            {#each previewCoils as coil (coil)}
+              <label class="flex items-center gap-1.5 text-xs text-slate-300">
+                <input type="checkbox" aria-label={`Coil ${coil}`} checked={!coilHidden(coil)} onchange={(event) => { hiddenCoils = { ...hiddenCoils, [coil]: !event.currentTarget.checked }; }} />
+                <span class="h-2 w-2 rounded-full" style:background-color={coilColor(coil)}></span>
+                Coil {coil}
+              </label>
+            {/each}
           </div>
           <div class="flex flex-wrap items-center justify-between gap-3">
             <LayerVisibilityControls
@@ -471,7 +523,7 @@
             Drag to pan; pinch or ctrl-scroll to zoom. Review the preview, then open the design with this geometry.
           </p>
           <p class="text-[11px] text-slate-500">
-            Nearby endpoints are aligned for display only. Saved and exported geometry keeps the original DXF coordinates.
+            Nearby endpoints are aligned for display only. Simplification, when enabled, also updates saved and exported lines; remaining endpoints keep their DXF coordinates.
           </p>
           {#if !viaSizingValid}
             <p role="alert" class="text-xs text-rose-200">Via drill and annular ring must be positive values.</p>

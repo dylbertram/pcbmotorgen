@@ -620,7 +620,7 @@
               <!-- Traces view lives here in the Design tab so layout and geometry can
                    be inspected side by side; the Simulation tab keeps its own copy. -->
               <div class="mt-3 space-y-3">
-                <CoilPreview {config} coils={activeCoils} {motion} />
+                <CoilPreview {config} coils={activeCoils} {motion} importedGeometry={projects.cadGeometry} onGeometryChange={(geometry) => projects.setCadGeometry(geometry)} />
                 <DesignDimensions
                   {config}
                   measuredTraceLengthMm={measuredTrace?.traceLengthMm ?? null}

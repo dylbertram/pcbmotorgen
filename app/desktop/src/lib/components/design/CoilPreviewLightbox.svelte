@@ -67,6 +67,9 @@
     view,
     gestures,
     measure,
+    onSimplify,
+    onUndoSimplify,
+    simplifyNotice = "",
     stats,
     uniquePhases,
     uniqueLayers,
@@ -84,6 +87,9 @@
     view: CoilPreviewViewState;
     gestures: CoilPreviewGestures;
     measure: CoilPreviewMeasure;
+    onSimplify?: () => void;
+    onUndoSimplify?: () => void;
+    simplifyNotice?: string;
     /** Header stat line ("N phases · N layers · N coil groups"), precomputed. */
     stats: string;
     uniquePhases: { idx: number; name: string; colorIdx: number }[];
@@ -207,6 +213,13 @@
 
       <div role="toolbar" aria-label="Coil preview tools" class="border-y border-slate-700 py-2">
         <CoilPreviewMeasureToolbar {measure} />
+        {#if onSimplify}
+          <div class="mt-2 flex flex-wrap items-center gap-2">
+            <button type="button" onclick={onSimplify} class="rounded border border-slate-700 bg-slate-800 px-2 py-1 text-xs text-slate-300 hover:text-emerald-300" title="Merge collinear lines in saved and exported geometry">Simplify lines</button>
+            {#if onUndoSimplify}<button type="button" onclick={onUndoSimplify} class="px-2 py-1 text-xs text-slate-400 hover:text-slate-100">Undo simplify</button>{/if}
+            <span role="status" class="text-xs text-slate-400">{simplifyNotice}</span>
+          </div>
+        {/if}
       </div>
 
       <div class="viewer-layout">

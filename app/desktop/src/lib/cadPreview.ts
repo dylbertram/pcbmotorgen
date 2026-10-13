@@ -199,10 +199,20 @@ export function joinCadPreviewEndpoints(
   return { segments, curves };
 }
 
+/** Stable identities/colours across the import dialog and motor preview. */
+export function cadCoilNames(geometry: CadGeometry): string[] {
+  return [...new Set([
+    ...geometry.routing.segments.map((s) => s.net),
+    ...geometry.routing.curves.map((s) => s.net),
+    ...(geometry.routing.splines ?? []).map((s) => s.net),
+    ...geometry.routing.vias.map((s) => s.net),
+  ])].sort();
+}
+
 /** Convert saved CAD centerlines to the existing top-down coil preview DTO. */
 export function cadGeometryToPreview(geometry: CadGeometry): CoilPathDto {
   const grouped = new Map<string, PhaseCoilDto>();
-  const netOrder = new Map<string, number>();
+  const netOrder = new Map(cadCoilNames(geometry).map((net, index) => [net, index]));
   const getGroup = (layer: number, net: string): PhaseCoilDto => {
     const key = `${layer}\u0000${net}`;
     let coil = grouped.get(key);

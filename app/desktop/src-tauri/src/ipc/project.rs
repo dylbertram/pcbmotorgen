@@ -468,6 +468,10 @@ mod tests {
                 },
                 layer_z_mm: vec![-0.8, 0.8],
                 trace_width_mm: 0.2,
+                source_layer_coils: std::collections::BTreeMap::from([(
+                    "Bottom winding".into(),
+                    "A".into(),
+                )]),
             }),
             sensor_config: SensorConfig::default(),
             sensor_cad_geometry: None,

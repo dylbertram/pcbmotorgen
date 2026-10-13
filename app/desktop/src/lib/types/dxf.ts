@@ -56,6 +56,8 @@ export interface CadGeometry {
   /** Copper plane heights ordered bottom-to-top. */
   layer_z_mm: number[];
   trace_width_mm: number;
+  /** Original DXF source layer → assigned coil/net. Absent in older projects. */
+  source_layer_coils?: Record<string, string>;
 }
 export interface CadImportResult {
   geometry: CadGeometry;
