@@ -176,8 +176,8 @@ test.describe("startup chooser and new-design setup", () => {
     await traceWidth.evaluate((input: HTMLInputElement) => input.setSelectionRange(3, 3));
     await traceWidth.press("Backspace");
     await expect(traceWidth).toHaveValue("0.27");
-    await expect(importDialog.getByLabel("Via drill (mm)")).toBeVisible();
-    await expect(importDialog.getByLabel("Via annular ring (mm)")).toBeVisible();
+    await expect(importDialog.getByLabel("Via hole size (mm)")).toBeVisible();
+    await expect(importDialog.getByLabel("Annular ring width (mm)")).toBeVisible();
     await expect(importDialog.locator("#cad-retry-layer-count")).toHaveCount(0);
     await expect(importDialog.getByRole("button", { name: "Choose DXF…" })).toBeVisible();
 
