@@ -120,6 +120,8 @@ export interface PoleRegionDto {
 export interface CoilPathDto {
   phases: PhaseCoilDto[];
   layer_count: number;
+  /** Saved/imported copper width, when no routing-dimension sidecar exists. */
+  trace_width_m?: number;
   /** Additive design-dimension sidecar for magnet-pattern calculations. */
   routing_dimensions?: RoutingDimensionsDto;
 }

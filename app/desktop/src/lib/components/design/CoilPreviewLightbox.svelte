@@ -8,7 +8,7 @@
   visibility, the pole-region phase picker, and the one-section hint — and
   the measure-ruler toolbar. Those two UI clusters are components of their
   own (extracted in kata 426r — each renders exactly once, here):
-    - ./CoilPreviewVisibilityPanel.svelte — the show/hide toggle row,
+     - ./CoilPreviewVisibilityPanel.svelte — the right-hand Layers panel controls,
       bound to the shared CoilPreviewViewState instance
     - ./CoilPreviewMeasureToolbar.svelte — the measure-ruler toolbar,
       bound to the shared CoilPreviewMeasure instance
@@ -188,7 +188,7 @@
       bind:ref={modalPanelRef}
       preventScroll={false}
       aria-label="Coil Preview — expanded"
-      class="fixed left-1/2 top-1/2 z-50 flex max-h-[calc(100vh-2rem)] w-[calc(100%-2rem)] max-w-5xl -translate-x-1/2 -translate-y-1/2 flex-col gap-3 overflow-y-auto overscroll-contain rounded-lg border border-slate-700 bg-slate-900 p-4 shadow-2xl"
+      class="fixed left-1/2 top-1/2 z-50 flex max-h-[calc(100vh-2rem)] w-[calc(100%-2rem)] max-w-7xl -translate-x-1/2 -translate-y-1/2 flex-col gap-3 overflow-y-auto overscroll-contain rounded-lg border border-slate-700 bg-slate-900 p-4 shadow-2xl"
     >
       <!-- Header row -->
       <div class="flex items-center justify-between flex-wrap gap-2">
@@ -207,27 +207,8 @@
         </div>
       </div>
 
-      <!-- Visibility controls only — zoom/reset live below the canvas.
-           The whole toggle row (per-phase/per-layer/via/one-section/
-           pole-pitch/band-width/pole-region + the pole-region phase
-           picker) is the extracted CoilPreviewVisibilityPanel, bound to
-           the shared CoilPreviewViewState instance. -->
-      <CoilPreviewVisibilityPanel
-        {view}
-        {uniquePhases}
-        {uniqueLayers}
-        {hasPolePitchData}
-        {hasBandWidthData}
-        {hasPoleRegionData}
-        {poleRegionPhases}
-      />
-
-      <!-- Measure ruler toolbar: mode toggle, reset (shown only while
-           measuring) and a live status prompt — the extracted
-           CoilPreviewMeasureToolbar, bound to the shared
-           CoilPreviewMeasure instance. -->
-      <CoilPreviewMeasureToolbar {measure} />
-
+      <div class="viewer-layout">
+      <div class="min-w-0 flex flex-col gap-3">
       <!-- Modal frame div owns the ARIA label (the canvas is the paint
            target; data-* attributes carry the introspection counters,
            mirroring the inline pair). All gestures delegate to the same
@@ -273,9 +254,24 @@
            moves inside the lightbox. -->
       <MoverPositionControls {config} {motion} />
 
+      </div>
+      <aside class="layers-panel" aria-label="Layers panel">
+        <h4 class="border-b border-slate-700 px-3 py-2 text-sm font-semibold text-slate-200">Layers</h4>
+        <div class="p-3">
+          <CoilPreviewVisibilityPanel
+            {view} {uniquePhases} {uniqueLayers} {hasPolePitchData}
+            {hasBandWidthData} {hasPoleRegionData} {poleRegionPhases}
+          />
+          <div class="mt-4 border-t border-slate-700 pt-3">
+            <CoilPreviewMeasureToolbar {measure} />
+          </div>
+        </div>
+      </aside>
+      </div>
+
       <!-- Modal note -->
       <p class="text-xs text-slate-500">
-        Solid lines = active legs. Dashed = end-turns. Magnet poles
+        Traces show actual copper width. In centerline mode, dashed lines show end-turns. Magnet poles
         overlay along the top edge. Layers are overlaid at true coordinates;
         use the layer toggles to inspect each copper layer. Pole-pitch,
         band-width and pole-region annotations come from the
@@ -289,3 +285,12 @@
     </Dialog.Content>
   </Dialog.Portal>
 </Dialog.Root>
+
+<style>
+  .viewer-layout { display: grid; grid-template-columns: minmax(0, 1fr) 15rem; gap: 1rem; align-items: start; }
+  .layers-panel { max-height: 65vh; overflow-y: auto; overscroll-behavior: contain; border: 1px solid rgb(var(--slate-700)); border-radius: 6px; background: rgb(var(--slate-900)); }
+  @media (max-width: 640px) {
+    .viewer-layout { grid-template-columns: minmax(0, 1fr); }
+    .layers-panel { max-height: none; }
+  }
+</style>

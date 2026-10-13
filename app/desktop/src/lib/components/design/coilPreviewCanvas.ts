@@ -87,6 +87,8 @@ export interface CoilPreviewDrawInput {
   isPhaseVisible: (phaseIdx: number) => boolean;
   isLayerVisible: (layerIdx: number) => boolean;
   showVias: boolean;
+  traceMode: "traces" | "centerlines";
+  traceWidthMm: number;
   viaDrillMm: number;
   viaAnnularRingMm: number;
   /** Pole-pitch ruler + toggle (ruler null without a routing sidecar). */
@@ -275,9 +277,19 @@ export class CoilPreviewRenderer {
         ph.corner_arcs ??
         [];
 
-      // a. Active conductors — thick, solid.
+      const centerlines = input.traceMode === "centerlines";
+      const band = coils.routing_dimensions?.phase_band_widths.find(
+        (row) => row.layer === ph.layer_idx && row.net === ph.phase_name,
+      );
+      // Copper width stays constant in world metres, independent of camera zoom.
+      const traceWidth = band?.trace_width_m ?? coils.trace_width_m ?? input.traceWidthMm / 1000;
+      const lineWidth = centerlines ? 1 / s : traceWidth;
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+
+      // a. Active conductors.
       ctx.strokeStyle = color;
-      ctx.lineWidth = 2.4 / s;
+      ctx.lineWidth = lineWidth;
       ctx.setLineDash([]);
       ctx.globalAlpha = layerOpacity;
       ctx.beginPath();
@@ -289,11 +301,11 @@ export class CoilPreviewRenderer {
       }
       ctx.stroke();
 
-      // b. End-turns — thin, dashed.
+      // b. End-turns are dashed only in centerline mode.
       ctx.strokeStyle = color;
-      ctx.lineWidth = 1 / s;
-      ctx.setLineDash([3 / s, 2 / s]);
-      ctx.globalAlpha = layerOpacity * 0.6;
+      ctx.lineWidth = lineWidth;
+      ctx.setLineDash(centerlines ? [3 / s, 2 / s] : []);
+      ctx.globalAlpha = layerOpacity;
       ctx.beginPath();
       for (const seg of segs) {
         if (seg.is_active) continue;
@@ -304,12 +316,12 @@ export class CoilPreviewRenderer {
       ctx.stroke();
       ctx.setLineDash([]);
 
-      // d. Corner arcs — quadratic Béziers, dashed unless active.
+      // d. Corner arcs use the same copper width as straight traces.
       ctx.strokeStyle = color;
-      ctx.lineWidth = 1.6 / s;
+      ctx.lineWidth = lineWidth;
       for (const arc of arcs) {
-        ctx.setLineDash(arc.is_active ? [] : [3 / s, 2 / s]);
-        ctx.globalAlpha = layerOpacity * (arc.is_active ? 1 : 0.6);
+        ctx.setLineDash(centerlines && !arc.is_active ? [3 / s, 2 / s] : []);
+        ctx.globalAlpha = layerOpacity;
         ctx.stroke(new Path2D(arcSvgPath({
           start: { x: arc.start[0], y: arc.start[1] },
           mid: { x: arc.mid[0], y: arc.mid[1] },
@@ -318,13 +330,16 @@ export class CoilPreviewRenderer {
         })));
       }
       for (const spline of ph.splines ?? []) {
-        ctx.setLineDash([]);
+        ctx.setLineDash(centerlines && !spline.is_active ? [3 / s, 2 / s] : []);
         ctx.globalAlpha = layerOpacity;
-        ctx.lineWidth = 2.4 / s;
+        ctx.lineWidth = lineWidth;
         ctx.stroke(new Path2D(splineSvgPath(spline)));
         segments += 1;
       }
     }
+
+    ctx.lineCap = "butt";
+    ctx.lineJoin = "miter";
 
     // Paint pads and drill holes after all traces so other layers cannot
     // obscure the holes. Shared via coordinates are drawn only once.
@@ -523,7 +538,8 @@ export class CoilPreviewRenderer {
     // -----------------------------------------------------------------
     ctx.setTransform(k, 0, 0, k, 0, 0);
 
-    // Legend (bottom-left).
+    // Centerline legend (bottom-left). Copper traces are all solid.
+    if (input.traceMode === "centerlines") {
     ctx.textAlign = "left";
     ctx.textBaseline = "alphabetic";
     ctx.font = "11px sans-serif";
@@ -544,13 +560,16 @@ export class CoilPreviewRenderer {
     ctx.stroke();
     ctx.setLineDash([]);
     ctx.fillText("end-turn", 196, PREVIEW_H - 4);
+    }
 
     // Schematic disclaimer (bottom-right).
     ctx.textAlign = "right";
     ctx.font = "9px sans-serif";
     ctx.fillStyle = "#64748b";
     ctx.fillText(
-      "Schematic — layers overlaid at true coordinates. Toggle per layer to inspect.",
+      input.traceMode === "centerlines"
+        ? "Centerlines. Layers overlaid at true coordinates."
+        : "Actual copper width. Layers overlaid at true coordinates.",
       PREVIEW_W - 8,
       PREVIEW_H - 4,
     );
@@ -558,6 +577,7 @@ export class CoilPreviewRenderer {
     drawnSegments = segments;
     drawnVias = vias;
     canvas.dataset.segments = String(drawnSegments);
+    canvas.dataset.traceMode = input.traceMode;
     canvas.dataset.vias = String(drawnVias);
     canvas.dataset.polePitch = String(
       input.showPolePitch && input.poleRuler ? 1 : 0,

@@ -276,7 +276,7 @@ export function cadGeometryToPreview(geometry: CadGeometry): CoilPathDto {
     coil.terminal_start = first?.start ?? (splineStart ? [splineStart.x, splineStart.y] : [b[0], b[1]]);
     coil.terminal_end = last?.end ?? (splineEnd ? [splineEnd.x, splineEnd.y] : [b[2], b[3]]);
   }
-  return { phases, layer_count: Math.max(geometry.layer_z_mm.length, 1) };
+  return { phases, layer_count: Math.max(geometry.layer_z_mm.length, 1), trace_width_m: geometry.trace_width_mm * M };
 }
 
 export interface CadWarningGroup {

@@ -20,6 +20,7 @@ describe("cadGeometryToPreview", () => {
     };
     const preview = cadGeometryToPreview(geometry);
     expect(preview.layer_count).toBe(2);
+    expect(preview.trace_width_m).toBe(0.0002);
     expect(preview.phases).toHaveLength(2);
     expect(preview.phases[0].phase_name).toBe("A");
     expect(preview.phases[0].segments[0].start).toEqual([0.001, 0.002]);
