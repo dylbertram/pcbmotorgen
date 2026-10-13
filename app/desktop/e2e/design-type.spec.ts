@@ -70,7 +70,7 @@ test("motor trace and via settings are editable and retained across design types
     await page.locator(`#${id}`).fill(value);
     await page.locator(`#${id}`).press("Enter");
   }
-  await expect(page.getByText("Via diameter: 0.600 mm.", { exact: false })).toBeVisible();
+  await expect(page.getByRole("figure", { name: "Via sizing guide" }).locator("dl > div").filter({ hasText: "Via diameter" }).locator("dd")).toHaveText("0.600 mm");
   await selectDesignType(page, "Sensor");
   await selectDesignType(page, "Motor coil");
   await expect(page.locator("#motor-trace-width")).toHaveValue("0.2");

@@ -18,6 +18,7 @@
     CoilPreviewGestures,
   } from "../../utils/coilPreviewGestures.svelte";
   import HelpTag from "../ui/HelpTag.svelte";
+  import ViaSizingGuide from "../design/ViaSizingGuide.svelte";
 
   let {
     config,
@@ -357,18 +358,20 @@
             <span class="inline-flex items-center">Trace width (mm)<HelpTag label="About trace width" tip="Applied uniformly to imported trace centerlines. This value controls their preview width and overrides embedded global trace-width metadata." /></span>
             <input id="cad-trace-width" aria-label="Trace width (mm)" type="text" inputmode="decimal" value={traceWidthText} oninput={updateTraceWidth} disabled={busy} class="mt-1.5 w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 disabled:opacity-50" />
           </label>
-          <label class="text-xs font-medium text-slate-300" for="cad-via-drill">
-            Via drill (mm)
-            <input id="cad-via-drill" aria-label="Via drill (mm)" type="text" inputmode="decimal" value={viaDrillText} oninput={updateViaDrill} disabled={busy} class="mt-1.5 w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 disabled:opacity-50" />
-          </label>
-          <label class="text-xs font-medium text-slate-300" for="cad-via-annular-ring">
-            Via annular ring (mm)
-            <input id="cad-via-annular-ring" aria-label="Via annular ring (mm)" type="text" inputmode="decimal" value={viaAnnularRingText} oninput={updateViaAnnularRing} disabled={busy} class="mt-1.5 w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 disabled:opacity-50" />
-          </label>
           <div class="flex items-end">
             <p class="pb-2 text-[11px] leading-relaxed text-slate-500">3D layer positions are detected from Z heights. Via sizes use the project manufacturing defaults.</p>
           </div>
         </div>
+        <ViaSizingGuide holeMm={viaDrill} ringMm={viaAnnularRing}>
+          <label class="flex items-center justify-between gap-2 text-xs font-medium text-slate-300" for="cad-via-drill">
+            <span>Via hole size (mm)<HelpTag label="About via hole size" tip="The diameter of the drilled hole, excluding the surrounding copper ring. This is not the outer via diameter." /></span>
+            <input id="cad-via-drill" aria-label="Via hole size (mm)" type="text" inputmode="decimal" value={viaDrillText} oninput={updateViaDrill} disabled={busy} class="w-24 shrink-0 rounded-md border border-slate-700 bg-slate-900 px-2 py-1 text-xs text-slate-100 disabled:opacity-50" />
+          </label>
+          <label class="flex items-center justify-between gap-2 text-xs font-medium text-slate-300" for="cad-via-annular-ring">
+            <span>Annular ring width (mm)<HelpTag label="About annular ring width" tip="Copper width on one side of the hole. A 0.075 mm ring adds 0.15 mm to the via diameter, because it surrounds both sides." /></span>
+            <input id="cad-via-annular-ring" aria-label="Annular ring width (mm)" type="text" inputmode="decimal" value={viaAnnularRingText} oninput={updateViaAnnularRing} disabled={busy} class="w-24 shrink-0 rounded-md border border-slate-700 bg-slate-900 px-2 py-1 text-xs text-slate-100 disabled:opacity-50" />
+          </label>
+        </ViaSizingGuide>
         {#if !importSettingsValid}
           <p role="alert" class="mt-3 text-xs text-rose-200">Enter a positive trace width and a non-negative Z tolerance to import.</p>
         {/if}
