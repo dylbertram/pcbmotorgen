@@ -91,3 +91,28 @@ test("overlay visibility and phase selection do not change the camera", async ({
     await expect(canvas).toHaveAttribute("data-test-camera", camera);
   }
 });
+
+test("phase waveform visibility preserves mover controls and survives reopening", async ({ page }) => {
+  await gotoDesignApp(page);
+  await page.getByRole("button", { name: "Expand coil preview" }).click();
+  const dialog = page.getByRole("dialog", { name: "Coil Preview", exact: true });
+  const toggle = dialog.getByRole("checkbox", { name: "Show phase waveform", exact: true });
+  const waveform = dialog.getByRole("img", { name: /Per-phase holding force versus mover position/ });
+  const position = dialog.getByRole("spinbutton", { name: "Mover position (mm)", exact: true });
+  const slider = dialog.getByRole("slider", { name: "Mover position slider (mm)", exact: true });
+  await expect(toggle).toBeChecked();
+  await expect(waveform).toBeVisible();
+  const value = await position.inputValue();
+  await toggle.uncheck();
+  await expect(waveform).toHaveCount(0);
+  await expect(position).toBeVisible();
+  await expect(position).toHaveValue(value);
+  await expect(slider).toBeVisible();
+  await page.getByRole("button", { name: "Close coil preview" }).click();
+  await page.getByRole("button", { name: "Expand coil preview" }).click();
+  await expect(toggle).not.toBeChecked();
+  await expect(waveform).toHaveCount(0);
+  await toggle.check();
+  await expect(waveform).toBeVisible();
+  expect((await toggle.locator("..").getAttribute("title"))!.length).toBeLessThanOrEqual(140);
+});

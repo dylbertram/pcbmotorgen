@@ -21,6 +21,10 @@
       <label><input type="radio" name="coil-display" value="traces" bind:group={view.traceMode} />Traces</label>
       <label><input type="radio" name="coil-display" value="centerlines" bind:group={view.traceMode} />Centerlines</label>
     </div>
+    <label class="layer-row" class:hidden-row={!view.showWaveform} title="Show or hide the phase holding-force waves below the mover slider.">
+      <input type="checkbox" bind:checked={view.showWaveform} aria-label="Show phase waveform" />
+      <span class="col-span-2">Phase waveform</span>
+    </label>
   </fieldset>
 
   {#if uniqueLayers.length > 0}

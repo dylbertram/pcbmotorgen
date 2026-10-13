@@ -26,7 +26,7 @@
   import Slider from "../ui/Slider.svelte";
   import HoldingForceChart from "./HoldingForceChart.svelte";
 
-  let { config, motion }: { config: ConfigStore; motion: MotionStore } =
+  let { config, motion, showWaveform = true }: { config: ConfigStore; motion: MotionStore; showWaveform?: boolean } =
     $props();
 
   // Strip extent in the DOMAIN (routing) frame — exactly what the coil
@@ -72,7 +72,7 @@
 
   <!-- Normalized per-phase holding force vs position (3 waves at 120° for
        a 3-phase motor); phase-A zeros mark the stable rest positions. -->
-  <HoldingForceChart {config} {motion} />
+  {#if showWaveform}<HoldingForceChart {config} {motion} />{/if}
 
   <div class="mt-1 text-[10px] text-slate-500" aria-live="polite">
     Position: {motion.clampedPositionMm.toFixed(1)} mm · Mover extent:

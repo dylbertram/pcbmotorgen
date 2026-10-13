@@ -320,7 +320,7 @@
       <!-- Mover position: same controls as the Design reflection on the
            shared MotionStore, so the slider lives next to the strip it
            moves inside the lightbox. -->
-      <MoverPositionControls {config} {motion} />
+      <MoverPositionControls {config} {motion} showWaveform={view.showWaveform} />
 
       </div>
       <aside class="layers-panel" aria-label="Layers panel">
