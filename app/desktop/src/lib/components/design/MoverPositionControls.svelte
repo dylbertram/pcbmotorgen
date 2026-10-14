@@ -20,13 +20,14 @@
    * shared store.
    */
   import type { ConfigStore } from "../../stores/config.svelte";
+  import type { Snippet } from "svelte";
   import type { MotionStore } from "../../stores/motion.svelte";
   import { stripBoundsDomainMm } from "../../previewGeometry";
   import NumberField from "../ui/NumberField.svelte";
   import Slider from "../ui/Slider.svelte";
   import HoldingForceChart from "./HoldingForceChart.svelte";
 
-  let { config, motion, showWaveform = true, compact = false }: { config: ConfigStore; motion: MotionStore; showWaveform?: boolean; compact?: boolean } =
+  let { config, motion, showWaveform = true, compact = false, children }: { config: ConfigStore; motion: MotionStore; showWaveform?: boolean; compact?: boolean; children?: Snippet } =
     $props();
 
   // Strip extent in the DOMAIN (routing) frame — exactly what the coil
@@ -51,17 +52,18 @@
       step={0.1}
       value={motion.clampedPositionMm}
       ariaLabel="Mover position (mm)"
-      class="w-24 rounded px-1.5 py-0.5 text-right font-mono text-emerald-300"
+      class="{compact ? 'w-16' : 'w-24'} rounded px-1.5 py-0.5 text-right font-mono text-emerald-300"
       onCommit={(value) => motion.commit(value)}
     />
     <span class="text-xs text-slate-400">mm</span>
+    {#if compact}<div class="min-w-0 flex-1">{@render positionSlider()}</div>{/if}
   </div>
 
   <!-- Bits UI slider (accessible role="slider" thumb): Arrow/Home/End keys
        and pointer drag commit continuously into the MotionStore; the
        endpoints are the backend travel envelope above. -->
+  {#snippet positionSlider()}
   <Slider
-    class="mt-2"
     min={motion.moverMinMm}
     max={motion.moverMaxMm}
     step={0.1}
@@ -69,10 +71,13 @@
     ariaLabel="Mover position slider (mm)"
     onValueChange={(v) => motion.commit(v)}
   />
+  {/snippet}
+  {#if !compact}<div class="mt-2">{@render positionSlider()}</div>{/if}
 
   <!-- Normalized per-phase holding force vs position (3 waves at 120° for
        a 3-phase motor); phase-A zeros mark the stable rest positions. -->
   {#if showWaveform}<HoldingForceChart {config} {motion} />{/if}
+  {@render children?.()}
 
   {#if !compact}<div class="mt-1 text-[10px] text-slate-500" aria-live="polite">
     Position: {motion.clampedPositionMm.toFixed(1)} mm · Mover extent:

@@ -1,6 +1,30 @@
 import { test, expect } from "@playwright/test";
 import { gotoDesignApp } from "./helpers";
 
+test("inline motor preview is read-only and pans with the primary drag", async ({ page }) => {
+  await gotoDesignApp(page);
+  const inline = page.getByRole("img", { name: "Coil preview", exact: true });
+  await expect(inline).toBeVisible();
+  await expect(page.getByRole("toolbar", { name: "Coil preview tools" })).toHaveCount(0);
+  await expect(page.getByRole("group", { name: "Zoom controls" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Simplify lines", exact: true })).toHaveCount(0);
+  const canvas = inline.locator("canvas");
+  const revision = Number(await canvas.getAttribute("data-revision"));
+  await inline.scrollIntoViewIfNeeded();
+  await expect(inline).toHaveCSS("cursor", "grab");
+  const box = (await inline.boundingBox())!;
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await expect(inline).toHaveCSS("cursor", "grabbing");
+  await page.mouse.move(box.x + box.width / 2 + 40, box.y + box.height / 2 + 20, { steps: 5 });
+  await page.mouse.up();
+  await expect.poll(async () => Number(await canvas.getAttribute("data-revision"))).toBeGreaterThan(revision);
+  await expect(page.getByRole("dialog", { name: "Coil Preview", exact: true })).toHaveCount(0);
+  await expect(inline).toHaveCSS("cursor", "grab");
+  await page.getByRole("button", { name: "Expand coil preview" }).click();
+  await expect(page.getByRole("dialog", { name: "Coil Preview", exact: true })).toBeVisible();
+});
+
 test("copper width is zoom-independent in world units; centerlines remain thin", async ({ page }) => {
   await page.addInitScript(() => {
     const original = CanvasRenderingContext2D.prototype.stroke;
@@ -127,6 +151,48 @@ test("full-modal drawing contains docked controls and bottom display menu", asyn
     await dialog.getByRole("button", { name: "Display state" }).click();
     await page.getByRole("menuitemcheckbox", { name: "Show phase waveform" }).click();
     await expect(dialog.getByRole("img", { name: /Per-phase holding force versus mover position/ })).toBeVisible();
+  }
+});
+
+test("preview controls have no outer boxes and the inline slider has a text graph toggle", async ({ page }) => {
+  await gotoDesignApp(page);
+  await page.getByRole("button", { name: "Expand coil preview" }).click();
+  const dialog = page.getByRole("dialog", { name: "Coil Preview", exact: true });
+  for (const size of [{ width: 1280, height: 800 }, { width: 390, height: 844 }]) {
+    await page.setViewportSize(size);
+    const toolbar = dialog.getByRole("toolbar", { name: "Coil preview tools" });
+    const zoom = dialog.getByRole("group", { name: "Zoom controls" });
+    const position = dialog.getByRole("spinbutton", { name: "Mover position (mm)", exact: true });
+    const slider = dialog.getByRole("slider", { name: "Mover position slider (mm)", exact: true });
+    const toggle = dialog.getByRole("button", { name: "Show frequency graph", exact: true });
+    for (const control of [toolbar, toolbar.locator(".."), zoom.locator(".."), position.locator('xpath=ancestor::div[@aria-label="Mover position"]/..')]) {
+      expect(await control.evaluate(el => {
+        const style = getComputedStyle(el);
+        return [style.borderTopWidth, style.borderRightWidth, style.borderBottomWidth, style.borderLeftWidth];
+      })).toEqual(["0px", "0px", "0px", "0px"]);
+    }
+    await expect.poll(async () => {
+      const inputBox = (await position.boundingBox())!;
+      const sliderBox = (await slider.boundingBox())!;
+      return Math.abs(inputBox.y + inputBox.height / 2 - sliderBox.y - sliderBox.height / 2);
+    }).toBeLessThan(2);
+    await expect(toggle).toHaveAttribute("aria-pressed", "true");
+    await expect(toggle).toHaveText("Hide frequency graph");
+    const shownColor = await toggle.evaluate(el => getComputedStyle(el).color);
+    await toggle.click();
+    await expect(toggle).toHaveAttribute("aria-pressed", "false");
+    await expect(toggle).toHaveText("Show frequency graph");
+    expect(await toggle.evaluate(el => getComputedStyle(el).color)).not.toBe(shownColor);
+    await expect(dialog.getByRole("img", { name: /Per-phase holding force versus mover position/ })).toHaveCount(0);
+    await dialog.getByRole("button", { name: "Display state" }).click();
+    await expect(page.getByRole("menuitemcheckbox", { name: "Show phase waveform" })).toHaveAttribute("aria-checked", "false");
+    await page.keyboard.press("Escape");
+    await toggle.focus();
+    await page.keyboard.press("Enter");
+    await expect(toggle).toHaveAttribute("aria-pressed", "true");
+    const graph = (await dialog.getByRole("img", { name: /Per-phase holding force versus mover position/ }).boundingBox())!;
+    const toggleBox = (await toggle.boundingBox())!;
+    expect(graph.y).toBeGreaterThanOrEqual(toggleBox.y + toggleBox.height);
   }
 });
 

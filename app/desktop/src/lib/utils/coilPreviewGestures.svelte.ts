@@ -106,7 +106,7 @@ interface PointerEntry extends Point {
 export class CoilPreviewGestures {
   // --- options -------------------------------------------------------------
   readonly #options: CoilPreviewGesturesOptions;
-  readonly interactionMode: "navigation" | "cad";
+  get interactionMode(): "navigation" | "cad" { return this.#options.interactionMode ?? "navigation"; }
   get virtualW(): number { return this.#options.virtualW; }
   get virtualH(): number { return this.#options.virtualH; }
   readonly minZoom: number;
@@ -138,7 +138,6 @@ export class CoilPreviewGestures {
 
   constructor(options: CoilPreviewGesturesOptions) {
     this.#options = options;
-    this.interactionMode = options.interactionMode ?? "navigation";
     this.minZoom = options.minZoom;
     this.maxZoom = options.maxZoom;
     this.zoomSteps = options.zoomSteps;

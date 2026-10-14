@@ -167,9 +167,9 @@
         </div>
       </div>
 
-      <div class="absolute left-2 right-12 top-12 z-20 max-h-[30%] overflow-y-auto rounded border border-slate-700 bg-slate-900/95 p-2">
+      <div class="absolute left-2 right-12 top-12 z-20 max-h-[30%] overflow-y-auto bg-slate-900/95 px-2">
       <GeometryEditingToolbar label="Coil preview tools" geometry={onGeometryChange ? importedGeometry : null}
-        {selection} {measure} {terminalTool} {onSimplify} {onUndoSimplify} {simplifyNotice}
+        {selection} {measure} {terminalTool} {onSimplify} {onUndoSimplify} {simplifyNotice} borderless
         onActivateSelection={activateSelection} onPrepareGeometry={onStartSegmentEditing} {onStartTerminals} />
       {#if terminalTool?.active}<CoilTerminalPanel tool={terminalTool} />{/if}
       {#if importedGeometry}
@@ -202,7 +202,7 @@
           label="Coil preview layers" {hasPolePitchData} {hasBandWidthData} {hasPoleRegionData} {poleRegionPhases} />
         </div>
        </div>
-       <div class="absolute top-[32%] right-12 z-20 rounded border border-slate-700 bg-slate-900/95 p-2 sm:top-auto sm:bottom-12">
+        <div class="absolute top-[32%] right-12 z-20 bg-slate-900/95 p-2 sm:top-auto sm:bottom-12">
       <CoilPreviewControls
         zoomLabel={gestures.zoomLabel}
         canZoomIn={gestures.canZoomIn}
@@ -217,9 +217,15 @@
       <!-- Mover position: same controls as the Design reflection on the
            shared MotionStore, so the slider lives next to the strip it
            moves inside the lightbox. -->
-       <div class="absolute bottom-12 left-2 z-20 max-h-[40%] w-[min(420px,calc(100%-4rem))] overflow-y-auto rounded border border-slate-700 bg-slate-900/95 p-3">
-         <MoverPositionControls {config} {motion} showWaveform={false} compact />
-         {#if view.showWaveform}<HoldingForceChart {config} {motion} />{/if}
+        <div class="absolute bottom-12 left-2 z-20 max-h-[40%] w-[min(420px,calc(100%-4rem))] overflow-y-auto bg-slate-900/95 px-2 py-1">
+          <MoverPositionControls {config} {motion} showWaveform={false} compact>
+          <button type="button" aria-label="Show frequency graph" aria-pressed={view.showWaveform}
+            class="mt-2 text-xs {view.showWaveform ? 'text-emerald-300' : 'text-slate-400'} hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
+            onclick={() => { view.showWaveform = !view.showWaveform; }}>
+            {view.showWaveform ? "Hide frequency graph" : "Show frequency graph"}
+          </button>
+          {#if view.showWaveform}<HoldingForceChart {config} {motion} />{/if}
+          </MoverPositionControls>
        </div>
 
       </div>
