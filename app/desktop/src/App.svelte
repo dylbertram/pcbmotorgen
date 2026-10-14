@@ -103,7 +103,14 @@
   });
 
   onMount(() => {
-    void recentFiles.load().finally(() => (recentLoading = false));
+    // Like VS Code, reopen the most recent file or workspace on launch.
+    void recentFiles.load()
+      .then(async () => {
+        const last = recentFiles.paths[0];
+        if (last && !workspace.pending && workspace.documents.length === 0) await workspace.openPath(last);
+      })
+      .catch(() => undefined)
+      .finally(() => (recentLoading = false));
     const unbind = bindProjectMenuActions({
       newFile: () => { if (!workspace.pending) newFileOpen = true; },
       newProject: () => { void workspace.newProject(); },

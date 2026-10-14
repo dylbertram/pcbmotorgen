@@ -32,10 +32,10 @@ test.beforeEach(async ({ page }) => {
 
 for (const action of ["recent", "browse"] as const) {
   test(`startup ${action} opens a clean document after catalog loading`, async ({ page }) => {
+    if (action === "browse") await page.addInitScript(() => localStorage.removeItem("pcbmotorgen.recentProjects"));
     await page.goto("/");
     const startup = page.getByRole("region", { name: "Project workspace" });
-    if (action === "recent") await startup.getByRole("button", { name: /Motor.pmmotor/ }).click();
-    else await startup.getByRole("button", { name: "Open file or project…" }).click();
+    if (action === "browse") await startup.getByRole("button", { name: "Open file or project…" }).click();
     await expect(startup).toBeHidden();
     await expect(page.locator("#num-layers")).toContainText("6");
     await expect(page.locator("#magnet-count")).toHaveValue("8");
