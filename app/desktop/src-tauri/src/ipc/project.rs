@@ -78,40 +78,6 @@ use pcbmotorgen_routing::SensorConfig;
 pub const PROJECT_FORMAT_VERSION: u32 = 2;
 
 // ===========================================================================
-// Legacy v1 envelope (read-only migration input)
-// ===========================================================================
-
-/// The legacy single-state envelope. `format_version` and `state`
-/// are REQUIRED (no serde defaults): a file missing either is rejected as
-/// malformed rather than silently defaulted.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub struct ProjectFileEnvelope {
-    pub format_version: u32,
-    /// App version that wrote the file (informational only; never parsed
-    /// for behaviour).
-    #[serde(default)]
-    pub app_version: String,
-    /// Wall-clock write time (informational only).
-    #[serde(default)]
-    pub saved_at_unix_ms: i64,
-    pub state: ProjectStateIpc,
-}
-
-#[cfg(test)]
-impl ProjectFileEnvelope {
-    /// Legacy fixture for testing migration from single-state v1 files.
-    pub fn build(state: &ProjectStateIpc, saved_at_unix_ms: i64) -> Self {
-        Self {
-            format_version: 1,
-            app_version: env!("CARGO_PKG_VERSION").to_string(),
-            saved_at_unix_ms,
-            state: state.clone(),
-        }
-    }
-}
-
-// ===========================================================================
 // State payload (crosses IPC on save AND load)
 // ===========================================================================
 
@@ -598,25 +564,27 @@ mod tests {
 
     #[test]
     fn forward_compatible_load_missing_fields_take_defaults() {
-        // An artifact from an older build: v1 JSON missing fields that the
-        // current build knows, PLUS unknown fields a newer producer might
-        // add. Load must succeed: missing → app defaults, unknown → ignored.
-        let json = format!(
-            r#"{{
-                "format_version": 1,
-                "app_version": "0.4.0",
-                "saved_at_unix_ms": 123,
-                "state": {{
-                    "config": {{
+        let json = r#"{
+            "format_version": 2,
+            "app_version": "0.5.0",
+            "saved_at_unix_ms": 123,
+            "next_version_id": 2,
+            "versions": [{
+                "id": 1,
+                "description": "",
+                "created_at_unix_ms": 123,
+                "last_edited_at_unix_ms": 123,
+                "project": {
+                    "config": {
                         "desired_travel_mm": 30.0,
-                        "brand_new_future_field": {{ "x": 1 }}
-                    }},
+                        "brand_new_future_field": { "x": 1 }
+                    },
                     "mover_position_mm": 10.0
-                }}
-            }}"#
-        );
-        let (state, version) = parse_project_file(&json).expect("parse");
-        assert_eq!(version, 1);
+                }
+            }]
+        }"#;
+        let (state, version) = parse_project_file(json).expect("parse");
+        assert_eq!(version, 2);
         assert_eq!(state.config.desired_travel_mm, 30.0);
         assert_eq!(state.mover_position_mm, 10.0);
         // Everything absent falls back to the app defaults, not zeroes.
@@ -629,7 +597,7 @@ mod tests {
 
     #[test]
     fn missing_state_rejected() {
-        let json = r#"{ "format_version": 1, "app_version": "0.5.0" }"#;
+        let json = r#"{ "format_version": 2, "app_version": "0.5.0" }"#;
         let err = parse_project_file(json).expect_err("must reject");
         assert!(err.contains("malformed project file"), "got: {err}");
     }

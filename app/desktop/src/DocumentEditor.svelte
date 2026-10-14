@@ -32,7 +32,8 @@
   import { saveTextToFile } from "./lib/files";
 
   import TabNav from "./lib/components/layout/TabNav.svelte";
-  import TitleBar from "./lib/components/layout/TitleBar.svelte";
+  import DrcStatus from "./lib/components/layout/DrcStatus.svelte";
+  import StatusIndicator from "./lib/components/layout/StatusIndicator.svelte";
   import StatusBanner from "./lib/components/ui/StatusBanner.svelte";
   import ProjectNotification from "./lib/components/ui/ProjectNotification.svelte";
   import ScrollArea from "./lib/components/ui/ScrollArea.svelte";
@@ -104,11 +105,16 @@
   let activeCoils = $derived(projects.cadGeometry ? cadGeometryToPreview(projects.cadGeometry) : coils);
   let measuredTrace = $derived.by(() => measureTrace(activeCoils, config));
 
+  export function openVersions(creating = false): void {
+    showVersions(creating);
+  }
+
   export function handleAction(action: string): void {
     if (!active || projects.busy) return;
     if (action === "export") void exportDxf();
     if (action === "kicad") kicadDialogOpen = true;
     if (action === "versions") showVersions(true);
+    if (action === "browse-versions") showVersions(false);
     if (action === "settings") preferencesOpen = true;
     if (action === "import") cadImportDialogOpen = true;
   }
@@ -474,8 +480,12 @@
       class="flex min-h-0 flex-1 flex-col"
     >
       <header class="shrink-0 bg-slate-900">
-        <TitleBar {projects} loading={loading || exportingDxf} {drc} onVersions={() => showVersions()} />
-        <TabNav tabs={workflowTabs} statusFor={tabStatus} />
+        <TabNav tabs={workflowTabs} statusFor={tabStatus}>
+          {#if projects.kind === "motor"}
+            <DrcStatus {drc} cadGeometryActive={projects.cadGeometry !== null} />
+          {/if}
+          <StatusIndicator loading={loading || exportingDxf} />
+        </TabNav>
       </header>
 
       {#if projects.error}

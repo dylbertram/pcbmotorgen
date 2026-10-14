@@ -160,7 +160,7 @@ describe("workspace documents", () => {
 
   it("reopens all workspace files and restores the active file", async () => {
     const { workspace } = makeWorkspace();
-    vi.mocked(ipc.loadWorkspace).mockResolvedValue({ path: "/project.pmproj", files: ["/motor.pmmotor", "/sensor.pmsensor"], active_file: "/sensor.pmsensor", legacy: false });
+    vi.mocked(ipc.loadWorkspace).mockResolvedValue({ path: "/project.pmproj", files: ["/motor.pmmotor", "/sensor.pmsensor"], active_file: "/sensor.pmsensor" });
     expect(await workspace.openPath("/project.pmproj")).toBe(true);
     expect(workspace.documents.map(d => d.kind)).toEqual(["motor", "sensor"]);
     expect(workspace.active!.kind).toBe("sensor");
@@ -173,7 +173,7 @@ describe("workspace documents", () => {
     await workspace.create("motor");
     const original = workspace.active!;
     original.config.magnet_count = 8;
-    vi.mocked(ipc.loadWorkspace).mockResolvedValue({ path: "/project.pmproj", files: ["/missing.pmsensor"], active_file: null, legacy: false });
+    vi.mocked(ipc.loadWorkspace).mockResolvedValue({ path: "/project.pmproj", files: ["/missing.pmsensor"], active_file: null });
     vi.mocked(ipc.loadProject).mockRejectedValueOnce(new Error("File not found"));
     expect(await workspace.openPath("/project.pmproj")).toBe(false);
     expect(workspace.active).toBe(original);
@@ -190,15 +190,6 @@ describe("workspace documents", () => {
     expect(await workspace.newProject()).toBe(true);
     expect(workspace.documents).toHaveLength(0);
     expect(workspace.path).toBeNull();
-  });
-
-  it("legacy conversion is explicit and cancellation leaves the project untouched", async () => {
-    const { workspace } = makeWorkspace();
-    vi.mocked(ipc.loadWorkspace).mockResolvedValue({ path: "/old.pmproj", files: [], active_file: null, legacy: true });
-    vi.mocked(ipc.confirmLegacyMigration).mockResolvedValueOnce(false);
-    expect(await workspace.openPath("/old.pmproj")).toBe(false);
-    expect(ipc.migrateWorkspace).not.toHaveBeenCalled();
-    expect(workspace.documents).toHaveLength(0);
   });
 
   it("edits made during a close-save keep the document open and dirty", async () => {
@@ -243,7 +234,7 @@ describe("workspace documents", () => {
     await workspace.openPath("/motor.pmmotor");
     workspace.active!.config.magnet_count = 8;
     choose.mockResolvedValue("save");
-    vi.mocked(ipc.loadWorkspace).mockResolvedValue({ path: "/project.pmproj", files: ["/motor.pmmotor"], active_file: "/motor.pmmotor", legacy: false });
+    vi.mocked(ipc.loadWorkspace).mockResolvedValue({ path: "/project.pmproj", files: ["/motor.pmmotor"], active_file: "/motor.pmmotor" });
     expect(await workspace.openPath("/project.pmproj")).toBe(true);
     expect(workspace.active!.config.magnet_count).toBe(8);
     expect(workspace.active!.projects.isDirty).toBe(false);

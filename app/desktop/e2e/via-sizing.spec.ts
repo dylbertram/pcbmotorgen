@@ -33,8 +33,8 @@ test("via guide distinguishes hole diameter from ring width and updates live", a
 
 test("CAD import shares the same via sizing guide and help", async ({ page }) => {
   await gotoDesignApp(page);
-  await page.getByRole("button", { name: "File", exact: true }).click();
-  await page.getByRole("menuitem", { name: "Import CAD…" }).click();
+  await page.getByRole("button", { name: "Routing source", exact: true }).click();
+  await page.getByRole("option", { name: "Load design from file…" }).click();
   const dialog = page.getByRole("dialog", { name: "Import CAD" });
   await dialog.getByText("Via sizes", { exact: true }).click();
   await dialog.getByRole("textbox", { name: "Via hole size (mm)", exact: true }).fill("0.2");

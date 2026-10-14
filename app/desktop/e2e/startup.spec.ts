@@ -9,12 +9,13 @@ test("empty workspace offers file creation and opening without creating a draft"
   await expect(page.getByRole("tablist", { name: "Coil files" }).getByRole("tab")).toHaveCount(0);
   await expect(page.locator("#magnet-count")).toHaveCount(0);
   await expect(workspace.getByText("Saved files and projects will appear here.")).toBeVisible();
+  await expect(page.getByRole("button", { name: "File", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Save Project", exact: true })).toHaveCount(0);
 });
 
-test("File New asks for a type and Cancel leaves the workspace empty", async ({ page }) => {
+test("New coil file button asks for a type and Cancel leaves the workspace empty", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("button", { name: "File", exact: true }).click();
-  await page.getByRole("menuitem", { name: "New…", exact: true }).click();
+  await page.getByRole("button", { name: "New coil file", exact: true }).first().click();
   const dialog = page.getByRole("dialog", { name: "New coil file", exact: true });
   await expect(dialog.getByText(".pmmotor", { exact: true })).toBeVisible();
   await expect(dialog.getByText(".pmsensor", { exact: true })).toBeVisible();
@@ -35,8 +36,8 @@ test("New sensor creates a sensor-only workflow", async ({ page }) => {
 
 test("CAD import is tied to the active file type and cancel preserves settings", async ({ page }) => {
   await gotoDesignApp(page);
-  await page.getByRole("button", { name: "File", exact: true }).click();
-  await page.getByRole("menuitem", { name: "Import CAD…" }).click();
+  await page.getByRole("button", { name: "Routing source", exact: true }).click();
+  await page.getByRole("option", { name: "Load design from file…" }).click();
   const dialog = page.getByRole("dialog", { name: "Import CAD", exact: true });
   await expect(dialog.getByLabel("Coil type")).toHaveValue("motor");
   await expect(dialog.getByLabel("Coil type")).toBeDisabled();
@@ -44,8 +45,8 @@ test("CAD import is tied to the active file type and cancel preserves settings",
   const originalWidth = await traceWidth.inputValue();
   await traceWidth.fill("0.321");
   await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
-  await page.getByRole("button", { name: "File", exact: true }).click();
-  await page.getByRole("menuitem", { name: "Import CAD…" }).click();
+  await page.getByRole("button", { name: "Routing source", exact: true }).click();
+  await page.getByRole("option", { name: "Load design from file…" }).click();
   await expect(traceWidth).toHaveValue(originalWidth);
 });
 

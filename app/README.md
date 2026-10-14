@@ -48,10 +48,13 @@ Keep the coil files with the workspace when copying a project to another device.
   relative references. It does not move or copy the referenced coil files.
 - Closing a tab asks about unsaved work. Closing a tab never deletes its file.
   Save Project again to retain changes to the open-file list.
+- Right-click a file tab to rename or move the file, save it, save a new version,
+  or close the tab. Clicking **+** offers new motor or sensor coil files and lists
+  other `.pmmotor` and `.pmsensor` files from the same folder and subfolders.
 
 ## File versions
 
-- Use the title-bar **Versions** or **Version N** button to browse versions,
+- Use the file tab's **Versions** or **Version N** tag to browse versions,
   open another version, edit a description, or delete a selected version.
 - **File > Save** updates the active version. Its creation time stays unchanged;
   its last-edited time advances.
@@ -67,14 +70,6 @@ Keep the coil files with the workspace when copying a project to another device.
 
 Version switches ask before discarding unsaved design edits. Description edits
 and deletion of an inactive version do not save or discard the working draft.
-
-Opening an older combined `.pmproj` offers conversion to a **new** workspace.
-Choose a new name and location. Conversion creates a `.pmmotor` and `.pmsensor`
-beside the new workspace, preserving every revision's ID, description, timestamps,
-settings and geometry. Older single-state files become revision 1. The original
-project remains unchanged, and conversion never overwrites existing files.
-Older app builds cannot open the new formats. Side-by-side version comparison
-is not included in this change.
 
 ## CAD import and coil assignments
 

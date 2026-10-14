@@ -7,7 +7,7 @@ import type { DocumentKind, WorkspaceLoad, ForceSweepResult, CoilPathDto, Fricti
 import type { TabId } from "../ui";
 import { PreviewCamera } from "../utils/coilPreviewGestures.svelte";
 import { CoilPreviewViewState } from "../components/design/coilPreviewViewState.svelte";
-import { confirmLegacyMigration, fileExists, loadWorkspace, migrateWorkspace, pickProjectOpenPath, pickWorkspaceSavePath, resolveDocumentPath, saveWorkspace } from "../ipc";
+import { fileExists, loadWorkspace, pickProjectOpenPath, pickWorkspaceSavePath, resolveDocumentPath, saveWorkspace } from "../ipc";
 
 export type UnsavedChoice = "save" | "discard" | "cancel";
 export type ResolveUnsaved = (label: string) => Promise<UnsavedChoice>;
@@ -56,6 +56,19 @@ export class WorkspaceStore {
   fingerprint = $derived(JSON.stringify(this.documents.map(d => d.projects.currentPath ?? `untitled:${d.id}`)));
   isDirty = $derived(this.fingerprint !== this.baseline);
   pending = $derived(this.busy || this.documents.some(d => d.projects.busy));
+  directories = $derived.by(() => {
+    const dirs: string[] = [];
+    const add = (dir: string | null) => {
+      if (dir && !dirs.includes(dir)) dirs.push(dir);
+    };
+    if (this.path) {
+      const idx = Math.max(this.path.lastIndexOf("/"), this.path.lastIndexOf("\\"));
+      if (idx >= 0) add(this.path.slice(0, idx + 1));
+    }
+    if (this.active) add(this.active.projects.directory);
+    for (const d of this.documents) add(d.projects.directory);
+    return dirs;
+  });
 
   constructor(private readonly recents: RecentFilesStore, private readonly resolveUnsaved: ResolveUnsaved) {}
 
@@ -195,13 +208,7 @@ export class WorkspaceStore {
         this.activeId = document.id;
         return true;
       }
-      let workspace: WorkspaceLoad = await loadWorkspace(path);
-      if (workspace.legacy) {
-        if (!(await confirmLegacyMigration())) return false;
-        const destination = await pickWorkspaceSavePath(path.replace(/\.pmproj$/i, "-workspace.pmproj"));
-        if (!destination) return false;
-        workspace = await migrateWorkspace(path, destination);
-      }
+      const workspace: WorkspaceLoad = await loadWorkspace(path);
       // Stage every file before replacing the workspace. A missing or corrupt
       // reference leaves all existing tabs and drafts intact.
       const documents: DocumentSession[] = [];
