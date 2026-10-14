@@ -71,10 +71,10 @@
 
 <svelte:window onkeydown={handleKeydown} />
 
-<div role="toolbar" aria-label={label} class="flex shrink-0 flex-col">
+<div role="toolbar" aria-label={label} class="relative flex shrink-0 flex-col">
   <!-- The bottom rule stays after the editing boxes were removed; it is the
        line between the toolbar and the viewer. -->
-  <div class="flex flex-wrap items-start gap-2 border-b border-slate-700 {borderless ? 'py-1.5 pl-3 pr-1.5' : 'border-t p-2'}">
+  <div class="flex flex-wrap items-start gap-2 border-b border-slate-700 {borderless ? 'bg-slate-900 py-1.5 pl-3 pr-1.5' : 'border-t p-2'}">
   {#if geometry}
     <CadSelectionToolbar tool={selection} {geometry} {disabled} onActivate={activateSelection} />
   {:else if onPrepareGeometry}
@@ -89,7 +89,7 @@
     <button type="button" aria-label="Set coil terminals" onclick={() => { selection.setMode("pan"); onStartTerminals?.(); }} {disabled} aria-pressed={terminalTool.active} class="icon-tool" title="Set coil terminals: review open ends, change either endpoint, or flip IN and OUT."><Plug size={16} aria-hidden="true" /></button>
   {/if}
   </div>
-  <div class="flex h-5 min-w-0 items-center text-xs text-slate-400">
+  <div class="flex h-5 min-w-0 items-center text-xs text-slate-400 {borderless ? 'absolute inset-x-0 top-full' : ''}">
     <span role="status" class="truncate" title={status}>{status}</span>
   </div>
 </div>

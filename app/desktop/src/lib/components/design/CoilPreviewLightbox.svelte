@@ -151,7 +151,7 @@
       preventScroll={false}
       onEscapeKeydown={(event) => { if (terminalTool?.active) { event.preventDefault(); terminalTool.cancel(); } else if (selection.selected.length || selection.anchor) { event.preventDefault(); selection.clear(); } }}
       aria-label="Coil Preview — expanded"
-      class="fixed inset-x-6 bottom-6 top-12 z-50 flex flex-col overflow-hidden overscroll-contain rounded-lg border border-slate-700 bg-slate-900 shadow-2xl"
+      class="fixed inset-x-6 bottom-6 top-12 z-50 flex flex-col overflow-hidden overscroll-contain rounded-lg border border-slate-700 bg-transparent shadow-2xl"
     >
       <!-- Header row -->
       <header class="z-30 flex shrink-0 items-center justify-between gap-2 border-b border-slate-700 bg-slate-900 px-3 py-2">
@@ -191,7 +191,7 @@
 
         <!-- The toolbar spans the workspace top, flush under the header and
              backed so the buttons stay legible over the drawing. -->
-        <div class="absolute inset-x-0 top-0 z-20 bg-slate-900" bind:clientHeight={toolbarHeight}>
+        <div class="absolute inset-x-0 top-0 z-20" bind:clientHeight={toolbarHeight}>
           <GeometryEditingToolbar label="Coil preview tools" geometry={onGeometryChange ? importedGeometry : null}
             {selection} {measure} {terminalTool} {onSimplify} {onUndoSimplify} {simplifyNotice} borderless
             onActivateSelection={activateSelection} onPrepareGeometry={onStartSegmentEditing} {onStartTerminals} />
