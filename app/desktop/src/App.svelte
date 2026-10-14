@@ -10,7 +10,7 @@
   import { WorkspaceStore, type DocumentSession, type UnsavedChoice } from "./lib/stores/workspace.svelte";
   import type { ProjectStore } from "./lib/stores/project.svelte";
   import { recentFiles } from "./lib/stores/recentFiles.svelte";
-  import { bindProjectMenuActions, isTauriAvailable } from "./lib/ipc";
+  import { bindProjectMenuActions, isTauriAvailable, revealInFinder } from "./lib/ipc";
   import type { DocumentKind } from "./lib/types";
   import PreferencesDialog from "./lib/components/layout/PreferencesDialog.svelte";
   import { ConfigStore } from "./lib/stores/config.svelte";
@@ -49,6 +49,16 @@
     workspace.activate(document.id);
     await tick();
     editor?.openVersions(creating);
+  }
+
+  async function revealTabFile(document: DocumentSession): Promise<void> {
+    const path = document.projects.currentPath;
+    if (!path || workspace.pending) return;
+    try {
+      await revealInFinder(path);
+    } catch (e) {
+      workspace.error = e instanceof Error ? e.message : String(e);
+    }
   }
 
   function action(name: string): void {
@@ -144,6 +154,7 @@
               class="z-[150] min-w-44 rounded-lg border border-slate-600 bg-slate-800 p-1 text-slate-100 shadow-xl"
             >
               <ContextMenu.Item class={item} disabled={workspace.pending} onSelect={() => { renameTarget = document.projects; }}>Rename</ContextMenu.Item>
+              <ContextMenu.Item class={item} disabled={workspace.pending || !document.projects.currentPath} onSelect={() => { void revealTabFile(document); }}>Reveal in Finder</ContextMenu.Item>
               <ContextMenu.Item class={item} disabled={workspace.pending} onSelect={() => { void document.projects.save(false); }}>Save</ContextMenu.Item>
               <ContextMenu.Item class={item} disabled={workspace.pending} onSelect={() => { void openTabVersions(document, true); }}>Save new version</ContextMenu.Item>
               <ContextMenu.Separator class="my-1 h-px bg-slate-600" />

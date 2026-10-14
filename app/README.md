@@ -48,9 +48,10 @@ Keep the coil files with the workspace when copying a project to another device.
   relative references. It does not move or copy the referenced coil files.
 - Closing a tab asks about unsaved work. Closing a tab never deletes its file.
   Save Project again to retain changes to the open-file list.
-- Right-click a file tab to rename or move the file, save it, save a new version,
-  or close the tab. Clicking **+** offers new motor or sensor coil files and lists
-  other `.pmmotor` and `.pmsensor` files from the same folder and subfolders.
+- Right-click a file tab to rename or move the file, reveal it in Finder, save it,
+  save a new version, or close the tab. Clicking **+** offers new motor or sensor
+  coil files and lists other `.pmmotor` and `.pmsensor` files from the same folder
+  and subfolders.
 
 ## File versions
 

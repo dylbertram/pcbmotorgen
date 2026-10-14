@@ -210,6 +210,35 @@ pub async fn list_coil_files(directory: String) -> Result<Vec<String>, String> {
     .map_err(|e| e.to_string())?
 }
 
+#[tauri::command]
+pub async fn reveal_in_finder(path: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let canonical = std::fs::canonicalize(&path)
+            .map_err(|e| format!("Could not find {path}: {e}"))?;
+        #[cfg(target_os = "macos")]
+        let status = std::process::Command::new("open")
+            .arg("-R")
+            .arg(&canonical)
+            .status();
+        #[cfg(target_os = "windows")]
+        let status = std::process::Command::new("explorer")
+            .arg(format!("/select,{}", canonical.display()))
+            .status();
+        #[cfg(all(unix, not(target_os = "macos")))]
+        let status = {
+            let folder = canonical.parent().unwrap_or(canonical.as_path());
+            std::process::Command::new("xdg-open").arg(folder).status()
+        };
+        let status = status.map_err(|e| format!("Could not reveal file: {e}"))?;
+        if !status.success() {
+            return Err("Could not reveal file in Finder.".into());
+        }
+        Ok(())
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

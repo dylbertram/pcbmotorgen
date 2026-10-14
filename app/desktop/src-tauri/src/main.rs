@@ -95,6 +95,7 @@ fn main() {
             commands::workspace::load_workspace,
             commands::workspace::save_workspace,
             commands::workspace::list_coil_files,
+            commands::workspace::reveal_in_finder,
             commands::workspace::quit_app,
             commands::routing_plugins::list_routing_patterns,
             commands::routing_plugins::register_routing_plugin,
