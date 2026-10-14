@@ -107,11 +107,11 @@ test.describe("coil preview modal scroll lock @interaction @desktop", () => {
     expect(released).toEqual({ root: "", body: "" });
   });
 
-  test("lg: the modal panel still scrolls itself but never chains to the background", async ({
+  test("lg: the full-modal workspace stays fixed and never chains to the background", async ({
     page,
   }) => {
-    // Short viewport guarantees the panel content overflows, so the
-    // positive control (panel scrollTop moves) is never vacuous.
+    // Even on a short viewport the drawing fills a fixed workspace;
+    // individual tool panels handle overflow rather than the modal itself.
     await page.setViewportSize({ width: 1280, height: 560 });
     await openLightbox(page);
 
@@ -122,7 +122,7 @@ test.describe("coil preview modal scroll lock @interaction @desktop", () => {
     const overflows = await panel.evaluate(
       (el) => el.scrollHeight > el.clientHeight,
     );
-    expect(overflows).toBe(true);
+    expect(overflows).toBe(false);
 
     // Baseline taken AFTER the modal is open: Playwright's click on the
     // expand button may have auto-scrolled the aside beforehand, so the
@@ -132,16 +132,15 @@ test.describe("coil preview modal scroll lock @interaction @desktop", () => {
       () => document.querySelector("aside")?.scrollTop ?? -1,
     );
 
-    // Wheel inside the panel over its header row (not the canvas gesture
-    // surface): the panel scrolls itself…
+    // Wheel over the header, not the canvas gesture surface.
     await page.mouse.move(panelBox!.x + panelBox!.width / 2, panelBox!.y + 12);
     await page.mouse.wheel(0, 600);
     await settleScroll(page);
 
     const panelScrolled = await panel.evaluate((el) => el.scrollTop);
-    expect(panelScrolled).toBeGreaterThan(0);
+    expect(panelScrolled).toBe(0);
 
-    // …and the reflection column behind the modal never moved.
+    // The reflection column behind the modal never moves either.
     const asideScroll = await page.evaluate(
       () => document.querySelector("aside")?.scrollTop ?? -1,
     );

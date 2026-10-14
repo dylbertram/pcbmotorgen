@@ -111,7 +111,9 @@
   // these virtual px so it matches the SVG markup exactly. The paint routines
   // live in ./coilPreviewCanvas.ts, which shares these constants.
   const W = PREVIEW_W;
-  const H = PREVIEW_H;
+  let modalWidth = $state(PREVIEW_W);
+  let modalHeight = $state(PREVIEW_H);
+  const H = $derived(expanded && modalWidth > 0 ? W * modalHeight / modalWidth : PREVIEW_H);
   const PAD = 30;
 
   // -------------------------------------------------------------------
@@ -197,7 +199,7 @@
   const gestures = new CoilPreviewGestures({
     interactionMode: "cad",
     virtualW: W,
-    virtualH: H,
+    get virtualH() { return H; },
     minZoom: MIN_ZOOM,
     maxZoom: MAX_ZOOM,
     zoomSteps: ZOOM_STEPS,
@@ -415,6 +417,8 @@
         modalCanvas.width = Math.round(modalFrame.clientWidth * dpr);
         modalCanvas.height = Math.round(modalFrame.clientHeight * dpr);
         frameSize = modalFrame.clientWidth;
+        modalWidth = modalFrame.clientWidth;
+        modalHeight = modalFrame.clientHeight;
       });
       modalRo.observe(modalFrame);
     }
@@ -576,6 +580,7 @@
   {#if expanded}
     <CoilPreviewLightbox
       bind:expanded
+      height={H}
       {config}
       {motion}
       {view}
