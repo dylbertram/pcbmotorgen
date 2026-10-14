@@ -84,6 +84,19 @@ describe("CoilTerminalTool", () => {
     expect(tool.active).toBe(false); tool.done(); expect(onChange).not.toHaveBeenCalled();
     tool.begin(); expect(tool.active).toBe(true); expect(tool.input).toEqual(point(0));
   });
+  it("undoes an applied terminal change until another edit replaces it", () => {
+    const { tool, getGeometry, replace } = fixture();
+    tool.begin(); tool.done();
+    expect(tool.canUndo).toBe(true);
+    expect(getGeometry().coil_terminals!.A).toBeDefined();
+    tool.undo();
+    expect(tool.canUndo).toBe(false);
+    expect(getGeometry().coil_terminals?.A).toBeUndefined();
+    tool.begin(); tool.done();
+    expect(tool.canUndo).toBe(true);
+    replace();
+    expect(tool.canUndo).toBe(false);
+  });
   it("reveals both layers when inferred endpoints span an internal via", () => {
     const { tool, getGeometry, onReveal } = fixture();
     const geometry = getGeometry();

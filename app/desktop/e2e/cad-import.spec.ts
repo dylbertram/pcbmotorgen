@@ -405,6 +405,9 @@ test("imported motor preview simplifies saved geometry and supports undo beside 
   await expect(tools.getByRole("status").filter({ hasText: "undone" })).toBeVisible();
   await tools.getByRole("button", { name: "Simplify lines", exact: true }).click();
   await expect(tools.getByRole("status").filter({ hasText: "merged" })).toContainText("2 line(s) merged");
+  // Ctrl+Z reaches the same undo as the toolbar button in the motor modal.
+  await page.keyboard.press("Control+z");
+  await expect(tools.getByRole("status").filter({ hasText: "undone" })).toBeVisible();
 });
 
 async function tracePoint(page: Page, x: number, y: number) {
@@ -621,6 +624,36 @@ test("import selection toggles segments, reassigns coil and layer, and supports 
   await page.screenshot({ path: testInfo.outputPath("cad-segment-selection.png") });
   await tools.getByRole("button", { name: "Undo assignment" }).click();
   await expect(dialog.getByRole("option", { name: /Segment 2, coil A, layer 0/ })).toHaveCount(1);
+});
+
+test("Ctrl+Z undoes the last assignment, simplify and terminal edit", async ({ page }) => {
+  // No vias keeps coil A's open ends unambiguous, matching the other
+  // terminal tests, so the default endpoints are ready to apply.
+  await page.addInitScript(() => { (window as any).__cadNoVias = true; });
+  const dialog = await openImport(page);
+  const selection = dialog.getByRole("group", { name: "Segment selection tools" });
+  const tools = dialog.getByRole("toolbar", { name: "CAD import tools" });
+  const markers = dialog.getByRole("group", { name: "Coil terminal markers" });
+  // Assignment (also proves the shortcut, not just the toolbar button).
+  await clickTrace(page, .5, 0);
+  await dialog.getByRole("button", { name: "Layers", exact: true }).click();
+  await page.getByRole("button", { name: "Move selection to B, layer 2", exact: true }).click();
+  await page.getByRole("button", { name: "Close layers panel" }).click();
+  await expect(dialog.getByRole("option", { name: /Segment 1, coil B, layer 1/ })).toHaveCount(1);
+  await page.keyboard.press("Control+z");
+  await expect(dialog.getByRole("option", { name: /Segment 1, coil A, layer 0/ })).toHaveCount(1);
+  await expect(selection.getByRole("button", { name: "Undo assignment" })).toHaveCount(0);
+  // Simplify, undone with the platform modifier.
+  await tools.getByRole("button", { name: "Simplify lines", exact: true }).click();
+  await expect(tools.getByRole("status")).toContainText("merged");
+  await page.keyboard.press("Meta+z");
+  await expect(tools.getByRole("status")).toContainText("undone");
+  // Terminal change.
+  await tools.getByRole("button", { name: "Set coil terminals", exact: true }).click();
+  await dialog.getByRole("region", { name: "Set coil terminals", exact: true }).getByRole("button", { name: "Apply terminals", exact: true }).click();
+  await expect(markers.getByRole("img")).toHaveCount(2);
+  await page.keyboard.press("Control+z");
+  await expect(markers.getByRole("img")).toHaveCount(0);
 });
 
 test("chain assignments persist into the motor preview and selection tools work there too", async ({ page }, testInfo) => {

@@ -20,10 +20,20 @@ export class CoilTerminalTool {
   notice = $state("");
   error = $state("");
   #base: CadGeometry | null = null;
+  #before = $state.raw<CadGeometry | null>(null);
+  #after = $state.raw<CadGeometry | null>(null);
   #options: Options;
   constructor(options: Options) { this.#options = options; }
 
   get active(): boolean { return this.step !== null && this.#base === this.#options.getGeometry(); }
+  /** Undo is available only until another edit replaces the applied geometry. */
+  get canUndo(): boolean { return this.#before !== null && this.#options.getGeometry() === this.#after; }
+  undo = () => {
+    if (!this.canUndo || !this.#before) return;
+    this.#options.onChange(this.#before);
+    this.#before = null; this.#after = null;
+    this.notice = "Terminal change undone.";
+  };
   get coils(): string[] { const g = this.#options.getGeometry(); return g ? cadCoilNames(g).filter((coil) => cadTerminalCandidates(g, coil).length >= 2) : []; }
   get candidates(): CadTerminal[] { return this.active && this.#base ? cadTerminalCandidates(this.#base, this.coil) : []; }
   get layers(): number[] { return [...new Set(this.candidates.map((p) => p.layer))]; }
@@ -116,7 +126,10 @@ export class CoilTerminalTool {
   #apply(next: boolean) {
     if (!this.canApply || !this.#base || !this.input || !this.output) return;
     const nextCoil = next ? this.nextCoil : undefined;
+    const before = this.#base;
     const geometry = assignCadTerminals(this.#base, this.coil, { input: this.input, output: this.output });
+    this.#before = before;
+    this.#after = geometry;
     this.notice = `Coil ${this.coil} terminals updated. Save the project to keep them.`;
     this.cancel();
     this.#options.onChange(geometry);
