@@ -3,7 +3,8 @@
   import type { CoilPreviewViewState } from "./coilPreviewViewState.svelte";
 
   let { view, uniquePhases, uniqueLayers, hasPolePitchData, hasBandWidthData,
-    hasPoleRegionData, poleRegionPhases }: {
+    hasPoleRegionData, poleRegionPhases, showMotorControls = true,
+    coils = [], isCoilVisible, onToggleCoil }: {
     view: CoilPreviewViewState;
     uniquePhases: { idx: number; name: string; colorIdx: number }[];
     uniqueLayers: { idx: number }[];
@@ -11,20 +12,27 @@
     hasBandWidthData: boolean;
     hasPoleRegionData: boolean;
     poleRegionPhases: string[];
+    showMotorControls?: boolean;
+    coils?: { name: string; colorIdx: number }[];
+    isCoilVisible?: (name: string) => boolean;
+    onToggleCoil?: (name: string) => void;
   } = $props();
+  const displayGroup = $props.id();
 </script>
 
 <div class="layer-controls">
   <fieldset class="display-mode">
     <legend>Display</legend>
     <div class="mode-options">
-      <label><input type="radio" name="coil-display" value="traces" bind:group={view.traceMode} />Traces</label>
-      <label><input type="radio" name="coil-display" value="centerlines" bind:group={view.traceMode} />Centerlines</label>
+      <label><input type="radio" name={displayGroup} value="traces" bind:group={view.traceMode} />Traces</label>
+      <label><input type="radio" name={displayGroup} value="centerlines" bind:group={view.traceMode} />Centerlines</label>
     </div>
-    <label class="layer-row" class:hidden-row={!view.showWaveform} title="Show or hide the phase holding-force waves below the mover slider.">
-      <input type="checkbox" bind:checked={view.showWaveform} aria-label="Show phase waveform" />
-      <span class="col-span-2">Phase waveform</span>
-    </label>
+    {#if showMotorControls}
+      <label class="layer-row" class:hidden-row={!view.showWaveform} title="Show or hide the phase holding-force waves below the mover slider.">
+        <input type="checkbox" bind:checked={view.showWaveform} aria-label="Show phase waveform" />
+        <span class="col-span-2">Phase waveform</span>
+      </label>
+    {/if}
   </fieldset>
 
   {#if uniqueLayers.length > 0}
@@ -47,6 +55,19 @@
           <input type="checkbox" checked={view.isPhaseVisible(ph.idx)} onchange={() => view.phaseVisibility[ph.idx] = !view.isPhaseVisible(ph.idx)} aria-label={"Show phase " + ph.name} />
           <span class="swatch" style:background-color={PHASE_COLORS[ph.colorIdx % PHASE_COLORS.length]}></span>
           <span>Phase {ph.name}</span>
+        </label>
+      {/each}
+    </fieldset>
+  {/if}
+
+  {#if coils.length > 0 && isCoilVisible && onToggleCoil}
+    <fieldset aria-label="Coil visibility">
+      <legend>Coils</legend>
+      {#each coils as coil (coil.name)}
+        <label class="layer-row" class:hidden-row={!isCoilVisible(coil.name)}>
+          <input type="checkbox" checked={isCoilVisible(coil.name)} onchange={() => onToggleCoil?.(coil.name)} aria-label={`Coil ${coil.name}`} />
+          <span class="swatch" style:background-color={PHASE_COLORS[coil.colorIdx % PHASE_COLORS.length]}></span>
+          <span>Coil {coil.name}</span>
         </label>
       {/each}
     </fieldset>
@@ -82,13 +103,15 @@
     {/if}
   </fieldset>
 
-  <fieldset>
-    <legend>Pattern</legend>
-    <label class="layer-row">
-      <input type="checkbox" bind:checked={view.oneSection} aria-label="Show only one repeating section of the pattern" />
-      <span class="col-span-2">One electrical period</span>
-    </label>
-  </fieldset>
+  {#if showMotorControls}
+    <fieldset>
+      <legend>Pattern</legend>
+      <label class="layer-row">
+        <input type="checkbox" bind:checked={view.oneSection} aria-label="Show only one repeating section of the pattern" />
+        <span class="col-span-2">One electrical period</span>
+      </label>
+    </fieldset>
+  {/if}
 </div>
 
 <style>
