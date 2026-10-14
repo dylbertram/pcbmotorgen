@@ -135,7 +135,13 @@ test("full-modal drawing contains docked controls and bottom display menu", asyn
   for (const size of [{ width: 1280, height: 800 }, { width: 390, height: 844 }]) {
     await page.setViewportSize(size);
     const frame = dialog.getByRole("img", { name: "Coil preview — expanded", exact: true });
-    await expect.poll(async () => (await frame.boundingBox())!.height).toBeGreaterThan(size.height - 40);
+    // The modal clears the 36px title bar (traffic lights) and keeps a
+    // margin all around, so the drawing fills the rest of the viewport.
+    const modal = (await dialog.boundingBox())!;
+    expect(modal.y).toBeGreaterThanOrEqual(44);
+    expect(modal.x).toBeGreaterThanOrEqual(20);
+    expect(modal.y + modal.height).toBeLessThanOrEqual(size.height - 20);
+    await expect.poll(async () => (await frame.boundingBox())!.height).toBeGreaterThan(size.height - 90);
     const drawing = (await frame.boundingBox())!;
     for (const control of [dialog.getByRole("toolbar", { name: "Coil preview tools" }), dialog.getByRole("group", { name: "Zoom controls" }), dialog.getByRole("group", { name: "Preview status" }), dialog.getByRole("slider", { name: "Mover position slider (mm)" })]) {
       const box = (await control.boundingBox())!;
