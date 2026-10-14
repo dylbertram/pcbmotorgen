@@ -36,8 +36,13 @@
     pending?.resolve(choice);
   }
 
-  async function create(kind: DocumentKind): Promise<void> {
-    if (await workspace.create(kind)) newFileOpen = false;
+  async function create(kind: DocumentKind, source: "generator" | "import"): Promise<void> {
+    if (!(await workspace.create(kind))) return;
+    newFileOpen = false;
+    if (source === "import") {
+      await tick();
+      editor?.handleAction("import");
+    }
   }
 
   async function openFromDialog(path: string): Promise<void> {
@@ -205,7 +210,7 @@
       busy={workspace.pending}
       directories={workspace.directories}
       {openPaths}
-      onCreate={(kind) => void create(kind)}
+      onCreate={(kind, source) => void create(kind, source)}
       onOpenFile={(path) => void openFromDialog(path)}
       onClose={() => (newFileOpen = false)}
     />

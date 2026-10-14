@@ -15,7 +15,7 @@
     busy: boolean;
     directories?: string[];
     openPaths?: string[];
-    onCreate: (kind: DocumentKind) => void;
+    onCreate: (kind: DocumentKind, source: "generator" | "import") => void;
     onOpenFile?: (path: string) => void;
     onClose: () => void;
   } = $props();
@@ -26,6 +26,7 @@
     kind: DocumentKind;
   }
 
+  let source = $state<"generator" | "import">("generator");
   let loadingFiles = $state(false);
   let folderFiles = $state.raw<ListedCoilFile[]>([]);
 
@@ -78,14 +79,19 @@
     <Dialog.Overlay class="fixed inset-0 z-[140] bg-slate-950/80 backdrop-blur-sm" />
     <Dialog.Content onInteractOutside={(event) => { if (busy) event.preventDefault(); }} onEscapeKeydown={(event) => { if (busy) event.preventDefault(); }} class="fixed left-1/2 top-1/2 z-[141] w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 rounded-xl border border-slate-600 bg-slate-900 p-6 text-slate-100 shadow-2xl focus:outline-none">
       <Dialog.Title class="text-lg font-semibold">New coil file</Dialog.Title>
-      <Dialog.Description class="mt-1 text-sm text-slate-400">Choose a coil type. The new file opens in its own tab.</Dialog.Description>
-      <div class="mt-5 grid gap-3 sm:grid-cols-2">
-        <button type="button" disabled={busy} onclick={() => onCreate("motor")} class="rounded-lg border border-slate-600 bg-slate-800 p-4 text-left hover:border-emerald-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400 disabled:opacity-50">
+      <Dialog.Description class="mt-1 text-sm text-slate-400">Choose how to start and a coil type. The new file opens in its own tab.</Dialog.Description>
+      <div role="radiogroup" aria-label="Start from" class="mt-4 inline-flex rounded-lg border border-slate-700 bg-slate-950/50 p-0.5 text-xs">
+        {#each [["generator", "Generator"], ["import", "Import DXF"]] as [value, label] (value)}
+          <button type="button" role="radio" aria-checked={source === value} disabled={busy} onclick={() => (source = value as "generator" | "import")} class="rounded-md px-3 py-1.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400 {source === value ? 'bg-slate-700 text-slate-100' : 'text-slate-400 hover:text-slate-200'}">{label}</button>
+        {/each}
+      </div>
+      <div class="mt-3 grid gap-3 sm:grid-cols-2">
+        <button type="button" disabled={busy} onclick={() => onCreate("motor", source)} class="rounded-lg border border-slate-600 bg-slate-800 p-4 text-left hover:border-emerald-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400 disabled:opacity-50">
           <span class="block font-medium">Motor coil</span>
           <span class="mt-1 block text-xs text-slate-400">Motor winding, motion and simulation</span>
           <span class="mt-3 block font-mono text-xs text-emerald-300">.pmmotor</span>
         </button>
-        <button type="button" disabled={busy} onclick={() => onCreate("sensor")} class="rounded-lg border border-slate-600 bg-slate-800 p-4 text-left hover:border-sky-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-400 disabled:opacity-50">
+        <button type="button" disabled={busy} onclick={() => onCreate("sensor", source)} class="rounded-lg border border-slate-600 bg-slate-800 p-4 text-left hover:border-sky-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-400 disabled:opacity-50">
           <span class="block font-medium">Sensor coil</span>
           <span class="mt-1 block text-xs text-slate-400">Inductive position sensor</span>
           <span class="mt-3 block font-mono text-xs text-sky-300">.pmsensor</span>
