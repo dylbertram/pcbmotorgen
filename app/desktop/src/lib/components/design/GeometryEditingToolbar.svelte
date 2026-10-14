@@ -9,7 +9,7 @@
 
   let { label, geometry, selection, measure, terminalTool, disabled = false,
     onActivateSelection, onStartTerminals, onSimplify, onUndoSimplify,
-    simplifyNotice = "", onPrepareGeometry }: {
+    simplifyNotice = "", onPrepareGeometry, borderless = false }: {
     label: string;
     geometry: CadGeometry | null;
     selection: CadSelectionTool;
@@ -22,6 +22,7 @@
     onUndoSimplify?: () => void;
     simplifyNotice?: string;
     onPrepareGeometry?: () => Promise<boolean>;
+    borderless?: boolean;
   } = $props();
   let preparing = $state(false);
   let error = $state("");
@@ -40,7 +41,7 @@
   }
 </script>
 
-<div role="toolbar" aria-label={label} class="flex shrink-0 flex-wrap items-start gap-2 border-y border-slate-700 py-2">
+<div role="toolbar" aria-label={label} class="flex shrink-0 flex-wrap items-start gap-2 py-2 {borderless ? '' : 'border-y border-slate-700'}">
   {#if geometry}
     <CadSelectionToolbar tool={selection} {geometry} {disabled} onActivate={activateSelection} />
   {:else if onPrepareGeometry}

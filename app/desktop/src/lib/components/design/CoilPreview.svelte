@@ -32,7 +32,6 @@
   ═══════════════════════════════════════════════════════════════════════
 -->
 <script lang="ts">
-  import { GitMerge, Plug, Undo2 } from "@lucide/svelte";
   import { confirm } from "@tauri-apps/plugin-dialog";
   import { editableCoilGeometry } from "../../ipc/dxf";
   import type { ConfigStore } from "../../stores/config.svelte";
@@ -65,7 +64,6 @@
   import { fitWorldToView, unionBounds } from "../../chart";
   import { CoilPreviewGestures } from "../../utils/coilPreviewGestures.svelte";
   import { CoilPreviewMeasure } from "../../utils/coilPreviewMeasure.svelte";
-  import CoilPreviewControls from "./CoilPreviewControls.svelte";
   import CoilPreviewLightbox from "./CoilPreviewLightbox.svelte";
   import PreviewFrame from "./PreviewFrame.svelte";
   import {
@@ -197,7 +195,7 @@
   // pointer-capture cleanup live in the gesture utility; this component only
   // reads its reactive view state and binds its handlers.
   const gestures = new CoilPreviewGestures({
-    interactionMode: "cad",
+    get interactionMode() { return expanded ? "cad" : "navigation"; },
     virtualW: W,
     get virtualH() { return H; },
     minZoom: MIN_ZOOM,
@@ -514,8 +512,7 @@
 </script>
 
 <div class="rounded-lg bg-slate-800/40 border border-slate-700 p-4">
-  <!-- Header: title + stats + the expand button only. Zoom/reset controls
-       live BELOW the canvas so the header stays collapsed-card-simple. -->
+  <!-- The inline preview is read-only. Tools live in the expanded viewer. -->
   <div class="flex items-center justify-between mb-2 flex-wrap gap-2">
     <h3 class="text-sm font-semibold text-slate-200">Coil Preview</h3>
     <div class="flex items-center gap-2">
@@ -535,7 +532,7 @@
   <!-- Frame div owns the ARIA label (the canvas is the paint surface; data-*
        attributes on the canvas carry the introspection counters). All pan/
        pinch/scroll-zoom handling is delegated to the gesture utility. -->
-  <PreviewFrame bind:frame={frameRef} {gestures} label="Coil preview" aspectRatio={W / H} ondblclick={onInlineDoubleClick}>
+  <PreviewFrame bind:frame={frameRef} {gestures} label="Coil preview" aspectRatio={W / PREVIEW_H} ondblclick={onInlineDoubleClick}>
     <!-- data-segments / data-vias / data-pole-pitch / data-band-widths /
          data-pole-regions / data-revision are written imperatively by the
          renderer (canvas.dataset in coilPreviewCanvas.ts), NOT bound
@@ -546,33 +543,10 @@
     {/if}
   </PreviewFrame>
 
-  <!-- Zoom + reset view, pinned to the bottom-right of the preview. -->
-  <div class="mt-2">
-    {#if importedGeometry && onGeometryChange}
-      <div class="mb-2 flex flex-wrap items-center gap-2" role="group" aria-label="Imported geometry tools">
-        <button type="button" aria-label="Simplify lines" onclick={simplifyImportedLines} disabled={terminalTool.active} class="inline-flex h-8 w-8 items-center justify-center rounded border border-slate-700 bg-slate-800 text-slate-300 hover:text-emerald-300 disabled:opacity-40" title="Simplify lines: merge collinear lines in saved and exported geometry."><GitMerge size={16} aria-hidden="true" /></button>
-        <button type="button" aria-label="Set coil terminals" onclick={() => startTerminalTool()} class="inline-flex h-8 w-8 items-center justify-center rounded border border-slate-700 bg-slate-800 text-slate-300 hover:text-emerald-300" title="Set coil terminals: review open ends, change either endpoint, or flip IN and OUT."><Plug size={16} aria-hidden="true" /></button>
-        {#if canUndoSimplify}<button type="button" aria-label="Undo simplify" title="Undo line simplification." onclick={undoSimplify} class="inline-flex h-8 w-8 items-center justify-center rounded border border-slate-700 text-slate-400 hover:text-slate-100"><Undo2 size={16} aria-hidden="true" /></button>{/if}
-        <span role="status" class="text-xs text-slate-400">{simplifyNotice}</span>
-        {#if terminalTool.notice}<span role="status" class="text-xs text-slate-400">{terminalTool.notice}</span>{/if}
-      </div>
-    {/if}
-    <CoilPreviewControls
-      zoomLabel={gestures.zoomLabel}
-      canZoomIn={gestures.canZoomIn}
-      canZoomOut={gestures.canZoomOut}
-      onZoomIn={gestures.zoomIn}
-      onZoomOut={gestures.zoomOut}
-      onResetZoom={gestures.zoomReset}
-      onResetView={gestures.resetView}
-    />
-  </div>
-
   {#if coils && coils.phases.length > 0}
     <p class="mt-2 text-xs text-slate-500">
       <span class="text-slate-600"
-        >Middle-drag or use two fingers to pan. Three-finger pinch or
-        Ctrl-scroll zooms. Open the expanded viewer to select and edit segments.</span
+        >Drag to pan. Pinch or Ctrl-scroll to zoom. Open the expanded viewer to edit.</span
       >
     </p>
   {/if}
