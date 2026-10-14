@@ -564,18 +564,6 @@ export class CoilPreviewRenderer {
     ctx.fillText("end-turn", 196, viewportHeight - 4);
     }
 
-    // Schematic disclaimer (bottom-right).
-    ctx.textAlign = "right";
-    ctx.font = "9px sans-serif";
-    ctx.fillStyle = "#64748b";
-    ctx.fillText(
-      input.traceMode === "centerlines"
-        ? "Centerlines. Layers overlaid at true coordinates."
-        : "Actual copper width. Layers overlaid at true coordinates.",
-      PREVIEW_W - 8,
-      viewportHeight - 4,
-    );
-
     drawnSegments = segments;
     drawnVias = vias;
     canvas.dataset.segments = String(drawnSegments);
