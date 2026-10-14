@@ -43,8 +43,8 @@ test("all toggles live in the Layers popover and survive reopening without resiz
   const rail = dialog.getByRole("toolbar", { name: "Preview side tools" });
   await expect(rail).toHaveAttribute("aria-orientation", "vertical");
   const railBounds = (await rail.boundingBox())!;
-  expect(railBounds.x).toBeCloseTo(canvasBox!.x + canvasBox!.width, 0);
-  expect(railBounds.y).toBeCloseTo(canvasBox!.y, 0);
+  expect(railBounds.x + railBounds.width).toBeCloseTo(canvasBox!.x + canvasBox!.width, 0);
+  expect(railBounds.y).toBeGreaterThan(canvasBox!.y);
   await dialog.getByRole("button", { name: "Layers", exact: true }).click();
   await expect(panel).toBeVisible();
   const panelBounds = (await panel.boundingBox())!;
@@ -56,7 +56,7 @@ test("all toggles live in the Layers popover and survive reopening without resiz
   await panel.getByRole("radio", { name: "Centerlines" }).check();
   await panel.getByRole("button", { name: "Close layers panel" }).click();
   const toolbar = dialog.getByRole("toolbar", { name: "Coil preview tools" });
-  expect((await toolbar.boundingBox())!.y).toBeLessThan(canvasBox!.y);
+  expect((await toolbar.boundingBox())!.y).toBeGreaterThan(canvasBox!.y);
   await toolbar.getByRole("button", { name: "Toggle measure tool" }).click();
   await expect(toolbar.getByRole("button", { name: "Toggle measure tool" })).toHaveAttribute("aria-pressed", "true");
   await page.keyboard.press("Escape");
@@ -101,6 +101,32 @@ test("overlay visibility and phase selection do not change the camera", async ({
     await panel.getByRole("checkbox", { name, exact: true }).uncheck();
     await expect(canvas).not.toHaveAttribute("data-revision", revision!);
     await expect(canvas).toHaveAttribute("data-test-camera", camera);
+  }
+});
+
+test("full-modal drawing contains docked controls and bottom display menu", async ({ page }) => {
+  await gotoDesignApp(page);
+  await page.getByRole("button", { name: "Expand coil preview" }).click();
+  const dialog = page.getByRole("dialog", { name: "Coil Preview", exact: true });
+  for (const size of [{ width: 1280, height: 800 }, { width: 390, height: 844 }]) {
+    await page.setViewportSize(size);
+    const frame = dialog.getByRole("img", { name: "Coil preview — expanded", exact: true });
+    await expect.poll(async () => (await frame.boundingBox())!.height).toBeGreaterThan(size.height - 40);
+    const drawing = (await frame.boundingBox())!;
+    for (const control of [dialog.getByRole("toolbar", { name: "Coil preview tools" }), dialog.getByRole("group", { name: "Zoom controls" }), dialog.getByRole("group", { name: "Preview status" }), dialog.getByRole("slider", { name: "Mover position slider (mm)" })]) {
+      const box = (await control.boundingBox())!;
+      expect(box.x).toBeGreaterThanOrEqual(drawing.x);
+      expect(box.y).toBeGreaterThanOrEqual(drawing.y);
+      expect(box.x + box.width).toBeLessThanOrEqual(drawing.x + drawing.width);
+      expect(box.y + box.height).toBeLessThanOrEqual(drawing.y + drawing.height);
+    }
+    await dialog.getByRole("button", { name: "Display state" }).click();
+    await page.getByRole("menuitemcheckbox", { name: "Show phase waveform" }).click();
+    await expect(dialog.getByRole("img", { name: /Per-phase holding force versus mover position/ })).toHaveCount(0);
+    await expect(dialog.getByRole("slider", { name: "Mover position slider (mm)" })).toBeVisible();
+    await dialog.getByRole("button", { name: "Display state" }).click();
+    await page.getByRole("menuitemcheckbox", { name: "Show phase waveform" }).click();
+    await expect(dialog.getByRole("img", { name: /Per-phase holding force versus mover position/ })).toBeVisible();
   }
 });
 

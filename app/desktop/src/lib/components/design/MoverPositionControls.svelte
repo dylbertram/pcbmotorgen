@@ -26,7 +26,7 @@
   import Slider from "../ui/Slider.svelte";
   import HoldingForceChart from "./HoldingForceChart.svelte";
 
-  let { config, motion, showWaveform = true }: { config: ConfigStore; motion: MotionStore; showWaveform?: boolean } =
+  let { config, motion, showWaveform = true, compact = false }: { config: ConfigStore; motion: MotionStore; showWaveform?: boolean; compact?: boolean } =
     $props();
 
   // Strip extent in the DOMAIN (routing) frame — exactly what the coil
@@ -36,7 +36,7 @@
   const travelRangeMm = $derived(motion.moverMaxMm - motion.moverMinMm);
 </script>
 
-<div class="mt-3" aria-label="Mover position">
+<div class={compact ? "" : "mt-3"} aria-label="Mover position">
   <div class="flex items-center gap-2">
     <label
       for="mover-position-value"
@@ -74,11 +74,11 @@
        a 3-phase motor); phase-A zeros mark the stable rest positions. -->
   {#if showWaveform}<HoldingForceChart {config} {motion} />{/if}
 
-  <div class="mt-1 text-[10px] text-slate-500" aria-live="polite">
+  {#if !compact}<div class="mt-1 text-[10px] text-slate-500" aria-live="polite">
     Position: {motion.clampedPositionMm.toFixed(1)} mm · Mover extent:
     <span class="text-slate-300">{bounds.startMm.toFixed(1)} - {bounds.endMm.toFixed(1)} mm</span>
     · Offset from rest: {motion.offsetFromRestMm.toFixed(1)} / {travelRangeMm.toFixed(1)} mm
-  </div>
+  </div>{/if}
 
   {#if motion.envelopeWarning}
     <!-- Placeholder travel envelope in effect (kata ab30): the bounds are a

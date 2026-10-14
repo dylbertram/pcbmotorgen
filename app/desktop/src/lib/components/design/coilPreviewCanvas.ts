@@ -139,6 +139,7 @@ export class CoilPreviewRenderer {
     input: CoilPreviewDrawInput,
   ): void {
     if (frame.clientWidth <= 0) return;
+    const viewportHeight = PREVIEW_W * frame.clientHeight / frame.clientWidth;
     this.#revision += 1;
     const drawRevision = this.#revision;
     let drawnSegments = 0;
@@ -152,17 +153,17 @@ export class CoilPreviewRenderer {
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
     const k = (frame.clientWidth / PREVIEW_W) * dpr; // virtual px → device px
     ctx.setTransform(k, 0, 0, k, 0, 0);
-    ctx.clearRect(0, 0, PREVIEW_W, PREVIEW_H);
+    ctx.clearRect(0, 0, PREVIEW_W, viewportHeight);
     // Page panel behind the (same-coloured) board rect.
     ctx.fillStyle = "#0f172a";
-    ctx.fillRect(0, 0, PREVIEW_W, PREVIEW_H);
+    ctx.fillRect(0, 0, PREVIEW_W, viewportHeight);
 
     if (!coils) {
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       ctx.font = "14px sans-serif";
       ctx.fillStyle = "#64748b";
-      ctx.fillText("Awaiting coil generation…", PREVIEW_W / 2, PREVIEW_H / 2);
+      ctx.fillText("Awaiting coil generation…", PREVIEW_W / 2, viewportHeight / 2);
       drawnSegments = 0;
       drawnVias = 0;
       canvas.dataset.segments = "0";
@@ -549,18 +550,18 @@ export class CoilPreviewRenderer {
     ctx.lineWidth = 2.4;
     ctx.setLineDash([]);
     ctx.beginPath();
-    ctx.moveTo(0, PREVIEW_H - 8);
-    ctx.lineTo(20, PREVIEW_H - 8);
+    ctx.moveTo(0, viewportHeight - 8);
+    ctx.lineTo(20, viewportHeight - 8);
     ctx.stroke();
-    ctx.fillText("active leg", 26, PREVIEW_H - 4);
+    ctx.fillText("active leg", 26, viewportHeight - 4);
     ctx.lineWidth = 1;
     ctx.setLineDash([3, 2]);
     ctx.beginPath();
-    ctx.moveTo(170, PREVIEW_H - 8);
-    ctx.lineTo(190, PREVIEW_H - 8);
+    ctx.moveTo(170, viewportHeight - 8);
+    ctx.lineTo(190, viewportHeight - 8);
     ctx.stroke();
     ctx.setLineDash([]);
-    ctx.fillText("end-turn", 196, PREVIEW_H - 4);
+    ctx.fillText("end-turn", 196, viewportHeight - 4);
     }
 
     // Schematic disclaimer (bottom-right).
@@ -572,7 +573,7 @@ export class CoilPreviewRenderer {
         ? "Centerlines. Layers overlaid at true coordinates."
         : "Actual copper width. Layers overlaid at true coordinates.",
       PREVIEW_W - 8,
-      PREVIEW_H - 4,
+      viewportHeight - 4,
     );
 
     drawnSegments = segments;

@@ -484,7 +484,7 @@ test("outside clicks dismiss context menus and submenus while selecting in CAD a
     const bounds = (await frame.boundingBox())!;
     const menu = page.getByRole("menu", { name: "Selection actions", exact: true });
     const openMenu = async () => {
-      await page.mouse.click(bounds.x + bounds.width * .8, bounds.y + bounds.height * .15, { button: "right" });
+      await page.mouse.click(bounds.x + bounds.width * .8, bounds.y + bounds.height * (viewer === "motor" ? .45 : .15), { button: "right" });
       await expect(menu).toBeVisible();
     };
     await openMenu();

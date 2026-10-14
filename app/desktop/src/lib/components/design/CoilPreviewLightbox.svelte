@@ -12,7 +12,7 @@
   import { X } from "@lucide/svelte";
   import type { ConfigStore } from "../../stores/config.svelte";
   import type { MotionStore } from "../../stores/motion.svelte";
-  import { Dialog } from "bits-ui";
+  import { Dialog, DropdownMenu } from "bits-ui";
   import { onDestroy } from "svelte";
   import type { CadGeometry } from "../../types";
   import type { WorldTransform } from "../../chart";
@@ -35,9 +35,12 @@
   import { PREVIEW_H, PREVIEW_W } from "./coilPreviewCanvas";
   import type { CoilPreviewViewState } from "./coilPreviewViewState.svelte";
   import { CadSelectionTool } from "../../utils/cadSelectionTool.svelte";
+  import HoldingForceChart from "./HoldingForceChart.svelte";
+  import { stripBoundsDomainMm } from "../../previewGeometry";
 
   let {
     expanded = $bindable(false),
+    height = PREVIEW_H,
     config,
     motion,
     view,
@@ -65,6 +68,7 @@
   }: {
     /** Dialog open state, bound to the parent's `expanded` rune. */
     expanded?: boolean;
+    height?: number;
     config: ConfigStore;
     motion: MotionStore;
     view: CoilPreviewViewState;
@@ -93,10 +97,11 @@
     modalCanvasRef?: HTMLCanvasElement;
   } = $props();
 
-  // Virtual drawing space — same constants as the inline card (the CSS box
-  // keeps the same 760:260 aspect ratio as the old SVG viewBox).
+  // Keep the virtual width shared with the inline card; height follows the
+  // modal's aspect ratio so canvas, overlays and gestures stay aligned.
   const W = PREVIEW_W;
-  const H = PREVIEW_H;
+  const H = $derived(height);
+  const moverBounds = $derived(stripBoundsDomainMm(config, motion));
   const selection = new CadSelectionTool({ getGeometry: () => importedGeometry, onChange: (geometry) => onGeometryChange?.(geometry) });
   function activateSelection() { terminalTool?.cancel(); measure.mode = false; view.oneSection = false; }
   onDestroy(() => terminalTool?.cancel());
@@ -143,15 +148,15 @@
       preventScroll={false}
       onEscapeKeydown={(event) => { if (terminalTool?.active) { event.preventDefault(); terminalTool.cancel(); } else if (selection.selected.length || selection.anchor) { event.preventDefault(); selection.clear(); } }}
       aria-label="Coil Preview — expanded"
-      class="fixed left-1/2 top-1/2 z-50 flex max-h-[calc(100vh-2rem)] w-[calc(100%-2rem)] max-w-7xl -translate-x-1/2 -translate-y-1/2 flex-col gap-3 overflow-y-auto overscroll-contain rounded-lg border border-slate-700 bg-slate-900 p-4 shadow-2xl"
+      class="fixed inset-4 z-50 overflow-hidden overscroll-contain rounded-lg border border-slate-700 bg-slate-900 shadow-2xl"
     >
       <!-- Header row -->
-      <div class="flex items-center justify-between flex-wrap gap-2">
+      <div class="absolute inset-x-0 top-0 z-30 flex items-center justify-between gap-2 border-b border-slate-700 bg-slate-900/95 px-3 py-2">
         <Dialog.Title level={3} class="text-sm font-semibold text-slate-200">
           Coil Preview
         </Dialog.Title>
         <div class="flex items-center gap-3 flex-wrap">
-          <span class="text-xs text-slate-400">
+          <span class="hidden text-xs text-slate-400 sm:inline">
             {stats}
           </span>
           <Dialog.Close
@@ -162,19 +167,24 @@
         </div>
       </div>
 
+      <div class="absolute left-2 right-12 top-12 z-20 max-h-[30%] overflow-y-auto rounded border border-slate-700 bg-slate-900/95 p-2">
       <GeometryEditingToolbar label="Coil preview tools" geometry={onGeometryChange ? importedGeometry : null}
         {selection} {measure} {terminalTool} {onSimplify} {onUndoSimplify} {simplifyNotice}
         onActivateSelection={activateSelection} onPrepareGeometry={onStartSegmentEditing} {onStartTerminals} />
       {#if terminalTool?.active}<CoilTerminalPanel tool={terminalTool} />{/if}
+      {#if importedGeometry}
+        <CoilTerminalSummary geometry={importedGeometry} tool={terminalTool} onEdit={(coil) => { selection.setMode("pan"); onStartTerminals?.(coil); }} {onGeometryChange} />
+      {/if}
+      </div>
 
-      <div class="min-w-0 flex flex-col gap-3">
+       <div class="absolute inset-0">
       <!-- Modal frame div owns the ARIA label (the canvas is the paint
            target; data-* attributes carry the introspection counters,
            mirroring the inline pair). All gestures delegate to the same
            utility instance. -->
-       <div class="relative overflow-hidden rounded-md border border-slate-700 pr-11">
+        <div class="relative h-full overflow-hidden">
        <PreviewFrame bind:frame={modalFrameRef} {gestures} {measure} interactive={terminalTool?.active ?? false}
-        label="Coil preview — expanded" aspectRatio={W / H}>
+         label="Coil preview — expanded">
         <canvas bind:this={modalCanvasRef} class="block h-full w-full"
         ></canvas>
         {#if importedGeometry}
@@ -183,15 +193,16 @@
         <PreviewMeasureOverlay {measure} transform={worldTransform} panX={gestures.panX} panY={gestures.panY} width={W} height={H} />
       </PreviewFrame>
 
-       <PreviewLayersPopover {view} layers={importedGeometry ? importedGeometry.layer_z_mm.map((_, idx) => ({ idx })) : uniqueLayers} phases={importedGeometry ? [] : uniquePhases}
+        <div class="absolute right-0 top-11 bottom-11 z-20 w-11">
+        <PreviewLayersPopover {view} layers={importedGeometry ? importedGeometry.layer_z_mm.map((_, idx) => ({ idx })) : uniqueLayers} phases={importedGeometry ? [] : uniquePhases}
          geometry={importedGeometry} {selection} assignmentDisabled={!onGeometryChange || measure.mode || !!terminalTool?.active || view.oneSection}
         coils={importedGeometry ? uniquePhases.map((phase) => ({ name: phase.name, colorIdx: phase.colorIdx })) : []}
         isCoilVisible={(name) => view.isPhaseVisible(uniquePhases.find((phase) => phase.name === name)?.idx ?? -1)}
         onToggleCoil={(name) => { const phase = uniquePhases.find((phase) => phase.name === name); if (phase) view.phaseVisibility[phase.idx] = !view.isPhaseVisible(phase.idx); }} showMotorControls={true}
-         label="Coil preview layers" {hasPolePitchData} {hasBandWidthData} {hasPoleRegionData} {poleRegionPhases} />
+          label="Coil preview layers" {hasPolePitchData} {hasBandWidthData} {hasPoleRegionData} {poleRegionPhases} />
+        </div>
        </div>
-       <!-- Zoom controls stay below the drawing; Layers opens from the right rail. -->
-       <div class="flex flex-wrap items-center justify-end gap-3">
+       <div class="absolute top-[32%] right-12 z-20 rounded border border-slate-700 bg-slate-900/95 p-2 sm:top-auto sm:bottom-12">
       <CoilPreviewControls
         zoomLabel={gestures.zoomLabel}
         canZoomIn={gestures.canZoomIn}
@@ -206,12 +217,21 @@
       <!-- Mover position: same controls as the Design reflection on the
            shared MotionStore, so the slider lives next to the strip it
            moves inside the lightbox. -->
-      <MoverPositionControls {config} {motion} showWaveform={view.showWaveform} />
+       <div class="absolute bottom-12 left-2 z-20 max-h-[40%] w-[min(420px,calc(100%-4rem))] overflow-y-auto rounded border border-slate-700 bg-slate-900/95 p-3">
+         <MoverPositionControls {config} {motion} showWaveform={false} compact />
+         {#if view.showWaveform}<HoldingForceChart {config} {motion} />{/if}
+       </div>
 
       </div>
-      {#if importedGeometry}
-        <CoilTerminalSummary geometry={importedGeometry} tool={terminalTool} onEdit={(coil) => { selection.setMode("pan"); onStartTerminals?.(coil); }} {onGeometryChange} />
-      {/if}
+      <div class="absolute inset-x-0 bottom-0 z-30 flex items-center justify-between gap-3 border-t border-slate-700 bg-slate-900 px-3 py-2 text-[10px] text-slate-400" role="group" aria-label="Preview status">
+        <span class="min-w-0 flex-1 font-mono">Position: {motion.clampedPositionMm.toFixed(1)} mm · Mover extent: {moverBounds.startMm.toFixed(1)} – {moverBounds.endMm.toFixed(1)} mm</span>
+        <DropdownMenu.Root>
+          <DropdownMenu.Trigger class="shrink-0 rounded border border-slate-700 px-2 py-1 text-xs hover:text-emerald-300" aria-label="Display state">Display ▾</DropdownMenu.Trigger>
+          <DropdownMenu.Portal><DropdownMenu.Content preventScroll={false} class="z-[150] rounded border border-slate-700 bg-slate-900 p-1 text-xs text-slate-200" side="top" sideOffset={8}>
+            <DropdownMenu.CheckboxItem bind:checked={view.showWaveform} class="cursor-default rounded px-3 py-2 outline-none data-[highlighted]:bg-slate-800">{view.showWaveform ? "✓ " : ""}Show phase waveform</DropdownMenu.CheckboxItem>
+          </DropdownMenu.Content></DropdownMenu.Portal>
+        </DropdownMenu.Root>
+      </div>
 
     </Dialog.Content>
   </Dialog.Portal>
