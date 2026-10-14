@@ -13,7 +13,7 @@
  */
 
 import { checkCoilInterference, debounce } from "../ipc";
-import type { InterferenceViolation } from "../types";
+import type { CadGeometry, InterferenceViolation } from "../types";
 import type { ConfigStore } from "./config.svelte";
 
 interface DrcControllerOptions {
@@ -21,6 +21,8 @@ interface DrcControllerOptions {
   config: ConfigStore;
   /** Computes the layout fingerprint from the current config. */
   getLayoutKey: () => string;
+  /** Imported copper to check instead of the generated layout. */
+  getCadGeometry?: () => CadGeometry | null;
 }
 
 export class DrcController {
@@ -35,6 +37,7 @@ export class DrcController {
   constructor(options: DrcControllerOptions) {
     this.config = options.config;
     this.getLayoutKey = options.getLayoutKey;
+    this.getCadGeometry = options.getCadGeometry ?? (() => null);
   }
 
   readonly #schedule = debounce((requestId: number, layoutKey: string): void => {
@@ -43,6 +46,7 @@ export class DrcController {
 
   private readonly config: ConfigStore;
   private readonly getLayoutKey: () => string;
+  private readonly getCadGeometry: () => CadGeometry | null;
 
   /** The layout fingerprint for the current config, recomputed live. */
   get currentLayoutKey(): string {
@@ -75,7 +79,7 @@ export class DrcController {
 
   async #perform(requestId: number, layoutKey: string): Promise<void> {
     try {
-      const result = await checkCoilInterference(this.config.toIpc());
+      const result = await checkCoilInterference(this.config.toIpc(), this.getCadGeometry());
       if (requestId !== this.#requestId || layoutKey !== this.currentLayoutKey) {
         return;
       }

@@ -28,7 +28,10 @@
 mod geometry;
 mod inductance;
 
-pub use geometry::{extract_phase_networks, solve_network, EdgeKind, NetworkSolution, PhaseNetwork};
+pub use geometry::{
+    extract_phase_networks, extract_phase_networks_with_terminals, solve_network, EdgeKind,
+    NetworkSolution, PhaseNetwork, TerminalPair, TerminalPoint,
+};
 
 use crate::params::SimulationInput;
 use crate::units::{oz_to_m, RHO_CU};
@@ -302,6 +305,27 @@ pub fn analyze_drive(
     settings: &DriveSettings,
     thrust_constant_n_per_a: Option<f64>,
 ) -> DriveAnalysis {
+    analyze_drive_with(sim, routing, settings, thrust_constant_n_per_a, &DriveGeometryHints::default())
+}
+
+/// Extra geometry known for imported copper.
+#[derive(Debug, Clone, Default)]
+pub struct DriveGeometryHints {
+    /// Copper plane heights per layer index [m]; evenly spaced through
+    /// `pcb_thickness_m` when empty.
+    pub layer_z_m: Vec<f64>,
+    /// Picked IN/OUT terminals per phase net.
+    pub terminals: std::collections::BTreeMap<String, Vec<TerminalPair>>,
+}
+
+/// [`analyze_drive`] with imported-geometry hints.
+pub fn analyze_drive_with(
+    sim: &SimulationInput,
+    routing: &RoutingResult,
+    settings: &DriveSettings,
+    thrust_constant_n_per_a: Option<f64>,
+    hints: &DriveGeometryHints,
+) -> DriveAnalysis {
     let num_layers = sim.num_layers.max(1);
     let width = sim.min_trace_m;
     let rho_hot = rho_cu_at(settings.winding_temp_c);
@@ -314,7 +338,8 @@ pub fn analyze_drive(
         0.0
     };
 
-    let networks = extract_phase_networks(routing);
+    let networks = extract_phase_networks_with_terminals(routing, &hints.terminals);
+    let layer_z = |l: u32| hints.layer_z_m.get(l as usize).copied().unwrap_or(l as f64 * layer_pitch);
     let mut notes = Vec::new();
     let via_amp = ipc2221_ampacity_a(
         std::f64::consts::PI * sim.min_via_drill_m,
@@ -403,7 +428,7 @@ pub fn analyze_drive(
     let filaments: Vec<Vec<inductance::Filament>> = networks
         .iter()
         .zip(solutions.iter())
-        .map(|(net, sol)| inductance::phase_filaments(net, &sol.current_share, layer_pitch))
+        .map(|(net, sol)| inductance::phase_filaments(net, &sol.current_share, layer_z))
         .collect();
     let self_l: Vec<f64> = filaments
         .iter()

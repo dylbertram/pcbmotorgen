@@ -135,3 +135,25 @@ fn braid_fixture_produces_plausible_values() {
 }
 
 
+
+#[test]
+fn picked_terminals_override_the_inferred_ones() {
+    // Pick the strand end on layer 1 as IN: the inferred terminal is the
+    // layer-0 end, so the buses swap.
+    let r = two_strand_fixture();
+    let pick = |y: f64| TerminalPair {
+        input: TerminalPoint { layer: 1, position: Point::new(0.0, y + 1.0) },
+        output: TerminalPoint { layer: 0, position: Point::new(0.0, y) },
+    };
+    let picked = std::collections::BTreeMap::from([("A".to_string(), vec![pick(0.0), pick(5.0)])]);
+    let inferred = &extract_phase_networks(&r)[0];
+    let explicit = &extract_phase_networks_with_terminals(&r, &picked)[0];
+    assert_eq!(explicit.terminal, inferred.star);
+    assert_eq!(explicit.star, inferred.terminal);
+    let a = analyze_drive_with(&sim(), &r, &DriveSettings::default(), None, &DriveGeometryHints {
+        layer_z_m: vec![0.0, 1.6e-3],
+        terminals: picked,
+    });
+    assert!(a.phases[0].connected);
+    assert_eq!(a.phases[0].strands, 2);
+}

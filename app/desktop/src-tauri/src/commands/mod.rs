@@ -66,6 +66,7 @@
 //! handlers as `commands::routing_plugins::list_routing_patterns` or via the
 //! flat `commands::` paths, whichever the caller prefers.
 
+pub mod cad_source;
 pub mod dxf;
 pub mod kicad;
 pub mod physics;

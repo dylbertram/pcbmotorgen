@@ -457,6 +457,7 @@ mod tests {
                         },
                     },
                 )]),
+                coil_phases: std::collections::BTreeMap::new(),
             }),
             sensor_config: SensorConfig::default(),
             sensor_cad_geometry: None,

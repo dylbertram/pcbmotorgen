@@ -14,7 +14,9 @@
     PreconditionWarning,
     CoilPreview,
     InterferenceViolation,
+    CadGeometry,
   } from "../../types";
+  import { unmappedCoils } from "../../cadPhases";
   import KicadConnectionCard from "./KicadConnectionCard.svelte";
   import KicadPreflightCard from "./KicadPreflightCard.svelte";
   import KicadWriteControls from "./KicadWriteControls.svelte";
@@ -26,8 +28,11 @@
     drcError,
     drcReady,
     drcLayoutKey,
+    cadGeometry = null,
   }: {
     config: ConfigStore;
+    /** Imported copper to write instead of the generated coils. */
+    cadGeometry?: CadGeometry | null;
     drcViolations: InterferenceViolation[];
     drcLoading: boolean;
     drcError: string | null;
@@ -56,6 +61,7 @@
   let toastTimer: ReturnType<typeof setTimeout> | undefined;
 
   // --- Derived -----------------------------------------------------------
+  let unmapped = $derived(cadGeometry ? unmappedCoils(cadGeometry) : []);
   let connected = $derived(connection?.connected ?? false);
   let boardName = $derived(connection?.board_name ?? "(not connected)");
   let copperLayers = $derived(connection?.copper_layers ?? 0);
@@ -148,7 +154,7 @@
       // needs the live board snapshot.
       if (!diagnostics) diagnostics = await getBoardDiagnostics();
       const ipc = config.toIpc();
-      validationWarnings = await validateWritePreconditions(ipc, diagnostics);
+      validationWarnings = await validateWritePreconditions(ipc, diagnostics, cadGeometry);
       const n = validationWarnings.length;
       const errs = validationWarnings.filter((w) => w.level === "error").length;
       const tail = n === 0
@@ -167,7 +173,7 @@
     error = null;
     try {
       const ipc = config.toIpc();
-      previewResult = await previewCoils(ipc);
+      previewResult = await previewCoils(ipc, cadGeometry);
       showToast(
         `Preview: ${previewResult.num_layers} layer(s), ` +
           `${previewResult.total_tracks} track(s), ` +
@@ -181,6 +187,10 @@
   }
 
   async function handleWrite(): Promise<void> {
+    if (unmapped.length) {
+      error = `Assign a phase to every imported coil before writing (unassigned: ${unmapped.join(", ")}).`;
+      return;
+    }
     if (!overrideDrc && drcGateBlocked) {
       error = `Export blocked: ${drcGateMessage} Acknowledge the DRC override to continue.`;
       return;
@@ -192,7 +202,7 @@
     dryRunPreview = null;
     try {
       const ipc = config.toIpc();
-      const result = await writeCoilsToBoard(ipc, dryRun);
+      const result = await writeCoilsToBoard(ipc, dryRun, cadGeometry);
       writeResult = result;
 
       // Special-case the "0 of 0" bug: don't show a green toast when

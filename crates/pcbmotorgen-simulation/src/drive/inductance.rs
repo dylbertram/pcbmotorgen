@@ -39,16 +39,16 @@ fn norm(v: [f64; 3]) -> f64 {
     (v[0] * v[0] + v[1] * v[1] + v[2] * v[2]).sqrt()
 }
 
-/// Current-carrying filaments of a phase; layer `l` sits at
-/// `z = l·layer_pitch`. `share` is the per-edge current share.
-pub fn phase_filaments(net: &PhaseNetwork, share: &[f64], layer_pitch_m: f64) -> Vec<Filament> {
+/// Current-carrying filaments of a phase; layer `l` sits at `layer_z(l)`
+/// [m]. `share` is the per-edge current share.
+pub fn phase_filaments(net: &PhaseNetwork, share: &[f64], layer_z: impl Fn(u32) -> f64) -> Vec<Filament> {
     let mut out = Vec::new();
     for (e, w) in net.edges.iter().zip(share.iter()) {
         if w.abs() < 1e-9 {
             continue;
         }
         if let EdgeKind::Trace { layer, points, .. } = &e.kind {
-            let z = *layer as f64 * layer_pitch_m;
+            let z = layer_z(*layer);
             for p in points.windows(2) {
                 let f = Filament { a: [p[0][0], p[0][1], z], b: [p[1][0], p[1][1], z], w: *w };
                 if f.len() > 0.0 {

@@ -21,6 +21,7 @@ import type {
   MagnetGrade,
   DriveSettings,
   DriveAnalysis,
+  CadGeometry,
 } from "../types";
 import { isTauriAvailable } from "./core";
 import {
@@ -61,11 +62,13 @@ export async function fetchTravelEnvelope(
   return await invoke<TravelEnvelopeDto>("travel_envelope", { config });
 }
 
+/** Thrust sweep over the generated coils, or over `cadGeometry` when set. */
 export async function evaluateForceSweep(
   config: LinearMotorConfig,
+  cadGeometry: CadGeometry | null = null,
 ): Promise<ForceSweepResult> {
   if (!isTauriAvailable()) return mockForceSweep(config);
-  return await invoke<ForceSweepResult>("evaluate_force_sweep", { config });
+  return await invoke<ForceSweepResult>("evaluate_force_sweep", { config, cadGeometry });
 }
 
 export async function computeHeightStack(
@@ -97,12 +100,14 @@ export async function analyzeDrive(
   config: LinearMotorConfig,
   drive: DriveSettings,
   kf: number | null,
+  cadGeometry: CadGeometry | null = null,
 ): Promise<DriveAnalysis> {
   if (!isTauriAvailable()) return mockDriveAnalysis(config, drive, kf);
   return await invoke<DriveAnalysis>("analyze_drive", {
     config,
     drive,
     thrustConstantNPerA: kf,
+    cadGeometry,
   });
 }
 

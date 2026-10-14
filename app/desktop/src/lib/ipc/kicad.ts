@@ -10,6 +10,7 @@
 
 import { invoke } from "@tauri-apps/api/core";
 import type {
+  CadGeometry,
   LinearMotorConfig,
   KicadConnection,
   KicadWriteResult,
@@ -49,11 +50,13 @@ export async function connectKicad(): Promise<KicadConnection> {
 export async function writeCoilsToBoard(
   config: LinearMotorConfig,
   dryRun: boolean = false,
+  cadGeometry: CadGeometry | null = null,
 ): Promise<KicadWriteResult> {
   if (!isTauriAvailable()) return mockKicadWrite();
   return await invoke<KicadWriteResult>("write_coils_to_board", {
     config,
     dryRun,
+    cadGeometry,
   });
 }
 
@@ -84,11 +87,13 @@ export async function getBoardDiagnostics(): Promise<BoardDiagnostics> {
 export async function validateWritePreconditions(
   config: LinearMotorConfig,
   diagnostics: BoardDiagnostics,
+  cadGeometry: CadGeometry | null = null,
 ): Promise<PreconditionWarning[]> {
   if (!isTauriAvailable()) return mockValidatePreconditions(config, diagnostics);
   return await invoke<PreconditionWarning[]>("validate_write_preconditions", {
     config,
     diagnostics,
+    cadGeometry,
   });
 }
 
@@ -99,7 +104,8 @@ export async function validateWritePreconditions(
  */
 export async function previewCoils(
   config: LinearMotorConfig,
+  cadGeometry: CadGeometry | null = null,
 ): Promise<CoilPreview> {
   if (!isTauriAvailable()) return mockPreviewCoils(config);
-  return await invoke<CoilPreview>("preview_coils", { config });
+  return await invoke<CoilPreview>("preview_coils", { config, cadGeometry });
 }

@@ -324,14 +324,47 @@ fn builder<'a>(nets: &'a mut BTreeMap<String, Builder>, net: &str) -> &'a mut Bu
     })
 }
 
-/// Build the conductor network of every phase net, in label order.
+/// A picked phase terminal: a trace endpoint on one copper layer [mm].
+#[derive(Debug, Clone, Copy)]
+pub struct TerminalPoint {
+    pub layer: u32,
+    pub position: Point,
+}
+
+/// The IN (phase terminal) and OUT (star end) of one coil.
+#[derive(Debug, Clone, Copy)]
+pub struct TerminalPair {
+    pub input: TerminalPoint,
+    pub output: TerminalPoint,
+}
+
+/// Build the conductor network of every phase net, in label order, finding
+/// the terminals from the copper shape.
 pub fn extract_phase_networks(routing: &RoutingResult) -> Vec<PhaseNetwork> {
+    extract_phase_networks_with_terminals(routing, &BTreeMap::new())
+}
+
+/// As [`extract_phase_networks`], but a net listed in `picked` uses those
+/// IN/OUT endpoints as its terminal and star buses instead of the inferred
+/// ones. Picks that do not land on the net's copper are ignored.
+pub fn extract_phase_networks_with_terminals(
+    routing: &RoutingResult,
+    picked: &BTreeMap<String, Vec<TerminalPair>>,
+) -> Vec<PhaseNetwork> {
     let mut nets: BTreeMap<String, Builder> = BTreeMap::new();
     for s in &routing.segments {
         builder(&mut nets, &s.net).trace(s.layer, vec![s.start, s.end], s.is_active);
     }
     for c in &routing.curves {
         builder(&mut nets, &c.net).trace(c.layer, arc_points(c.start, c.mid, c.end), c.is_active);
+    }
+    for sp in &routing.splines {
+        let length: f64 = sp.control_points.windows(2).map(|p| p[0].distance_to(p[1])).sum();
+        let Ok(pieces) = sp.tessellate((length / 10_000.0).max(0.01)) else { continue };
+        let Some(first) = pieces.first() else { continue };
+        let mut points = vec![first.start];
+        points.extend(pieces.iter().map(|p| p.end));
+        builder(&mut nets, &sp.net).trace(sp.layer, points, sp.is_active);
     }
     let mut seen = HashSet::new();
     for v in &routing.vias {
@@ -352,7 +385,19 @@ pub fn extract_phase_networks(routing: &RoutingResult) -> Vec<PhaseNetwork> {
         .map(|(net, b)| {
             let n = b.keys.len();
             let pos = |i: usize| (b.keys[i].1 as f64 * SNAP_MM, b.keys[i].2 as f64 * SNAP_MM);
-            let (terminal, star) = find_terminals(&b, pos);
+            let explicit = picked.get(&net).map(|pairs| {
+                let node = |t: &TerminalPoint| {
+                    let (x, y) = snap(t.position);
+                    b.nodes.get(&(t.layer, x, y)).copied()
+                };
+                let ins: Vec<usize> = pairs.iter().filter_map(|p| node(&p.input)).collect();
+                let outs: Vec<usize> = pairs.iter().filter_map(|p| node(&p.output)).collect();
+                (ins, outs)
+            });
+            let (terminal, star) = match explicit {
+                Some((ins, outs)) if !ins.is_empty() && !outs.is_empty() => (ins, outs),
+                _ => find_terminals(&b, pos),
+            };
             PhaseNetwork {
                 net,
                 node_count: n,

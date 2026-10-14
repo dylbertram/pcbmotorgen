@@ -6,6 +6,7 @@
   import KicadPanel from "../export/KicadPanel.svelte";
   import SensorKicadPanel from "../export/SensorKicadPanel.svelte";
   import type { SensorStore } from "../../stores/sensor.svelte";
+  import CoilPhaseMapping from "../design/CoilPhaseMapping.svelte";
 
   let { open = $bindable(false), config, projects, drc, sensor }: {
     open: boolean;
@@ -28,13 +29,23 @@
         <Dialog.Close class="rounded-md px-3 py-2 text-xs text-slate-400 hover:bg-slate-800 hover:text-slate-100 focus-visible:outline focus-visible:outline-emerald-400">Close</Dialog.Close>
       </header>
       <div class="min-h-0 flex-1 overflow-y-auto overscroll-contain p-5">
-        {#if projects.cadGeometry || (projects.kind === "sensor" && sensor?.cadGeometry)}
-          <p role="status" class="rounded-md border border-amber-500/50 bg-amber-500/10 p-4 text-sm text-amber-100">Imported CAD geometry cannot be sent to KiCad until phase and net mappings are supported. Use File &gt; Export as… &gt; DXF to export this geometry.</p>
+        {#if projects.kind === "sensor" && sensor?.cadGeometry}
+          <p role="status" class="rounded-md border border-amber-500/50 bg-amber-500/10 p-4 text-sm text-amber-100">Imported sensor geometry can't be sent to KiCad yet. Use File &gt; Export as… &gt; DXF to export it.</p>
         {:else if projects.kind === "sensor" && sensor}
           <SensorKicadPanel {sensor} />
         {:else}
+          {#if projects.cadGeometry}
+            <div class="mb-4">
+              <CoilPhaseMapping
+                geometry={projects.cadGeometry}
+                phases={config.phases}
+                onChange={(g) => projects.setCadGeometry(g)}
+              />
+            </div>
+          {/if}
           <KicadPanel
             {config}
+            cadGeometry={projects.cadGeometry}
             drcViolations={drc.violations}
             drcLoading={drc.loading}
             drcError={drc.error}

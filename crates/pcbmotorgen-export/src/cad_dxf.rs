@@ -29,6 +29,96 @@ pub struct CadGeometry {
     /// Explicit terminal positions in mm, keyed by coil/net identity.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub coil_terminals: BTreeMap<String, CadCoilTerminals>,
+    /// Coil/net identity → motor phase label (`A`, `B`, `C`, …). Coils that
+    /// share a phase join the same KiCad net and drive in parallel. A coil
+    /// already named after a phase maps to it without an entry.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub coil_phases: BTreeMap<String, String>,
+}
+
+impl CadGeometry {
+    /// Every coil/net identity carrying copper, sorted.
+    pub fn coil_names(&self) -> Vec<String> {
+        let mut names: BTreeSet<String> = BTreeSet::new();
+        names.extend(self.routing.segments.iter().map(|s| s.net.clone()));
+        names.extend(self.routing.curves.iter().map(|c| c.net.clone()));
+        names.extend(self.routing.splines.iter().map(|s| s.net.clone()));
+        names.into_iter().collect()
+    }
+
+    /// The phase a coil drives: its explicit assignment, else its own name
+    /// when that is already a phase label.
+    pub fn phase_of(&self, coil: &str) -> Option<String> {
+        match self.coil_phases.get(coil) {
+            Some(phase) if !phase.trim().is_empty() => Some(phase.trim().to_string()),
+            _ if pcbmotorgen_routing::PHASE_NAMES.contains(&coil) => Some(coil.to_string()),
+            _ => None,
+        }
+    }
+
+    /// Coils without a phase.
+    pub fn unmapped_coils(&self) -> Vec<String> {
+        self.coil_names().into_iter().filter(|c| self.phase_of(c).is_none()).collect()
+    }
+
+    /// The routing with every coil net renamed to its phase, so coils of one
+    /// phase share a net. Fails while any coil has no phase.
+    pub fn routing_by_phase(&self) -> Result<RoutingResult, String> {
+        let unmapped = self.unmapped_coils();
+        if !unmapped.is_empty() {
+            return Err(format!(
+                "Assign a phase to every imported coil first (unassigned: {})",
+                unmapped.join(", ")
+            ));
+        }
+        let phase = |net: &str| self.phase_of(net).unwrap_or_else(|| net.to_string());
+        let mut routing = self.routing.clone();
+        for s in &mut routing.segments {
+            s.net = phase(&s.net);
+        }
+        for c in &mut routing.curves {
+            c.net = phase(&c.net);
+        }
+        for s in &mut routing.splines {
+            s.net = phase(&s.net);
+        }
+        for v in &mut routing.vias {
+            v.net = phase(&v.net);
+        }
+        Ok(routing)
+    }
+
+    /// Picked IN/OUT terminals grouped by phase (mapped coils only).
+    pub fn terminals_by_phase(&self) -> BTreeMap<String, Vec<CadCoilTerminals>> {
+        let mut out: BTreeMap<String, Vec<CadCoilTerminals>> = BTreeMap::new();
+        for (coil, t) in &self.coil_terminals {
+            if let Some(phase) = self.phase_of(coil) {
+                out.entry(phase).or_default().push(t.clone());
+            }
+        }
+        out
+    }
+
+    /// `[min, max]` copper extent along x and y in mm (`None` when empty).
+    pub fn extent_mm(&self) -> Option<([f64; 2], [f64; 2])> {
+        let mut pts: Vec<Point> = Vec::new();
+        for s in &self.routing.segments {
+            pts.extend([s.start, s.end]);
+        }
+        for c in &self.routing.curves {
+            pts.extend([c.start, c.mid, c.end]);
+        }
+        for s in &self.routing.splines {
+            pts.extend(s.control_points.iter().copied());
+        }
+        if pts.is_empty() {
+            return None;
+        }
+        let fold = |f: fn(&Point) -> f64| {
+            pts.iter().map(f).fold([f64::INFINITY, f64::NEG_INFINITY], |a, v| [a[0].min(v), a[1].max(v)])
+        };
+        Some((fold(|p| p.x), fold(|p| p.y)))
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -135,6 +225,7 @@ pub fn sensor_geometry_to_cad_geometry(sensor: &SensorGeometry) -> CadGeometry {
         source_layer_coils: BTreeMap::new(),
         source_file_name: None,
         coil_terminals: BTreeMap::new(),
+        coil_phases: BTreeMap::new(),
     }
 }
 
@@ -320,6 +411,7 @@ pub fn phase_coils_to_cad_geometry(
         source_layer_coils: BTreeMap::new(),
         source_file_name: None,
         coil_terminals: BTreeMap::new(),
+        coil_phases: BTreeMap::new(),
     };
     validate_geometry(&geometry)?;
     Ok(geometry)
@@ -811,6 +903,7 @@ pub fn import_3d_dxf_with_coils(
         source_layer_coils,
         source_file_name: None,
         coil_terminals: BTreeMap::new(),
+        coil_phases: BTreeMap::new(),
     };
     validate_geometry(&geometry)?;
     Ok(CadImportResult { geometry, warnings })
@@ -866,6 +959,12 @@ fn validate_geometry(geometry: &CadGeometry) -> Result<(), String> {
             .any(|v| !finite_point(v.position))
     {
         return Err("CAD geometry coordinates must be finite".into());
+    }
+    for (coil, phase) in &geometry.coil_phases {
+        let phase = phase.trim();
+        if !phase.is_empty() && !pcbmotorgen_routing::PHASE_NAMES.contains(&phase) {
+            return Err(format!("Coil '{coil}' has unknown phase '{phase}'"));
+        }
     }
     for (coil, terminals) in &geometry.coil_terminals {
         for (label, terminal) in [("IN", &terminals.input), ("OUT", &terminals.output)] {
@@ -1257,6 +1356,7 @@ mod tests {
             source_layer_coils: BTreeMap::new(),
             source_file_name: None,
             coil_terminals: BTreeMap::new(),
+            coil_phases: BTreeMap::new(),
         };
         let text = cad_geometry_to_3d_dxf(&geometry).unwrap();
         let imported = import_3d_dxf(
@@ -1314,6 +1414,7 @@ mod tests {
             source_layer_coils: BTreeMap::new(),
             source_file_name: None,
             coil_terminals: BTreeMap::new(),
+            coil_phases: BTreeMap::new(),
         }
     }
 

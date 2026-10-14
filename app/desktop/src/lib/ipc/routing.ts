@@ -9,6 +9,7 @@
 
 import { invoke } from "@tauri-apps/api/core";
 import type {
+  CadGeometry,
   LinearMotorConfig,
   RoutingPatternInfo,
   RoutingParamDef,
@@ -86,9 +87,11 @@ export async function loadInstalledPlugins(): Promise<string[]> {
  */
 export async function checkCoilInterference(
   config: LinearMotorConfig,
+  cadGeometry: CadGeometry | null = null,
 ): Promise<InterferenceViolation[]> {
   if (!isTauriAvailable()) return [];
   return await invoke<InterferenceViolation[]>("check_coil_interference", {
     config,
+    cadGeometry,
   });
 }

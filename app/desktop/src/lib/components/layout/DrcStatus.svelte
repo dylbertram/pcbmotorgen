@@ -3,16 +3,15 @@
   import type { DrcController } from "../../stores/drc.svelte";
   import InterferencePanel from "../export/InterferencePanel.svelte";
 
-  let { drc, cadGeometryActive }: { drc: DrcController; cadGeometryActive: boolean } = $props();
+  let { drc }: { drc: DrcController } = $props();
   let label = $derived.by(() => {
-    if (cadGeometryActive) return "DRC unavailable";
     if (drc.loading) return "DRC checking";
     if (drc.error) return "DRC failed";
     if (!drc.ready) return "DRC pending";
     if (drc.violations.length) return `DRC: ${drc.violations.length} violation${drc.violations.length === 1 ? "" : "s"}`;
     return "DRC clear";
   });
-  let color = $derived(cadGeometryActive || drc.loading || !drc.ready ? "text-amber-300" : drc.violations.length ? "text-rose-300" : "text-emerald-300");
+  let color = $derived(drc.loading || !drc.ready ? "text-amber-300" : drc.violations.length ? "text-rose-300" : "text-emerald-300");
 </script>
 
 <Dialog.Root>
@@ -29,11 +28,7 @@
         </div>
         <Dialog.Close class="rounded-md px-3 py-2 text-xs text-slate-400 hover:bg-slate-800 hover:text-slate-100 focus-visible:outline focus-visible:outline-emerald-400">Close</Dialog.Close>
       </div>
-      {#if cadGeometryActive}
-        <p role="status" class="text-sm text-amber-200">DRC is not available for imported CAD geometry.</p>
-      {:else}
-        <InterferencePanel violations={drc.violations} loading={drc.loading} error={drc.error} ready={drc.ready} onCheck={() => drc.request()} />
-      {/if}
+      <InterferencePanel violations={drc.violations} loading={drc.loading} error={drc.error} ready={drc.ready} onCheck={() => drc.request()} />
     </Dialog.Content>
   </Dialog.Portal>
 </Dialog.Root>

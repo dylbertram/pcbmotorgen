@@ -196,6 +196,7 @@ pub async fn generate_coils(config: LinearMotorConfigIpc) -> Result<CoilPathIpc,
 #[tauri::command]
 pub async fn evaluate_force_sweep(
     config: LinearMotorConfigIpc,
+    cad_geometry: Option<pcbmotorgen_export::cad_dxf::CadGeometry>,
 ) -> Result<ForceSweepResultIpc, String> {
     let core = config.to_core();
     let n_positions = config.n_positions.max(2) as usize;
@@ -205,19 +206,28 @@ pub async fn evaluate_force_sweep(
         CommutationModeIpc::PhaseAOnly => CoreCommutationMode::PhaseAOnly,
     };
     tauri::async_runtime::spawn_blocking(move || {
-        let ctx = core.routing_context();
-        let routing_result = pcbmotorgen_routing::generate_routing_result(
-            &ctx,
-            &core.routing_pattern_id(),
-        )
-        .map_err(|e| format!("routing pattern failed: {e}"))?;
-        let coils = pcbmotorgen_routing::routing_result_to_phase_coils(
-            &routing_result,
-            &core.routing_pattern_id(),
-        );
+        let (coils, sim) = match cad_geometry.as_ref() {
+            Some(cad) => {
+                let board = super::cad_source::CadBoard::new(cad, &core)?;
+                let sim = board.simulation_input(cad, &core);
+                (board.coils, sim)
+            }
+            None => {
+                let ctx = core.routing_context();
+                let routing_result = pcbmotorgen_routing::generate_routing_result(
+                    &ctx,
+                    &core.routing_pattern_id(),
+                )
+                .map_err(|e| format!("routing pattern failed: {e}"))?;
+                let coils = pcbmotorgen_routing::routing_result_to_phase_coils(
+                    &routing_result,
+                    &core.routing_pattern_id(),
+                );
+                (coils, core.to_simulation())
+            }
+        };
 
         let mut evaluator = ForceEvaluator::new(n_positions, meshing, commutation, 0.0);
-        let sim = core.to_simulation();
         let result = evaluator
             .evaluate(&sim, &coils)
             .map_err(|e| format!("force_sweep self-calibration failed: {e}"))?;
@@ -449,9 +459,20 @@ pub async fn analyze_drive(
     config: LinearMotorConfigIpc,
     drive: pcbmotorgen_simulation::drive::DriveSettings,
     thrust_constant_n_per_a: Option<f64>,
+    cad_geometry: Option<pcbmotorgen_export::cad_dxf::CadGeometry>,
 ) -> Result<pcbmotorgen_simulation::drive::DriveAnalysis, String> {
     let core = config.to_core();
     tauri::async_runtime::spawn_blocking(move || {
+        if let Some(cad) = cad_geometry.as_ref() {
+            let board = super::cad_source::CadBoard::new(cad, &core)?;
+            return Ok(pcbmotorgen_simulation::drive::analyze_drive_with(
+                &board.simulation_input(cad, &core),
+                &board.routing,
+                &drive,
+                thrust_constant_n_per_a,
+                &super::cad_source::CadBoard::drive_hints(cad),
+            ));
+        }
         let routing = pcbmotorgen_routing::generate_routing_result(
             &core.routing_context(),
             &core.routing_pattern_id(),
@@ -628,6 +649,7 @@ mod analyze_drive_tests {
             ipc,
             pcbmotorgen_simulation::drive::DriveSettings::default(),
             Some(0.4),
+            None,
         ))
         .expect("command");
         assert_eq!(a.phases.len(), 3);
@@ -635,5 +657,59 @@ mod analyze_drive_tests {
         assert!(a.phase_resistance_ohm > 0.0);
         assert!(a.line_inductance_h > 0.0);
         assert_eq!(a.checks.len(), 9);
+    }
+}
+
+#[cfg(test)]
+mod cad_source_tests {
+    use super::*;
+
+    /// The default design exported as CAD geometry, with its coils renamed
+    /// so they need a phase mapping.
+    fn exported_default() -> (LinearMotorConfigIpc, pcbmotorgen_export::cad_dxf::CadGeometry) {
+        let ipc = crate::ipc::ProjectConfigStateIpc::default().to_linear_motor_ipc();
+        let core = ipc.to_core();
+        let mut cad = pcbmotorgen_export::cad_dxf::phase_coils_to_cad_geometry(
+            &core.generate_coils_for_board(),
+            core.num_layers,
+            core.pcb_thickness_m * 1e3,
+            core.min_trace_m * 1e3,
+        )
+        .expect("export");
+        let rename = |net: &mut String| *net = format!("coil {net}");
+        cad.routing.segments.iter_mut().for_each(|s| rename(&mut s.net));
+        cad.routing.curves.iter_mut().for_each(|c| rename(&mut c.net));
+        cad.routing.vias.iter_mut().for_each(|v| rename(&mut v.net));
+        (ipc, cad)
+    }
+
+    #[test]
+    fn unmapped_coils_are_reported() {
+        let (ipc, cad) = exported_default();
+        let err = tauri::async_runtime::block_on(evaluate_force_sweep(ipc, Some(cad)))
+            .expect_err("unmapped");
+        assert!(err.contains("coil A"), "{err}");
+    }
+
+    #[test]
+    fn mapped_import_matches_the_generated_copper() {
+        let (ipc, mut cad) = exported_default();
+        for p in ["A", "B", "C"] {
+            cad.coil_phases.insert(format!("coil {p}"), p.to_string());
+        }
+        let gen = tauri::async_runtime::block_on(evaluate_force_sweep(ipc.clone(), None)).unwrap();
+        let imp = tauri::async_runtime::block_on(evaluate_force_sweep(ipc.clone(), Some(cad.clone()))).unwrap();
+        assert!(
+            (gen.mean_thrust_n - imp.mean_thrust_n).abs() <= 1e-6 * gen.mean_thrust_n.abs().max(1.0),
+            "generated {} vs imported {}",
+            gen.mean_thrust_n,
+            imp.mean_thrust_n
+        );
+        let settings = pcbmotorgen_simulation::drive::DriveSettings::default();
+        let a_gen = tauri::async_runtime::block_on(analyze_drive(ipc.clone(), settings.clone(), Some(0.4), None)).unwrap();
+        let a_imp = tauri::async_runtime::block_on(analyze_drive(ipc, settings, Some(0.4), Some(cad))).unwrap();
+        assert_eq!(a_imp.phases.len(), 3);
+        let rel = (a_gen.phase_resistance_ohm - a_imp.phase_resistance_ohm).abs() / a_gen.phase_resistance_ohm;
+        assert!(rel < 0.02, "R generated {} vs imported {}", a_gen.phase_resistance_ohm, a_imp.phase_resistance_ohm);
     }
 }

@@ -142,12 +142,11 @@ pub async fn connect_kicad() -> Result<KicadConnectionResult, String> {
 pub async fn write_coils_to_board(
     config: LinearMotorConfigIpc,
     dry_run: bool,
+    cad_geometry: Option<pcbmotorgen_export::cad_dxf::CadGeometry>,
 ) -> Result<KicadWriteResult, String> {
     let core = config.to_core();
     tauri::async_runtime::spawn_blocking(move || {
-        // Round-robin phase→layer assignment (one phase per layer).
-        // See the function-level doc for the full rationale (Bug 16 fix).
-        let coils = core.generate_coils_for_board();
+        let (coils, num_layers, rules, length_mm) = board_source(&core, cad_geometry.as_ref())?;
 
         let mut client = KiCadClient::new(None, None, 5000);
         client
@@ -164,12 +163,7 @@ pub async fn write_coils_to_board(
             // been written. The connection establishment above is wasted in
             // dry-run mode but harmless (no KiCad commands are sent).
             let result = board
-                .write_coils_dry_run(
-                    &coils,
-                    core.num_layers,
-                    &core.design_rules(),
-                    core.active_area_length_m * 1e3,
-                )
+                .write_coils_dry_run(&coils, num_layers, &rules, length_mm)
                 .map_err(|e| format!("KiCad write_coils_dry_run failed: {e}"))?;
             return Ok(KicadWriteResult {
                 items_attempted: result.items_attempted,
@@ -181,12 +175,7 @@ pub async fn write_coils_to_board(
         }
 
         let result = board
-            .write_coils(
-                &coils,
-                core.num_layers,
-                &core.design_rules(),
-                core.active_area_length_m * 1e3,
-            )
+            .write_coils(&coils, num_layers, &rules, length_mm)
             .map_err(|e| format!("KiCad write_coils failed: {e}"))?;
 
         Ok(KicadWriteResult {
@@ -199,6 +188,27 @@ pub async fn write_coils_to_board(
     })
     .await
     .map_err(|e| format!("write_coils_to_board worker failed: {e}"))?
+}
+
+/// The copper to write: the imported CAD geometry (coil nets mapped to
+/// phases) when present, else the generated coils. Returns the coils, copper
+/// layer count, design rules, and the writer's placement length [mm].
+fn board_source(
+    core: &crate::config::LinearMotorConfig,
+    cad: Option<&pcbmotorgen_export::cad_dxf::CadGeometry>,
+) -> Result<(Vec<pcbmotorgen_routing::PhaseCoil>, u32, DesignRules, f64), String> {
+    match cad {
+        Some(cad) => {
+            let board = super::cad_source::CadBoard::new(cad, core)?;
+            Ok((board.coils, board.num_layers, board.rules, board.placement_length_mm))
+        }
+        None => Ok((
+            core.generate_coils_for_board(),
+            core.num_layers,
+            core.design_rules(),
+            core.active_area_length_m * 1e3,
+        )),
+    }
 }
 
 /// Generate and write sensor copper to an open two-layer KiCad board.
@@ -290,9 +300,17 @@ pub async fn get_board_diagnostics() -> Result<BoardDiagnosticsIpc, String> {
 pub async fn validate_write_preconditions(
     config: LinearMotorConfigIpc,
     diagnostics: BoardDiagnosticsIpc,
+    cad_geometry: Option<pcbmotorgen_export::cad_dxf::CadGeometry>,
 ) -> Result<Vec<PreconditionWarningIpc>, String> {
     tauri::async_runtime::spawn_blocking(move || {
         let core = config.to_core();
+        let (rules, num_layers, length_m, width_m) = match cad_geometry.as_ref() {
+            Some(cad) => {
+                let board = super::cad_source::CadBoard::new(cad, &core)?;
+                (board.rules, board.num_layers, board.placement_length_mm * 1e-3, board.width_mm * 1e-3)
+            }
+            None => (core.design_rules(), core.num_layers, core.active_area_length_m, core.board_width_m),
+        };
         let diags_core = pcbmotorgen_export::BoardDiagnostics {
             board_name: diagnostics.board_name,
             copper_layer_count: diagnostics.copper_layer_count,
@@ -303,10 +321,10 @@ pub async fn validate_write_preconditions(
             available_net_classes: diagnostics.available_net_classes,
         };
         let warnings = pcbmotorgen_export::validate_write_preconditions(
-            &core.design_rules(),
-            core.num_layers,
-            core.active_area_length_m,
-            core.board_width_m,
+            &rules,
+            num_layers,
+            length_m,
+            width_m,
             &diags_core,
         );
         Ok(warnings
@@ -326,11 +344,13 @@ pub async fn validate_write_preconditions(
 /// The full `PhaseCoil` geometry is *not* carried on the wire here — the
 /// UI calls `generate_coils` separately if it needs the raw segments.
 #[tauri::command]
-pub async fn preview_coils(config: LinearMotorConfigIpc) -> Result<CoilPreviewIpc, String> {
+pub async fn preview_coils(
+    config: LinearMotorConfigIpc,
+    cad_geometry: Option<pcbmotorgen_export::cad_dxf::CadGeometry>,
+) -> Result<CoilPreviewIpc, String> {
     tauri::async_runtime::spawn_blocking(move || {
         let core = config.to_core();
-        let num_layers = config.num_layers;
-        let coils = core.generate_coils_for_board();
+        let (coils, num_layers, _, _) = board_source(&core, cad_geometry.as_ref())?;
         match pcbmotorgen_export::preview_coils(&coils, num_layers) {
             Ok(p) => Ok(CoilPreviewIpc::from_core(&p)),
             Err(e) => Err(format!("preview_coils failed: {e}")),

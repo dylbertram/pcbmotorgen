@@ -5,7 +5,10 @@
     FrictionBudgetDto,
     HeightStackResultDto,
     DriveAnalysis,
+    CadGeometry,
   } from "../../types";
+  import { unmappedCoils } from "../../cadPhases";
+  import CoilPhaseMapping from "../design/CoilPhaseMapping.svelte";
   import FluxDiagram from "../simulate/FluxDiagram.svelte";
   import ForceSweepPlot from "../simulate/ForceSweepPlot.svelte";
   import MetricsPanel from "../simulate/MetricsPanel.svelte";
@@ -22,7 +25,8 @@
     drive,
     driveError = null,
     error,
-    cadGeometryActive = false,
+    cadGeometry = null,
+    onCadGeometryChange,
   }: {
     config: ConfigStore;
     active: boolean;
@@ -32,7 +36,8 @@
     drive: DriveAnalysis | null;
     driveError?: string | null;
     error: string | null;
-    cadGeometryActive?: boolean;
+    cadGeometry?: CadGeometry | null;
+    onCadGeometryChange?: (geometry: CadGeometry) => void;
   } = $props();
 </script>
 
@@ -45,10 +50,17 @@
         Automated adjustment tips are planned for a later iteration.
       </p>
     </div>
-    {#if cadGeometryActive}
-      <div class="rounded-md border border-amber-500/50 bg-amber-500/10 px-3 py-2 text-xs text-amber-100" role="status">
-        Imported CAD geometry is active, but simulation still uses geometry generated from the design settings.
-      </div>
+    {#if cadGeometry}
+      {#if unmappedCoils(cadGeometry).length}
+        <div class="rounded-md border border-amber-500/50 bg-amber-500/10 px-3 py-2 text-xs text-amber-100" role="status">
+          Simulation uses the generated coils until every imported coil has a phase.
+        </div>
+      {:else}
+        <p class="text-xs text-slate-400" role="status">Thrust and driver results use the imported copper.</p>
+      {/if}
+      {#if onCadGeometryChange}
+        <CoilPhaseMapping geometry={cadGeometry} phases={config.phases} onChange={onCadGeometryChange} />
+      {/if}
     {/if}
     {#if error}
       <div

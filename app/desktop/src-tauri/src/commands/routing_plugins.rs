@@ -223,14 +223,27 @@ pub struct InterferenceViolationIpc {
 #[tauri::command]
 pub async fn check_coil_interference(
     config: LinearMotorConfigIpc,
+    cad_geometry: Option<pcbmotorgen_export::cad_dxf::CadGeometry>,
 ) -> Result<Vec<InterferenceViolationIpc>, String> {
     let core = config.to_core();
     tauri::async_runtime::spawn_blocking(move || {
-        let ctx = core.routing_context();
-        let result =
-            pcbmotorgen_routing::generate_routing_result(&ctx, &core.routing_pattern_id())
-                .map_err(|e| format!("routing pattern failed: {e}"))?;
-        let violations = pcbmotorgen_dfm::check_interference(&core.design_rules(), &result);
+        let (result, rules) = match cad_geometry.as_ref() {
+            // Imported copper is checked as drawn. Before every coil has a
+            // phase, coils keep their own nets so DRC still runs.
+            Some(cad) => {
+                let mut rules = core.design_rules();
+                rules.min_trace_mm = cad.trace_width_mm;
+                (cad.routing_by_phase().unwrap_or_else(|_| cad.routing.clone()), rules)
+            }
+            None => {
+                let ctx = core.routing_context();
+                let result =
+                    pcbmotorgen_routing::generate_routing_result(&ctx, &core.routing_pattern_id())
+                        .map_err(|e| format!("routing pattern failed: {e}"))?;
+                (result, core.design_rules())
+            }
+        };
+        let violations = pcbmotorgen_dfm::check_interference(&rules, &result);
         Ok(violations
             .into_iter()
             .map(|v| InterferenceViolationIpc {

@@ -22,12 +22,14 @@
     HeightStackResultDto,
     DriveAnalysis,
     SensorConfig,
+    CadGeometry,
   } from "./lib/types";
   import { TABS, type TabId } from "./lib/ui";
   import { DrcController } from "./lib/stores/drc.svelte";
   import { measureTrace } from "./lib/previewGeometry";
   import { cadGeometryToPreview } from "./lib/cadPreview";
   import { saveTextToFile } from "./lib/files";
+  import { geometryKey, unmappedCoils } from "./lib/cadPhases";
 
   import TabNav from "./lib/components/layout/TabNav.svelte";
   import DrcStatus from "./lib/components/layout/DrcStatus.svelte";
@@ -241,6 +243,7 @@
       config.electrical_pitch_mm,
       config.routing_pattern,
       config.routing_params_version,
+      geometryKey(projects.cadGeometry),
       config.phases,
       config.num_layers,
       config.strands_per_phase,
@@ -262,6 +265,13 @@
   // gates both the debounce callback and all result writes, including work
   // that was already in flight when the user changed tabs.
   let simulationGeneration = 0;
+
+  /** Imported copper the sweep and drive analysis run on, once every coil
+   *  has a phase. Unmapped imports fall back to the generated coils. */
+  function simulationCad(): CadGeometry | null {
+    const g = projects.cadGeometry;
+    return g && unmappedCoils(g).length === 0 ? g : null;
+  }
   const scheduleSimulation = debounce((generation: number) => {
     if (!isCurrentSimulation(generation)) return;
     void runSimulation(generation);
@@ -296,7 +306,7 @@
 
     try {
       const results = await Promise.allSettled([
-        evaluateForceSweep(ipc),
+        evaluateForceSweep(ipc, simulationCad()),
         computeFriction(ipc),
         computeHeightStack(ipc),
       ]);
@@ -401,7 +411,7 @@
     }
     const kf = sweep && sweep.current_a > 0 ? Math.abs(sweep.mean_thrust_n) / sweep.current_a : null;
     try {
-      const result = await analyzeDrive(config.toIpc(), $state.snapshot(config.drive), kf);
+      const result = await analyzeDrive(config.toIpc(), $state.snapshot(config.drive), kf, simulationCad());
       if (generation !== driveGeneration) return;
       drive = result;
       driveError = null;
@@ -414,6 +424,7 @@
   $effect(() => {
     void sweep;
     void JSON.stringify(config.drive);
+    void geometryKey(projects.cadGeometry);
     void valid;
     const generation = ++driveGeneration;
     if (!active || activeTab !== "simulate") {
@@ -444,10 +455,17 @@
       config.phases,
       config.active_area_length_mm,
       config.active_area_width_mm,
+      // Imported copper replaces the generated layout; the mapping renames
+      // nets, so both live in the geometry identity.
+      geometryKey(projects.cadGeometry),
     ]);
   }
 
-  const drc = new DrcController({ config, getLayoutKey: getDrcLayoutKey });
+  const drc = new DrcController({
+    config,
+    getLayoutKey: getDrcLayoutKey,
+    getCadGeometry: () => projects.cadGeometry,
+  });
 
   // A layout change invalidates the previous DRC result immediately. The
   // request id and layout key together prevent stale responses from opening
@@ -515,7 +533,7 @@
       <header class="shrink-0 bg-slate-900">
         <TabNav tabs={workflowTabs} statusFor={tabStatus}>
           {#if projects.kind === "motor"}
-            <DrcStatus {drc} cadGeometryActive={projects.cadGeometry !== null} />
+            <DrcStatus {drc} />
           {/if}
           <StatusIndicator loading={loading || exportingDxf} />
         </TabNav>
@@ -634,7 +652,8 @@
               {drive}
               {driveError}
               {error}
-              cadGeometryActive={projects.cadGeometry !== null}
+              cadGeometry={projects.cadGeometry}
+              onCadGeometryChange={(g) => projects.setCadGeometry(g)}
             />
           </Tabs.Content>
         </div>
