@@ -1,10 +1,12 @@
 <script lang="ts">
-  import { PHASE_COLORS } from "./coilPreviewCanvas";
   import type { CoilPreviewViewState } from "./coilPreviewViewState.svelte";
+  import CoilLayerTreeGroup from "./CoilLayerTreeGroup.svelte";
+  import type { CadGeometry } from "../../types";
+  import type { CadSelectionTool } from "../../utils/cadSelectionTool.svelte";
 
   let { view, uniquePhases, uniqueLayers, hasPolePitchData, hasBandWidthData,
     hasPoleRegionData, poleRegionPhases, showMotorControls = true,
-    coils = [], isCoilVisible, onToggleCoil }: {
+    coils = [], isCoilVisible, onToggleCoil, geometry, selection, assignmentDisabled = false }: {
     view: CoilPreviewViewState;
     uniquePhases: { idx: number; name: string; colorIdx: number }[];
     uniqueLayers: { idx: number }[];
@@ -16,6 +18,9 @@
     coils?: { name: string; colorIdx: number }[];
     isCoilVisible?: (name: string) => boolean;
     onToggleCoil?: (name: string) => void;
+    geometry?: CadGeometry | null;
+    selection?: CadSelectionTool;
+    assignmentDisabled?: boolean;
   } = $props();
   const displayGroup = $props.id();
 </script>
@@ -41,7 +46,7 @@
       {#each uniqueLayers as layer (layer.idx)}
         <label class="layer-row" class:hidden-row={!view.isLayerVisible(layer.idx)}>
           <input type="checkbox" checked={view.isLayerVisible(layer.idx)} onchange={() => view.toggleLayer(layer.idx)} aria-label={"Show layer " + layer.idx} />
-          <span class="swatch copper"></span><span>Layer {layer.idx}</span>
+          <span class="swatch copper"></span><span>Layer {layer.idx + 1}</span>
         </label>
       {/each}
     </fieldset>
@@ -51,24 +56,20 @@
     <fieldset aria-label="Phase visibility">
       <legend>Phases</legend>
       {#each uniquePhases as ph (ph.idx)}
-        <label class="layer-row" class:hidden-row={!view.isPhaseVisible(ph.idx)}>
-          <input type="checkbox" checked={view.isPhaseVisible(ph.idx)} onchange={() => view.phaseVisibility[ph.idx] = !view.isPhaseVisible(ph.idx)} aria-label={"Show phase " + ph.name} />
-          <span class="swatch" style:background-color={PHASE_COLORS[ph.colorIdx % PHASE_COLORS.length]}></span>
-          <span>Phase {ph.name}</span>
-        </label>
+        <CoilLayerTreeGroup name={ph.name} colorIdx={ph.colorIdx} label={`Phase ${ph.name}`} visibilityLabel={`Show phase ${ph.name}`}
+          visible={view.isPhaseVisible(ph.idx)} onToggle={() => view.phaseVisibility[ph.idx] = !view.isPhaseVisible(ph.idx)}
+          layers={uniqueLayers} {view} {geometry} {selection} disabled={assignmentDisabled} />
       {/each}
     </fieldset>
   {/if}
 
   {#if coils.length > 0 && isCoilVisible && onToggleCoil}
     <fieldset aria-label="Coil visibility">
-      <legend>Coils</legend>
+      <legend>Phases and coils</legend>
       {#each coils as coil (coil.name)}
-        <label class="layer-row" class:hidden-row={!isCoilVisible(coil.name)}>
-          <input type="checkbox" checked={isCoilVisible(coil.name)} onchange={() => onToggleCoil?.(coil.name)} aria-label={`Coil ${coil.name}`} />
-          <span class="swatch" style:background-color={PHASE_COLORS[coil.colorIdx % PHASE_COLORS.length]}></span>
-          <span>Coil {coil.name}</span>
-        </label>
+        <CoilLayerTreeGroup name={coil.name} colorIdx={coil.colorIdx} label={`${/^[ABC]$/.test(coil.name) ? 'Phase' : 'Coil'} ${coil.name}`} visibilityLabel={`Coil ${coil.name}`}
+          visible={isCoilVisible(coil.name)} onToggle={() => onToggleCoil?.(coil.name)}
+          layers={uniqueLayers} {view} {geometry} {selection} disabled={assignmentDisabled} />
       {/each}
     </fieldset>
   {/if}

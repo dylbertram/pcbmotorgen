@@ -3,6 +3,7 @@
   import type { WorldTransform } from "../../chart";
   import type { CadSelectionTool } from "../../utils/cadSelectionTool.svelte";
   import { selectableTraces } from "../../cadSelection";
+  import SelectionAssignmentMenu from "./SelectionAssignmentMenu.svelte";
   let { geometry, tool, transform, panX, panY, width, height, worldScale = 1, isVisible, disabled = false }: {
     geometry: CadGeometry; tool: CadSelectionTool; transform: WorldTransform; panX: number; panY: number;
     width: number; height: number; worldScale?: number; isVisible: (coil: string, layer: number) => boolean; disabled?: boolean;
@@ -56,6 +57,7 @@
   }
 </script>
 
+<SelectionAssignmentMenu {geometry} {tool} {disabled} passthrough={disabled} triggerClass="absolute inset-0">
 <div bind:this={svg} class="absolute inset-0 h-full w-full overflow-hidden" style:pointer-events={!disabled ? "auto" : "none"} style:cursor={!disabled ? "crosshair" : undefined}
   role="listbox" aria-label="Segment selection preview" aria-hidden={disabled} aria-multiselectable="true" aria-describedby={`${uid}-help`} aria-activedescendant={traces[focusedIndex] ? `${uid}-${focusedIndex}` : undefined} tabindex={!disabled ? 0 : -1}
   onpointerdown={down} onpointermove={move} onpointerup={up} onpointercancel={(e) => { if (e.pointerType !== "touch" && drag?.id === e.pointerId) e.stopPropagation(); touchPointers.delete(e.pointerId); if (!touchPointers.size) multiTouch = false; drag = null; }} onlostpointercapture={(e) => { if (drag?.id === e.pointerId) drag = null; }}
@@ -80,3 +82,4 @@
   </g>
   </svg>
 </div>
+</SelectionAssignmentMenu>

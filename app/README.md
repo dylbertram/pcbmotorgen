@@ -81,6 +81,14 @@ Only numerical roundoff up to 1e-9 mm is allowed when testing collinearity.
 
 CAD import and the expanded motor preview use the same editing tools. Select
 individual segments, chains, or a box to assign coil names and copper layers.
+Right-click selected segments and choose **Change to coil…** or **Change to
+layer…**. The selection-actions button offers the same commands for keyboard
+and touch input, including naming a new coil. In **Layers**, each phase or coil
+has nested copper layers. Click a phase to change only the coil, or a nested
+layer to change both coil and layer. Right-click a destination and choose
+**Move to** for the same action. Visibility checkboxes do not change assignments;
+nested checkboxes hide only that coil/layer pair. **Undo assignment** restores
+the last move. Changes clear affected coil terminals; check them before export.
 Click a segment or drag a selection box without choosing a box tool. Drag
 right to select fully contained segments, or left to select crossed segments.
 Shift adds to the selection. Two fingers pan; a three-finger pinch zooms.
