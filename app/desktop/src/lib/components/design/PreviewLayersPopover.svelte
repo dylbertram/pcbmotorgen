@@ -4,12 +4,21 @@
   import CoilPreviewVisibilityPanel from "./CoilPreviewVisibilityPanel.svelte";
   import type { CoilPreviewViewState } from "./coilPreviewViewState.svelte";
 
-  let { view, layers, coils, isCoilVisible, onToggleCoil }: {
+  let { view, layers, coils = [], isCoilVisible, onToggleCoil,
+    label, phases = [], showMotorControls = false, hasPolePitchData = false,
+    hasBandWidthData = false, hasPoleRegionData = false, poleRegionPhases = [] }: {
     view: CoilPreviewViewState;
     layers: { idx: number }[];
-    coils: { name: string; colorIdx: number }[];
-    isCoilVisible: (name: string) => boolean;
-    onToggleCoil: (name: string) => void;
+    coils?: { name: string; colorIdx: number }[];
+    isCoilVisible?: (name: string) => boolean;
+    onToggleCoil?: (name: string) => void;
+    label: string;
+    phases?: { idx: number; name: string; colorIdx: number }[];
+    showMotorControls?: boolean;
+    hasPolePitchData?: boolean;
+    hasBandWidthData?: boolean;
+    hasPoleRegionData?: boolean;
+    poleRegionPhases?: string[];
   } = $props();
 </script>
 
@@ -19,7 +28,7 @@
     Layers
   </Popover.Trigger>
   <Popover.Portal>
-    <Popover.Content side="top" align="start" sideOffset={8} role="dialog" aria-label="CAD import layers"
+    <Popover.Content side="top" align="start" sideOffset={8} role="dialog" aria-label={label}
       class="z-[130] flex max-h-[min(32rem,var(--bits-popover-content-available-height))] w-60 max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-md border border-slate-700 bg-slate-900 text-slate-200 shadow-xl shadow-black/40">
       <header class="flex shrink-0 items-center justify-between border-b border-slate-700 px-3 py-2">
         <h3 class="text-sm font-semibold">Layers</h3>
@@ -28,8 +37,8 @@
         </Popover.Close>
       </header>
       <div class="min-h-0 overflow-y-auto overscroll-contain p-3">
-        <CoilPreviewVisibilityPanel {view} uniqueLayers={layers} uniquePhases={[]} {coils} {isCoilVisible} {onToggleCoil}
-          showMotorControls={false} hasPolePitchData={false} hasBandWidthData={false} hasPoleRegionData={false} poleRegionPhases={[]} />
+        <CoilPreviewVisibilityPanel {view} uniqueLayers={layers} uniquePhases={phases} {coils} {isCoilVisible} {onToggleCoil}
+          {showMotorControls} {hasPolePitchData} {hasBandWidthData} {hasPoleRegionData} {poleRegionPhases} />
       </div>
     </Popover.Content>
   </Popover.Portal>

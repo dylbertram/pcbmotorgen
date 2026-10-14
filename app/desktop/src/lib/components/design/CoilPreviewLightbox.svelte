@@ -1,50 +1,15 @@
 <!--
-  ═══════════════════════════════════════════════════════════════════════
-  CoilPreviewLightbox — the expanded coil preview modal.
+  Expanded motor preview. The frame, editing toolbar, overlays, terminal
+  controls, and Layers popover are shared with CAD import. CoilPreview owns
+  the canvas renderer, camera, measure state, and presentation state so the
+  inline and expanded previews stay synchronized.
 
-  Hosts the Bits UI Dialog (Dialog.Root/Portal/Overlay/Content) with the
-  expanded frame + canvas pair, ALL interactive presentation toggles —
-  per-phase, per-layer, via, pole-pitch, band-width and pole-region
-   visibility, the pole-region phase picker, and the one-section toggle — and
-  the measure-ruler toolbar. Those two UI clusters are components of their
-  own (extracted in kata 426r — each renders exactly once, here):
-     - ./CoilPreviewVisibilityPanel.svelte — the right-hand Layers panel controls,
-      bound to the shared CoilPreviewViewState instance
-    - ./CoilPreviewMeasureToolbar.svelte — the measure-ruler toolbar,
-      bound to the shared CoilPreviewMeasure instance
-  Zoom/reset controls live BELOW the canvas (identical to the inline
-  card), and the mover slider joins the strip it moves via the shared
-  MotionStore.
-
-  The schematic state itself is shared: `view` (CoilPreviewViewState),
-  `gestures` (CoilPreviewGestures) and `measure` (CoilPreviewMeasure) are
-  instances owned by CoilPreview and passed down, so both view instances
-  (inline frame + canvas and modal frame + canvas) always show the same
-  live schematic. Only ONE pair is drawn per render tick — the `expanded`
-  rune in the parent picks the active pair. The modal frame + canvas refs
-  bind back up (`bind:modalFrameRef`/`bind:modalCanvasRef`) because the
-  parent's ResizeObserver sizing + draw effect and the gesture wheel
-  listener drive both pairs.
-
-  Dismissal: a backdrop click, Escape, and the × close button all dismiss
-  it through Bits' dismissible/escape layers — no custom keydown/
-  pointerdown handlers live here. While expanded, the page behind the
-  lightbox is scroll-locked by the custom refcounted helper (document
-  overflow lock + backdrop wheel/touchmove guard), which stays the source
-  of truth — Bits' built-in scroll lock is therefore disabled
-  (`preventScroll={false}`).
-  Assessed in kata 1jfa — Bits' lock is not a replacement: it only writes
-  overflow/padding/pointer-events on <body> (never inline on <html>) and
-  has no wheel/touchmove preventDefault, so the e2e contract's pinned
-  invariants (inline root+body overflow lock, backdrop wheel
-  defaultPrevented) fail without this helper (4/6 spec runs red under
-  pure-Bits). It must not run alongside either: Bits' delayed body-style
-  reset re-applies a stale snapshot and leaves the page scroll-locked
-  after close.
-  ═══════════════════════════════════════════════════════════════════════
+  Custom document and backdrop scroll locks remain authoritative. Bits UI's
+  delayed body-style restoration conflicts with these locks, so its built-in
+  preventScroll stays disabled. Escape first cancels an active edit command.
 -->
 <script lang="ts">
-  import { GitMerge, Undo2, Plug, X } from "@lucide/svelte";
+  import { X } from "@lucide/svelte";
   import type { ConfigStore } from "../../stores/config.svelte";
   import type { MotionStore } from "../../stores/motion.svelte";
   import { Dialog } from "bits-ui";
@@ -53,8 +18,7 @@
   import type { WorldTransform } from "../../chart";
   import type { CoilTerminalTool } from "../../utils/coilTerminalTool.svelte";
   import CoilTerminalPanel from "./CoilTerminalPanel.svelte";
-  import CoilTerminalOverlay from "./CoilTerminalOverlay.svelte";
-  import { assignCadTerminals, terminalDescription } from "../../cadTerminals";
+  import CoilTerminalSummary from "./CoilTerminalSummary.svelte";
   import type { CoilPreviewGestures } from "../../utils/coilPreviewGestures.svelte";
   import type { CoilPreviewMeasure } from "../../utils/coilPreviewMeasure.svelte";
   import {
@@ -62,14 +26,15 @@
     lockPageScroll,
   } from "../../utils/pageScrollLock";
   import CoilPreviewControls from "./CoilPreviewControls.svelte";
-  import CoilPreviewMeasureToolbar from "./CoilPreviewMeasureToolbar.svelte";
-  import CoilPreviewVisibilityPanel from "./CoilPreviewVisibilityPanel.svelte";
+  import GeometryEditingToolbar from "./GeometryEditingToolbar.svelte";
+  import GeometryEditingOverlay from "./GeometryEditingOverlay.svelte";
+  import PreviewFrame from "./PreviewFrame.svelte";
+  import PreviewMeasureOverlay from "./PreviewMeasureOverlay.svelte";
+  import PreviewLayersPopover from "./PreviewLayersPopover.svelte";
   import MoverPositionControls from "./MoverPositionControls.svelte";
   import { PREVIEW_H, PREVIEW_W } from "./coilPreviewCanvas";
   import type { CoilPreviewViewState } from "./coilPreviewViewState.svelte";
   import { CadSelectionTool } from "../../utils/cadSelectionTool.svelte";
-  import CadSelectionToolbar from "./CadSelectionToolbar.svelte";
-  import CadSelectionOverlay from "./CadSelectionOverlay.svelte";
 
   let {
     expanded = $bindable(false),
@@ -134,62 +99,10 @@
   const H = PREVIEW_H;
   const selection = new CadSelectionTool({ getGeometry: () => importedGeometry, onChange: (geometry) => onGeometryChange?.(geometry) });
   function activateSelection() { terminalTool?.cancel(); measure.mode = false; view.oneSection = false; }
-  let preparingSegments = $state(false);
-  let selectionError = $state("");
-  async function prepareSegments() {
-    preparingSegments = true;
-    selectionError = "";
-    try { if (await onStartSegmentEditing?.()) { activateSelection(); selection.setMode("select"); } }
-    catch (e) { selectionError = e instanceof Error ? e.message : String(e); }
-    finally { preparingSegments = false; }
-  }
   onDestroy(() => terminalTool?.cancel());
 
   let backdropRef: HTMLDivElement | null = $state(null);
   let modalPanelRef: HTMLDivElement | null = $state(null);
-
-  // Modal pointer/touch handlers compose the measure tool with the gesture
-  // utility (order preserved from the pre-extraction implementation: taps
-  // bookkeep before/after the gesture pass exactly as it did inline).
-  function onModalPointerDown(e: PointerEvent) {
-    measure.handlePointerDown(e);
-    gestures.handlePointerDown(e);
-  }
-
-  function onModalPointerMove(e: PointerEvent) {
-    measure.handlePointerMove(e);
-    gestures.handlePointerMove(e);
-  }
-
-  function onModalPointerUp(e: PointerEvent) {
-    gestures.handlePointerEnd(e);
-    measure.handlePointerUp(e);
-  }
-
-  function onModalPointerCancel(e: PointerEvent) {
-    measure.handlePointerCancel(e);
-    gestures.handlePointerEnd(e);
-  }
-
-  function onModalTouchStart(e: TouchEvent) {
-    measure.handleTouchStart(e);
-    gestures.handleTouchStart(e);
-  }
-
-  function onModalTouchMove(e: TouchEvent) {
-    measure.handleTouchMove(e);
-    gestures.handleTouchMove(e);
-  }
-
-  function onModalTouchEnd(e: TouchEvent) {
-    gestures.handleTouchEnd(e);
-    measure.handleTouchEnd(e);
-  }
-
-  function onModalTouchCancel(e: TouchEvent) {
-    measure.handleTouchCancel(e);
-    gestures.handleTouchEnd(e);
-  }
 
   // Scroll lock for the lightbox (Kata xy31): while the modal is open the
   // page behind it must never scroll. Two layers:
@@ -249,65 +162,34 @@
         </div>
       </div>
 
-      <div role="toolbar" aria-label="Coil preview tools" class="flex flex-wrap items-start gap-2 border-y border-slate-700 py-2">
-        {#if importedGeometry && onGeometryChange}
-          <CadSelectionToolbar tool={selection} geometry={importedGeometry} onActivate={activateSelection} />
-        {:else if onStartSegmentEditing}
-          <button type="button" onclick={prepareSegments} disabled={preparingSegments} class="rounded border border-slate-700 bg-slate-800 px-2 py-1 text-xs text-slate-300 disabled:opacity-40" title="Create editable geometry to select and reassign segments. Edits stop following the routing settings.">{preparingSegments ? "Preparing segments…" : "Edit segments"}</button>
-        {/if}
-        {#if selectionError}<p role="alert" class="text-xs text-rose-200">{selectionError}</p>{/if}
-        <CoilPreviewMeasureToolbar {measure} onToggle={() => { selection.setMode("pan"); terminalTool?.cancel(); measure.toggleMode(); }} />
-        {#if onSimplify}
-          <div class="flex flex-wrap items-center gap-2">
-            <button type="button" aria-label="Simplify lines" onclick={() => { selection.clear(); selection.setMode("pan"); onSimplify?.(); }} disabled={terminalTool?.active} class="icon-tool rounded border border-slate-700 bg-slate-800 text-slate-300 hover:text-emerald-300 disabled:opacity-40" title="Simplify lines: merge collinear lines in saved and exported geometry."><GitMerge size={16} aria-hidden="true" /></button>
-            {#if onUndoSimplify}<button type="button" aria-label="Undo simplify" title="Undo line simplification." onclick={() => { selection.clear(); onUndoSimplify?.(); }} disabled={terminalTool?.active} class="icon-tool rounded border border-slate-700 text-slate-400 hover:text-slate-100 disabled:opacity-40"><Undo2 size={16} aria-hidden="true" /></button>{/if}
-            <span role="status" class="text-xs text-slate-400">{simplifyNotice}</span>
-            {#if terminalTool && onStartTerminals}
-              <button type="button" aria-label="Set coil terminals" onclick={() => { selection.setMode("pan"); onStartTerminals?.(); }} aria-pressed={terminalTool.active} title="Set coil terminals: review open ends, change either endpoint, or flip IN and OUT." class="icon-tool rounded border border-slate-700 bg-slate-800 text-slate-300 hover:text-emerald-300"><Plug size={16} aria-hidden="true" /></button>
-              {#if terminalTool.notice}<span role="status" class="text-xs text-slate-400">{terminalTool.notice}</span>{/if}
-            {/if}
-          </div>
-        {/if}
-      </div>
+      <GeometryEditingToolbar label="Coil preview tools" geometry={onGeometryChange ? importedGeometry : null}
+        {selection} {measure} {terminalTool} {onSimplify} {onUndoSimplify} {simplifyNotice}
+        onActivateSelection={activateSelection} onPrepareGeometry={onStartSegmentEditing} {onStartTerminals} />
+      {#if terminalTool?.active}<CoilTerminalPanel tool={terminalTool} />{/if}
 
-      <div class="viewer-layout">
       <div class="min-w-0 flex flex-col gap-3">
       <!-- Modal frame div owns the ARIA label (the canvas is the paint
            target; data-* attributes carry the introspection counters,
            mirroring the inline pair). All gestures delegate to the same
            utility instance. -->
-      <div
-        bind:this={modalFrameRef}
-        class="relative w-full touch-none select-none {gestures.isPanning
-          ? 'cursor-grabbing'
-           : measure.mode || terminalTool?.active
-            ? 'cursor-crosshair'
-            : 'cursor-grab'}"
-        role={terminalTool?.active ? "group" : "img"}
-        aria-label="Coil preview — expanded"
-        style="aspect-ratio: {W} / {H};"
-        onpointerdown={onModalPointerDown}
-        onpointermove={onModalPointerMove}
-        onpointerup={onModalPointerUp}
-        onpointercancel={onModalPointerCancel}
-        onlostpointercapture={gestures.handleLostPointerCapture}
-        ontouchstart={onModalTouchStart}
-        ontouchmove={onModalTouchMove}
-        ontouchend={onModalTouchEnd}
-        ontouchcancel={onModalTouchCancel}
-      >
+      <PreviewFrame bind:frame={modalFrameRef} {gestures} {measure} interactive={terminalTool?.active ?? false}
+        label="Coil preview — expanded" aspectRatio={W / H}>
         <canvas bind:this={modalCanvasRef} class="block h-full w-full"
         ></canvas>
         {#if importedGeometry}
-          <CoilTerminalOverlay geometry={importedGeometry} tool={terminalTool} transform={worldTransform} panX={gestures.panX} panY={gestures.panY} width={W} height={H} isVisible={isTerminalVisible} />
-          {#if onGeometryChange}
-            <CadSelectionOverlay geometry={importedGeometry} tool={selection} transform={worldTransform} panX={gestures.panX} panY={gestures.panY} width={W} height={H} worldScale={1e-3} isVisible={isTerminalVisible} disabled={measure.mode || terminalTool?.active || view.oneSection} />
-          {/if}
+          <GeometryEditingOverlay geometry={importedGeometry} {selection} {terminalTool} transform={worldTransform} panX={gestures.panX} panY={gestures.panY} width={W} height={H} worldScale={1e-3} isVisible={isTerminalVisible} disabled={!onGeometryChange || measure.mode || view.oneSection} />
         {/if}
-      </div>
+        <PreviewMeasureOverlay {measure} transform={worldTransform} panX={gestures.panX} panY={gestures.panY} width={W} height={H} />
+      </PreviewFrame>
 
       <!-- Zoom + reset view below the expanded canvas, same layout as the
            inline preview. -->
+      <div class="flex flex-wrap items-center justify-between gap-3">
+      <PreviewLayersPopover {view} layers={importedGeometry ? importedGeometry.layer_z_mm.map((_, idx) => ({ idx })) : uniqueLayers} phases={importedGeometry ? [] : uniquePhases}
+        coils={importedGeometry ? uniquePhases.map((phase) => ({ name: phase.name, colorIdx: phase.colorIdx })) : []}
+        isCoilVisible={(name) => view.isPhaseVisible(uniquePhases.find((phase) => phase.name === name)?.idx ?? -1)}
+        onToggleCoil={(name) => { const phase = uniquePhases.find((phase) => phase.name === name); if (phase) view.phaseVisibility[phase.idx] = !view.isPhaseVisible(phase.idx); }} showMotorControls={true}
+        label="Coil preview layers" {hasPolePitchData} {hasBandWidthData} {hasPoleRegionData} {poleRegionPhases} />
       <CoilPreviewControls
         zoomLabel={gestures.zoomLabel}
         canZoomIn={gestures.canZoomIn}
@@ -317,6 +199,7 @@
         onResetZoom={gestures.zoomReset}
         onResetView={gestures.resetView}
       />
+      </div>
 
       <!-- Mover position: same controls as the Design reflection on the
            shared MotionStore, so the slider lives next to the strip it
@@ -324,47 +207,10 @@
       <MoverPositionControls {config} {motion} showWaveform={view.showWaveform} />
 
       </div>
-      <aside class="layers-panel" aria-label="Layers panel">
-        {#if terminalTool?.active}<CoilTerminalPanel tool={terminalTool} />{/if}
-        <h4 class="shrink-0 border-b border-slate-700 px-3 py-2 text-sm font-semibold text-slate-200">Layers</h4>
-        <div class="layers-body p-3">
-          <CoilPreviewVisibilityPanel
-            {view} {uniquePhases} {uniqueLayers} {hasPolePitchData}
-            {hasBandWidthData} {hasPoleRegionData} {poleRegionPhases}
-          />
-          {#if importedGeometry && Object.keys(importedGeometry.coil_terminals ?? {}).length}
-            <section class="mt-4 border-t border-slate-700 pt-3" aria-label="Configured coil terminals">
-              <h4 class="mb-2 text-xs font-semibold text-slate-300">Coil terminals</h4>
-              {#each Object.entries(importedGeometry.coil_terminals ?? {}) as [coil, terminals] (coil)}
-                <div class="mb-3 space-y-1 text-[11px] text-slate-400">
-                  <p class="font-semibold text-slate-200">Coil {coil}</p>
-                  <p>IN {terminalDescription(terminals.input)}</p>
-                  <p>OUT {terminalDescription(terminals.output)}</p>
-                  <div class="flex gap-3">
-                    <button type="button" disabled={terminalTool?.active} onclick={() => { selection.setMode("pan"); onStartTerminals?.(coil); }} class="text-xs text-emerald-300 disabled:opacity-40" aria-label={`Edit coil ${coil} terminals`}>Edit terminals</button>
-                    {#if onGeometryChange}<button type="button" disabled={terminalTool?.active} onclick={() => { if (importedGeometry) onGeometryChange?.(assignCadTerminals(importedGeometry, coil, { input: terminals.output, output: terminals.input })); }} class="text-xs text-emerald-300 disabled:opacity-40" aria-label={`Flip coil ${coil} terminals`} title="Swap this coil's IN and OUT terminals.">Flip</button>{/if}
-                  </div>
-                </div>
-              {/each}
-            </section>
-          {/if}
-        </div>
-      </aside>
-      </div>
+      {#if importedGeometry}
+        <CoilTerminalSummary geometry={importedGeometry} tool={terminalTool} onEdit={(coil) => { selection.setMode("pan"); onStartTerminals?.(coil); }} {onGeometryChange} />
+      {/if}
 
     </Dialog.Content>
   </Dialog.Portal>
 </Dialog.Root>
-
-<style>
-  .icon-tool { display: inline-flex; align-items: center; justify-content: center; width: 2rem; height: 2rem; }
-  .icon-tool[aria-pressed="true"] { border-color: #34d399; color: #6ee7b7; background: #064e3b; }
-  .icon-tool:focus-visible { outline: 2px solid #34d399; outline-offset: 2px; }
-  .viewer-layout { display: grid; grid-template-columns: minmax(0, 1fr) 15rem; gap: 1rem; align-items: stretch; }
-  .layers-panel { contain: size; display: flex; flex-direction: column; min-height: 0; overflow-y: auto; overscroll-behavior: contain; border: 1px solid rgb(var(--slate-700)); border-radius: 6px; background: rgb(var(--slate-900)); }
-  .layers-body { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
-  @media (max-width: 640px) {
-    .viewer-layout { grid-template-columns: minmax(0, 1fr); }
-    .layers-panel { contain: none; max-height: 24rem; }
-  }
-</style>

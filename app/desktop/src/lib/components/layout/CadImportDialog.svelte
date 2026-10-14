@@ -5,7 +5,7 @@
   import type { ConfigStore } from "../../stores/config.svelte";
   import type { ProjectStore } from "../../stores/project.svelte";
   import type { SensorStore } from "../../stores/sensor.svelte";
-  import type { CadImportResult } from "../../types";
+  import type { CadGeometry, CadImportResult } from "../../types";
   import { cadCoilNames, joinCadPreviewEndpoints } from "../../cadPreview";
   import { simplifyCadLines } from "../../cadSimplify";
   import { PHASE_COLORS } from "../design/coilPreviewCanvas";
@@ -13,7 +13,17 @@
   import { attachBackdropScrollGuard, lockPageScroll } from "../../utils/pageScrollLock";
   import { fitWorldToView, type WorldTransform } from "../../chart";
   import CoilPreviewControls from "../design/CoilPreviewControls.svelte";
-  import CadImportLayersPopover from "../design/CadImportLayersPopover.svelte";
+  import PreviewLayersPopover from "../design/PreviewLayersPopover.svelte";
+  import PreviewFrame from "../design/PreviewFrame.svelte";
+  import GeometryEditingToolbar from "../design/GeometryEditingToolbar.svelte";
+  import GeometryEditingOverlay from "../design/GeometryEditingOverlay.svelte";
+  import PreviewMeasureOverlay from "../design/PreviewMeasureOverlay.svelte";
+  import CoilTerminalPanel from "../design/CoilTerminalPanel.svelte";
+  import CoilTerminalSummary from "../design/CoilTerminalSummary.svelte";
+  import { CoilTerminalTool } from "../../utils/coilTerminalTool.svelte";
+  import { CoilPreviewMeasure } from "../../utils/coilPreviewMeasure.svelte";
+  import { CadSimplifyTool } from "../../utils/cadSimplifyTool.svelte";
+  import { clientToVirtual, virtualToWorld } from "../../previewGeometry";
   import { PREVIEW_H, PREVIEW_W } from "../design/coilPreviewCanvas";
   import { CoilPreviewViewState } from "../design/coilPreviewViewState.svelte";
   import {
@@ -22,8 +32,6 @@
   import HelpTag from "../ui/HelpTag.svelte";
   import ViaSizingGuide from "../design/ViaSizingGuide.svelte";
   import { CadSelectionTool } from "../../utils/cadSelectionTool.svelte";
-  import CadSelectionToolbar from "../design/CadSelectionToolbar.svelte";
-  import CadSelectionOverlay from "../design/CadSelectionOverlay.svelte";
 
   let {
     config,
@@ -74,7 +82,7 @@
   let edited = $state(false);
   const selection = new CadSelectionTool({
     getGeometry: () => imported?.geometry ?? null,
-    onChange: (geometry) => { if (imported) { imported = { ...imported, geometry }; edited = true; } },
+    onChange: updateImportedGeometry,
     tolerance: () => zTolerance,
   });
   let importedOptions = $state("");
@@ -163,6 +171,35 @@
   });
   let worldTransform = $derived(worldTransformFor(gestures.zoom));
   let renderedStrokeWidth = $derived(previewView.traceMode === "centerlines" ? 1 / worldTransform.s : previewStrokeWidth);
+  const measure = new CoilPreviewMeasure({
+    screenToWorld: (x, y) => {
+      if (!previewFrameRef) return null;
+      const point = clientToVirtual(x, y, previewFrameRef.getBoundingClientRect(), viewportWidth, viewportHeight);
+      const world = virtualToWorld(point.x, point.y, worldTransform, gestures.panX, gestures.panY);
+      return { x: world.x / 1000, y: world.y / 1000 };
+    },
+  });
+  const terminalTool = new CoilTerminalTool({
+    getGeometry: () => imported?.geometry ?? null,
+    onChange: updateImportedGeometry,
+    onReveal: (coil, layer) => {
+      hiddenCoils = { ...hiddenCoils, [coil]: false };
+      previewView.layerVisibility = { ...previewView.layerVisibility, [layer]: true };
+    },
+    onFit: gestures.resetView,
+  });
+  const simplifyTool = new CadSimplifyTool({ getGeometry: () => imported?.geometry ?? null, onChange: updateImportedGeometry });
+  function updateImportedGeometry(geometry: CadGeometry): void {
+    if (!imported) return;
+    imported = { ...imported, geometry };
+    edited = true;
+  }
+  function startTerminals(coil?: string): void {
+    selection.setMode("pan");
+    measure.mode = false;
+    measure.clear();
+    terminalTool.begin(coil);
+  }
   let previewLayers = $derived(
     imported?.geometry.layer_z_mm.map((_, idx) => ({ idx })) ?? [],
   );
@@ -178,14 +215,8 @@
     };
   });
 
-  $effect(() => {
-    const frame = previewFrameRef;
-    if (!frame) return;
-    frame.addEventListener("wheel", gestures.handleWheel, { passive: false });
-    return () => frame.removeEventListener("wheel", gestures.handleWheel);
-  });
-
   onDestroy(() => {
+    terminalTool.cancel();
     if (previewRefreshTimer) clearTimeout(previewRefreshTimer);
   });
 
@@ -241,6 +272,9 @@
         selection.clear();
         selection.before = null;
         selection.after = null;
+        terminalTool.cancel();
+        measure.clear();
+        simplifyTool.reset();
       } else if (path === selectedPath) {
         schedulePreviewRefresh();
       }
@@ -271,6 +305,9 @@
       selection.before = null;
       selection.after = null;
       gestures.resetView();
+      terminalTool.cancel();
+      measure.mode = false;
+      measure.clear();
       previewView.layerVisibility = {};
       await readPreview(path);
     } catch (e) {
@@ -374,6 +411,15 @@
     aria-modal="true"
     aria-labelledby="cad-import-title"
     tabindex="-1"
+    onkeydown={(event) => {
+      if (event.key !== "Escape" || busy) return;
+      event.preventDefault();
+      event.stopPropagation();
+      if (terminalTool.active) terminalTool.cancel();
+      else if (selection.mode !== "pan") { selection.clear(); selection.setMode("pan"); }
+      else if (measure.mode) { measure.mode = false; measure.clear(); }
+      else onClose();
+    }}
   >
     <header class="flex shrink-0 items-center justify-between gap-3 border-b border-slate-800 px-4 py-3">
       <h2 id="cad-import-title" class="text-sm font-semibold text-slate-100">Import CAD</h2>
@@ -455,25 +501,15 @@
       <main class="flex min-h-0 min-w-0 flex-col overflow-hidden p-3">
       {#if imported}
         <section class="flex min-h-0 flex-1 flex-col gap-3" aria-label="CAD import preview">
-          <CadSelectionToolbar tool={selection} geometry={imported.geometry} disabled={busy || !previewIsCurrent} />
+          <GeometryEditingToolbar label="CAD import tools" geometry={imported.geometry} {selection} {measure} {terminalTool}
+            disabled={busy || !previewIsCurrent} onStartTerminals={startTerminals} onSimplify={simplifyTool.simplify}
+            onUndoSimplify={simplifyTool.canUndo ? simplifyTool.undo : undefined} simplifyNotice={simplifyTool.notice} />
+          {#if terminalTool.active}
+            <CoilTerminalPanel tool={terminalTool} />
+          {/if}
           <div class="flex min-h-0 flex-1 overflow-hidden rounded-md border border-slate-700 bg-slate-950">
-          <div
-            bind:this={previewFrameRef}
-            bind:clientWidth={previewWidth}
-            bind:clientHeight={previewHeight}
-            class="relative h-full min-h-0 w-full touch-none select-none overflow-hidden bg-slate-950 {gestures.isPanning ? 'cursor-grabbing' : 'cursor-grab'}"
-            role="img"
-            aria-label="CAD import preview"
-            onpointerdown={gestures.handlePointerDown}
-            onpointermove={gestures.handlePointerMove}
-            onpointerup={gestures.handlePointerEnd}
-            onpointercancel={gestures.handlePointerEnd}
-            onlostpointercapture={gestures.handleLostPointerCapture}
-            ontouchstart={gestures.handleTouchStart}
-            ontouchmove={gestures.handleTouchMove}
-            ontouchend={gestures.handleTouchEnd}
-            ontouchcancel={gestures.handleTouchEnd}
-          >
+          <PreviewFrame bind:frame={previewFrameRef} bind:width={previewWidth} bind:height={previewHeight}
+            {gestures} {measure} interactive={terminalTool.active} label="CAD import preview">
             <svg
               viewBox={`0 0 ${viewportWidth} ${viewportHeight}`}
               aria-hidden="true"
@@ -510,11 +546,13 @@
                 {/if}
               </g>
             </svg>
-            <CadSelectionOverlay geometry={imported.geometry} tool={selection} transform={worldTransform} panX={gestures.panX} panY={gestures.panY} width={viewportWidth} height={viewportHeight} isVisible={(coil, layer) => !coilHidden(coil) && previewView.isLayerVisible(layer)} disabled={busy || !previewIsCurrent} />
-          </div>
+            <GeometryEditingOverlay geometry={imported.geometry} {selection} {terminalTool} transform={worldTransform} panX={gestures.panX} panY={gestures.panY} width={viewportWidth} height={viewportHeight} isVisible={(coil, layer) => !coilHidden(coil) && previewView.isLayerVisible(layer)} disabled={busy || !previewIsCurrent || measure.mode} />
+            <PreviewMeasureOverlay {measure} transform={worldTransform} panX={gestures.panX} panY={gestures.panY} width={viewportWidth} height={viewportHeight} metresToWorld={1000} />
+          </PreviewFrame>
           </div>
           <div class="flex flex-wrap items-center justify-between gap-3">
-            <CadImportLayersPopover
+            <PreviewLayersPopover
+              label="CAD import layers"
               view={previewView}
               layers={previewLayers}
               coils={previewCoils.map((name, colorIdx) => ({ name, colorIdx }))}
@@ -531,6 +569,11 @@
               onResetView={gestures.resetView}
             />
           </div>
+          {#if Object.keys(imported.geometry.coil_terminals ?? {}).length}
+            <div class="max-h-24 shrink-0 overflow-y-auto overscroll-contain">
+              <CoilTerminalSummary geometry={imported.geometry} tool={terminalTool} onEdit={startTerminals} onGeometryChange={updateImportedGeometry} />
+            </div>
+          {/if}
           {#if !viaSizingValid}
             <p role="alert" class="text-xs text-rose-200">Via drill and annular ring must be positive values.</p>
           {/if}

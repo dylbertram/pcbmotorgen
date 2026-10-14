@@ -3,7 +3,7 @@
   import type { WorldTransform } from "../../chart";
   import type { CoilTerminalTool } from "../../utils/coilTerminalTool.svelte";
   import { terminalDescription } from "../../cadTerminals";
-  let { geometry, tool, transform, panX, panY, width, height, isVisible }: {
+  let { geometry, tool, transform, panX, panY, width, height, isVisible, worldScale = 1e-3 }: {
     geometry: CadGeometry;
     tool?: CoilTerminalTool;
     transform: WorldTransform;
@@ -12,10 +12,11 @@
     width: number;
     height: number;
     isVisible: (coil: string, layer: number) => boolean;
+    worldScale?: number;
   } = $props();
   function location(point: CadTerminal): string {
-    const x = point.position.x * 1e-3 * transform.s + transform.tx + panX;
-    const y = -point.position.y * 1e-3 * transform.s + transform.ty + panY;
+    const x = point.position.x * worldScale * transform.s + transform.tx + panX;
+    const y = -point.position.y * worldScale * transform.s + transform.ty + panY;
     return `left:${x / width * 100}%;top:${y / height * 100}%;`;
   }
   let candidates = $derived(tool?.active && (tool.step === "input" || tool.step === "output")

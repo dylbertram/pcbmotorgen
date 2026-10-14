@@ -193,6 +193,92 @@ async function expectImportCoil(page: Page, name: string, present: boolean) {
   await panel.getByRole("button", { name: "Close layers panel" }).click();
 }
 
+test("shared editing tools measure and edit CAD drafts, then keep those edits in motor preview", async ({ page }, testInfo) => {
+  await page.addInitScript(() => { (window as any).__cadNoVias = true; });
+  const dialog = await openImport(page);
+  const tools = dialog.getByRole("toolbar", { name: "CAD import tools" });
+  const summary = dialog.getByText(/\d+ lines,/);
+  const toolNames = await tools.getByRole("button").evaluateAll(buttons => buttons.map(button => button.getAttribute("aria-label")).filter(Boolean));
+  await tools.getByRole("button", { name: "Simplify lines", exact: true }).click();
+  await expect(summary).toContainText("2 lines");
+  await tools.getByRole("button", { name: "Undo simplify", exact: true }).click();
+  await expect(summary).toContainText("4 lines");
+  await tools.getByRole("button", { name: "Toggle measure tool" }).click();
+  const frame = dialog.getByRole("img", { name: "CAD import preview", exact: true });
+  for (const x of [0, 2]) {
+    const point = await frame.locator(":scope > svg > g").evaluate((group, x) => {
+      const matrix = (group as SVGGraphicsElement).getScreenCTM()!;
+      const point = new DOMPoint(x, 0).matrixTransform(matrix);
+      return { x: point.x, y: point.y };
+    }, x);
+    await page.mouse.click(point.x, point.y);
+  }
+  await expect(tools.getByRole("status").filter({ hasText: "click again" })).toContainText("2.00 mm");
+  await expect(dialog.getByRole("img", { name: "Measurement 2.00 mm", exact: true })).toBeVisible();
+  await tools.getByRole("button", { name: "Set coil terminals" }).click();
+  await expect(tools.getByRole("button", { name: "Toggle measure tool" })).toHaveAttribute("aria-pressed", "false");
+  const command = dialog.getByRole("region", { name: "Set coil terminals", exact: true });
+  await command.getByRole("button", { name: "Change OUT", exact: true }).click();
+  const endpoint = dialog.getByRole("button", { name: "Endpoint coil A, L0, X 2 mm, Y 0 mm", exact: true });
+  await endpoint.focus();
+  await page.keyboard.press("Enter");
+  await command.getByRole("button", { name: "Flip", exact: true }).click();
+  await command.getByRole("button", { name: "Apply terminals", exact: true }).click();
+  await expect(dialog.getByRole("img", { name: "Coil A IN, L0, X 2 mm, Y 0 mm", exact: true })).toBeVisible();
+  await tools.getByRole("button", { name: "Simplify lines", exact: true }).click();
+  await expect(summary).toContainText("2 lines");
+  await dialog.getByRole("button", { name: "Open with this geometry" }).click();
+  await page.getByRole("button", { name: "Expand coil preview" }).click();
+  const motor = page.getByRole("dialog", { name: "Coil Preview", exact: true });
+  const motorTools = motor.getByRole("toolbar", { name: "Coil preview tools" });
+  expect(await motorTools.getByRole("button").evaluateAll(buttons => buttons.map(button => button.getAttribute("aria-label")).filter(Boolean))).toEqual(toolNames);
+  await expect(motor.getByRole("img", { name: "Coil A IN, L0, X 2 mm, Y 0 mm", exact: true })).toBeVisible();
+  await motorTools.getByRole("button", { name: "Toggle measure tool" }).click();
+  for (const x of [0, 2]) {
+    const point = await motor.locator('[aria-label="Segment selection preview"] svg > g').evaluate((group, x) => {
+      const matrix = (group as SVGGraphicsElement).getScreenCTM()!;
+      const point = new DOMPoint(x, 0).matrixTransform(matrix);
+      return { x: point.x, y: point.y };
+    }, x);
+    await page.mouse.click(point.x, point.y);
+  }
+  await expect(motorTools.getByRole("status").filter({ hasText: "click again" })).toContainText("2.00 mm");
+  await expect(motor.getByRole("img", { name: "Measurement 2.00 mm", exact: true })).toBeVisible();
+  await motorTools.getByRole("button", { name: "Toggle measure tool" }).click();
+  await motor.getByRole("button", { name: "Flip coil A terminals" }).click();
+  await expect(motor.getByRole("img", { name: "Coil A IN, L0, X 0 mm, Y 0 mm", exact: true })).toBeVisible();
+  await motor.getByRole("button", { name: "Layers", exact: true }).click();
+  const layers = page.getByRole("dialog", { name: "Coil preview layers", exact: true });
+  await layers.getByRole("checkbox", { name: "Coil A", exact: true }).uncheck();
+  await expect(motor.getByRole("img", { name: /Coil A IN/ })).toHaveCount(0);
+  await layers.getByRole("checkbox", { name: "Coil A", exact: true }).check();
+  await layers.getByRole("button", { name: "Close layers panel" }).click();
+  await motor.getByRole("button", { name: "Close coil preview" }).click();
+  await page.getByRole("button", { name: "Expand coil preview" }).click();
+  await expect(motor.getByRole("img", { name: "Coil A IN, L0, X 0 mm, Y 0 mm", exact: true })).toBeVisible();
+  await page.screenshot({ path: testInfo.outputPath("shared-motor-editor.png") });
+});
+
+test("CAD terminal editing works on mobile and changing tools cancels unapplied drafts", async ({ page }) => {
+  await page.addInitScript(() => { (window as any).__cadNoVias = true; });
+  await page.setViewportSize({ width: 390, height: 844 });
+  const dialog = await openImport(page);
+  const tools = dialog.getByRole("toolbar", { name: "CAD import tools" });
+  await tools.getByRole("button", { name: "Set coil terminals" }).click();
+  const command = dialog.getByRole("region", { name: "Set coil terminals", exact: true });
+  await command.getByRole("button", { name: "Flip", exact: true }).click();
+  await tools.getByRole("button", { name: "Select", exact: true }).click();
+  await expect(command).toHaveCount(0);
+  await tools.getByRole("button", { name: "Set coil terminals" }).click();
+  await command.getByRole("button", { name: "Apply terminals", exact: true }).click();
+  await expect(dialog.getByRole("img", { name: "Coil A IN, L0, X 0 mm, Y 0 mm", exact: true })).toBeVisible();
+  await tools.getByRole("button", { name: "Set coil terminals" }).click();
+  await page.keyboard.press("Escape");
+  await expect(command).toHaveCount(0);
+  await expect(dialog).toBeVisible();
+  expect(await dialog.evaluate(element => element.scrollHeight <= element.clientHeight)).toBe(true);
+});
+
 test("CAD layer popover toggles visibility and display without resizing the viewer", async ({ page }, testInfo) => {
   const dialog = await openImport(page);
   const trigger = dialog.getByRole("button", { name: "Layers", exact: true });

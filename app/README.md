@@ -79,8 +79,16 @@ It is off by default. It does not bridge gaps, merge parallel offset lines, or
 change arcs, splines, or vias. The Z tolerance is not a simplification tolerance.
 Only numerical roundoff up to 1e-9 mm is allowed when testing collinearity.
 
-After importing a motor coil, use **Simplify lines** below the coil preview or
-beside the Measure tool in the expanded preview. This updates actual geometry,
+CAD import and the expanded motor preview use the same editing tools. Select
+individual segments, chains, or a box to assign coil names and copper layers.
+Use Measure for distances, Set coil terminals for IN/OUT endpoints, and the
+Layers popover for visibility, vias, and trace or centerline display. CAD edits
+remain a draft until **Open with this geometry**. Motor preview edits update
+the project geometry. Generated motor geometry requires confirmation before
+segment editing, because edits stop following the routing settings.
+
+Use **Simplify lines** in either viewer, or below the motor coil preview.
+This updates actual geometry,
 including what is saved and exported, rather than just its display. **Undo
 simplify** restores the previous geometry while that preview is open and no
 other geometry has replaced it. Save the project to keep the result. Import-time
