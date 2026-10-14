@@ -50,7 +50,26 @@
     } catch (e) { error = e instanceof Error ? e.message : String(e); }
     finally { preparing = false; }
   }
+  /** Undo the most recent geometry edit. Only the tool that owns the live
+   *  edit reports `canUndo`, so the last one wins. */
+  function undoLastEdit(): boolean {
+    if (terminalTool?.canUndo) { terminalTool.undo(); return true; }
+    if (selection.canUndo) { selection.undo(); return true; }
+    if (onUndoSimplify) { onUndoSimplify(); return true; }
+    return false;
+  }
+  function handleKeydown(event: KeyboardEvent) {
+    if (disabled || event.defaultPrevented || event.altKey || event.shiftKey) return;
+    if (!(event.ctrlKey || event.metaKey) || event.key.toLowerCase() !== "z") return;
+    const target = event.target as HTMLElement | null;
+    // Native undo owns text fields and selects.
+    if (target?.isContentEditable || target?.tagName === "INPUT" || target?.tagName === "TEXTAREA" || target?.tagName === "SELECT") return;
+    if (!undoLastEdit()) return;
+    event.preventDefault();
+  }
 </script>
+
+<svelte:window onkeydown={handleKeydown} />
 
 <div role="toolbar" aria-label={label} class="flex shrink-0 flex-col">
   <!-- The bottom rule stays after the editing boxes were removed; it is the
