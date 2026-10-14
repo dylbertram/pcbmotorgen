@@ -70,6 +70,7 @@ pub mod dxf;
 pub mod kicad;
 pub mod physics;
 pub mod project;
+pub mod workspace;
 pub mod routing_plugins;
 pub mod sensor;
 

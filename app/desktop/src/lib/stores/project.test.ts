@@ -19,11 +19,11 @@ vi.mock("../ipc", { spy: true });
  * artifact round-trip lives in `src-tauri/src/ipc/project.rs`.
  */
 
-function makeStores(recents?: RecentFilesStore) {
+function makeStores(recents?: RecentFilesStore, kind: "motor" | "sensor" = "motor") {
   const config = new ConfigStore();
   const motion = new MotionStore(config);
   const sensor = new SensorStore();
-  const projects = new ProjectStore(config, motion, recents, sensor);
+  const projects = new ProjectStore(config, motion, recents, sensor, kind);
   return { config, motion, sensor, projects };
 }
 
@@ -43,7 +43,7 @@ describe("title-bar project name and location", () => {
     vi.mocked(relocateProject).mockResolvedValue({ path: "/new/renamed.pmproj", active_version_id: 3, versions: [], format_version: 2, saved_at_unix_ms: 2 });
 
     expect(await projects.relocate("renamed", "/new")).toBe(true);
-    expect(relocateProject).toHaveBeenCalledWith("/old/design.pmproj", "/new", "renamed", projects.snapshotIpc(), 3);
+    expect(relocateProject).toHaveBeenCalledWith("/old/design.pmproj", "/new", "renamed.pmmotor", projects.snapshotIpc(), 3);
     expect(projects.currentPath).toBe("/new/renamed.pmproj");
     expect(projects.directory).toBe("/new/");
     expect(projects.activeVersionId).toBe(3);
@@ -150,7 +150,7 @@ function editDesign(config: ConfigStore, motion: MotionStore): void {
 
 describe("ProjectStore snapshot mapping", () => {
   it("persists sensor CAD separately and clears it when loading older projects", () => {
-    const { config, sensor, projects } = makeStores();
+    const { config, sensor, projects } = makeStores(undefined, "sensor");
     const legacy = projects.snapshotIpc();
     delete legacy.sensor_cad_geometry;
     projects.markClean();
@@ -182,7 +182,7 @@ describe("ProjectStore snapshot mapping", () => {
   });
 
   it("tracks sensor-only edits and restores defaults from older projects", () => {
-    const { sensor, projects } = makeStores();
+    const { sensor, projects } = makeStores(undefined, "sensor");
     const legacy = projects.snapshotIpc();
     delete legacy.sensor_config;
     projects.markClean();
@@ -466,11 +466,11 @@ describe("ProjectStore versions", () => {
     const { projects } = savedStores();
     vi.mocked(saveProject).mockResolvedValue({ path: "/project.pmproj", format_version: 2, saved_at_unix_ms: 300, active_version_id: 2, versions });
     expect(await projects.save()).toBe(true);
-    expect(saveProject).toHaveBeenLastCalledWith("/project.pmproj", projects.snapshotIpc(), { sourcePath: "/project.pmproj", activeVersionId: 2, newVersion: false, description: undefined });
+    expect(saveProject).toHaveBeenLastCalledWith("/project.pmproj", projects.snapshotIpc(), { sourcePath: "/project.pmproj", activeVersionId: 2, newVersion: false, description: undefined, kind: "motor" });
     const forked = [...versions, { ...versions[1], id: 3, description: "Experiment" }];
     vi.mocked(saveProject).mockResolvedValue({ path: "/project.pmproj", format_version: 2, saved_at_unix_ms: 400, active_version_id: 3, versions: forked });
     expect(await projects.save(false, true, "Experiment")).toBe(true);
-    expect(saveProject).toHaveBeenLastCalledWith("/project.pmproj", projects.snapshotIpc(), { sourcePath: "/project.pmproj", activeVersionId: 2, newVersion: true, description: "Experiment" });
+    expect(saveProject).toHaveBeenLastCalledWith("/project.pmproj", projects.snapshotIpc(), { sourcePath: "/project.pmproj", activeVersionId: 2, newVersion: true, description: "Experiment", kind: "motor" });
     expect(projects.activeVersionId).toBe(3);
     expect(projects.versions).toEqual(forked);
   });

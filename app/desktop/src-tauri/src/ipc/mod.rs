@@ -43,6 +43,7 @@ pub mod magnets;
 pub mod physics;
 pub mod project;
 pub mod project_versions;
+pub mod documents;
 
 pub use coils::*;
 pub use config::*;
@@ -52,3 +53,4 @@ pub use magnets::*;
 pub use physics::*;
 pub use project::*;
 pub use project_versions::*;
+pub use documents::*;

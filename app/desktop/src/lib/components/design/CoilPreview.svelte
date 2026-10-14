@@ -33,6 +33,8 @@
 -->
 <script lang="ts">
   import { confirm } from "@tauri-apps/plugin-dialog";
+  import { untrack } from "svelte";
+  import type { PreviewCamera } from "../../utils/coilPreviewGestures.svelte";
   import { editableCoilGeometry } from "../../ipc/dxf";
   import type { ConfigStore } from "../../stores/config.svelte";
   import type { MotionStore } from "../../stores/motion.svelte";
@@ -80,7 +82,9 @@
     motion,
     importedGeometry = null,
     onGeometryChange,
-  }: { config: ConfigStore; coils: CoilPathDto | null; motion: MotionStore; importedGeometry?: CadGeometry | null; onGeometryChange?: (geometry: CadGeometry) => void } =
+    camera,
+    view = new CoilPreviewViewState(),
+  }: { config: ConfigStore; coils: CoilPathDto | null; motion: MotionStore; importedGeometry?: CadGeometry | null; onGeometryChange?: (geometry: CadGeometry) => void; camera?: PreviewCamera; view?: CoilPreviewViewState } =
     $props();
 
   const simplifyTool = new CadSimplifyTool({ getGeometry: () => importedGeometry, onChange: (geometry) => onGeometryChange?.(geometry) });
@@ -120,7 +124,6 @@
   // views. The toggles live in the lightbox UI; the draw effect below
   // reads the same instance, so a flip there repaints the schematic.
   // -------------------------------------------------------------------
-  const view = new CoilPreviewViewState();
   const terminalTool = new CoilTerminalTool({
     getGeometry: () => importedGeometry,
     onChange: (geometry) => onGeometryChange?.(geometry),
@@ -195,6 +198,7 @@
   // pointer-capture cleanup live in the gesture utility; this component only
   // reads its reactive view state and binds its handlers.
   const gestures = new CoilPreviewGestures({
+    camera: untrack(() => camera),
     get interactionMode() { return expanded ? "cad" : "navigation"; },
     virtualW: W,
     get virtualH() { return H; },

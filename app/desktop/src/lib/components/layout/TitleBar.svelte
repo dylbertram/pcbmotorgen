@@ -49,7 +49,9 @@
     <button type="button" onclick={onVersions} disabled={projects.busy || versionsDisabled} aria-label="Project versions" class="shrink-0 rounded border border-slate-700 bg-slate-800/50 px-2 py-1 text-[11px] text-slate-300 hover:border-emerald-500/50 hover:text-emerald-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400 disabled:opacity-50">{projects.activeVersionId !== null ? `Version ${projects.activeVersionId}` : "Versions"}</button>
   </div>
   <div class="flex items-center gap-2 justify-self-end pr-4">
-    <DrcStatus {drc} cadGeometryActive={projects.cadGeometry !== null} />
+    {#if projects.kind === "motor"}
+      <DrcStatus {drc} cadGeometryActive={projects.cadGeometry !== null} />
+    {/if}
     <StatusIndicator {loading} />
   </div>
 </div>

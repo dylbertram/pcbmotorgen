@@ -369,5 +369,3 @@ export class ConfigStore {
     };
   }
 }
-
-export const config = new ConfigStore();

@@ -16,13 +16,14 @@ mod menu;
 mod plugins;
 
 fn main() {
-    tauri::Builder::default()
+    let app = tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .setup(|app| {
             // The Open Recent mirror state (kata eap8) must exist before the
             // menu is installed / any command resolves it.
             app.manage(menu::RecentFiles::default());
+            app.manage(commands::workspace::ExitApproval::default());
             menu::install(app.handle())?;
             Ok(())
         })
@@ -32,6 +33,11 @@ fn main() {
                 id,
                 menu::OPEN_ID
                     | menu::NEW_ID
+                    | menu::NEW_PROJECT_ID
+                    | menu::SAVE_WORKSPACE_ID
+                    | menu::SAVE_WORKSPACE_AS_ID
+                    | menu::SAVE_ALL_ID
+                    | menu::CLOSE_FILE_ID
                     | menu::EXPORT_DXF_ID
                     | menu::SEND_KICAD_ID
                     | menu::SAVE_ID
@@ -79,12 +85,17 @@ fn main() {
             commands::dxf::import_cad_dxf,
             commands::dxf::export_cad_geometry_dxf,
             commands::dxf::editable_coil_geometry,
-            commands::project::save_project,
+            commands::project::save_document,
+            commands::project::resolve_document_path,
             commands::project::relocate_project,
             commands::project::load_project,
             commands::project::update_project_version,
             commands::project::set_recent_files,
             commands::project::file_exists,
+            commands::workspace::load_workspace,
+            commands::workspace::save_workspace,
+            commands::workspace::migrate_workspace,
+            commands::workspace::quit_app,
             commands::routing_plugins::list_routing_patterns,
             commands::routing_plugins::register_routing_plugin,
             commands::routing_plugins::routing_pattern_parameters,
@@ -94,6 +105,15 @@ fn main() {
             commands::routing_plugins::remove_routing_plugin,
             commands::sensor::generate_sensor_geometry,
         ])
-        .run(tauri::generate_context!())
+        .build(tauri::generate_context!())
         .expect("error while running pcbmotorgen tauri application");
+    app.run(|app, event| {
+        if let tauri::RunEvent::ExitRequested { api, .. } = event {
+            let approval = app.state::<commands::workspace::ExitApproval>();
+            if !approval.inner().0.load(std::sync::atomic::Ordering::SeqCst) {
+                api.prevent_exit();
+                let _ = app.emit("app:request-quit", ());
+            }
+        }
+    });
 }

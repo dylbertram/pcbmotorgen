@@ -22,21 +22,22 @@ test("sensor curves stay curved in inline and expanded previews", async ({ page 
       export async function writeSensorToBoard() {}`,
   }));
   await gotoDesignApp(page);
-  await page.getByRole("radio", { name: "Sensor", exact: true }).check();
+  await page.getByRole("button", { name: "New coil file", exact: true }).click();
+  await page.getByRole("dialog", { name: "New coil file" }).getByRole("button", { name: /^Sensor coil/ }).click();
   const preview = page.locator('section[aria-labelledby="sensor-preview-title"]');
   await expect(preview.locator("line")).toHaveCount(0);
-  await expect(preview.locator("path")).toHaveCount(2);
+  await expect(preview.getByRole("img").locator("path")).toHaveCount(2);
   await expect(preview.locator('path[d*=" C "]')).toHaveCount(1);
   await expect(preview.locator('path[d*=" A "]')).toHaveCount(1);
   await preview.getByRole("button", { name: "Expand sensor preview" }).click();
   const modal = page.getByRole("dialog", { name: "Induction sensor preview", exact: true });
-  await expect(modal.locator("path")).toHaveCount(2);
+  await expect(modal.getByRole("img").locator("path")).toHaveCount(2);
   await modal.getByRole("checkbox", { name: "Show layer 0" }).uncheck();
   await expect(modal.locator('path[d*=" C "]')).toHaveCount(0);
   await expect(modal.locator('path[d*=" A "]')).toHaveCount(1);
   await page.keyboard.press("Escape");
   await expect(modal).toBeHidden();
-  await expect(preview.locator("path")).toHaveCount(1);
+  await expect(preview.getByRole("img").locator("path")).toHaveCount(1);
 });
 
 test("CAD import retains spline-only geometry in its preview and the motor designer", async ({ page }) => {

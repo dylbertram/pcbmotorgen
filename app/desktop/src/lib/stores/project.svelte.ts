@@ -1,13 +1,13 @@
 /**
- * Project persistence controller (kata 0cgm) — the frontend HALF of
- * save/load.
+ * Per-coil persistence controller. WorkspaceStore creates one instance per
+ * document and owns file tabs, workspace replacement and workspace manifests.
  *
  * Architecture boundary: this class contains NO persistence logic. It
  * (a) gathers the user-facing store fields into the `ProjectState` DTO
  * (the same data-mapping job `ConfigStore.toIpc()` does for physics) and
  * (b) applies a loaded DTO back onto the stores. Serialization, artifact
  * versioning/migration, file I/O, and load validation all happen in Rust
- * behind the `save_project` / `load_project` commands (see
+ * behind the `save_document` / `load_project` commands (see
  * `src-tauri/src/ipc/project.rs`).
  *
  * Dirty-state tracking compares a canonical JSON snapshot of the persisted
@@ -21,11 +21,11 @@ import type {
   ProjectState,
   ProjectValidation,
   ProjectVersionInfo,
+  DocumentKind,
 } from "../types";
 import { DEFAULT_SENSOR_CONFIG } from "../types";
 import { readPreferences } from "../preferences";
 import {
-  DEFAULT_PROJECT_FILE_NAME,
   confirmDiscardChanges,
   loadProject,
   pickProjectOpenPath,
@@ -33,6 +33,7 @@ import {
   saveProject,
   relocateProject,
   updateProjectVersion,
+  documentExtension,
 } from "../ipc";
 import type { ConfigStore } from "./config.svelte";
 import type { MotionStore } from "./motion.svelte";
@@ -51,8 +52,9 @@ function baseName(path: string): string {
 }
 
 export class ProjectStore {
+  checkSavePath?: (path: string) => void | Promise<void>;
   private readonly initialState: ProjectState;
-  /** Absolute path of the project file backing the current state. */
+  /** Absolute path of the motor or sensor file backing this document. */
   currentPath = $state<string | null>(null);
   /** True while a save/open round-trip is in flight. */
   busy = $state(false);
@@ -83,6 +85,7 @@ export class ProjectStore {
      */
     private recents?: RecentFilesStore | null,
     private sensor?: SensorStore,
+    readonly kind: DocumentKind = "motor",
   ) {
     this.initialState = JSON.parse(JSON.stringify(this.snapshotIpc()));
   }
@@ -95,7 +98,12 @@ export class ProjectStore {
    * `routing_params_version` is deliberately NOT included: it is a
    * reactivity bump counter, not user state.
    */
-  snapshotJson = $derived.by(() => JSON.stringify(this.snapshotIpc()));
+  snapshotJson = $derived.by(() => {
+    const state = this.snapshotIpc();
+    return JSON.stringify(this.kind === "motor"
+      ? { config: state.config, mover_position_mm: state.mover_position_mm, cad_geometry: state.cad_geometry }
+      : { sensor_config: state.sensor_config, sensor_cad_geometry: state.sensor_cad_geometry });
+  });
 
   /** True when the working state differs from the last saved artifact. */
   isDirty = $derived(
@@ -109,6 +117,8 @@ export class ProjectStore {
 
   /** Header label: file name, or the untitled placeholder. */
   label = $derived(this.fileName ?? "untitled design");
+
+  defaultFileName = $derived.by(() => `untitled.${documentExtension(this.kind)}`);
 
   directory = $derived.by(() => {
     if (!this.currentPath) return null;
@@ -245,8 +255,12 @@ export class ProjectStore {
     const source = this.currentPath;
     try {
       const snapshot = this.snapshotIpc();
-      const savedSnapshot = JSON.stringify(snapshot);
-      const result = await relocateProject(source, directory, name, snapshot, this.activeVersionId);
+      const savedSnapshot = this.snapshotJson;
+      const extension = documentExtension(this.kind);
+      const fileName = name.toLowerCase().endsWith(`.${extension}`) ? name : `${name}.${extension}`;
+      const separator = directory.endsWith("/") || directory.endsWith("\\") ? "" : "/";
+      if (this.checkSavePath) await this.checkSavePath(`${directory}${separator}${fileName}`);
+      const result = await relocateProject(source, directory, fileName, snapshot, this.activeVersionId);
       this.currentPath = result.path;
       if (source === null) {
         this.versions = result.versions ?? [];
@@ -306,7 +320,8 @@ export class ProjectStore {
     if (saveAs || path === null) {
       try {
         path = await pickProjectSavePath(
-          this.fileName ?? DEFAULT_PROJECT_FILE_NAME,
+          this.fileName ?? this.defaultFileName,
+          this.kind,
         );
       } catch (e) {
         this.error = errorMessage(e);
@@ -322,16 +337,18 @@ export class ProjectStore {
 
     this.clearMessages();
     try {
+      if (this.checkSavePath) await this.checkSavePath(path);
       const snapshot = this.snapshotIpc();
-      const savedSnapshot = JSON.stringify(snapshot);
+      const savedSnapshot = this.snapshotJson;
       const result = await saveProject(path, snapshot, {
-        sourcePath: this.currentPath, activeVersionId: this.activeVersionId, newVersion, description,
+        sourcePath: this.currentPath, activeVersionId: this.activeVersionId, newVersion, description, kind: this.kind,
       });
       this.currentPath = result.path;
       this.versions = result.versions ?? [];
       this.activeVersionId = result.active_version_id ?? null;
       this.savedSnapshot = savedSnapshot;
       this.notice = `Saved ${baseName(result.path)}${newVersion ? ` as version ${this.activeVersionId ?? 1}` : ""}.`;
+      this.recents?.record(result.path).catch(() => undefined);
       return true;
     } catch (e) {
       this.error = `Save failed — ${errorMessage(e)}`;
@@ -444,7 +461,7 @@ export class ProjectStore {
    * state restore, and (on success) the recents record (kata eap8).
    * Recents failures are swallowed — they only degrade the menu.
    */
-  private async loadFromPath(path: string, versionId: number | null = null): Promise<boolean> {
+  async loadFromPath(path: string, versionId: number | null = null): Promise<boolean> {
     this.busy = true;
     this.clearMessages();
     try {

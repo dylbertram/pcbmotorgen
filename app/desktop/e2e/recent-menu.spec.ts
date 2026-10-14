@@ -15,7 +15,7 @@ test("startup sends existing recent projects to the native menu on every launch"
   await page.goto("/");
   for (let launch = 0; launch < 2; launch++) {
     if (launch > 0) await page.reload();
-    const startup = page.getByRole("dialog", { name: "Recent projects" });
+    const startup = page.getByRole("region", { name: "Project workspace" });
     await expect(startup.getByRole("button", { name: /Motor.pmproj/ })).toBeVisible();
     await expect.poll(() => page.evaluate(() => (window as any).__recentMenuUpdates)).toEqual([["/designs/Motor.pmproj"]]);
   }

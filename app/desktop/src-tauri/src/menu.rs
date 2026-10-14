@@ -23,7 +23,12 @@ use tauri::{
 
 /// Menu item id == webview event name for Open.
 pub const OPEN_ID: &str = "menu:open-project";
-pub const NEW_ID: &str = "menu:new-project";
+pub const NEW_ID: &str = "menu:new-file";
+pub const NEW_PROJECT_ID: &str = "menu:new-project";
+pub const SAVE_WORKSPACE_ID: &str = "menu:save-workspace";
+pub const SAVE_WORKSPACE_AS_ID: &str = "menu:save-workspace-as";
+pub const SAVE_ALL_ID: &str = "menu:save-all";
+pub const CLOSE_FILE_ID: &str = "menu:close-file";
 pub const EXPORT_DXF_ID: &str = "menu:export-dxf";
 pub const SEND_KICAD_ID: &str = "menu:send-kicad";
 /// Menu item id == webview event name for Save.
@@ -108,6 +113,11 @@ pub fn install(app: &tauri::AppHandle) -> tauri::Result<()> {
 /// frontend pushes the real contents through `set_recent_files`.
 fn file_submenu(app: &tauri::AppHandle) -> tauri::Result<Submenu<Wry>> {
     let new = MenuItem::with_id(app, NEW_ID, "New", true, Some("CmdOrCtrl+N"))?;
+    let new_project = MenuItem::with_id(app, NEW_PROJECT_ID, "New Project", true, Some("CmdOrCtrl+Alt+N"))?;
+    let save_workspace = MenuItem::with_id(app, SAVE_WORKSPACE_ID, "Save Project", true, None::<&str>)?;
+    let save_workspace_as = MenuItem::with_id(app, SAVE_WORKSPACE_AS_ID, "Save Project As…", true, None::<&str>)?;
+    let save_all = MenuItem::with_id(app, SAVE_ALL_ID, "Save All", true, Some("CmdOrCtrl+Alt+S"))?;
+    let close_file = MenuItem::with_id(app, CLOSE_FILE_ID, "Close File", true, Some("CmdOrCtrl+W"))?;
     let open = MenuItem::with_id(app, OPEN_ID, "Open…", true, Some("CmdOrCtrl+O"))?;
     let save = MenuItem::with_id(app, SAVE_ID, "Save", true, Some("CmdOrCtrl+S"))?;
     let save_as = MenuItem::with_id(app, SAVE_AS_ID, "Save As…", true, Some("CmdOrCtrl+Shift+S"))?;
@@ -138,11 +148,16 @@ fn file_submenu(app: &tauri::AppHandle) -> tauri::Result<Submenu<Wry>> {
         true,
         &[
             &new,
+            &new_project,
             &open,
             &recent,
             &save,
             &save_as,
             &save_new_version,
+            &save_all,
+            &save_workspace,
+            &save_workspace_as,
+            &close_file,
             &sep,
             &import_cad,
             &sep_after_import,

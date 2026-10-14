@@ -51,7 +51,7 @@ test.describe("routing pattern select (Bits UI) @interaction @desktop", () => {
     // role="separator" — purely visual, neither focusable nor selectable.
     await expect(
       listbox.locator("[role='none'][data-orientation='horizontal']"),
-    ).toHaveCount(1);
+    ).toHaveCount(2);
     await expect(
       listbox.getByRole("option", { name: SENTINEL_LABEL }),
     ).toBeVisible();
@@ -84,8 +84,7 @@ test.describe("routing pattern select (Bits UI) @interaction @desktop", () => {
     await expect(trigger).toContainText(MOCK_PATTERN_LABEL);
     await expect(page.getByRole("listbox")).toHaveCount(0);
 
-    // The pattern-declared routing params section still renders below.
-    await expect(page.locator("#routing-parameters-heading")).toBeVisible();
+    await expect(page.getByText("No user-editable parameters for this pattern.")).toBeVisible();
   });
 });
 

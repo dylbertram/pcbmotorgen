@@ -1,721 +1,191 @@
 <script lang="ts">
-  import { config } from "./lib/stores/config.svelte";
-  import { BitsConfig, Tabs } from "bits-ui";
-  import {
-    evaluateForceSweep,
-    generateCoils,
-    generateSensorGeometry,
-    fetchTravelEnvelope,
-    computeFriction,
-    computePowerBudget,
-    computeHeightStack,
-    computeStackup,
-    bindProjectMenuActions,
-    exportCadGeometryDxf,
-    exportCoilsDxf,
-    debounce,
-  } from "./lib/ipc";
-  import type {
-    ForceSweepResult,
-    CoilPathDto,
-    FrictionBudgetDto,
-    PowerBudgetDto,
-    HeightStackResultDto,
-    StackupResultDto,
-    SensorConfig,
-  } from "./lib/types";
-  import { TABS, type TabId, type DesignType } from "./lib/ui";
-  import { DrcController } from "./lib/stores/drc.svelte";
-  import { MotionStore } from "./lib/stores/motion.svelte";
-  import { ProjectStore } from "./lib/stores/project.svelte";
-  import { sensor as sensorStore } from "./lib/stores/sensor.svelte";
+  import { onMount, tick } from "svelte";
+  import { Dialog, DropdownMenu } from "bits-ui";
+  import { getCurrentWindow } from "@tauri-apps/api/window";
+  import { invoke } from "@tauri-apps/api/core";
+  import { listen } from "@tauri-apps/api/event";
+  import DocumentEditor from "./DocumentEditor.svelte";
+  import NewFileDialog from "./lib/components/layout/NewFileDialog.svelte";
+  import { WorkspaceStore, type UnsavedChoice } from "./lib/stores/workspace.svelte";
   import { recentFiles } from "./lib/stores/recentFiles.svelte";
-  import { measureTrace } from "./lib/previewGeometry";
-  import { cadGeometryToPreview } from "./lib/cadPreview";
-  import { saveTextToFile } from "./lib/files";
-
-  import TabNav from "./lib/components/layout/TabNav.svelte";
-  import TitleBar from "./lib/components/layout/TitleBar.svelte";
-  import StatusBanner from "./lib/components/ui/StatusBanner.svelte";
-  import ProjectNotification from "./lib/components/ui/ProjectNotification.svelte";
-  import ScrollArea from "./lib/components/ui/ScrollArea.svelte";
-  import TravelDiagram from "./lib/components/design/TravelDiagram.svelte";
-  import CoilPreview from "./lib/components/design/CoilPreview.svelte";
-  import DesignDimensions from "./lib/components/design/DesignDimensions.svelte";
-  import DesignTab from "./lib/components/layout/DesignTab.svelte";
-  import SimulateTab from "./lib/components/layout/SimulateTab.svelte";
-  import KicadDialog from "./lib/components/layout/KicadDialog.svelte";
-  import StartupScreen from "./lib/components/layout/StartupScreen.svelte";
-  import CadImportDialog from "./lib/components/layout/CadImportDialog.svelte";
-  import SensorTab from "./lib/components/layout/SensorTab.svelte";
-  import SensorPreview from "./lib/components/design/SensorPreview.svelte";
-  import ProjectVersionsDialog from "./lib/components/layout/ProjectVersionsDialog.svelte";
+  import { bindProjectMenuActions, isTauriAvailable } from "./lib/ipc";
+  import type { DocumentKind } from "./lib/types";
   import PreferencesDialog from "./lib/components/layout/PreferencesDialog.svelte";
+  import { ConfigStore } from "./lib/stores/config.svelte";
 
-  // Session-only navigation state; none of these values enter IPC.
-  let activeTab = $state<TabId>("design");
-  let designType = $state<DesignType>("motor");
-  const designTypes = [
-    { value: "motor", label: "Motor coil" },
-    { value: "sensor", label: "Sensor" },
-  ];
-  let workflowTabs = $derived(TABS.filter((tab) => designType === "motor" || tab.id !== "simulate"));
+  let unsaved = $state<{ label: string; resolve: (choice: UnsavedChoice) => void } | null>(null);
+  const workspace = new WorkspaceStore(recentFiles, (label) => new Promise(resolve => { unsaved = { label, resolve }; }));
+  let newFileOpen = $state(false);
+  let recentLoading = $state(true);
+  let editor = $state<DocumentEditor | undefined>();
+  let preferencesConfig = $state.raw<ConfigStore | null>(null);
+  const button = "rounded px-3 py-1.5 text-xs text-slate-300 hover:bg-slate-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400 disabled:opacity-50";
+  const item = "cursor-pointer rounded px-3 py-2 text-sm outline-none data-[highlighted]:bg-slate-700 data-[disabled]:opacity-40";
 
-  function selectDesignType(value: string): void {
-    if (value !== "motor" && value !== "sensor") return;
-    designType = value;
-    if (value === "sensor" && activeTab === "simulate") selectTab("design");
-  }
-  let startupOpen = $state(true);
-  let startupRecentLoading = $state(true);
-  let cadImportDialogOpen = $state(false);
-  let kicadDialogOpen = $state(false);
-  let exportingDxf = $state(false);
-  let versionsDialogOpen = $state(false);
-  let preferencesOpen = $state(false);
-  let creatingVersion = $state(false);
-  let versionsDialogGeneration = $state(0);
-
-  function showVersions(creating = false): void {
-    if (startupOpen || projects.busy) return;
-    creatingVersion = creating;
-    versionsDialogGeneration += 1;
-    versionsDialogOpen = true;
+  function decide(choice: UnsavedChoice): void {
+    const pending = unsaved;
+    unsaved = null;
+    pending?.resolve(choice);
   }
 
-  // App init: populate the routing-pattern selector + magnet-grade reference
-  // from the backend. Fire-and-forget — failures are swallowed inside the
-  // stores (the static TS tables remain as offline fallbacks).
-  config.loadRoutingPatterns();
-  config.loadMagnetGrades();
+  async function create(kind: DocumentKind): Promise<void> {
+    if (await workspace.create(kind)) newFileOpen = false;
+  }
 
-  // Async result state.
-  let sweep = $state<ForceSweepResult | null>(null);
-  let coils = $state<CoilPathDto | null>(null);
-  /**
-   * Geometry MEASURED from the returned coil payload (trace X extent +
-   * canvas-consistent magnet-strip rest bounds). The routing braid floors
-   * whole periods, so the measured trace span is intentionally shorter than
-   * the configured routing domain — every preview and readout consumes THIS,
-   * never the configured numbers. Null until the first payload arrives.
-   */
-  let friction = $state<FrictionBudgetDto | null>(null);
-  let power = $state<PowerBudgetDto | null>(null);
-  let height = $state<HeightStackResultDto | null>(null);
-  let stackup = $state<StackupResultDto | null>(null);
-  let loading = $state(false);
-  let error = $state<string | null>(null);
+  function action(name: string): void {
+    if (workspace.pending) return;
+    if (name === "settings" && !workspace.active) preferencesConfig = new ConfigStore();
+    else editor?.handleAction(name);
+  }
 
-  // Whether the current config produces a valid travel range.
-  let valid = $derived(config.travel_mm > 0);
+  async function fileTabKeydown(event: KeyboardEvent, id: number): Promise<void> {
+    const count = workspace.documents.length;
+    const index = workspace.documents.findIndex(d => d.id === id);
+    const target = event.key === "ArrowRight" ? (index + 1) % count
+      : event.key === "ArrowLeft" ? (index + count - 1) % count
+      : event.key === "Home" ? 0 : event.key === "End" ? count - 1 : null;
+    if (target === null || workspace.pending) return;
+    event.preventDefault();
+    const nextId = workspace.documents[target].id;
+    workspace.activate(nextId);
+    await tick();
+    document.getElementById(`file-tab-${nextId}`)?.focus();
+  }
+  function saveFile(saveAs = false): void {
+    if (workspace.pending) return;
+    if (workspace.active) void workspace.active.projects.save(saveAs);
+    else void workspace.save(saveAs);
+  }
 
-  // Shared mover position for the design reflection: the TravelDiagram slider
-  // and the CoilPreview magnet strip both read from this store.
-  const motion = new MotionStore(config);
+  async function approveQuit(): Promise<void> {
+    try {
+      if (await workspace.canClose()) await invoke("quit_app");
+    } catch (e) { workspace.error = e instanceof Error ? e.message : String(e); }
+  }
 
-  // Project save/load (kata 0cgm): all persistence logic lives in the Rust
-  // backend behind save_project/load_project; this store is the interface
-  // half (DTO mapping + dirty tracking + dialog flows).
-  const projects = new ProjectStore(config, motion, recentFiles, sensorStore);
-  // Startup has no active project yet. Catalog loading can adjust defaults,
-  // but those adjustments are not user edits. Open/create/import establish
-  // the first baseline when the user leaves the startup chooser.
-  let activeCoils = $derived(projects.cadGeometry ? cadGeometryToPreview(projects.cadGeometry) : coils);
-  let measuredTrace = $derived.by(() => measureTrace(activeCoils, config));
-
-  // Open Recent (kata eap8): lazily load the persisted list and build the
-  // native submenu from disk truth (the load prunes vanished entries).
-  // Load recents before the startup chooser offers its recent-project list.
-  // Best effort — a recents hiccup must never block startup.
-  void recentFiles
-    .load()
-    .catch(() => undefined)
-    .finally(() => (startupRecentLoading = false));
-
-  // Native File menu: menu clicks land here as Tauri events
-  // and dispatch into the same store flows. The store's busy guard
-  // serializes overlapping menu events.
   $effect(() => {
+    const id = workspace.activeId;
+    if (id !== null) document.getElementById(`file-tab-${id}`)?.scrollIntoView({ block: "nearest", inline: "nearest" });
+  });
+
+  onMount(() => {
+    void recentFiles.load().finally(() => (recentLoading = false));
     const unbind = bindProjectMenuActions({
-      newProject: () => {
-        void projects.newProject().then((created) => {
-          if (!created) return;
-          // Clear a focused field's local draft after the stores are reset.
-          if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
-          startupOpen = false;
-          cadImportDialogOpen = false;
-          kicadDialogOpen = false;
-          versionsDialogOpen = false;
-          clearSimulationResults();
-          selectTab("design");
-        });
-      },
-      exportDxf: () => void exportDxf(),
-      sendKicad: () => (kicadDialogOpen = true),
-      open: () => {
-        void projects.open().then((opened) => {
-          if (opened) {
-            startupOpen = false;
-            versionsDialogOpen = false;
-          }
-        });
-      },
-      save: () => void projects.save(false),
-      saveAs: () => void projects.save(true),
-      saveNewVersion: () => showVersions(true),
-      settings: () => { preferencesOpen = true; },
-      importCad: () => (cadImportDialogOpen = true),
-      openRecent: (path) => {
-        // Open-recent access point: refresh menu truth (the entry is pruned
-        // when its file vanished) before dispatching into the shared open
-        // flow — a vanished file surfaces the existing "Open failed — …"
-        // error banner. Both calls fail-open; no catch needed.
-        void recentFiles.dropMissing(path)
-          .then(() => projects.openPath(path))
-          .then((opened) => {
-            if (opened) {
-              startupOpen = false;
-              versionsDialogOpen = false;
-            }
-          });
-      },
-      clearRecent: () => void recentFiles.clear(),
+      newFile: () => { if (!workspace.pending) newFileOpen = true; },
+      newProject: () => { void workspace.newProject(); },
+      open: () => { void workspace.open(); },
+      save: () => saveFile(), saveAs: () => saveFile(true),
+      saveWorkspace: () => { void workspace.save(); },
+      saveWorkspaceAs: () => { void workspace.save(true); },
+      saveAll: () => { void workspace.saveAll(); },
+      closeFile: () => { if (workspace.activeId !== null) void workspace.close(workspace.activeId); },
+      saveNewVersion: () => action("versions"),
+      exportDxf: () => action("export"), sendKicad: () => action("kicad"),
+      importCad: () => action("import"), settings: () => action("settings"),
+      openRecent: (path) => { void workspace.openPath(path); },
+      clearRecent: () => { void recentFiles.clear(); },
     });
-    return () => {
-      void unbind.then((done) => done());
-    };
+    const unclose = isTauriAvailable() ? getCurrentWindow().onCloseRequested(async (event) => {
+      event.preventDefault();
+      await approveQuit();
+    }) : Promise.resolve(() => {});
+    const unquit = isTauriAvailable() ? listen("app:request-quit", () => { void approveQuit(); }) : Promise.resolve(() => {});
+    return () => { void unbind.then(f => f()); void unclose.then(f => f()); void unquit.then(f => f()); };
   });
-
-  // DXF currently has one format and no extra options, so go straight to Save.
-  async function exportDxf(): Promise<void> {
-    if (exportingDxf || projects.busy || startupOpen) return;
-    exportingDxf = true;
-    projects.clearMessages();
-    try {
-      const cadGeometry = designType === "sensor" ? sensorStore.cadGeometry : projects.cadGeometry;
-      const result = cadGeometry
-        ? await exportCadGeometryDxf(cadGeometry)
-        : await exportCoilsDxf(config.toIpc());
-      const path = await saveTextToFile(result.dxf_content, "coils.dxf", ["dxf"]);
-      if (path) projects.notice = `Exported DXF to ${path}.`;
-    } catch (e) {
-      projects.error = `DXF export failed: ${e instanceof Error ? e.message : String(e)}`;
-    } finally {
-      exportingDxf = false;
-    }
-  }
-
-  // -----------------------------------------------------------------------
-  // Design preview generation
-  // -----------------------------------------------------------------------
-  // Coil geometry is useful outside the Simulation tab, so it has its own
-  // request stream. A generation id prevents a slow response for an older
-  // config from replacing a newer preview. The preview keeps its last good
-  // result while a new request is pending or fails.
-  let previewGeneration = 0;
-  const scheduleCoilPreview = debounce((generation: number) => {
-    if (generation !== previewGeneration) return;
-    if (!valid) {
-      coils = null;
-      return;
-    }
-    void updateCoilPreview(generation, config.toIpc());
-  }, 150);
-
-  let sensorGeneration = 0;
-  const scheduleSensorGeometry = debounce(
-    (generation: number, request: SensorConfig) => {
-      if (generation !== sensorGeneration) return;
-      void updateSensorGeometry(generation, request);
-    },
-    150,
-  );
-
-  async function updateSensorGeometry(
-    generation: number,
-    request: SensorConfig,
-  ): Promise<void> {
-    sensorStore.loading = true;
-    sensorStore.error = null;
-    try {
-      const result = await generateSensorGeometry(request);
-      if (generation === sensorGeneration) sensorStore.generatedGeometry = result;
-    } catch (e) {
-      if (generation === sensorGeneration) {
-        sensorStore.generatedGeometry = null;
-        sensorStore.error = e instanceof Error ? e.message : String(e);
-      }
-    } finally {
-      if (generation === sensorGeneration) sensorStore.loading = false;
-    }
-  }
-
-  // Keep sensor geometry independent of motor travel and motor routing state.
-  $effect(() => {
-    const generation = ++sensorGeneration;
-    if (sensorStore.cadGeometry) {
-      sensorStore.loading = false;
-      sensorStore.error = null;
-      return;
-    }
-    const request = sensorStore.toIpc();
-    sensorStore.loading = true;
-    sensorStore.error = null;
-    scheduleSensorGeometry(generation, request);
-  });
-
-  async function updateCoilPreview(
-    generation: number,
-    ipc: ReturnType<typeof config.toIpc>,
-  ): Promise<void> {
-    try {
-      const result = await generateCoils(ipc);
-      if (generation === previewGeneration) coils = result;
-    } catch {
-      // Keep the previous preview visible. A transient generation failure
-      // must not make the design reflection depend on simulation state.
-    }
-    // Equilibrium travel envelope (stable rest positions of the mover
-    // centre). Fetched on the same debounced/generation-guarded stream; a
-    // failure keeps the previous envelope (or the flagged placeholder —
-    // MotionStore raises "travel envelope unavailable", kata ab30).
-    try {
-      const env = await fetchTravelEnvelope(ipc);
-      if (generation === previewGeneration) motion.setEnvelope(env);
-    } catch {
-      // Keep the previous envelope — bounds stay at their last good values.
-    }
-  }
-
-  // Generate the Design-tab reflection when geometry or routing inputs change.
-  // This effect intentionally runs regardless of the active workflow tab.
-  $effect(() => {
-    if (startupOpen) {
-      scheduleCoilPreview.cancel();
-      return;
-    }
-    void [
-      config.desired_travel_mm,
-      config.active_area_length_mm,
-      config.active_area_width_mm,
-      config.magnet_count,
-      config.magnet_width_mm,
-      config.magnet_gap_mm,
-      config.electrical_pitch_mm,
-      config.routing_pattern,
-      config.routing_params_version,
-      config.phases,
-      config.num_layers,
-      config.strands_per_phase,
-      config.min_trace_mm,
-      config.min_space_mm,
-      config.min_via_drill_mm,
-      config.min_via_annular_ring_mm,
-    ];
-    void valid;
-
-    const generation = ++previewGeneration;
-    scheduleCoilPreview(generation);
-  });
-
-  // -----------------------------------------------------------------------
-  // Simulation-tab scheduling
-  // -----------------------------------------------------------------------
-  // Simulation is demand-driven: entering the Simulation tab or changing a
-  // watched input while it is active schedules one run. The generation id
-  // gates both the debounce callback and all result writes, including work
-  // that was already in flight when the user changed tabs.
-  let simulationGeneration = 0;
-  const scheduleSimulation = debounce((generation: number) => {
-    if (!isCurrentSimulation(generation)) return;
-    void runSimulation(generation);
-  }, 150);
-
-  function isCurrentSimulation(generation: number): boolean {
-    return activeTab === "simulate" && generation === simulationGeneration;
-  }
-
-  function clearSimulationResults(): void {
-    sweep = null;
-    friction = null;
-    power = null;
-    height = null;
-    stackup = null;
-  }
-
-  async function runSimulation(generation: number): Promise<void> {
-    if (!isCurrentSimulation(generation)) return;
-
-    // Invalid geometry is a deliberate reset, not a backend failure. Keep
-    // valid results while editing, but do not run any simulation IPC call.
-    if (!valid) {
-      clearSimulationResults();
-      error = null;
-      loading = false;
-      return;
-    }
-
-    loading = true;
-    error = null;
-    const ipc = config.toIpc();
-
-    try {
-      const results = await Promise.allSettled([
-        evaluateForceSweep(ipc),
-        computeFriction(ipc),
-        computePowerBudget(ipc),
-        computeHeightStack(ipc),
-        computeStackup(ipc),
-      ]);
-
-      if (!isCurrentSimulation(generation)) return;
-
-      const [s, f, p, h, st] = results;
-      // Apply each successful result independently. A failed calculation does
-      // not erase the last good value from the other simulation panels.
-      if (s.status === "fulfilled") sweep = s.value;
-      if (f.status === "fulfilled") friction = f.value;
-      if (p.status === "fulfilled") power = p.value;
-      if (h.status === "fulfilled") height = h.value;
-      if (st.status === "fulfilled") stackup = st.value;
-
-      const reasons = results
-        .filter(
-          (result): result is PromiseRejectedResult =>
-            result.status === "rejected",
-        )
-        .map((result) =>
-          result.reason instanceof Error
-            ? result.reason.message
-            : String(result.reason),
-        );
-      error = reasons.length ? reasons.join("  ·  ") : null;
-    } catch (e) {
-      if (!isCurrentSimulation(generation)) return;
-      error = e instanceof Error ? e.message : String(e);
-    } finally {
-      if (isCurrentSimulation(generation)) loading = false;
-    }
-  }
-
-  // Touch every input used by the simulation calls. The active-tab check is
-  // intentionally inside the effect so config changes outside Simulation
-  // only invalidate/cancel a pending run; they never invoke simulation IPC.
-  $effect(() => {
-    void [
-      config.desired_travel_mm,
-      config.active_area_length_mm,
-      config.active_area_width_mm,
-      config.magnet_count,
-      config.magnet_width_mm,
-      config.magnet_gap_mm,
-      config.electrical_pitch_mm,
-      config.magnet_height_mm,
-      config.magnet_cross_width_mm,
-      config.magnet_remanence_t,
-      config.magnet_grade,
-      config.air_gap_mm,
-      config.routing_pattern,
-      config.routing_params_version,
-      config.phases,
-      config.num_layers,
-      config.strands_per_phase,
-      config.max_current_a,
-      config.supply_voltage_v,
-      config.pcb_thickness_mm,
-      config.min_trace_mm,
-      config.min_space_mm,
-      config.min_via_drill_mm,
-      config.min_via_annular_ring_mm,
-      config.max_layers,
-      config.drive_frequency_hz,
-      config.max_temperature_rise_c,
-      config.target_force_n,
-      config.peak_force_n,
-      config.friction_n,
-      config.carriage_mass_kg,
-      config.max_accel_m_s2,
-      config.capacitor_bank_uf,
-      config.commutation,
-      config.n_positions,
-      config.meshing,
-    ];
-    void valid;
-
-    const generation = ++simulationGeneration;
-    if (activeTab !== "simulate") {
-      scheduleSimulation.cancel();
-      // Invalidate an in-flight run. Tab selection releases the app-wide
-      // indicator immediately; the eventual response is ignored by
-      // isCurrentSimulation().
-      return;
-    }
-    scheduleSimulation(generation);
-  });
-
-  // -----------------------------------------------------------------------
-  // App-owned DRC controller
-  // -----------------------------------------------------------------------
-  // Layout fingerprint: the inputs that determine where the generated
-  // traces can be placed (preserved verbatim from the inline controller).
-  function getDrcLayoutKey(): string {
-    return JSON.stringify([
-      config.routing_pattern,
-      config.routing_params_version,
-      config.num_layers,
-      config.min_trace_mm,
-      config.min_space_mm,
-      config.min_via_drill_mm,
-      config.min_via_annular_ring_mm,
-      config.strands_per_phase,
-      config.magnet_count,
-      config.magnet_width_mm,
-      config.magnet_gap_mm,
-      config.phases,
-      config.active_area_length_mm,
-      config.active_area_width_mm,
-    ]);
-  }
-
-  const drc = new DrcController({ config, getLayoutKey: getDrcLayoutKey });
-
-  // A layout change invalidates the previous DRC result immediately. The
-  // request id and layout key together prevent stale responses from opening
-  // the export gate for a newer config.
-  $effect(() => {
-    if (startupOpen) return;
-    void drc.currentLayoutKey;
-    drc.request();
-  });
-
-  function tabStatus(tab: TabId): { label: string; className: string } {
-    if (tab === "design" && designType === "motor") {
-      return valid
-        ? { label: "ready", className: "text-emerald-300" }
-        : { label: "needs attention", className: "text-rose-300" };
-    }
-    if (tab === "simulate") {
-      if (!valid) return { label: "blocked", className: "text-rose-300" };
-      return loading
-        ? { label: "updating", className: "text-amber-300" }
-        : { label: "ready", className: "text-emerald-300" };
-    }
-    if (designType === "sensor") {
-      if (sensorStore.error) {
-        return { label: "needs attention", className: "text-rose-300" };
-      }
-      return sensorStore.loading || !sensorStore.geometry
-        ? { label: "updating", className: "text-amber-300" }
-        : { label: "ready", className: "text-emerald-300" };
-    }
-    return { label: "ready", className: "text-emerald-300" };
-  }
-
-  function selectTab(tab: TabId): void {
-    activeTab = tab;
-    if (tab !== "simulate") loading = false;
-  }
 </script>
 
-<main
-  class="flex min-h-screen flex-col bg-slate-900 text-slate-100 lg:h-screen lg:overflow-hidden"
->
-  <!-- BitsConfig centralizes the portal target for every Bits portal
-       (dialogs, selects, tooltips) in one place. -->
-  <BitsConfig defaultPortalTo="body" defaultLocale="en-US">
-    <!-- Tabs.Root renders its own wrapper element, so the main column's
-         flex layout (grow + shrink floor) lives on it. -->
-    <Tabs.Root
-      value={activeTab}
-      onValueChange={(v) => selectTab(v as TabId)}
-      class="flex min-h-0 flex-1 flex-col"
-    >
-      <header class="shrink-0 bg-slate-900">
-        <TitleBar {projects} loading={loading || exportingDxf} {drc} onVersions={() => showVersions()} versionsDisabled={startupOpen} />
-        <div class="flex items-center gap-3 px-6 py-2">
-          <span id="design-type-label" class="shrink-0 text-xs text-slate-400">Design type</span>
-          <fieldset aria-labelledby="design-type-label" class="flex min-w-0 gap-0.5 rounded-md border border-slate-700 bg-slate-950/50 p-0.5">
-            {#each designTypes as type (type.value)}
-              <label class="relative">
-                <input
-                  type="radio"
-                  name="design-type"
-                  value={type.value}
-                  checked={designType === type.value}
-                  onchange={() => selectDesignType(type.value)}
-                  class="peer absolute inset-0 m-0 h-full w-full cursor-pointer appearance-none opacity-0"
-                />
-                <span class="block whitespace-nowrap rounded px-3 py-1.5 text-sm font-medium text-slate-400 peer-hover:bg-slate-800 peer-hover:text-slate-100 peer-checked:bg-emerald-500/15 peer-checked:text-emerald-200 peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-emerald-400">{type.label}</span>
-              </label>
-            {/each}
-          </fieldset>
+<main class="flex min-h-screen flex-col bg-slate-900 text-slate-100 lg:h-screen lg:overflow-hidden">
+  <header class="shrink-0 border-b border-slate-700 bg-slate-950/60">
+    <div class="flex min-h-10 items-center gap-2 pl-[95px] pr-3" data-tauri-drag-region>
+      <DropdownMenu.Root>
+        <DropdownMenu.Trigger class={button}>File</DropdownMenu.Trigger>
+        <DropdownMenu.Portal>
+          <DropdownMenu.Content sideOffset={5} class="z-[130] min-w-56 rounded-lg border border-slate-600 bg-slate-800 p-1 text-slate-100 shadow-xl">
+            <DropdownMenu.Item class={item} disabled={workspace.pending} onSelect={() => (newFileOpen = true)}>New…</DropdownMenu.Item>
+            <DropdownMenu.Item class={item} disabled={workspace.pending} onSelect={() => void workspace.newProject()}>New Project</DropdownMenu.Item>
+            <DropdownMenu.Item class={item} disabled={workspace.pending} onSelect={() => void workspace.open()}>Open…</DropdownMenu.Item>
+            <DropdownMenu.Separator class="my-1 h-px bg-slate-600" />
+            <DropdownMenu.Item class={item} disabled={workspace.pending} onSelect={() => saveFile()}>Save</DropdownMenu.Item>
+            <DropdownMenu.Item class={item} disabled={workspace.pending} onSelect={() => saveFile(true)}>Save As…</DropdownMenu.Item>
+            <DropdownMenu.Item class={item} disabled={workspace.pending || !workspace.active} onSelect={() => action("versions")}>Save new version…</DropdownMenu.Item>
+            <DropdownMenu.Item class={item} disabled={workspace.pending} onSelect={() => void workspace.saveAll()}>Save All</DropdownMenu.Item>
+            <DropdownMenu.Item class={item} disabled={workspace.pending} onSelect={() => void workspace.save()}>Save Project</DropdownMenu.Item>
+            <DropdownMenu.Item class={item} disabled={workspace.pending} onSelect={() => void workspace.save(true)}>Save Project As…</DropdownMenu.Item>
+            <DropdownMenu.Separator class="my-1 h-px bg-slate-600" />
+            <DropdownMenu.Item class={item} disabled={workspace.pending || !workspace.active} onSelect={() => action("import")}>Import CAD…</DropdownMenu.Item>
+            <DropdownMenu.Item class={item} disabled={workspace.pending || !workspace.active} onSelect={() => action("export")}>Export DXF…</DropdownMenu.Item>
+            <DropdownMenu.Item class={item} disabled={workspace.pending || !workspace.active} onSelect={() => action("kicad")}>Send to KiCad…</DropdownMenu.Item>
+            <DropdownMenu.Item class={item} disabled={workspace.pending} onSelect={() => action("settings")}>Settings…</DropdownMenu.Item>
+          </DropdownMenu.Content>
+        </DropdownMenu.Portal>
+      </DropdownMenu.Root>
+      <span class="min-w-0 flex-1 truncate text-center text-xs text-slate-400" title={workspace.path ?? "Unsaved workspace"} data-tauri-drag-region>{workspace.label}{workspace.isDirty ? " •" : ""}</span>
+      <button type="button" class={button} disabled={workspace.pending} onclick={() => void workspace.save()}>Save Project</button>
+    </div>
+    <nav class="flex items-stretch overflow-x-auto" aria-label="Open files">
+      <div role="tablist" aria-label="Coil files" class="flex items-stretch">
+      {#each workspace.documents as document (document.id)}
+        <div class="flex shrink-0 items-center border-r border-slate-700 border-t-2 {workspace.activeId === document.id ? 'border-t-emerald-400 bg-slate-800' : 'border-t-transparent bg-slate-950/30'}">
+          <button type="button" role="tab" id={`file-tab-${document.id}`} aria-controls="active-document" aria-selected={workspace.activeId === document.id} tabindex={workspace.activeId === document.id ? 0 : -1} onkeydown={(event) => void fileTabKeydown(event, document.id)} class="flex items-center gap-2 px-3 py-2 text-xs focus-visible:outline focus-visible:outline-emerald-400 disabled:opacity-50" disabled={workspace.pending} title={document.projects.currentPath ?? document.projects.defaultFileName} onclick={() => workspace.activate(document.id)}>
+            <span class={document.kind === "motor" ? "text-emerald-300" : "text-sky-300"}>{document.kind === "motor" ? "M" : "S"}</span>
+            <span>{document.projects.fileName ?? `Untitled ${document.kind} ${document.id}`}</span>
+            {#if document.projects.isDirty || document.projects.currentPath === null}<span class="text-amber-300" aria-label={document.projects.isDirty ? "Unsaved changes" : "Unsaved file"}>●</span>{/if}
+          </button>
+          <button type="button" class="mr-1 rounded px-1.5 text-slate-500 hover:bg-slate-700 hover:text-slate-100 focus-visible:outline focus-visible:outline-emerald-400 disabled:opacity-50" disabled={workspace.pending} aria-label={`Close ${document.projects.fileName ?? `Untitled ${document.kind} ${document.id}`}`} onclick={() => void workspace.close(document.id)}>×</button>
         </div>
-        <TabNav tabs={workflowTabs} statusFor={tabStatus} />
-      </header>
-
-      {#if projects.error}
-        <div class="px-4 pt-3">
-          <StatusBanner level="error">
-            <div class="flex items-start justify-between gap-3">
-              <p>{projects.error}</p>
-              <button
-                type="button"
-                class="shrink-0 underline underline-offset-2 hover:brightness-125"
-                onclick={() => projects.clearMessages()}>Dismiss</button
-              >
-            </div>
-          </StatusBanner>
-        </div>
-      {/if}
-
-      {#if projects.notice}
-        {#key projects.notice}
-          <ProjectNotification message={projects.notice} onDismiss={() => (projects.notice = null)} />
-        {/key}
-      {/if}
-
-      {#if projects.loadIssues}
-        <div class="px-4 pt-3">
-          <StatusBanner
-            level={projects.loadIssues.errors.length > 0 ? "error" : "warning"}
-          >
-            <div>
-              <p class="font-medium">
-                The restored design has
-                {projects.loadIssues.errors.length} error(s) and
-                {projects.loadIssues.warnings.length} warning(s):
-              </p>
-              <ul class="mt-1 list-disc pl-5">
-                {#each projects.loadIssues.errors as message (message)}
-                  <li>{message}</li>
-                {/each}
-                {#each projects.loadIssues.warnings as message (message)}
-                  <li>{message}</li>
-                {/each}
-              </ul>
-            </div>
-          </StatusBanner>
-        </div>
-      {/if}
-
-      <!-- The reflection stays mounted beside every workflow panel. On desktop
-           only the settings/content column scrolls; on small screens the columns
-           stack so the reflection remains available above the active panel. -->
-      <div
-        class="grid min-h-0 flex-1 items-start gap-4 px-4 pb-4 lg:grid-cols-[minmax(360px,0.9fr)_minmax(0,1.35fr)] lg:grid-rows-[minmax(0,1fr)] lg:items-stretch lg:pb-0 lg:pr-0"
-      >
-        <!-- The desktop layout locks the page height: both columns stretch to the
-             row (viewport minus header/footer) and scroll independently inside
-             themselves, so the footer is always visible and the page never
-             scrolls. Below lg the columns stack and the page scrolls normally. -->
-        <aside
-        class="relative min-w-0 min-h-0 lg:h-full lg:pt-4 lg:pb-4 lg:pr-2"
-          aria-label="Persistent design reflection"
-        >
-          <ScrollArea class="h-full min-h-0">
-            {#if designType === "sensor"}
-              <SensorPreview store={sensorStore} />
-            {:else}
-              <TravelDiagram {config} {motion} {measuredTrace} />
-              <!-- Traces view lives here in the Design tab so layout and geometry can
-                   be inspected side by side; the Simulation tab keeps its own copy. -->
-              <div class="mt-3 space-y-3">
-                <CoilPreview {config} coils={activeCoils} {motion} importedGeometry={projects.cadGeometry} onGeometryChange={(geometry) => projects.setCadGeometry(geometry)} />
-                <DesignDimensions
-                  {config}
-                  measuredTraceLengthMm={measuredTrace?.traceLengthMm ?? null}
-                  routingDimensions={activeCoils?.routing_dimensions ?? null}
-                  cadGeometryActive={projects.cadGeometry !== null}
-                />
-              </div>
-            {/if}
-          </ScrollArea>
-        </aside>
-
-        <div class="min-w-0 min-h-0 lg:h-full">
-          <!-- Workflow panels stay mounted so component-local controls retain
-               their state — Bits Tabs.Content never unmounts inactive panels, it
-               toggles the hidden attribute instead. Hidden Simulation content is
-               still lifecycle-gated: its IPC effects only run while this tab is
-               active. Each panel fills the column and scrolls internally; the
-               page height is locked so the footer always stays visible. -->
-          <Tabs.Content
-            value="design"
-            id="panel-design"
-            class="h-full p-4 lg:pr-0"
-          >
-            <div hidden={designType !== "motor"} class="h-full">
-              <DesignTab {config} cadGeometry={projects.cadGeometry} onImportCad={() => (cadImportDialogOpen = true)} onUseGenerated={() => projects.setCadGeometry(null)} />
-            </div>
-            <div hidden={designType !== "sensor"} class="h-full overflow-y-auto">
-              <SensorTab store={sensorStore} />
-            </div>
-          </Tabs.Content>
-
-          <Tabs.Content
-            value="simulate"
-            id="panel-simulate"
-            class="h-full overflow-y-auto p-4 lg:pr-0"
-          >
-            <SimulateTab
-              {config}
-              active={activeTab === "simulate"}
-              {sweep}
-              {friction}
-              {power}
-              {height}
-               {stackup}
-               {error}
-               cadGeometryActive={projects.cadGeometry !== null}
-            />
-          </Tabs.Content>
-        </div>
+      {/each}
       </div>
+      <button type="button" class="shrink-0 px-4 py-2 text-slate-400 hover:bg-slate-800 focus-visible:outline focus-visible:outline-emerald-400 disabled:opacity-50" disabled={workspace.pending} aria-label="New coil file" onclick={() => (newFileOpen = true)}>+</button>
+    </nav>
+  </header>
 
-      {#if startupOpen}
-        <StartupScreen
-          {config}
-          {projects}
-          {recentFiles}
-          recentLoading={startupRecentLoading}
-          onComplete={() => (startupOpen = false)}
-          onImportCad={() => (cadImportDialogOpen = true)}
-        />
-      {/if}
+  {#if workspace.error}
+    <div role="alert" class="flex shrink-0 items-start justify-between gap-3 border-b border-rose-500/40 bg-rose-500/10 px-5 py-3 text-sm text-rose-200"><p>{workspace.error}</p><button type="button" class="underline" onclick={() => (workspace.error = null)}>Dismiss</button></div>
+  {/if}
+  {#if workspace.notice}
+    <div role="status" class="flex shrink-0 justify-between px-5 py-2 text-xs text-emerald-300"><p>{workspace.notice}</p><button type="button" class="underline" onclick={() => (workspace.notice = null)}>Dismiss</button></div>
+  {/if}
 
-      <KicadDialog bind:open={kicadDialogOpen} {config} {projects} {drc} />
-      {#if preferencesOpen}
-        <PreferencesDialog {config} disabled={projects.busy} onClose={() => (preferencesOpen = false)} />
-      {/if}
+  {#if workspace.active}
+    {#key workspace.active.id}
+      <div id="active-document" role="tabpanel" aria-labelledby={`file-tab-${workspace.active.id}`} inert={workspace.busy} aria-busy={workspace.busy} class="flex min-h-0 flex-1 flex-col">
+        <DocumentEditor session={workspace.active} active bind:this={editor} />
+      </div>
+    {/key}
+  {:else}
+    <section class="mx-auto w-full max-w-3xl flex-1 overflow-y-auto px-6 py-16" aria-label="Project workspace">
+      <h1 class="text-2xl font-semibold">{workspace.label}</h1>
+      <p class="mt-3 max-w-lg text-sm leading-relaxed text-slate-400">Keep motor and sensor coil files together in a project. Each file has its own saved versions.</p>
+      <div class="mt-6 flex gap-3">
+        <button type="button" disabled={workspace.pending} onclick={() => (newFileOpen = true)} class="rounded-md bg-emerald-600 px-4 py-2 text-sm font-medium hover:bg-emerald-500 focus-visible:outline focus-visible:outline-emerald-300 disabled:opacity-50">New coil file</button>
+        <button type="button" disabled={workspace.pending} onclick={() => void workspace.open()} class="rounded-md border border-slate-600 px-4 py-2 text-sm hover:bg-slate-800 focus-visible:outline focus-visible:outline-emerald-300 disabled:opacity-50">Open file or project…</button>
+      </div>
+      <h2 class="mt-12 text-sm font-medium text-slate-300">Recent files and projects</h2>
+      {#if recentLoading}<p class="mt-3 text-xs text-slate-500">Loading…</p>
+      {:else if recentFiles.paths.length === 0}<p class="mt-3 text-xs text-slate-500">Saved files and projects will appear here.</p>
+      {:else}<ul class="mt-3 divide-y divide-slate-800">
+        {#each recentFiles.paths as path (path)}
+          <li><button type="button" disabled={workspace.pending} onclick={() => void workspace.openPath(path)} class="w-full rounded px-2 py-3 text-left hover:bg-slate-800 focus-visible:outline focus-visible:outline-emerald-400 disabled:opacity-50"><span class="block text-sm text-slate-200">{path.split(/[\\/]/).pop()}</span><span class="mt-1 block truncate text-xs text-slate-500">{path}</span></button></li>
+        {/each}
+      </ul>{/if}
+    </section>
+  {/if}
 
-      {#if versionsDialogOpen}
-        {#key versionsDialogGeneration}
-          <ProjectVersionsDialog {projects} creating={creatingVersion} onClose={() => (versionsDialogOpen = false)} />
-        {/key}
-      {/if}
+  {#if newFileOpen}<NewFileDialog busy={workspace.pending} onCreate={(kind) => void create(kind)} onClose={() => (newFileOpen = false)} />{/if}
+  {#if preferencesConfig}<PreferencesDialog config={preferencesConfig} disabled={workspace.pending} onClose={() => (preferencesConfig = null)} />{/if}
 
-      {#if cadImportDialogOpen}
-        <CadImportDialog
-          {config}
-          {projects}
-          sensor={sensorStore}
-          initialCoilType={designType}
-          onClose={() => (cadImportDialogOpen = false)}
-          onComplete={(coilType) => {
-            if (startupOpen) projects.markClean();
-            selectDesignType(coilType);
-            selectTab("design");
-            cadImportDialogOpen = false;
-            startupOpen = false;
-          }}
-        />
-      {/if}
-
-      <footer
-        class="shrink-0 border-t border-slate-800 px-6 py-3 text-xs text-slate-500"
-      >
-        Motor physics and routing plus an independent two-layer induction sensor workflow.
-      </footer>
-    </Tabs.Root>
-  </BitsConfig>
+  <Dialog.Root open={unsaved !== null} onOpenChange={(open) => { if (!open) decide("cancel"); }}>
+    <Dialog.Portal>
+      <Dialog.Overlay class="fixed inset-0 z-[150] bg-slate-950/80" />
+      <Dialog.Content class="fixed left-1/2 top-1/2 z-[151] w-[calc(100%-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-xl border border-slate-600 bg-slate-900 p-6 text-slate-100 shadow-xl focus:outline-none">
+        <Dialog.Title class="text-lg font-semibold">Save changes?</Dialog.Title>
+        <Dialog.Description class="mt-2 break-words text-sm text-slate-400">Save changes to {unsaved?.label} before continuing?</Dialog.Description>
+        <div class="mt-6 flex flex-wrap justify-end gap-2">
+          <button type="button" class={button} onclick={() => decide("cancel")}>Cancel</button>
+          <button type="button" class={button} onclick={() => decide("discard")}>Discard</button>
+          <button type="button" class="rounded bg-emerald-600 px-4 py-2 text-sm hover:bg-emerald-500 focus-visible:outline focus-visible:outline-emerald-300" onclick={() => decide("save")}>Save</button>
+        </div>
+      </Dialog.Content>
+    </Dialog.Portal>
+  </Dialog.Root>
 </main>

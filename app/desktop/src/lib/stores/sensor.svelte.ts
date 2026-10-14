@@ -32,5 +32,3 @@ export class SensorStore {
     this.error = null;
   }
 }
-
-export const sensor = new SensorStore();

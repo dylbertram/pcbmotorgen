@@ -2,27 +2,29 @@ import { test, expect, type Page } from "@playwright/test";
 import { gotoDesignApp } from "./helpers";
 
 async function selectDesignType(page: Page, name: string) {
-  await page.getByRole("group", { name: "Design type", exact: true }).getByRole("radio", { name, exact: true }).check();
+  const tab = page.getByRole("tab", { name: name === "Sensor" ? /^S Untitled sensor/ : /^M Untitled motor/ }).first();
+  if (await tab.count()) { await tab.click(); return; }
+  await page.getByRole("button", { name: "New coil file", exact: true }).first().click();
+  await page.getByRole("dialog", { name: "New coil file" }).getByRole("button", { name: name === "Sensor" ? /^Sensor coil/ : /^Motor coil/ }).click();
+  await expect(page.getByRole("dialog", { name: "New coil file" })).toBeHidden();
 }
 
-test("design type offers two visible labels and supports keyboard switching", async ({ page }) => {
+test("file tabs replace the type toggle and support keyboard switching", async ({ page }) => {
   await gotoDesignApp(page);
-  const group = page.getByRole("group", { name: "Design type", exact: true });
-  const motor = group.getByRole("radio", { name: "Motor coil", exact: true });
-  const sensor = group.getByRole("radio", { name: "Sensor", exact: true });
-  await expect(group.getByText("Motor coil", { exact: true })).toBeVisible();
-  await expect(group.getByText("Sensor", { exact: true })).toBeVisible();
-  await expect(motor).toBeChecked();
-  await expect(sensor).not.toBeChecked();
-  await expect(page.getByRole("button", { name: "Design type", exact: true })).toHaveCount(0);
+  await selectDesignType(page, "Sensor");
+  const group = page.getByRole("tablist", { name: "Coil files", exact: true });
+  const motor = group.getByRole("tab", { name: /^M Untitled motor/ });
+  const sensor = group.getByRole("tab", { name: /^S Untitled sensor/ });
+  await expect(page.getByRole("group", { name: "Design type", exact: true })).toHaveCount(0);
+  await motor.click();
   await motor.focus();
   await page.keyboard.press("ArrowRight");
-  await expect(sensor).toBeChecked();
+  await expect(sensor).toHaveAttribute("aria-selected", "true");
   await expect(sensor).toBeFocused();
   await expect(page.getByRole("heading", { name: "Sensor dimensions" })).toBeVisible();
   await page.keyboard.press("ArrowLeft");
-  await expect(motor).toBeChecked();
-  await expect(sensor).not.toBeChecked();
+  await expect(motor).toHaveAttribute("aria-selected", "true");
+  await expect(sensor).toHaveAttribute("aria-selected", "false");
   await expect(page.getByRole("heading", { name: "Magnets", exact: true })).toBeVisible();
 });
 
