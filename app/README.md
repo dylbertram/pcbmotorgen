@@ -22,10 +22,34 @@ are imported. Other conditions, unsupported checks, and maximum or preferred
 values are reported but not applied. This does not run KiCad's full DRC engine.
 Fields absent from the file keep their current values.
 
-## Project versions
+## Files and projects
 
-Each `.pmproj` file stores all of its saved design versions, including motor
-settings, sensor settings, imported CAD geometry, and mover position.
+Motor coils use `.pmmotor` files. Sensor coils use `.pmsensor` files. These are
+separate document types, not alternative extensions for the same design.
+Each file contains its own saved versions and imported CAD geometry. Motor
+files also retain motor settings and mover position; sensor files retain sensor
+settings. Preview and simulation results are regenerated, not stored on disk.
+
+A `.pmproj` file is a workspace manifest. It references coil files by paths
+relative to the workspace and remembers the open-file order and active file.
+Keep the coil files with the workspace when copying a project to another device.
+
+- **File > New** asks whether to add a motor or sensor coil file, then opens a
+  new untitled tab. Existing files and drafts are left alone.
+- **File > New Project** starts an empty workspace. Save, discard, and cancel
+  choices protect unsaved documents and workspace changes.
+- **File > Open** accepts coil files and workspaces. Opening a coil adds a tab;
+  opening an already-open file selects its tab. Opening a workspace replaces
+  the current workspace only after every referenced file loads successfully.
+- **File > Save Project** saves the workspace's file references. Untitled coil
+  files must be saved first. It does not save edits in already-named coil files.
+- **File > Save All** saves edited and untitled coil files, then the workspace.
+- **File > Save Project As** writes a manifest at a new location and adjusts
+  relative references. It does not move or copy the referenced coil files.
+- Closing a tab asks about unsaved work. Closing a tab never deletes its file.
+  Save Project again to retain changes to the open-file list.
+
+## File versions
 
 - Use the title-bar **Versions** or **Version N** button to browse versions,
   open another version, edit a description, or delete a selected version.
@@ -34,7 +58,7 @@ settings, sensor settings, imported CAD geometry, and mover position.
 - **File > Save new version…** saves the current design, including unsaved
   edits, as a separate version. You can give it a description before saving.
 - **File > Save As…** copies all versions into the chosen file, not just the
-  active design.
+  active design. These actions apply to the active coil file, not the workspace.
 - Opening a file loads the version with the most recent last-edited time.
   Editing a version's description also updates that time. Viewing a version
   does not change it.
@@ -44,14 +68,20 @@ settings, sensor settings, imported CAD geometry, and mover position.
 Version switches ask before discarding unsaved design edits. Description edits
 and deletion of an inactive version do not save or discard the working draft.
 
-Older single-design project files load as version 1 and migrate to the new
-format on their next save. Builds that only support the older format cannot
-open files saved in the new format.
+Opening an older combined `.pmproj` offers conversion to a **new** workspace.
+Choose a new name and location. Conversion creates a `.pmmotor` and `.pmsensor`
+beside the new workspace, preserving every revision's ID, description, timestamps,
+settings and geometry. Older single-state files become revision 1. The original
+project remains unchanged, and conversion never overwrites existing files.
+Older app builds cannot open the new formats. Side-by-side version comparison
+is not included in this change.
 
 ## CAD import and coil assignments
 
 Use **File > Import CAD** to preview a DXF before replacing the design geometry.
 Choose the drawing units, trace width, and via sizes. Review any import warnings.
+The active file determines the coil type. Create another file to import a
+different type; import cannot change a motor file into a sensor file.
 
 Source DXF layer names determine coil identity, independently of copper planes:
 
@@ -139,7 +169,7 @@ draft; closing the expanded preview or switching to Measure also discards it.
 The project changes only when you choose **Done**. Repeat the command for each
 coil, or use **Edit terminals** in the saved terminal summary. Confirmed points
 show IN/OUT labels on both previews and retain their original coordinates and
-copper-layer identities. Save the `.pmproj` file to retain these assignments.
+copper-layer identities. Save the coil file to retain these assignments.
 Simplifying lines preserves both assignments and any segment boundary carrying
 a terminal. Projects without explicit assignments keep their existing preview
 defaults. DXF export remains centerline geometry and does not carry IN/OUT

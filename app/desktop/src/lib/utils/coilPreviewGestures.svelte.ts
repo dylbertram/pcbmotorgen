@@ -77,6 +77,7 @@ export function nextZoomStepDown(
 // ---------------------------------------------------------------------------
 
 export interface CoilPreviewGesturesOptions {
+  camera?: PreviewCamera;
   /** CAD editors reserve primary drags for selection and use 2-touch pan / 3-touch zoom. */
   interactionMode?: "navigation" | "cad";
   /** Virtual drawing-space width. A getter can follow a resizable viewport. */
@@ -103,6 +104,13 @@ interface PointerEntry extends Point {
 // Gesture class
 // ---------------------------------------------------------------------------
 
+/** Camera survives editor remounts; pointer ownership never does. */
+export class PreviewCamera {
+  zoom = $state(1);
+  panX = $state(0);
+  panY = $state(0);
+}
+
 export class CoilPreviewGestures {
   // --- options -------------------------------------------------------------
   readonly #options: CoilPreviewGesturesOptions;
@@ -115,13 +123,17 @@ export class CoilPreviewGestures {
   readonly getWorldTransform: (zoom: number) => WorldTransform;
 
   // --- reactive view state (binds straight into CoilPreview's template) ----
-  zoom = $state(1);
-  panX = $state(0);
-  panY = $state(0);
+  readonly #camera: PreviewCamera;
+  get zoom(): number { return this.#camera.zoom; }
+  set zoom(value: number) { this.#camera.zoom = value; }
+  get panX(): number { return this.#camera.panX; }
+  set panX(value: number) { this.#camera.panX = value; }
+  get panY(): number { return this.#camera.panY; }
+  set panY(value: number) { this.#camera.panY = value; }
   isPanning = $state(false);
   zoomLabel = $derived(formatZoom(this.zoom));
-  canZoomIn = $derived(this.zoom >= this.maxZoom - 1e-6);
-  canZoomOut = $derived(this.zoom <= this.minZoom + 1e-6);
+  canZoomIn = $derived.by(() => this.zoom >= this.maxZoom - 1e-6);
+  canZoomOut = $derived.by(() => this.zoom <= this.minZoom + 1e-6);
 
   // --- gesture bookkeeping (deliberately NON-reactive) ----------------------
   #touchCapable: boolean;
@@ -137,12 +149,13 @@ export class CoilPreviewGestures {
   #pinchStart = { distance: 0, cx: 0, cy: 0, zoom: 1, panX: 0, panY: 0 };
 
   constructor(options: CoilPreviewGesturesOptions) {
+    this.#camera = options.camera ?? new PreviewCamera();
     this.#options = options;
     this.minZoom = options.minZoom;
     this.maxZoom = options.maxZoom;
     this.zoomSteps = options.zoomSteps;
     this.getWorldTransform = options.getWorldTransform;
-    this.zoom = clampZoom(1, this.minZoom, this.maxZoom);
+    this.zoom = clampZoom(this.zoom, this.minZoom, this.maxZoom);
     // Native touch events, when present, own ALL touch gestures.
     this.#touchCapable =
       typeof window !== "undefined" && "ontouchstart" in window;

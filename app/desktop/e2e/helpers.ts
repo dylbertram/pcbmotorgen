@@ -6,15 +6,13 @@ export const DESIGN_SCROLL = "#design-settings-scroll";
 /** The persistent left column (aside) of the main grid. */
 export const ASIDE = "aside[aria-label='Persistent design reflection']";
 
-/** Open the app and pass through its first-run chooser with generated defaults. */
+/** Open a motor document with generated defaults in the workspace. */
 export async function gotoDesignApp(page: Page): Promise<void> {
   await page.goto("/");
-  const startup = page.getByRole("dialog");
-  if (await startup.isVisible().catch(() => false)) {
-    await startup.getByRole("button", { name: "New Design" }).click();
-    await startup.getByRole("button", { name: "Create design" }).click();
-    await expect(startup).toBeHidden();
-  }
+  await page.getByRole("button", { name: "New coil file", exact: true }).first().click();
+  const dialog = page.getByRole("dialog", { name: "New coil file", exact: true });
+  await dialog.getByRole("button", { name: /^Motor coil/ }).click();
+  await expect(dialog).toBeHidden();
 }
 
 export function boundingBox(locator: Locator) {

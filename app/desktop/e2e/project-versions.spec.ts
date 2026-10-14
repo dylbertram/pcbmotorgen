@@ -20,8 +20,9 @@ test.beforeEach(async ({ page }) => {
         const version = versions.find(v => v.id === id) ?? latest();
         return { project: clone(version.project), active_version_id: version.id, versions: summaries(), format_version: 2, source_format_version: 2, validation: { errors: [], warnings: [] } };
       };
-      export async function pickProjectSavePath() { return '/design.pmproj'; }
-      export async function pickProjectOpenPath() { return '/design.pmproj'; }
+      export async function pickProjectSavePath() { return '/design.pmmotor'; }
+      export async function pickProjectOpenPath() { return '/design.pmmotor'; }
+      export async function resolveDocumentPath(path) { return path; }
       export async function saveProject(path, project, options) {
         time += 1000;
         let version = versions.find(v => v.id === options.activeVersionId);
@@ -88,6 +89,7 @@ test("title bar versions, File save-new-version, and latest-edited reopening", a
   await page.locator("#magnet-count").press("Enter");
   await fileAction(page, "save");
   await expect(page.getByLabel("Unsaved changes", { exact: true })).toHaveCount(0);
+  await fileAction(page, "closeFile");
   await fileAction(page, "open");
   await expect(page.getByRole("button", { name: "Project versions", exact: true })).toHaveText("Version 1");
   await expect(page.locator("#magnet-count")).toHaveValue("8");
@@ -142,6 +144,7 @@ test("long histories keep version details and actions in bounds on desktop and m
   await gotoDesignApp(page);
   await newVersion(page, "Original");
   await page.evaluate(() => (window as any).__seedVersions(25));
+  await fileAction(page, "closeFile");
   await fileAction(page, "open");
   await expect(page.getByRole("button", { name: "Project versions", exact: true })).toHaveText("Version 25");
   const dialog = await versionsDialog(page);

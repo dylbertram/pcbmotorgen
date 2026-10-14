@@ -4,7 +4,7 @@
  * The dialogs resolve the target path (interface concern, same convention
  * as `register_routing_plugin`); every persistence concern — serialization,
  * versioning, file I/O, validation — happens in the Rust commands
- * (`save_project` / `load_project`).
+ * (`save_document` / `load_project` and the workspace commands).
  *
  * Like `registerRoutingPlugin`, save/load are CRITICAL calls: they surface
  * real errors to the UI instead of falling back to a mock. The mock
@@ -23,15 +23,51 @@ import type {
   LoadProjectResult,
   ProjectState,
   SaveProjectResult,
+  DocumentKind,
+  WorkspaceLoad,
 } from "../types";
 import { isTauriAvailable } from "./core";
 
 const PROJECT_FILE_FILTERS = [
-  { name: "pcbmotorgen project (*.pmproj)", extensions: ["pmproj"] },
+  { name: "pcbmotorgen files", extensions: ["pmproj", "pmmotor", "pmsensor"] },
 ];
 
 /** Default artifact file name offered by the Save As dialog. */
-export const DEFAULT_PROJECT_FILE_NAME = "untitled.pmproj";
+export const DEFAULT_PROJECT_FILE_NAME = "untitled.pmmotor";
+
+export function documentExtension(kind: DocumentKind): string {
+  return kind === "motor" ? "pmmotor" : "pmsensor";
+}
+
+export async function resolveDocumentPath(path: string): Promise<string> {
+  if (!isTauriAvailable()) throw new Error("Opening files requires the desktop app.");
+  return await invoke("resolve_document_path", { path });
+}
+
+export async function confirmLegacyMigration(): Promise<boolean> {
+  if (!isTauriAvailable()) return false;
+  return await confirm("This older project contains motor and sensor designs together. Convert it to a new workspace with separate .pmmotor and .pmsensor files? Every saved version is preserved. The original project will not change.", { title: "Convert older project", okLabel: "Choose new workspace", cancelLabel: "Cancel" });
+}
+
+export async function loadWorkspace(path: string): Promise<WorkspaceLoad> {
+  if (!isTauriAvailable()) throw new Error("Opening workspaces requires the desktop app.");
+  return await invoke("load_workspace", { path });
+}
+
+export async function saveWorkspace(path: string, files: string[], activeFile: string | null): Promise<void> {
+  if (!isTauriAvailable()) throw new Error("Saving workspaces requires the desktop app.");
+  await invoke("save_workspace", { path, files, activeFile });
+}
+
+export async function migrateWorkspace(source: string, destination: string): Promise<WorkspaceLoad> {
+  if (!isTauriAvailable()) throw new Error("Migrating projects requires the desktop app.");
+  return await invoke("migrate_workspace", { source, destination });
+}
+
+export async function pickWorkspaceSavePath(defaultPath = "untitled.pmproj"): Promise<string | null> {
+  if (!isTauriAvailable()) throw new Error("Saving workspaces requires the desktop app.");
+  return await saveDialog({ title: "Save project workspace", defaultPath, filters: [{ name: "pcbmotorgen workspace", extensions: ["pmproj"] }] });
+}
 
 export async function pickProjectDirectory(defaultPath?: string): Promise<string | null> {
   if (!isTauriAvailable()) throw new Error("Choosing a project folder requires the desktop app");
@@ -44,7 +80,7 @@ export async function relocateProject(sourcePath: string | null, directory: stri
 }
 
 /**
- * Open the native file picker restricted to `.pmproj` project files.
+ * Open the native file picker for workspaces and both coil document types.
  * Resolves with the chosen absolute path, or `null` when cancelled.
  * Throws when the Tauri backend is unavailable (plain browser dev).
  */
@@ -61,12 +97,13 @@ export async function pickProjectOpenPath(): Promise<string | null> {
 }
 
 /**
- * Open the native save dialog for a `.pmproj` project file.
+ * Open the native save dialog for the selected coil document type.
  * Resolves with the chosen absolute path, or `null` when cancelled.
  * Throws when the Tauri backend is unavailable (plain browser dev).
  */
 export async function pickProjectSavePath(
   defaultName: string,
+  kind: DocumentKind = "motor",
 ): Promise<string | null> {
   if (!isTauriAvailable()) {
     throw new Error(
@@ -75,7 +112,7 @@ export async function pickProjectSavePath(
   }
   return await saveDialog({
     defaultPath: defaultName,
-    filters: PROJECT_FILE_FILTERS,
+    filters: [{ name: kind === "motor" ? "Motor coil" : "Sensor coil", extensions: [documentExtension(kind)] }],
   });
 }
 
@@ -100,28 +137,29 @@ export async function confirmDiscardChanges(action = "start another project"): P
 }
 
 /**
- * Save the working state to `path` as a versioned `.pmproj` artifact.
+ * Save the working state to `path` as a typed coil document.
  * The backend serializes and writes atomically; a rejection means the
  * file was not changed.
  */
 export async function saveProject(
   path: string,
   project: ProjectState,
-  options: { sourcePath: string | null; activeVersionId: number | null; newVersion: boolean; description?: string } = { sourcePath: null, activeVersionId: null, newVersion: false },
+  options: { sourcePath: string | null; activeVersionId: number | null; newVersion: boolean; description?: string; kind?: DocumentKind } = { sourcePath: null, activeVersionId: null, newVersion: false },
 ): Promise<SaveProjectResult> {
   if (!isTauriAvailable()) {
     throw new Error(
       "Tauri backend unavailable — saving projects requires the desktop app",
     );
   }
-  return await invoke<SaveProjectResult>("save_project", {
+  return await invoke<SaveProjectResult>("save_document", {
+    documentType: options.kind ?? "motor",
     path, project, sourcePath: options.sourcePath, activeVersionId: options.activeVersionId,
     newVersion: options.newVersion, description: options.description ?? null,
   });
 }
 
 /**
- * Load a `.pmproj` artifact. Resolves with the state to restore plus the
+ * Load a `.pmmotor` or `.pmsensor` document. Resolves with the state plus the
  * backend's load-time design validation. Rejects with a specific message
  * for missing/corrupt/incompatible files — the caller must not touch the
  * in-progress state on rejection.
@@ -175,7 +213,12 @@ export async function fileExists(path: string): Promise<boolean> {
  * native menu).
  */
 export async function bindProjectMenuActions(handlers: {
+  newFile?: () => void;
   newProject?: () => void;
+  saveWorkspace?: () => void;
+  saveWorkspaceAs?: () => void;
+  saveAll?: () => void;
+  closeFile?: () => void;
   exportDxf?: () => void;
   sendKicad?: () => void;
   open: () => void;
@@ -197,7 +240,12 @@ export async function bindProjectMenuActions(handlers: {
     return () => {};
   }
   const unlisteners = await Promise.all([
+    listen("menu:new-file", () => handlers.newFile?.()),
     listen("menu:new-project", () => handlers.newProject?.()),
+    listen("menu:save-workspace", () => handlers.saveWorkspace?.()),
+    listen("menu:save-workspace-as", () => handlers.saveWorkspaceAs?.()),
+    listen("menu:save-all", () => handlers.saveAll?.()),
+    listen("menu:close-file", () => handlers.closeFile?.()),
     listen("menu:export-dxf", () => handlers.exportDxf?.()),
     listen("menu:send-kicad", () => handlers.sendKicad?.()),
     listen("menu:open-project", handlers.open),

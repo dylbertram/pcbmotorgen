@@ -2,6 +2,8 @@
   import type { SensorStore } from "../../stores/sensor.svelte";
   import { fitWorldToView, type WorldTransform } from "../../chart";
   import { CoilPreviewGestures } from "../../utils/coilPreviewGestures.svelte";
+  import type { PreviewCamera } from "../../utils/coilPreviewGestures.svelte";
+  import { untrack } from "svelte";
   import { CoilPreviewViewState } from "./coilPreviewViewState.svelte";
   import { PREVIEW_W, PREVIEW_H } from "./coilPreviewCanvas";
   import CoilPreviewControls from "./CoilPreviewControls.svelte";
@@ -10,7 +12,7 @@
   import { Dialog } from "bits-ui";
   import { attachBackdropScrollGuard, lockPageScroll } from "../../utils/pageScrollLock";
 
-  let { store }: { store: SensorStore } = $props();
+  let { store, camera, previewView = new CoilPreviewViewState() }: { store: SensorStore; camera?: PreviewCamera; previewView?: CoilPreviewViewState } = $props();
 
   let geometry = $derived(store.geometry);
   let expanded = $state(false);
@@ -25,7 +27,6 @@
       unlock();
     };
   });
-  const previewView = new CoilPreviewViewState();
   let previewLayers = $derived(Array.from({ length: store.cadGeometry?.layer_z_mm.length ?? 2 }, (_, idx) => ({ idx })));
   let previewBounds = $derived.by(() => {
     if (!geometry) return { minX: -12, minY: -9, maxX: 132, maxY: 9 };
@@ -38,6 +39,7 @@
     return fitWorldToView(previewBounds, PREVIEW_W, PREVIEW_H, 24, zoom);
   }
   const gestures = new CoilPreviewGestures({
+    camera: untrack(() => camera),
     virtualW: PREVIEW_W,
     virtualH: PREVIEW_H,
     minZoom: 0.5,

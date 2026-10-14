@@ -108,9 +108,11 @@ test("rule edits are validated, applied, and used by new designs", async ({ page
   await dialog.getByRole("button", { name: "Save settings" }).click();
   await expect(page.getByLabel("Unsaved changes", { exact: true })).toBeVisible();
   expect(await page.evaluate(() => JSON.parse(localStorage.getItem("pcbmotorgen.preferences.v1")!).rules.min_space_mm)).toBe(0.3);
-  page.once("dialog", prompt => prompt.accept());
   await action(page, "newProject");
+  await page.getByRole("dialog", { name: "Save changes?" }).getByRole("button", { name: "Discard", exact: true }).click();
   await expect(page.getByLabel("Unsaved changes", { exact: true })).toHaveCount(0);
+  await action(page, "newFile");
+  await page.getByRole("dialog", { name: "New coil file" }).getByRole("button", { name: /^Motor coil/ }).click();
   dialog = await settings(page);
   await expect(dialog.getByLabel("Minimum clearance (mm)")).toHaveValue("0.3");
   await expect(dialog.getByLabel("Minimum via drill (mm)")).toHaveValue("0.4");

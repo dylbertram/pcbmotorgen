@@ -14,7 +14,7 @@
 
   function opened(value: boolean): void {
     if (!value) return;
-    name = projects.fileName ?? "untitled.pmproj";
+    name = projects.fileName ?? projects.defaultFileName;
     directory = projects.directory;
     error = null;
   }
@@ -36,8 +36,8 @@
     event.preventDefault();
     if (pending) return;
     error = null;
-    if (!name.trim() || name.trim() === "." || name.trim() === ".." || name.trim().toLowerCase() === ".pmproj" || /[\\/:\x00-\x1f\x7f]/.test(name)) {
-      error = "Enter a project name without slashes or colons.";
+    if (!name.trim() || name.trim() === "." || name.trim() === ".." || /^\.(pmmotor|pmsensor)$/i.test(name.trim()) || /[\\/:\x00-\x1f\x7f]/.test(name)) {
+      error = "Enter a file name without slashes or colons.";
       return;
     }
     if (directory === null) await chooseFolder();
@@ -48,21 +48,18 @@
 
   function selectName(node: HTMLInputElement): void {
     node.focus();
-    node.setSelectionRange(0, node.value.toLowerCase().endsWith(".pmproj") ? node.value.length - 7 : node.value.length);
+    node.setSelectionRange(0, node.value.lastIndexOf(".") > 0 ? node.value.lastIndexOf(".") : node.value.length);
   }
 </script>
 
 <Popover.Root bind:open onOpenChange={opened}>
   <Popover.Trigger
     disabled={projects.busy}
-    aria-label="Change project name and location"
-    title={projects.currentPath ?? "Change project name and location"}
+    aria-label="Change file name and location"
+    title={projects.currentPath ?? "Change file name and location"}
     class="flex max-w-[280px] items-center gap-1.5 rounded px-2 py-1 text-xs text-slate-300 hover:bg-slate-800 hover:text-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 disabled:opacity-50"
   >
     <span class="truncate">{projects.label}</span>
-    {#if projects.isDirty}
-      <span class="text-amber-400" title="Unsaved changes" aria-label="Unsaved changes">●</span>
-    {/if}
     <svg aria-hidden="true" width="12" height="12" viewBox="0 0 12 12" fill="none" class="shrink-0"><path d="m3 4.5 3 3 3-3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" /></svg>
   </Popover.Trigger>
   <Popover.Portal>
@@ -73,7 +70,7 @@
       class="z-[130] w-[360px] max-w-[calc(100vw-1rem)] rounded-xl border border-slate-600 bg-slate-900 p-4 text-sm text-slate-100 shadow-2xl"
     >
       <Popover.Arrow class="fill-slate-900" />
-      <form onsubmit={apply} class="space-y-3" aria-label="Project name and location">
+      <form onsubmit={apply} class="space-y-3" aria-label="File name and location">
         <div class="grid grid-cols-[48px_minmax(0,1fr)] items-center gap-3">
           <label for="project-name" class="text-right text-xs text-slate-400">Name:</label>
           <input id="project-name" bind:value={name} {@attach selectName} disabled={pending} autocomplete="off" spellcheck="false" aria-invalid={error !== null} aria-describedby={error ? "project-location-error" : undefined} class="min-w-0 rounded-md border border-slate-600 bg-slate-950 px-2.5 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 disabled:opacity-50" />

@@ -7,10 +7,11 @@ test.beforeEach(async ({ page }) => {
     contentType: "application/javascript",
     body: `export * from '/src/lib/ipc/project.ts?original';
       window.__moves = [];
+      export async function resolveDocumentPath(path) { return path; }
       export async function pickProjectDirectory() { return window.__cancelFolder ? null : window.__folder ?? '/Users/designer/Documents'; }
       export async function relocateProject(sourcePath, directory, name, project, activeVersionId) {
         if (window.__moveError) throw new Error(window.__moveError);
-        const path = directory.replace(/\\/$/, '') + '/' + (name.endsWith('.pmproj') ? name : name + '.pmproj');
+        const path = directory.replace(/\\/$/, '') + '/' + (name.endsWith('.pmmotor') ? name : name + '.pmmotor');
         window.__moves.push({ sourcePath, path });
         return { path, active_version_id: activeVersionId ?? 1, versions: [{ id: 1, description: '', created_at_unix_ms: 1, last_edited_at_unix_ms: 1 }], saved_at_unix_ms: 1, format_version: 2 };
       }`,
@@ -19,29 +20,29 @@ test.beforeEach(async ({ page }) => {
 
 test("title popover saves, renames and moves while keeping the unsaved draft", async ({ page }) => {
   await gotoDesignApp(page);
-  const title = page.getByRole("button", { name: "Change project name and location" });
+  const title = page.getByRole("button", { name: "Change file name and location" });
   await title.click();
-  const form = page.getByRole("form", { name: "Project name and location" });
+  const form = page.getByRole("form", { name: "File name and location" });
   const name = form.getByLabel("Name:");
   await expect(name).toBeFocused();
-  await expect(name).toHaveValue("untitled.pmproj");
+  await expect(name).toHaveValue("untitled.pmmotor");
   expect(await name.evaluate(el => [el.selectionStart, el.selectionEnd])).toEqual([0, 8]);
   await name.fill("Motor");
   await form.getByRole("button", { name: "Choose project folder" }).click();
   await expect(form.getByText("Documents", { exact: true })).toBeVisible();
   await form.getByRole("button", { name: "Save", exact: true }).click();
   await expect(form).toBeHidden();
-  await expect(title).toContainText("Motor.pmproj");
+  await expect(title).toContainText("Motor.pmmotor");
 
   await page.locator("#magnet-count").fill("8");
   await page.locator("#magnet-count").press("Enter");
   await expect(page.getByLabel("Unsaved changes", { exact: true })).toBeVisible();
   await title.click();
-  await expect(name).toHaveValue("Motor.pmproj");
-  await name.fill("Motor revised.pmproj");
+  await expect(name).toHaveValue("Motor.pmmotor");
+  await name.fill("Motor revised.pmmotor");
   await name.press("Enter");
   await expect(form).toBeHidden();
-  await expect(title).toContainText("Motor revised.pmproj");
+  await expect(title).toContainText("Motor revised.pmmotor");
   await expect(page.getByLabel("Unsaved changes", { exact: true })).toBeVisible();
   await expect(page.locator("#magnet-count")).toHaveValue("8");
   await expect(page.getByRole("button", { name: "Project versions", exact: true })).toHaveText("Version 1");
@@ -51,22 +52,22 @@ test("title popover saves, renames and moves while keeping the unsaved draft", a
   await expect(form.getByText("Desktop", { exact: true })).toBeVisible();
   await form.getByRole("button", { name: "Apply", exact: true }).click();
   await expect(form).toBeHidden();
-  await expect(title).toHaveAttribute("title", "/Users/designer/Desktop/Motor revised.pmproj");
+  await expect(title).toHaveAttribute("title", "/Users/designer/Desktop/Motor revised.pmmotor");
   await expect(page.getByLabel("Unsaved changes", { exact: true })).toBeVisible();
   expect(await page.evaluate(() => (window as any).__moves)).toEqual([
-    { sourcePath: null, path: "/Users/designer/Documents/Motor.pmproj" },
-    { sourcePath: "/Users/designer/Documents/Motor.pmproj", path: "/Users/designer/Documents/Motor revised.pmproj" },
-    { sourcePath: "/Users/designer/Documents/Motor revised.pmproj", path: "/Users/designer/Desktop/Motor revised.pmproj" },
+    { sourcePath: null, path: "/Users/designer/Documents/Motor.pmmotor" },
+    { sourcePath: "/Users/designer/Documents/Motor.pmmotor", path: "/Users/designer/Documents/Motor revised.pmmotor" },
+    { sourcePath: "/Users/designer/Documents/Motor revised.pmmotor", path: "/Users/designer/Desktop/Motor revised.pmmotor" },
   ]);
 });
 
 test("cancel, Escape and clicking outside discard name and folder edits", async ({ page }) => {
   await gotoDesignApp(page);
-  const title = page.getByRole("button", { name: "Change project name and location" });
-  const form = page.getByRole("form", { name: "Project name and location" });
+  const title = page.getByRole("button", { name: "Change file name and location" });
+  const form = page.getByRole("form", { name: "File name and location" });
   for (const action of ["cancel", "escape", "outside"]) {
     await title.click();
-    await expect(form.getByLabel("Name:")).toHaveValue("untitled.pmproj");
+    await expect(form.getByLabel("Name:")).toHaveValue("untitled.pmmotor");
     await form.getByLabel("Name:").fill("Discard this");
     if (action === "cancel") await form.getByRole("button", { name: "Cancel", exact: true }).click();
     else if (action === "escape") await page.keyboard.press("Escape");
@@ -79,12 +80,12 @@ test("cancel, Escape and clicking outside discard name and folder edits", async 
 
 test("invalid names, folder cancellation and file failures leave the popover open", async ({ page }) => {
   await gotoDesignApp(page);
-  const title = page.getByRole("button", { name: "Change project name and location" });
+  const title = page.getByRole("button", { name: "Change file name and location" });
   await title.click();
-  const form = page.getByRole("form", { name: "Project name and location" });
+  const form = page.getByRole("form", { name: "File name and location" });
   await form.getByLabel("Name:").fill("../Invalid");
   await form.getByRole("button", { name: "Save", exact: true }).click();
-  await expect(form.getByRole("alert")).toContainText("Enter a project name");
+  await expect(form.getByRole("alert")).toContainText("Enter a file name");
   await form.getByLabel("Name:").fill("Valid");
   await page.evaluate(() => (window as any).__cancelFolder = true);
   await form.getByRole("button", { name: "Save", exact: true }).click();

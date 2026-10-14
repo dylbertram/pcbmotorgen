@@ -437,7 +437,7 @@
         <div class="grid grid-cols-2 gap-3">
           <label class="text-xs font-medium text-slate-300" for="cad-coil-type">
             Coil type
-            <select id="cad-coil-type" value={coilType} onchange={updateCoilType} disabled={busy} class="mt-1.5 w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 disabled:opacity-50">
+            <select id="cad-coil-type" value={coilType} disabled title="Create another file to import a different coil type." class="mt-1.5 w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 disabled:opacity-50">
               <option value="motor">Motor coil</option>
               <option value="sensor">Sensor coil</option>
             </select>

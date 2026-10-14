@@ -4,15 +4,25 @@
  * Mirrors the Rust DTOs in `src-tauri/src/ipc/project.rs` exactly (field
  * names, order, units, snake_case). These are TRANSFER types only: all
  * serialization, versioning/migration, file I/O, and validation live in
- * the Rust backend behind the `save_project` / `load_project` commands.
+ * the Rust backend behind the `save_document` / `load_project` commands.
  * The frontend gathers the user-facing state into a `ProjectState` (the
  * same way it builds `LinearMotorConfig` for physics calls) and renders
- * the results.
+ * the results. ProjectState is a transfer adapter, not a disk format. Rust's
+ * documents module writes only the fields owned by the document's type.
  */
 
 import type { CommutationMode } from "./enums";
 import type { CadGeometry } from "./dxf";
 import type { SensorConfig } from "./sensor";
+
+export type DocumentKind = "motor" | "sensor";
+
+export interface WorkspaceLoad {
+  path: string;
+  files: string[];
+  active_file: string | null;
+  legacy: boolean;
+}
 
 /** Every user-facing design input, in UI units (mm + SI engineering
  *  units) — mirrors the fields of the frontend `ConfigStore` one-for-one

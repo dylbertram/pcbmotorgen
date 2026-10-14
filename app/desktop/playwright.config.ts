@@ -1,5 +1,7 @@
 import { defineConfig, devices } from "@playwright/test";
 
+const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? "http://127.0.0.1:1420";
+
 /**
  * Visual-layout e2e suite for the pcbmotorgen desktop UI.
  *
@@ -18,10 +20,14 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
   use: {
-    baseURL: "http://localhost:1420",
+    baseURL,
     // Use Playwright's bundled Chromium so CI/server runs need no system Chrome.
     trace: "on-first-retry",
     screenshot: "only-on-failure",
+    // Useful on Linux development hosts that already provide Chromium.
+    launchOptions: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH
+      ? { executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH }
+      : undefined,
   },
   projects: [
     {
@@ -36,8 +42,8 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: "npm run dev",
-    url: "http://localhost:1420",
+    command: "npm run dev -- --host 127.0.0.1",
+    url: baseURL,
     reuseExistingServer: true,
     timeout: 60_000,
   },

@@ -43,7 +43,7 @@ test("Send to KiCad opens details without leaving the Design tab", async ({ page
   await expect(dialog).toBeHidden();
 });
 
-test("DXF exports directly and New clears an edited design", async ({ page }) => {
+test("DXF exports directly and New adds a file without clearing an edited design", async ({ page }) => {
   await page.route("**/src/lib/files.ts", (route) => route.fulfill({
     contentType: "application/javascript",
     body: `export async function saveTextToFile(content, fileName, extensions) {
@@ -53,14 +53,16 @@ test("DXF exports directly and New clears an edited design", async ({ page }) =>
   }));
   await gotoDesignApp(page);
   await page.evaluate(() => window.dispatchEvent(new CustomEvent("test-file-action", { detail: "exportDxf" })));
-  await expect(page.getByText("Exported DXF to /exports/coils.dxf.")).toBeVisible();
+  await expect(page.getByText("Exported DXF to /exports/motor-coil.dxf.")).toBeVisible();
   const saved = await page.evaluate(() => (window as unknown as { __savedDxf: { content: string; fileName: string; extensions: string[] } }).__savedDxf);
-  expect(saved.fileName).toBe("coils.dxf");
+  expect(saved.fileName).toBe("motor-coil.dxf");
   expect(saved.extensions).toEqual(["dxf"]);
   expect(saved.content).toContain("SECTION");
   await page.locator("input#magnet-count").fill("6");
-  page.once("dialog", (dialog) => dialog.accept());
-  await page.evaluate(() => window.dispatchEvent(new CustomEvent("test-file-action", { detail: "newProject" })));
+  await page.locator("input#magnet-count").press("Enter");
+  await page.evaluate(() => window.dispatchEvent(new CustomEvent("test-file-action", { detail: "newFile" })));
+  await page.getByRole("dialog", { name: "New coil file" }).getByRole("button", { name: /^Motor coil/ }).click();
   await expect(page.locator("input#magnet-count")).toHaveValue("12");
-  await expect(page.getByLabel("Unsaved changes", { exact: true })).toHaveCount(0);
+  await page.getByRole("tab", { name: /^M Untitled motor 1/ }).click();
+  await expect(page.locator("input#magnet-count")).toHaveValue("6");
 });

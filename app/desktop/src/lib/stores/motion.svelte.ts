@@ -52,7 +52,7 @@ export class MotionStore {
    * one arrives. Null ⇒ the shared placeholder is active and
    * `envelopeWarning` is raised.
    */
-  envelope = $state<TravelEnvelopeDto | null>(null);
+  envelope = $state.raw<TravelEnvelopeDto | null>(null);
 
   constructor(private config: ConfigStore) { }
 
@@ -63,7 +63,7 @@ export class MotionStore {
    * P_e is a user INPUT echoed back by the envelope, so the config remains
    * its source — this is not envelope math re-derivation.
    */
-  electricalPeriodMm = $derived(this.config.pole_pitch_mm * 2);
+  electricalPeriodMm = $derived.by(() => this.config.pole_pitch_mm * 2);
 
   /**
    * The envelope currently driving the bounds: the backend value when one is
