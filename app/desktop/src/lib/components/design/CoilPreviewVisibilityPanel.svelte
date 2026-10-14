@@ -22,36 +22,9 @@
     selection?: CadSelectionTool;
     assignmentDisabled?: boolean;
   } = $props();
-  const displayGroup = $props.id();
 </script>
 
 <div class="layer-controls">
-  <fieldset class="display-mode">
-    <legend>Display</legend>
-    <div class="mode-options">
-      <label><input type="radio" name={displayGroup} value="traces" bind:group={view.traceMode} />Traces</label>
-      <label><input type="radio" name={displayGroup} value="centerlines" bind:group={view.traceMode} />Centerlines</label>
-    </div>
-    {#if showMotorControls}
-      <label class="layer-row" class:hidden-row={!view.showWaveform} title="Show or hide the phase holding-force waves below the mover slider.">
-        <input type="checkbox" bind:checked={view.showWaveform} aria-label="Show phase waveform" />
-        <span class="col-span-2">Phase waveform</span>
-      </label>
-    {/if}
-  </fieldset>
-
-  {#if uniqueLayers.length > 0}
-    <fieldset>
-      <legend>Copper layers</legend>
-      {#each uniqueLayers as layer (layer.idx)}
-        <label class="layer-row" class:hidden-row={!view.isLayerVisible(layer.idx)}>
-          <input type="checkbox" checked={view.isLayerVisible(layer.idx)} onchange={() => view.toggleLayer(layer.idx)} aria-label={"Show layer " + layer.idx} />
-          <span class="swatch copper"></span><span>Layer {layer.idx + 1}</span>
-        </label>
-      {/each}
-    </fieldset>
-  {/if}
-
   {#if uniquePhases.length > 0}
     <fieldset aria-label="Phase visibility">
       <legend>Phases</legend>
@@ -76,10 +49,6 @@
 
   <fieldset>
     <legend>Overlays</legend>
-    <label class="layer-row" class:hidden-row={!view.showVias}>
-      <input type="checkbox" bind:checked={view.showVias} aria-label="Show vias" />
-      <span class="swatch" style:background-color="#fbbf24"></span><span>Vias</span>
-    </label>
     {#if hasPolePitchData}
       <label class="layer-row" class:hidden-row={!view.showPolePitch}>
         <input type="checkbox" bind:checked={view.showPolePitch} aria-label="Show pole-pitch dimension ruler" />
@@ -106,6 +75,13 @@
 
   {#if showMotorControls}
     <fieldset>
+      <legend>Waveform</legend>
+      <label class="layer-row" class:hidden-row={!view.showWaveform} title="Show or hide the phase holding-force waves below the mover slider.">
+        <input type="checkbox" bind:checked={view.showWaveform} aria-label="Show phase waveform" />
+        <span class="col-span-2">Phase waveform</span>
+      </label>
+    </fieldset>
+    <fieldset>
       <legend>Pattern</legend>
       <label class="layer-row">
         <input type="checkbox" bind:checked={view.oneSection} aria-label="Show only one repeating section of the pattern" />
@@ -124,12 +100,9 @@
   .hidden-row { color: rgb(var(--slate-500)); }
   .hidden-row .swatch { opacity: 0.35; }
   .swatch { width: 0.65rem; height: 0.65rem; border-radius: 2px; }
-  .copper { background: rgb(var(--slate-300)); }
   .regions { background: linear-gradient(90deg, #f87171 50%, #60a5fa 50%); }
   input { accent-color: #34d399; }
   input:focus-visible, select:focus-visible { outline: 2px solid #34d399; outline-offset: 3px; }
-  .mode-options { display: flex; gap: 0.75rem; font-size: 0.75rem; color: rgb(var(--slate-200)); }
-  .mode-options label { display: flex; align-items: center; gap: 0.35rem; cursor: pointer; }
   select { width: calc(100% - 2rem); margin: 0.5rem 0 0 2rem; padding: 0.25rem; border: 1px solid rgb(var(--slate-600)); border-radius: 4px; background: rgb(var(--slate-800)); color: rgb(var(--slate-200)); font-size: 0.75rem; }
   select:disabled { opacity: 0.4; }
 </style>

@@ -48,44 +48,55 @@ test("copper width is zoom-independent in world units; centerlines remain thin",
   await dialog.getByRole("button", { name: "Zoom in", exact: true }).click();
   await expect(canvas).toHaveAttribute("data-test-world-width", width!);
   await expect.poll(async () => Number(await canvas.getAttribute("data-test-pixel-width"))).toBeGreaterThan(pixels);
-  await dialog.getByRole("button", { name: "Layers", exact: true }).click();
-  const panel = page.getByRole("dialog", { name: "Coil preview layers", exact: true });
+  await dialog.getByRole("button", { name: "Display", exact: true }).click();
+  const panel = page.getByRole("dialog", { name: "Coil preview display", exact: true });
   await panel.getByRole("radio", { name: "Centerlines" }).check();
-  await panel.getByRole("button", { name: "Close layers panel" }).click();
+  await panel.getByRole("button", { name: "Close display panel" }).click();
   await expect(canvas).toHaveAttribute("data-trace-mode", "centerlines");
   const centerlinePixels = Number(await canvas.getAttribute("data-test-pixel-width"));
   await dialog.getByRole("button", { name: "Zoom in", exact: true }).click();
   await expect.poll(async () => Number(await canvas.getAttribute("data-test-pixel-width"))).toBeCloseTo(centerlinePixels);
 });
 
-test("all toggles live in the Layers popover and survive reopening without resizing the viewer", async ({ page }) => {
+test("the side rail docks the Layers and Display panels without resizing the viewer", async ({ page }) => {
   await gotoDesignApp(page);
   await page.getByRole("button", { name: "Expand coil preview" }).click();
   const dialog = page.getByRole("dialog", { name: "Coil Preview", exact: true });
-  const panel = page.getByRole("dialog", { name: "Coil preview layers", exact: true });
+  const layers = page.getByRole("dialog", { name: "Coil preview layers", exact: true });
+  const display = page.getByRole("dialog", { name: "Coil preview display", exact: true });
   const canvasBox = await dialog.locator("canvas").boundingBox();
   const rail = dialog.getByRole("toolbar", { name: "Preview side tools" });
   await expect(rail).toHaveAttribute("aria-orientation", "vertical");
   const railBounds = (await rail.boundingBox())!;
   expect(railBounds.x + railBounds.width).toBeCloseTo(canvasBox!.x + canvasBox!.width, 0);
-  // The rail runs the full drawing height: no gap above or below.
-  expect(railBounds.y).toBeCloseTo(canvasBox!.y, 0);
-  expect(railBounds.y + railBounds.height).toBeCloseTo(canvasBox!.y + canvasBox!.height, 0);
-  await dialog.getByRole("button", { name: "Layers", exact: true }).click();
-  await expect(panel).toBeVisible();
-  const panelBounds = (await panel.boundingBox())!;
-  expect(panelBounds.x + panelBounds.width).toBeLessThanOrEqual(railBounds.x + 4);
-  expect(await dialog.locator("canvas").boundingBox()).toEqual(canvasBox);
-  expect(await dialog.getByRole("checkbox").count()).toBe(0);
-  await panel.getByRole("checkbox", { name: "Show vias", exact: true }).uncheck();
-  await expect(dialog.locator("canvas")).toHaveAttribute("data-vias", "0");
-  await panel.getByRole("radio", { name: "Centerlines" }).check();
-  await panel.getByRole("button", { name: "Close layers panel" }).click();
+  // The rail terminates under the top toolbar and meets the status bar.
   const toolbar = dialog.getByRole("toolbar", { name: "Coil preview tools" });
-  // The toolbar has the slate-900 backing and meets the header: its top lines
-  // up with the drawing top, with no gap.
   const toolbarBounds = (await toolbar.boundingBox())!;
   expect(toolbarBounds.y).toBeCloseTo(canvasBox!.y, 0);
+  expect(railBounds.y).toBeCloseTo(toolbarBounds.y + toolbarBounds.height, 0);
+  expect(railBounds.y + railBounds.height).toBeCloseTo(canvasBox!.y + canvasBox!.height, 0);
+  // Layers holds the coil tree, not the global display toggles.
+  await dialog.getByRole("button", { name: "Layers", exact: true }).click();
+  await expect(layers).toBeVisible();
+  await expect(display).toHaveCount(0);
+  // The panel slides in, so poll until it has settled flush against the rail.
+  await expect.poll(async () => {
+    const box = await layers.boundingBox();
+    return box ? box.x + box.width : Number.POSITIVE_INFINITY;
+  }).toBeLessThanOrEqual(railBounds.x + 4);
+  expect(await dialog.locator("canvas").boundingBox()).toEqual(canvasBox);
+  await expect(layers.getByRole("checkbox", { name: "Show vias", exact: true })).toHaveCount(0);
+  // Display owns traces vs centerlines, whole copper layers, and vias.
+  await dialog.getByRole("button", { name: "Display", exact: true }).click();
+  await expect(display).toBeVisible();
+  await expect(layers).toHaveCount(0);
+  await display.getByRole("checkbox", { name: "Show vias", exact: true }).uncheck();
+  await expect(dialog.locator("canvas")).toHaveAttribute("data-vias", "0");
+  await display.getByRole("radio", { name: "Centerlines" }).check();
+  await display.getByRole("button", { name: "Close display panel" }).click();
+  await expect(display).toHaveCount(0);
+  // The toolbar has the slate-900 backing and meets the header: its top lines
+  // up with the drawing top, with no gap.
   // The toolbar is backed with the same slate-900 as the modal; the zoom
   // buttons below are the only bare dock.
   const toolbarBg = await toolbar.locator("..").evaluate((el) => getComputedStyle(el).backgroundColor);
@@ -100,11 +111,11 @@ test("all toggles live in the Layers popover and survive reopening without resiz
   await expect(toolbar.getByRole("button", { name: "Toggle measure tool" })).toHaveAttribute("aria-pressed", "true");
   await page.keyboard.press("Escape");
   await page.getByRole("button", { name: "Expand coil preview" }).click();
-  await dialog.getByRole("button", { name: "Layers", exact: true }).click();
-  await expect(panel.getByRole("checkbox", { name: "Show vias", exact: true })).not.toBeChecked();
-  await expect(panel.getByRole("radio", { name: "Centerlines" })).toBeChecked();
+  await dialog.getByRole("button", { name: "Display", exact: true }).click();
+  await expect(display.getByRole("checkbox", { name: "Show vias", exact: true })).not.toBeChecked();
+  await expect(display.getByRole("radio", { name: "Centerlines" })).toBeChecked();
   await page.setViewportSize({ width: 390, height: 844 });
-  await expect(panel).toBeVisible();
+  await expect(display).toBeVisible();
   expect((await dialog.boundingBox())!.width).toBeLessThan(390);
 });
 
@@ -224,14 +235,16 @@ test("the modal toolbar and zoom controls are bare, the position box is outlined
     expect(pop.width).toBeCloseTo(box.width, 0);
     expect(pop.x).toBeCloseTo(box.x, 0);
     expect(pop.y + pop.height).toBeLessThanOrEqual(box.y + 1);
-    // No heading, one outer border only, and the X overlays the graph's box.
+    // No heading and no outer frame: the chart runs edge to edge and the X
+    // overlays the graph's box.
     await expect(popover.getByRole("heading")).toHaveCount(0);
-    expect(await popover.evaluate((el) => getComputedStyle(el).borderTopWidth)).toBe("1px");
-    expect(await popover.locator("xpath=./div[1]").evaluate((el) => getComputedStyle(el).borderTopWidth)).toBe("0px");
+    expect(await popover.evaluate((el) => getComputedStyle(el).borderTopWidth)).toBe("0px");
+    // No inner frame either: the chart is the only child besides the X.
+    await expect(popover.locator("xpath=./div")).toHaveCount(0);
     const closeBox = (await popover.getByRole("button", { name: "Close phase waveform" }).boundingBox())!;
     const graphBox = (await graph.boundingBox())!;
-    expect(pop.x + pop.width - (closeBox.x + closeBox.width)).toBeCloseTo(5, 0);
-    expect(closeBox.y - pop.y).toBeCloseTo(5, 0);
+    expect(pop.x + pop.width - (closeBox.x + closeBox.width)).toBeCloseTo(4, 0);
+    expect(closeBox.y - pop.y).toBeCloseTo(4, 0);
     expect(closeBox.x).toBeGreaterThanOrEqual(pop.x);
     expect(closeBox.y).toBeGreaterThanOrEqual(pop.y);
     expect(closeBox.y + closeBox.height).toBeLessThanOrEqual(pop.y + pop.height);

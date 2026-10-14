@@ -279,10 +279,12 @@ test("CAD terminal editing works on mobile and changing tools cancels unapplied 
   expect(await dialog.evaluate(element => element.scrollHeight <= element.clientHeight)).toBe(true);
 });
 
-test("CAD layer popover toggles visibility and display without resizing the viewer", async ({ page }, testInfo) => {
+test("CAD side rail docks the Layers and Display panels without resizing the viewer", async ({ page }, testInfo) => {
   const dialog = await openImport(page);
   const trigger = dialog.getByRole("button", { name: "Layers", exact: true });
+  const displayTrigger = dialog.getByRole("button", { name: "Display", exact: true });
   const panel = page.getByRole("dialog", { name: "CAD import layers", exact: true });
+  const display = page.getByRole("dialog", { name: "CAD import display", exact: true });
   const frame = dialog.getByRole("img", { name: "CAD import preview", exact: true });
   const traces = frame.locator(":scope > svg path");
   const vias = frame.locator(":scope > svg circle");
@@ -301,38 +303,49 @@ test("CAD layer popover toggles visibility and display without resizing the view
     await expect(trigger).toHaveAttribute("aria-expanded", "true");
     expect(await frame.boundingBox()).toEqual(before);
     await expect(panel.getByRole("checkbox", { name: "Show phase waveform" })).toHaveCount(0);
-    await panel.getByRole("checkbox", { name: "Show layer 0", exact: true }).uncheck();
+    await displayTrigger.click();
+    await expect(display).toBeVisible();
+    await expect(panel).toBeHidden();
+    await display.getByRole("checkbox", { name: "Show layer 0", exact: true }).uncheck();
     await expect(traces).toHaveCount(0);
-    await panel.getByRole("checkbox", { name: "Show layer 0", exact: true }).check();
+    await display.getByRole("checkbox", { name: "Show layer 0", exact: true }).check();
+    await trigger.click();
+    await expect(panel).toBeVisible();
     await panel.getByRole("checkbox", { name: "Coil B", exact: true }).uncheck();
     await expect(traces).toHaveCount(2);
-    await panel.getByRole("radio", { name: "Centerlines", exact: true }).check();
+    await displayTrigger.click();
+    await display.getByRole("radio", { name: "Centerlines", exact: true }).check();
     await expect.poll(() => traces.first().evaluate((path) => {
       const matrix = (path as SVGGraphicsElement).getScreenCTM()!;
       return Number(getComputedStyle(path).strokeWidth.replace("px", "")) * Math.abs(matrix.a);
     })).toBeCloseTo(1, 2);
-    await panel.getByRole("checkbox", { name: "Show vias", exact: true }).uncheck();
+    await display.getByRole("checkbox", { name: "Show vias", exact: true }).uncheck();
     await expect(vias).toHaveCount(0);
     await page.screenshot({ path: testInfo.outputPath(`cad-layers-${viewport.width}.png`) });
-    const bounds = (await panel.boundingBox())!;
+    const bounds = (await display.boundingBox())!;
     expect(bounds.x + bounds.width).toBeLessThanOrEqual(railBounds.x + 4);
     expect(bounds.x).toBeGreaterThanOrEqual(0);
     expect(bounds.y).toBeGreaterThanOrEqual(0);
     expect(bounds.x + bounds.width).toBeLessThanOrEqual(viewport.width);
     expect(bounds.y + bounds.height).toBeLessThanOrEqual(viewport.height);
     await page.keyboard.press("Escape");
-    await expect(panel).toBeHidden();
-    await expect(trigger).toBeFocused();
+    await expect(display).toBeHidden();
+    await expect(displayTrigger).toBeFocused();
     await expect(dialog).toBeVisible();
     await trigger.click();
     await expect(panel.getByRole("checkbox", { name: "Coil B", exact: true })).not.toBeChecked();
-    await expect(panel.getByRole("radio", { name: "Centerlines", exact: true })).toBeChecked();
     await panel.getByRole("checkbox", { name: "Coil B", exact: true }).check();
-    await panel.getByRole("checkbox", { name: "Show vias", exact: true }).check();
-    await panel.getByRole("radio", { name: "Traces", exact: true }).check();
     await panel.getByRole("button", { name: "Close layers panel" }).click();
     await expect(panel).toBeHidden();
+    await displayTrigger.click();
+    await expect(display.getByRole("radio", { name: "Centerlines", exact: true })).toBeChecked();
+    await display.getByRole("radio", { name: "Traces", exact: true }).check();
+    await display.getByRole("checkbox", { name: "Show vias", exact: true }).check();
+    await display.getByRole("button", { name: "Close display panel" }).click();
+    await expect(display).toBeHidden();
+    // An outside click, a repeat trigger click, and the Close button all dismiss.
     await trigger.click();
+    await expect(panel).toBeVisible();
     await dialog.getByRole("heading", { name: "Import CAD", exact: true }).click();
     await expect(panel).toBeHidden();
     await trigger.click();

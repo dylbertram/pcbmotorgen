@@ -30,7 +30,7 @@
   import GeometryEditingOverlay from "./GeometryEditingOverlay.svelte";
   import PreviewFrame from "./PreviewFrame.svelte";
   import PreviewMeasureOverlay from "./PreviewMeasureOverlay.svelte";
-  import PreviewLayersPopover from "./PreviewLayersPopover.svelte";
+  import PreviewSideRail from "./PreviewSideRail.svelte";
   import MoverPositionControls from "./MoverPositionControls.svelte";
   import { PREVIEW_H, PREVIEW_W } from "./coilPreviewCanvas";
   import type { CoilPreviewViewState } from "./coilPreviewViewState.svelte";
@@ -108,6 +108,9 @@
 
   let backdropRef: HTMLDivElement | null = $state(null);
   let modalPanelRef: HTMLDivElement | null = $state(null);
+  // Height of the floating top toolbar, so the right rail can start under it
+  // instead of reaching the modal's top edge.
+  let toolbarHeight = $state(0);
 
   // Scroll lock for the lightbox (Kata xy31): while the modal is open the
   // page behind it must never scroll. Two layers:
@@ -188,7 +191,7 @@
 
         <!-- The toolbar spans the workspace top, flush under the header and
              backed so the buttons stay legible over the drawing. -->
-        <div class="absolute inset-x-0 top-0 z-20 bg-slate-900">
+        <div class="absolute inset-x-0 top-0 z-20 bg-slate-900" bind:clientHeight={toolbarHeight}>
           <GeometryEditingToolbar label="Coil preview tools" geometry={onGeometryChange ? importedGeometry : null}
             {selection} {measure} {terminalTool} {onSimplify} {onUndoSimplify} {simplifyNotice} borderless
             onActivateSelection={activateSelection} onPrepareGeometry={onStartSegmentEditing} {onStartTerminals} />
@@ -203,14 +206,15 @@
           </div>
         {/if}
 
-        <!-- Right rail: full workspace height, no gap above or below. -->
-        <div class="absolute inset-y-0 right-0 z-20 w-11">
-          <PreviewLayersPopover {view} layers={importedGeometry ? importedGeometry.layer_z_mm.map((_, idx) => ({ idx })) : uniqueLayers} phases={importedGeometry ? [] : uniquePhases}
+        <!-- Right rail: hangs from the bottom of the top toolbar down to the
+             status bar, so the Layers and Display panels pull out under it. -->
+        <div class="absolute bottom-0 right-0 z-20 w-11" style:top={`${toolbarHeight}px`}>
+          <PreviewSideRail {view} layers={importedGeometry ? importedGeometry.layer_z_mm.map((_, idx) => ({ idx })) : uniqueLayers} phases={importedGeometry ? [] : uniquePhases}
            geometry={importedGeometry} {selection} assignmentDisabled={!onGeometryChange || measure.mode || !!terminalTool?.active || view.oneSection}
           coils={importedGeometry ? uniquePhases.map((phase) => ({ name: phase.name, colorIdx: phase.colorIdx })) : []}
           isCoilVisible={(name) => view.isPhaseVisible(uniquePhases.find((phase) => phase.name === name)?.idx ?? -1)}
           onToggleCoil={(name) => { const phase = uniquePhases.find((phase) => phase.name === name); if (phase) view.phaseVisibility[phase.idx] = !view.isPhaseVisible(phase.idx); }} showMotorControls={true}
-            label="Coil preview layers" {hasPolePitchData} {hasBandWidthData} {hasPoleRegionData} {poleRegionPhases} />
+            label="Coil preview layers" displayLabel="Coil preview display" {hasPolePitchData} {hasBandWidthData} {hasPoleRegionData} {poleRegionPhases} />
         </div>
 
         <!-- Bare zoom buttons: no background, with the same 12px gap on the

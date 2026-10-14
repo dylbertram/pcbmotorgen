@@ -13,7 +13,7 @@
   import { attachBackdropScrollGuard, lockPageScroll } from "../../utils/pageScrollLock";
   import { fitWorldToView, type WorldTransform } from "../../chart";
   import CoilPreviewControls from "../design/CoilPreviewControls.svelte";
-  import PreviewLayersPopover from "../design/PreviewLayersPopover.svelte";
+  import PreviewSideRail from "../design/PreviewSideRail.svelte";
   import PreviewFrame from "../design/PreviewFrame.svelte";
   import GeometryEditingToolbar from "../design/GeometryEditingToolbar.svelte";
   import GeometryEditingOverlay from "../design/GeometryEditingOverlay.svelte";
@@ -554,8 +554,10 @@
             <GeometryEditingOverlay geometry={imported.geometry} {selection} {terminalTool} transform={worldTransform} panX={gestures.panX} panY={gestures.panY} width={viewportWidth} height={viewportHeight} isVisible={traceVisible} disabled={busy || !previewIsCurrent || measure.mode} />
             <PreviewMeasureOverlay {measure} transform={worldTransform} panX={gestures.panX} panY={gestures.panY} width={viewportWidth} height={viewportHeight} metresToWorld={1000} />
           </PreviewFrame>
-            <PreviewLayersPopover
+            <div class="absolute inset-y-0 right-0 z-20 w-11">
+            <PreviewSideRail
               label="CAD import layers"
+              displayLabel="CAD import display"
               geometry={imported.geometry} {selection} assignmentDisabled={busy || !previewIsCurrent || measure.mode || terminalTool.active}
               view={previewView}
               layers={previewLayers}
@@ -563,6 +565,7 @@
               isCoilVisible={(name) => !coilHidden(name)}
               onToggleCoil={(name) => { hiddenCoils = { ...hiddenCoils, [name]: !coilHidden(name) }; }}
             />
+            </div>
           </div>
           <div class="flex flex-wrap items-center justify-end gap-3">
             <CoilPreviewControls
