@@ -22,7 +22,7 @@
     phaseFill,
   } from "../../holdingForce";
 
-  let { config, motion }: { config: ConfigStore; motion: MotionStore } = $props();
+  let { config, motion, flush = false }: { config: ConfigStore; motion: MotionStore; flush?: boolean } = $props();
 
   const W = 560;
   const H = 88;
@@ -73,7 +73,7 @@
   viewBox="0 0 {W} {H}"
   role="img"
   aria-label="Per-phase holding force versus mover position ({phaseCount} waves offset by {Math.round(360 / phaseCount)} degrees)"
-  class="mt-2 w-full rounded-md border border-slate-700/80 bg-slate-900/40"
+  class="block w-full rounded-md border border-slate-700/80 bg-slate-900/40 {flush ? '' : 'mt-2'}"
 >
   <!-- ±1 gridlines -->
   <line x1={PAD_X} x2={W - PAD_X} y1={sy(1)} y2={sy(1)} class="stroke-slate-700/60" stroke-dasharray="3 4" />
