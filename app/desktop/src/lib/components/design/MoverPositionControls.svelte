@@ -20,14 +20,13 @@
    * shared store.
    */
   import type { ConfigStore } from "../../stores/config.svelte";
-  import type { Snippet } from "svelte";
   import type { MotionStore } from "../../stores/motion.svelte";
   import { stripBoundsDomainMm } from "../../previewGeometry";
   import NumberField from "../ui/NumberField.svelte";
   import Slider from "../ui/Slider.svelte";
   import HoldingForceChart from "./HoldingForceChart.svelte";
 
-  let { config, motion, showWaveform = true, compact = false, children }: { config: ConfigStore; motion: MotionStore; showWaveform?: boolean; compact?: boolean; children?: Snippet } =
+  let { config, motion, showWaveform = true, compact = false }: { config: ConfigStore; motion: MotionStore; showWaveform?: boolean; compact?: boolean } =
     $props();
 
   // Strip extent in the DOMAIN (routing) frame — exactly what the coil
@@ -77,7 +76,6 @@
   <!-- Normalized per-phase holding force vs position (3 waves at 120° for
        a 3-phase motor); phase-A zeros mark the stable rest positions. -->
   {#if showWaveform}<HoldingForceChart {config} {motion} />{/if}
-  {@render children?.()}
 
   {#if !compact}<div class="mt-1 text-[10px] text-slate-500" aria-live="polite">
     Position: {motion.clampedPositionMm.toFixed(1)} mm · Mover extent:

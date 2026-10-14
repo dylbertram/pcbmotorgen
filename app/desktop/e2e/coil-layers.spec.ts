@@ -160,7 +160,7 @@ test("full-modal drawing contains docked controls and bottom display menu", asyn
   }
 });
 
-test("preview controls have no outer boxes and the inline slider has a text graph toggle", async ({ page }) => {
+test("the modal toolbar and zoom controls are bare, the position box is outlined, and the waveform pops above it", async ({ page }) => {
   await gotoDesignApp(page);
   await page.getByRole("button", { name: "Expand coil preview" }).click();
   const dialog = page.getByRole("dialog", { name: "Coil Preview", exact: true });
@@ -170,35 +170,36 @@ test("preview controls have no outer boxes and the inline slider has a text grap
     const zoom = dialog.getByRole("group", { name: "Zoom controls" });
     const position = dialog.getByRole("spinbutton", { name: "Mover position (mm)", exact: true });
     const slider = dialog.getByRole("slider", { name: "Mover position slider (mm)", exact: true });
-    const toggle = dialog.getByRole("button", { name: "Show frequency graph", exact: true });
-    for (const control of [toolbar, toolbar.locator(".."), zoom.locator(".."), position.locator('xpath=ancestor::div[@aria-label="Mover position"]/..')]) {
-      expect(await control.evaluate(el => {
-        const style = getComputedStyle(el);
-        return [style.borderTopWidth, style.borderRightWidth, style.borderBottomWidth, style.borderLeftWidth];
-      })).toEqual(["0px", "0px", "0px", "0px"]);
+    const positionBox = position.locator('xpath=ancestor::div[@aria-label="Mover position"]/..');
+    for (const bare of [toolbar, toolbar.locator(".."), zoom, zoom.locator("..")]) {
+      expect(await bare.evaluate((el) => getComputedStyle(el).borderTopWidth)).toBe("0px");
     }
+    // The position box has its outline and backing back.
+    expect(await positionBox.evaluate((el) => getComputedStyle(el).borderTopWidth)).not.toBe("0px");
+    expect(await positionBox.evaluate((el) => getComputedStyle(el).backgroundColor)).not.toBe("rgba(0, 0, 0, 0)");
     await expect.poll(async () => {
       const inputBox = (await position.boundingBox())!;
       const sliderBox = (await slider.boundingBox())!;
       return Math.abs(inputBox.y + inputBox.height / 2 - sliderBox.y - sliderBox.height / 2);
     }).toBeLessThan(2);
-    await expect(toggle).toHaveAttribute("aria-pressed", "true");
-    await expect(toggle).toHaveText("Hide frequency graph");
-    const shownColor = await toggle.evaluate(el => getComputedStyle(el).color);
-    await toggle.click();
-    await expect(toggle).toHaveAttribute("aria-pressed", "false");
-    await expect(toggle).toHaveText("Show frequency graph");
-    expect(await toggle.evaluate(el => getComputedStyle(el).color)).not.toBe(shownColor);
-    await expect(dialog.getByRole("img", { name: /Per-phase holding force versus mover position/ })).toHaveCount(0);
+    // The graph lives in its own fixed popover, never in the position box.
+    const popover = dialog.getByRole("dialog", { name: "Phase waveform", exact: true });
+    await expect(popover).toBeVisible();
+    await expect(popover.getByRole("img", { name: /Per-phase holding force versus mover position/ })).toBeVisible();
+    await expect(positionBox.getByRole("img", { name: /Per-phase/ })).toHaveCount(0);
+    const box = (await positionBox.boundingBox())!;
+    const pop = (await popover.boundingBox())!;
+    expect(pop.width).toBeCloseTo(box.width, 0);
+    expect(pop.x).toBeCloseTo(box.x, 0);
+    expect(pop.y + pop.height).toBeLessThanOrEqual(box.y + 1);
+    // The X closes it and clears the Display item.
+    await popover.getByRole("button", { name: "Close phase waveform" }).click();
+    await expect(popover).toHaveCount(0);
     await dialog.getByRole("button", { name: "Display state" }).click();
     await expect(page.getByRole("menuitemcheckbox", { name: "Show phase waveform" })).toHaveAttribute("aria-checked", "false");
-    await page.keyboard.press("Escape");
-    await toggle.focus();
-    await page.keyboard.press("Enter");
-    await expect(toggle).toHaveAttribute("aria-pressed", "true");
-    const graph = (await dialog.getByRole("img", { name: /Per-phase holding force versus mover position/ }).boundingBox())!;
-    const toggleBox = (await toggle.boundingBox())!;
-    expect(graph.y).toBeGreaterThanOrEqual(toggleBox.y + toggleBox.height);
+    await page.getByRole("menuitemcheckbox", { name: "Show phase waveform" }).click();
+    await expect(popover).toBeVisible();
+    await expect(position).toBeVisible();
   }
 });
 
