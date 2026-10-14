@@ -68,7 +68,9 @@ test("all toggles live in the Layers popover and survive reopening without resiz
   await expect(rail).toHaveAttribute("aria-orientation", "vertical");
   const railBounds = (await rail.boundingBox())!;
   expect(railBounds.x + railBounds.width).toBeCloseTo(canvasBox!.x + canvasBox!.width, 0);
-  expect(railBounds.y).toBeGreaterThan(canvasBox!.y);
+  // The rail runs the full drawing height: no gap above or below.
+  expect(railBounds.y).toBeCloseTo(canvasBox!.y, 0);
+  expect(railBounds.y + railBounds.height).toBeCloseTo(canvasBox!.y + canvasBox!.height, 0);
   await dialog.getByRole("button", { name: "Layers", exact: true }).click();
   await expect(panel).toBeVisible();
   const panelBounds = (await panel.boundingBox())!;
@@ -80,7 +82,15 @@ test("all toggles live in the Layers popover and survive reopening without resiz
   await panel.getByRole("radio", { name: "Centerlines" }).check();
   await panel.getByRole("button", { name: "Close layers panel" }).click();
   const toolbar = dialog.getByRole("toolbar", { name: "Coil preview tools" });
-  expect((await toolbar.boundingBox())!.y).toBeGreaterThan(canvasBox!.y);
+  // The toolbar has the slate-900 backing and meets the header: its top lines
+  // up with the drawing top, with no gap.
+  const toolbarBounds = (await toolbar.boundingBox())!;
+  expect(toolbarBounds.y).toBeCloseTo(canvasBox!.y, 0);
+  // The toolbar is backed with the same slate-900 as the modal; the zoom
+  // buttons below are the only bare dock.
+  const toolbarBg = await toolbar.locator("..").evaluate((el) => getComputedStyle(el).backgroundColor);
+  expect(toolbarBg).toBe(await dialog.evaluate((el) => getComputedStyle(el).backgroundColor));
+  expect(toolbarBg).not.toBe("rgba(0, 0, 0, 0)");
   await toolbar.getByRole("button", { name: "Toggle measure tool" }).click();
   await expect(toolbar.getByRole("button", { name: "Toggle measure tool" })).toHaveAttribute("aria-pressed", "true");
   await page.keyboard.press("Escape");
@@ -141,9 +151,12 @@ test("full-modal drawing contains docked controls and bottom display menu", asyn
     expect(modal.y).toBeGreaterThanOrEqual(44);
     expect(modal.x).toBeGreaterThanOrEqual(20);
     expect(modal.y + modal.height).toBeLessThanOrEqual(size.height - 20);
-    await expect.poll(async () => (await frame.boundingBox())!.height).toBeGreaterThan(size.height - 90);
+    // The drawing fills the workspace between the header and the status bar.
+    const statusBox = (await dialog.getByRole("group", { name: "Preview status" }).boundingBox())!;
     const drawing = (await frame.boundingBox())!;
-    for (const control of [dialog.getByRole("toolbar", { name: "Coil preview tools" }), dialog.getByRole("group", { name: "Zoom controls" }), dialog.getByRole("group", { name: "Preview status" }), dialog.getByRole("slider", { name: "Mover position slider (mm)" })]) {
+    expect(drawing.y + drawing.height).toBeCloseTo(statusBox.y, 0);
+    expect(drawing.height).toBeGreaterThan(size.height * 0.6);
+    for (const control of [dialog.getByRole("toolbar", { name: "Coil preview tools" }), dialog.getByRole("group", { name: "Zoom controls" }), dialog.getByRole("slider", { name: "Mover position slider (mm)" })]) {
       const box = (await control.boundingBox())!;
       expect(box.x).toBeGreaterThanOrEqual(drawing.x);
       expect(box.y).toBeGreaterThanOrEqual(drawing.y);
@@ -174,9 +187,22 @@ test("the modal toolbar and zoom controls are bare, the position box is outlined
     for (const bare of [toolbar, toolbar.locator(".."), zoom, zoom.locator("..")]) {
       expect(await bare.evaluate((el) => getComputedStyle(el).borderTopWidth)).toBe("0px");
     }
+    // Only the zoom dock is bare; the toolbar keeps its slate-900 backing.
+    expect(await zoom.locator("..").evaluate((el) => getComputedStyle(el).backgroundColor)).toBe("rgba(0, 0, 0, 0)");
+    expect(await toolbar.locator("..").evaluate((el) => getComputedStyle(el).backgroundColor)).not.toBe("rgba(0, 0, 0, 0)");
     // The position box has its outline and backing back.
     expect(await positionBox.evaluate((el) => getComputedStyle(el).borderTopWidth)).not.toBe("0px");
     expect(await positionBox.evaluate((el) => getComputedStyle(el).backgroundColor)).not.toBe("rgba(0, 0, 0, 0)");
+    // The zoom buttons keep a 12px gap on the right (rail) and bottom
+    // (status bar), matching the position box's bottom gap. Below sm they sit
+    // higher to clear the position box.
+    if (size.width > 640) {
+      const drawing = (await dialog.getByRole("img", { name: "Coil preview — expanded", exact: true }).boundingBox())!;
+      const railBox = (await dialog.getByRole("toolbar", { name: "Preview side tools" }).boundingBox())!;
+      const zoomBox = (await zoom.boundingBox())!;
+      expect(railBox.x - (zoomBox.x + zoomBox.width)).toBeCloseTo(12, 0);
+      expect(drawing.y + drawing.height - (zoomBox.y + zoomBox.height)).toBeCloseTo(12, 0);
+    }
     await expect.poll(async () => {
       const inputBox = (await position.boundingBox())!;
       const sliderBox = (await slider.boundingBox())!;

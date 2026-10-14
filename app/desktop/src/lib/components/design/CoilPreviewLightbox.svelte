@@ -148,10 +148,10 @@
       preventScroll={false}
       onEscapeKeydown={(event) => { if (terminalTool?.active) { event.preventDefault(); terminalTool.cancel(); } else if (selection.selected.length || selection.anchor) { event.preventDefault(); selection.clear(); } }}
       aria-label="Coil Preview — expanded"
-      class="fixed inset-x-6 bottom-6 top-12 z-50 overflow-hidden overscroll-contain rounded-lg border border-slate-700 bg-slate-900 shadow-2xl"
+      class="fixed inset-x-6 bottom-6 top-12 z-50 flex flex-col overflow-hidden overscroll-contain rounded-lg border border-slate-700 bg-slate-900 shadow-2xl"
     >
       <!-- Header row -->
-      <div class="absolute inset-x-0 top-0 z-30 flex items-center justify-between gap-2 border-b border-slate-700 bg-slate-900/95 px-3 py-2">
+      <header class="z-30 flex shrink-0 items-center justify-between gap-2 border-b border-slate-700 bg-slate-900 px-3 py-2">
         <Dialog.Title level={3} class="text-sm font-semibold text-slate-200">
           Coil Preview
         </Dialog.Title>
@@ -165,66 +165,73 @@
             ><X size={16} aria-hidden="true" /></Dialog.Close
           >
         </div>
-      </div>
+      </header>
 
-      <!-- The toolbar floats straight on the drawing: no padding band, flush
-           under the header and against the left edge. -->
-      <div class="absolute left-0 right-11 top-10 z-20">
-        <GeometryEditingToolbar label="Coil preview tools" geometry={onGeometryChange ? importedGeometry : null}
-          {selection} {measure} {terminalTool} {onSimplify} {onUndoSimplify} {simplifyNotice} borderless
-          onActivateSelection={activateSelection} onPrepareGeometry={onStartSegmentEditing} {onStartTerminals} />
-      </div>
-      {#if terminalTool?.active || importedGeometry}
-        <div class="absolute left-2 right-12 top-24 z-20 max-h-[40%] overflow-y-auto rounded-md bg-slate-900/95 px-2">
-          {#if terminalTool?.active}<CoilTerminalPanel tool={terminalTool} />{/if}
-          {#if importedGeometry}
-            <CoilTerminalSummary geometry={importedGeometry} tool={terminalTool} onEdit={(coil) => { selection.setMode("pan"); onStartTerminals?.(coil); }} {onGeometryChange} />
-          {/if}
+      <!-- Workspace: the drawing fills it and every dock sits flush inside it,
+           so the toolbar meets the header and the rail has no top or bottom gap. -->
+      <div class="relative min-h-0 flex-1">
+        <!-- Modal frame div owns the ARIA label (the canvas is the paint
+             target; data-* attributes carry the introspection counters,
+             mirroring the inline pair). All gestures delegate to the same
+             utility instance. -->
+        <div class="absolute inset-0">
+          <PreviewFrame bind:frame={modalFrameRef} {gestures} {measure} interactive={terminalTool?.active ?? false}
+            label="Coil preview — expanded">
+            <canvas bind:this={modalCanvasRef} class="block h-full w-full"
+            ></canvas>
+            {#if importedGeometry}
+              <GeometryEditingOverlay geometry={importedGeometry} {selection} {terminalTool} transform={worldTransform} panX={gestures.panX} panY={gestures.panY} width={W} height={H} worldScale={1e-3} isVisible={isTerminalVisible} disabled={!onGeometryChange || measure.mode || view.oneSection} />
+            {/if}
+            <PreviewMeasureOverlay {measure} transform={worldTransform} panX={gestures.panX} panY={gestures.panY} width={W} height={H} />
+          </PreviewFrame>
         </div>
-      {/if}
 
-       <div class="absolute inset-0">
-      <!-- Modal frame div owns the ARIA label (the canvas is the paint
-           target; data-* attributes carry the introspection counters,
-           mirroring the inline pair). All gestures delegate to the same
-           utility instance. -->
-        <div class="relative h-full overflow-hidden">
-       <PreviewFrame bind:frame={modalFrameRef} {gestures} {measure} interactive={terminalTool?.active ?? false}
-         label="Coil preview — expanded">
-        <canvas bind:this={modalCanvasRef} class="block h-full w-full"
-        ></canvas>
-        {#if importedGeometry}
-          <GeometryEditingOverlay geometry={importedGeometry} {selection} {terminalTool} transform={worldTransform} panX={gestures.panX} panY={gestures.panY} width={W} height={H} worldScale={1e-3} isVisible={isTerminalVisible} disabled={!onGeometryChange || measure.mode || view.oneSection} />
+        <!-- The toolbar spans the workspace top, flush under the header and
+             backed so the buttons stay legible over the drawing. -->
+        <div class="absolute inset-x-0 top-0 z-20 bg-slate-900">
+          <GeometryEditingToolbar label="Coil preview tools" geometry={onGeometryChange ? importedGeometry : null}
+            {selection} {measure} {terminalTool} {onSimplify} {onUndoSimplify} {simplifyNotice} borderless
+            onActivateSelection={activateSelection} onPrepareGeometry={onStartSegmentEditing} {onStartTerminals} />
+        </div>
+
+        {#if terminalTool?.active || importedGeometry}
+          <div class="absolute left-2 right-14 top-14 z-20 max-h-[40%] overflow-y-auto rounded-md bg-slate-900/95 px-2">
+            {#if terminalTool?.active}<CoilTerminalPanel tool={terminalTool} />{/if}
+            {#if importedGeometry}
+              <CoilTerminalSummary geometry={importedGeometry} tool={terminalTool} onEdit={(coil) => { selection.setMode("pan"); onStartTerminals?.(coil); }} {onGeometryChange} />
+            {/if}
+          </div>
         {/if}
-        <PreviewMeasureOverlay {measure} transform={worldTransform} panX={gestures.panX} panY={gestures.panY} width={W} height={H} />
-      </PreviewFrame>
 
-        <div class="absolute right-0 top-11 bottom-11 z-20 w-11">
-        <PreviewLayersPopover {view} layers={importedGeometry ? importedGeometry.layer_z_mm.map((_, idx) => ({ idx })) : uniqueLayers} phases={importedGeometry ? [] : uniquePhases}
-         geometry={importedGeometry} {selection} assignmentDisabled={!onGeometryChange || measure.mode || !!terminalTool?.active || view.oneSection}
-        coils={importedGeometry ? uniquePhases.map((phase) => ({ name: phase.name, colorIdx: phase.colorIdx })) : []}
-        isCoilVisible={(name) => view.isPhaseVisible(uniquePhases.find((phase) => phase.name === name)?.idx ?? -1)}
-        onToggleCoil={(name) => { const phase = uniquePhases.find((phase) => phase.name === name); if (phase) view.phaseVisibility[phase.idx] = !view.isPhaseVisible(phase.idx); }} showMotorControls={true}
-          label="Coil preview layers" {hasPolePitchData} {hasBandWidthData} {hasPoleRegionData} {poleRegionPhases} />
+        <!-- Right rail: full workspace height, no gap above or below. -->
+        <div class="absolute inset-y-0 right-0 z-20 w-11">
+          <PreviewLayersPopover {view} layers={importedGeometry ? importedGeometry.layer_z_mm.map((_, idx) => ({ idx })) : uniqueLayers} phases={importedGeometry ? [] : uniquePhases}
+           geometry={importedGeometry} {selection} assignmentDisabled={!onGeometryChange || measure.mode || !!terminalTool?.active || view.oneSection}
+          coils={importedGeometry ? uniquePhases.map((phase) => ({ name: phase.name, colorIdx: phase.colorIdx })) : []}
+          isCoilVisible={(name) => view.isPhaseVisible(uniquePhases.find((phase) => phase.name === name)?.idx ?? -1)}
+          onToggleCoil={(name) => { const phase = uniquePhases.find((phase) => phase.name === name); if (phase) view.phaseVisibility[phase.idx] = !view.isPhaseVisible(phase.idx); }} showMotorControls={true}
+            label="Coil preview layers" {hasPolePitchData} {hasBandWidthData} {hasPoleRegionData} {poleRegionPhases} />
         </div>
-       </div>
-        <div class="absolute right-11 z-20 top-[32%] sm:top-auto sm:bottom-12">
-      <CoilPreviewControls
-        zoomLabel={gestures.zoomLabel}
-        canZoomIn={gestures.canZoomIn}
-        canZoomOut={gestures.canZoomOut}
-        onZoomIn={gestures.zoomIn}
-        onZoomOut={gestures.zoomOut}
-        onResetZoom={gestures.zoomReset}
-        onResetView={gestures.resetView}
-      />
-      </div>
 
-      <!-- Mover position: same controls as the Design reflection on the
-           shared MotionStore, so the slider lives next to the strip it
-           moves inside the lightbox. The phase-waveform popover is anchored
-           directly above this box at the same width, so it cannot be moved. -->
-        <div class="absolute bottom-12 left-2 z-20 flex w-[min(420px,calc(100%-4rem))] flex-col gap-2">
+        <!-- Bare zoom buttons: no background, with the same 12px gap on the
+             right as the position box has at the bottom. -->
+        <div class="absolute right-14 z-20 top-[32%] sm:top-auto sm:bottom-3">
+          <CoilPreviewControls
+            zoomLabel={gestures.zoomLabel}
+            canZoomIn={gestures.canZoomIn}
+            canZoomOut={gestures.canZoomOut}
+            onZoomIn={gestures.zoomIn}
+            onZoomOut={gestures.zoomOut}
+            onResetZoom={gestures.zoomReset}
+            onResetView={gestures.resetView}
+          />
+        </div>
+
+        <!-- Mover position: same controls as the Design reflection on the
+             shared MotionStore, so the slider lives next to the strip it
+             moves inside the lightbox. The phase-waveform popover is anchored
+             directly above this box at the same width, so it cannot be moved. -->
+        <div class="absolute bottom-3 left-2 z-20 flex w-[min(420px,calc(100%-4rem))] flex-col gap-2">
           {#if view.showWaveform}
             <div role="dialog" aria-label="Phase waveform"
               class="flex max-h-[min(32rem,45vh)] flex-col overflow-hidden rounded-md border border-slate-700 bg-slate-900/95 text-slate-200 shadow-xl shadow-black/40">
@@ -242,10 +249,10 @@
           <div class="rounded-md border border-slate-700 bg-slate-900/95 p-3">
             <MoverPositionControls {config} {motion} showWaveform={false} compact />
           </div>
-       </div>
-
+        </div>
       </div>
-      <div class="absolute inset-x-0 bottom-0 z-30 flex items-center justify-between gap-3 border-t border-slate-700 bg-slate-900 px-3 py-2 text-[10px] text-slate-400" role="group" aria-label="Preview status">
+
+      <div class="z-30 flex shrink-0 items-center justify-between gap-3 border-t border-slate-700 bg-slate-900 px-3 py-2 text-[10px] text-slate-400" role="group" aria-label="Preview status">
         <span class="min-w-0 flex-1 font-mono">Position: {motion.clampedPositionMm.toFixed(1)} mm · Mover extent: {moverBounds.startMm.toFixed(1)} – {moverBounds.endMm.toFixed(1)} mm</span>
         <DropdownMenu.Root>
           <DropdownMenu.Trigger class="shrink-0 rounded border border-slate-700 px-2 py-1 text-xs hover:text-emerald-300" aria-label="Display state">Display ▾</DropdownMenu.Trigger>
