@@ -289,6 +289,11 @@ test("CAD layer popover toggles visibility and display without resizing the view
   for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 }]) {
     await page.setViewportSize(viewport);
     const before = await frame.boundingBox();
+    const rail = dialog.getByRole("toolbar", { name: "Preview side tools" });
+    await expect(rail).toHaveAttribute("aria-orientation", "vertical");
+    const railBounds = (await rail.boundingBox())!;
+    expect(railBounds.x).toBeCloseTo(before!.x + before!.width, 0);
+    expect(railBounds.y).toBeCloseTo(before!.y, 0);
     await expect(panel).toBeHidden();
     await trigger.focus();
     await page.keyboard.press("Enter");
@@ -310,6 +315,7 @@ test("CAD layer popover toggles visibility and display without resizing the view
     await expect(vias).toHaveCount(0);
     await page.screenshot({ path: testInfo.outputPath(`cad-layers-${viewport.width}.png`) });
     const bounds = (await panel.boundingBox())!;
+    expect(bounds.x + bounds.width).toBeLessThanOrEqual(railBounds.x + 4);
     expect(bounds.x).toBeGreaterThanOrEqual(0);
     expect(bounds.y).toBeGreaterThanOrEqual(0);
     expect(bounds.x + bounds.width).toBeLessThanOrEqual(viewport.width);

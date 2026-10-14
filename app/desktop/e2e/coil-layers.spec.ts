@@ -40,8 +40,15 @@ test("all toggles live in the Layers popover and survive reopening without resiz
   const dialog = page.getByRole("dialog", { name: "Coil Preview", exact: true });
   const panel = page.getByRole("dialog", { name: "Coil preview layers", exact: true });
   const canvasBox = await dialog.locator("canvas").boundingBox();
+  const rail = dialog.getByRole("toolbar", { name: "Preview side tools" });
+  await expect(rail).toHaveAttribute("aria-orientation", "vertical");
+  const railBounds = (await rail.boundingBox())!;
+  expect(railBounds.x).toBeCloseTo(canvasBox!.x + canvasBox!.width, 0);
+  expect(railBounds.y).toBeCloseTo(canvasBox!.y, 0);
   await dialog.getByRole("button", { name: "Layers", exact: true }).click();
   await expect(panel).toBeVisible();
+  const panelBounds = (await panel.boundingBox())!;
+  expect(panelBounds.x + panelBounds.width).toBeLessThanOrEqual(railBounds.x + 4);
   expect(await dialog.locator("canvas").boundingBox()).toEqual(canvasBox);
   expect(await dialog.getByRole("checkbox").count()).toBe(0);
   await panel.getByRole("checkbox", { name: "Show vias", exact: true }).uncheck();

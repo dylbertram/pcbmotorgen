@@ -508,7 +508,7 @@
           {#if terminalTool.active}
             <CoilTerminalPanel tool={terminalTool} />
           {/if}
-          <div class="flex min-h-0 flex-1 overflow-hidden rounded-md border border-slate-700 bg-slate-950">
+          <div class="relative flex min-h-0 flex-1 overflow-hidden rounded-md border border-slate-700 bg-slate-950 pr-11">
           <PreviewFrame bind:frame={previewFrameRef} bind:width={previewWidth} bind:height={previewHeight}
             {gestures} {measure} interactive={terminalTool.active} label="CAD import preview">
             <svg
@@ -550,8 +550,6 @@
             <GeometryEditingOverlay geometry={imported.geometry} {selection} {terminalTool} transform={worldTransform} panX={gestures.panX} panY={gestures.panY} width={viewportWidth} height={viewportHeight} isVisible={(coil, layer) => !coilHidden(coil) && previewView.isLayerVisible(layer)} disabled={busy || !previewIsCurrent || measure.mode} />
             <PreviewMeasureOverlay {measure} transform={worldTransform} panX={gestures.panX} panY={gestures.panY} width={viewportWidth} height={viewportHeight} metresToWorld={1000} />
           </PreviewFrame>
-          </div>
-          <div class="flex flex-wrap items-center justify-between gap-3">
             <PreviewLayersPopover
               label="CAD import layers"
               view={previewView}
@@ -560,6 +558,8 @@
               isCoilVisible={(name) => !coilHidden(name)}
               onToggleCoil={(name) => { hiddenCoils = { ...hiddenCoils, [name]: !coilHidden(name) }; }}
             />
+          </div>
+          <div class="flex flex-wrap items-center justify-end gap-3">
             <CoilPreviewControls
               zoomLabel={gestures.zoomLabel}
               canZoomIn={gestures.canZoomIn}

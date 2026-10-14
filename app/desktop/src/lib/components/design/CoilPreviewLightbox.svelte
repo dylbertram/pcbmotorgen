@@ -172,7 +172,8 @@
            target; data-* attributes carry the introspection counters,
            mirroring the inline pair). All gestures delegate to the same
            utility instance. -->
-      <PreviewFrame bind:frame={modalFrameRef} {gestures} {measure} interactive={terminalTool?.active ?? false}
+       <div class="relative overflow-hidden rounded-md border border-slate-700 pr-11">
+       <PreviewFrame bind:frame={modalFrameRef} {gestures} {measure} interactive={terminalTool?.active ?? false}
         label="Coil preview — expanded" aspectRatio={W / H}>
         <canvas bind:this={modalCanvasRef} class="block h-full w-full"
         ></canvas>
@@ -182,14 +183,14 @@
         <PreviewMeasureOverlay {measure} transform={worldTransform} panX={gestures.panX} panY={gestures.panY} width={W} height={H} />
       </PreviewFrame>
 
-      <!-- Zoom + reset view below the expanded canvas, same layout as the
-           inline preview. -->
-      <div class="flex flex-wrap items-center justify-between gap-3">
       <PreviewLayersPopover {view} layers={importedGeometry ? importedGeometry.layer_z_mm.map((_, idx) => ({ idx })) : uniqueLayers} phases={importedGeometry ? [] : uniquePhases}
         coils={importedGeometry ? uniquePhases.map((phase) => ({ name: phase.name, colorIdx: phase.colorIdx })) : []}
         isCoilVisible={(name) => view.isPhaseVisible(uniquePhases.find((phase) => phase.name === name)?.idx ?? -1)}
         onToggleCoil={(name) => { const phase = uniquePhases.find((phase) => phase.name === name); if (phase) view.phaseVisibility[phase.idx] = !view.isPhaseVisible(phase.idx); }} showMotorControls={true}
-        label="Coil preview layers" {hasPolePitchData} {hasBandWidthData} {hasPoleRegionData} {poleRegionPhases} />
+         label="Coil preview layers" {hasPolePitchData} {hasBandWidthData} {hasPoleRegionData} {poleRegionPhases} />
+       </div>
+       <!-- Zoom controls stay below the drawing; Layers opens from the right rail. -->
+       <div class="flex flex-wrap items-center justify-end gap-3">
       <CoilPreviewControls
         zoomLabel={gestures.zoomLabel}
         canZoomIn={gestures.canZoomIn}
