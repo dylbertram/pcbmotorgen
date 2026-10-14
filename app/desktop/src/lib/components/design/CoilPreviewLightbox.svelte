@@ -195,7 +195,7 @@
         </div>
 
         {#if terminalTool?.active || importedGeometry}
-          <div class="absolute left-2 right-14 top-14 z-20 max-h-[40%] overflow-y-auto rounded-md bg-slate-900/95 px-2">
+          <div class="absolute left-2 right-14 top-[68px] z-20 max-h-[40%] overflow-y-auto rounded-md bg-slate-900/95 px-2">
             {#if terminalTool?.active}<CoilTerminalPanel tool={terminalTool} />{/if}
             {#if importedGeometry}
               <CoilTerminalSummary geometry={importedGeometry} tool={terminalTool} onEdit={(coil) => { selection.setMode("pan"); onStartTerminals?.(coil); }} {onGeometryChange} />
@@ -234,14 +234,11 @@
         <div class="absolute bottom-3 left-2 z-20 flex w-[min(420px,calc(100%-4rem))] flex-col gap-2">
           {#if view.showWaveform}
             <div role="dialog" aria-label="Phase waveform"
-              class="flex max-h-[min(32rem,45vh)] flex-col overflow-hidden rounded-md border border-slate-700 bg-slate-900/95 text-slate-200 shadow-xl shadow-black/40">
-              <header class="flex shrink-0 items-center justify-between border-b border-slate-700 px-3 py-2">
-                <h3 class="text-sm font-semibold">Phase waveform</h3>
-                <button type="button" aria-label="Close phase waveform"
-                  class="rounded p-1 text-slate-400 hover:bg-slate-800 hover:text-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
-                  onclick={() => { view.showWaveform = false; }}><X size={16} aria-hidden="true" /></button>
-              </header>
-              <div class="min-h-0 overflow-y-auto overscroll-contain p-2">
+              class="relative max-h-[min(32rem,45vh)] overflow-hidden rounded-md border border-slate-700 bg-slate-900/95 shadow-xl shadow-black/40">
+              <button type="button" aria-label="Close phase waveform"
+                class="absolute right-1 top-1 z-10 rounded p-1 text-slate-400 hover:bg-slate-800 hover:text-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
+                onclick={() => { view.showWaveform = false; }}><X size={16} aria-hidden="true" /></button>
+              <div class="overflow-y-auto overscroll-contain p-2 pr-8">
                 <HoldingForceChart {config} {motion} />
               </div>
             </div>
