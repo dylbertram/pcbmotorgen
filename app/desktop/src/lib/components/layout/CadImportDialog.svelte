@@ -96,6 +96,9 @@
   function coilHidden(net: string): boolean {
     return hiddenCoils[net] === true;
   }
+  function traceVisible(coil: string, layer: number): boolean {
+    return !coilHidden(coil) && previewView.isLayerVisible(layer) && previewView.isCoilLayerVisible(coil, layer);
+  }
   const previewView = new CoilPreviewViewState();
   const previewPad = 24;
   let error = $state<string | null>(null);
@@ -186,6 +189,7 @@
     onReveal: (coil, layer) => {
       hiddenCoils = { ...hiddenCoils, [coil]: false };
       previewView.layerVisibility = { ...previewView.layerVisibility, [layer]: true };
+      previewView.showCoilLayer(coil, layer);
     },
     onFit: gestures.resetView,
   });
@@ -521,13 +525,13 @@
                 {#each imported.geometry.layer_z_mm as _, layer (layer)}
                   {#if previewView.isLayerVisible(layer)}
                     <g fill="none" stroke-width={renderedStrokeWidth} stroke-linecap="round" stroke-linejoin="round">
-                      {#each joinedPreview.segments.filter((segment) => segment.layer === layer && !coilHidden(segment.net)) as segment (segment)}
+                      {#each joinedPreview.segments.filter((segment) => segment.layer === layer && traceVisible(segment.net, layer)) as segment (segment)}
                         <path stroke={coilColor(segment.net)} d={`M ${segment.start.x} ${segment.start.y} L ${segment.end.x} ${segment.end.y}`} />
                       {/each}
-                      {#each joinedPreview.curves.filter((curve) => curve.layer === layer && !coilHidden(curve.net)) as curve (curve)}
+                      {#each joinedPreview.curves.filter((curve) => curve.layer === layer && traceVisible(curve.net, layer)) as curve (curve)}
                         <path stroke={coilColor(curve.net)} d={arcSvgPath(curve)} />
                       {/each}
-                      {#each (imported.geometry.routing.splines ?? []).filter((spline) => spline.layer === layer && !coilHidden(spline.net)) as spline (spline)}
+                      {#each (imported.geometry.routing.splines ?? []).filter((spline) => spline.layer === layer && traceVisible(spline.net, layer)) as spline (spline)}
                         <path stroke={coilColor(spline.net)} d={splineSvgPath(spline)} />
                       {/each}
                     </g>
@@ -535,23 +539,24 @@
                 {/each}
                 {#if previewView.showVias}
                 <g fill="#fbbf24" stroke="#0f172a" stroke-width={previewStrokeWidth * 0.25}>
-                  {#each imported.geometry.routing.vias.filter((via) => !coilHidden(via.net) && (previewView.isLayerVisible(via.from_layer) || previewView.isLayerVisible(via.to_layer))) as via (via)}
+                  {#each imported.geometry.routing.vias.filter((via) => traceVisible(via.net, via.from_layer) || traceVisible(via.net, via.to_layer)) as via (via)}
                     <circle fill={coilColor(via.net)} cx={via.position.x} cy={via.position.y} r={viaPadRadius} />
                   {/each}
                 </g>
                 <g fill="#020617" stroke="#0f172a" stroke-width={previewStrokeWidth * 0.2}>
-                  {#each imported.geometry.routing.vias.filter((via) => !coilHidden(via.net) && (previewView.isLayerVisible(via.from_layer) || previewView.isLayerVisible(via.to_layer))) as via (via)}
+                  {#each imported.geometry.routing.vias.filter((via) => traceVisible(via.net, via.from_layer) || traceVisible(via.net, via.to_layer)) as via (via)}
                     <circle cx={via.position.x} cy={via.position.y} r={viaDrillRadius} />
                   {/each}
                 </g>
                 {/if}
               </g>
             </svg>
-            <GeometryEditingOverlay geometry={imported.geometry} {selection} {terminalTool} transform={worldTransform} panX={gestures.panX} panY={gestures.panY} width={viewportWidth} height={viewportHeight} isVisible={(coil, layer) => !coilHidden(coil) && previewView.isLayerVisible(layer)} disabled={busy || !previewIsCurrent || measure.mode} />
+            <GeometryEditingOverlay geometry={imported.geometry} {selection} {terminalTool} transform={worldTransform} panX={gestures.panX} panY={gestures.panY} width={viewportWidth} height={viewportHeight} isVisible={traceVisible} disabled={busy || !previewIsCurrent || measure.mode} />
             <PreviewMeasureOverlay {measure} transform={worldTransform} panX={gestures.panX} panY={gestures.panY} width={viewportWidth} height={viewportHeight} metresToWorld={1000} />
           </PreviewFrame>
             <PreviewLayersPopover
               label="CAD import layers"
+              geometry={imported.geometry} {selection} assignmentDisabled={busy || !previewIsCurrent || measure.mode || terminalTool.active}
               view={previewView}
               layers={previewLayers}
               coils={previewCoils.map((name, colorIdx) => ({ name, colorIdx }))}

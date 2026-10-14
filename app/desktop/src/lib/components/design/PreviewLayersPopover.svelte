@@ -3,10 +3,12 @@
   import { Layers, X } from "@lucide/svelte";
   import CoilPreviewVisibilityPanel from "./CoilPreviewVisibilityPanel.svelte";
   import type { CoilPreviewViewState } from "./coilPreviewViewState.svelte";
+  import type { CadGeometry } from "../../types";
+  import type { CadSelectionTool } from "../../utils/cadSelectionTool.svelte";
 
   let { view, layers, coils = [], isCoilVisible, onToggleCoil,
     label, phases = [], showMotorControls = false, hasPolePitchData = false,
-    hasBandWidthData = false, hasPoleRegionData = false, poleRegionPhases = [] }: {
+    hasBandWidthData = false, hasPoleRegionData = false, poleRegionPhases = [], geometry, selection, assignmentDisabled = false }: {
     view: CoilPreviewViewState;
     layers: { idx: number }[];
     coils?: { name: string; colorIdx: number }[];
@@ -19,6 +21,9 @@
     hasBandWidthData?: boolean;
     hasPoleRegionData?: boolean;
     poleRegionPhases?: string[];
+    geometry?: CadGeometry | null;
+    selection?: CadSelectionTool;
+    assignmentDisabled?: boolean;
   } = $props();
 </script>
 
@@ -38,7 +43,7 @@
       </header>
       <div class="min-h-0 overflow-y-auto overscroll-contain p-3">
         <CoilPreviewVisibilityPanel {view} uniqueLayers={layers} uniquePhases={phases} {coils} {isCoilVisible} {onToggleCoil}
-          {showMotorControls} {hasPolePitchData} {hasBandWidthData} {hasPoleRegionData} {poleRegionPhases} />
+          {showMotorControls} {hasPolePitchData} {hasBandWidthData} {hasPoleRegionData} {poleRegionPhases} {geometry} {selection} {assignmentDisabled} />
       </div>
     </Popover.Content>
   </Popover.Portal>

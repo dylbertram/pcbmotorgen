@@ -1,12 +1,9 @@
 <script lang="ts">
   import type { CadGeometry } from "../../types";
   import type { CadSelectionTool } from "../../utils/cadSelectionTool.svelte";
-  import { cadCoilNames } from "../../cadPreview";
-  import { MousePointer2, Link, X, Undo2, ArrowRight } from "@lucide/svelte";
+  import { MousePointer2, Link, X, Undo2 } from "@lucide/svelte";
+  import SelectionAssignmentMenu from "./SelectionAssignmentMenu.svelte";
   let { tool, geometry, onActivate = () => {}, disabled = false }: { tool: CadSelectionTool; geometry: CadGeometry; onActivate?: () => void; disabled?: boolean } = $props();
-  let coil = $state("");
-  let layer = $state("");
-  const uid = $props.id();
   const modes = [
     { id: "select", label: "Select", icon: MousePointer2, tip: "Click to select. Drag a box anytime. Shift adds. Two fingers or middle mouse pan; three-finger pinch zooms." },
     { id: "chain", label: "Chain", icon: Link, tip: "Chain: click the first and last segments of a connected chain. Vias connect layers." },
@@ -27,15 +24,12 @@
       </select>
     <span class="text-slate-400" role="status">{tool.selected.length} selected</span>
     <button type="button" class="icon-button" aria-label="Clear" disabled={disabled || !tool.selected.length} onclick={tool.clear} title="Clear selected segments and the chain start."><X size={16} aria-hidden="true" /></button>
+    <SelectionAssignmentMenu {tool} {geometry} {disabled} variant="button" triggerClass="flex h-8 w-8 items-center justify-center rounded border border-slate-700 hover:bg-slate-800 disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500" />
+    {#if tool.canUndo}<button type="button" class="icon-button" aria-label="Undo assignment" title="Undo the last coil or layer assignment." {disabled} onclick={tool.undo}><Undo2 size={16} aria-hidden="true" /></button>{/if}
   </div>
   {#if tool.mode === "chain" || tool.selected.length}
     <div class="tool-row">
-      <label>Coil <input aria-label="Assign selected segments to coil" list={`${uid}-coils`} placeholder="Keep coil" bind:value={coil} {disabled} title="Enter a coil name or choose an existing coil." /></label>
-      <datalist id={`${uid}-coils`}>{#each cadCoilNames(geometry) as name (name)}<option value={name}></option>{/each}</datalist>
-      <label>Layer <select aria-label="Assign selected segments to layer" bind:value={layer} {disabled}><option value="">Keep layer</option>{#each geometry.layer_z_mm as _, i (i)}<option value={String(i)}>L{i}</option>{/each}</select></label>
-      <button type="button" class="text-button" disabled={disabled || !tool.selected.length || (!coil.trim() && layer === "")} onclick={() => tool.apply(coil, layer)} title="Move selected segments to this coil or layer. Vias stay unchanged; affected coil terminals are cleared."><ArrowRight size={14} aria-hidden="true" />Assign</button>
-      {#if tool.canUndo}<button type="button" class="icon-button" aria-label="Undo assignment" title="Undo the last coil or layer assignment." {disabled} onclick={tool.undo}><Undo2 size={16} aria-hidden="true" /></button>{/if}
-      <span class="text-slate-400" role="status">{tool.notice || (tool.mode === "chain" ? "Choose the first segment." : "Shift-click to add or remove.")}</span>
+      <span class="text-slate-400" role="status">{tool.notice || (tool.mode === "chain" ? "Choose the first segment." : "Right-click to change coil or layer, or choose a destination in Layers.")}</span>
     </div>
   {/if}
 </div>
@@ -43,12 +37,9 @@
 <style>
   .selection-toolbar { display: flex; flex-direction: column; gap: .5rem; font-size: .75rem; }
   .tool-row { display: flex; align-items: center; flex-wrap: wrap; gap: .5rem; }
-  button, select, input { border: 1px solid rgb(var(--slate-700)); border-radius: .25rem; background: rgb(var(--slate-900)); color: rgb(var(--slate-200)); padding: .25rem .5rem; }
+  button, select { border: 1px solid rgb(var(--slate-700)); border-radius: .25rem; background: rgb(var(--slate-900)); color: rgb(var(--slate-200)); padding: .25rem .5rem; }
   button[aria-pressed="true"] { border-color: #34d399; color: #6ee7b7; background: #064e3b; }
   .icon-button { display: inline-flex; align-items: center; justify-content: center; width: 2rem; height: 2rem; padding: 0; }
-  .text-button { display: inline-flex; align-items: center; gap: .35rem; min-height: 2rem; }
   button:disabled { opacity: .4; }
-  label { display: flex; gap: .35rem; align-items: center; color: rgb(var(--slate-300)); }
-  input { width: 7rem; }
-  :is(button, select, input):focus-visible { outline: 2px solid #34d399; outline-offset: 2px; }
+  :is(button, select):focus-visible { outline: 2px solid #34d399; outline-offset: 2px; }
 </style>

@@ -128,6 +128,7 @@
       const phase = coils?.phases.find((p) => p.phase_name === coil);
       if (phase) view.phaseVisibility[phase.phase_idx] = true;
       view.layerVisibility = { ...view.layerVisibility, [layer]: true };
+      view.showCoilLayer(coil, layer);
     },
     onFit: () => gestures.resetView(),
   });
@@ -141,7 +142,7 @@
   }
   function isTerminalVisible(coil: string, layer: number): boolean {
     const phase = coils?.phases.find((p) => p.phase_name === coil);
-    return Boolean(phase && view.isPhaseVisible(phase.phase_idx) && view.isLayerVisible(layer));
+    return Boolean(phase && view.isPhaseVisible(phase.phase_idx) && view.isLayerVisible(layer) && view.isCoilLayerVisible(coil, layer));
   }
 
   // -------------------------------------------------------------------
@@ -320,6 +321,7 @@
           (row) =>
             view.isPhaseVisible(row.phaseIdx) &&
             view.isLayerVisible(row.layer) &&
+            view.isCoilLayerVisible(coils?.phases.find((ph) => ph.phase_idx === row.phaseIdx)?.phase_name ?? "", row.layer) &&
             bandRowInOnePeriod(row, view.oneSection, visibleSegments),
         )
       : [],
@@ -478,6 +480,7 @@
       visibleArcs,
       isPhaseVisible: (phaseIdx) => view.isPhaseVisible(phaseIdx),
       isLayerVisible: (layerIdx) => view.isLayerVisible(layerIdx),
+      isCoilLayerVisible: (coil, layer) => view.isCoilLayerVisible(coil, layer),
       showVias: view.showVias,
       traceMode: view.traceMode,
       traceWidthMm: config.min_trace_mm,

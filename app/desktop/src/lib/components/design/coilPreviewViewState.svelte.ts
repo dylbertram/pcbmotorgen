@@ -45,6 +45,20 @@ export class CoilPreviewViewState {
   // only way to inspect a single copper layer in isolation. Default: all
   // layers visible (empty record → everything on).
   layerVisibility = $state<Record<number, boolean>>({});
+  coilLayerVisibility = $state<Record<string, boolean>>({});
+
+  isCoilLayerVisible(coil: string, layer: number): boolean {
+    return this.coilLayerVisibility[JSON.stringify([coil, layer])] !== false;
+  }
+
+  toggleCoilLayer(coil: string, layer: number): void {
+    const key = JSON.stringify([coil, layer]);
+    this.coilLayerVisibility = { ...this.coilLayerVisibility, [key]: !this.isCoilLayerVisible(coil, layer) };
+  }
+
+  showCoilLayer(coil: string, layer: number): void {
+    this.coilLayerVisibility = { ...this.coilLayerVisibility, [JSON.stringify([coil, layer])]: true };
+  }
 
   isPhaseVisible(phaseIdx: number): boolean {
     return this.phaseVisibility[phaseIdx] !== false;

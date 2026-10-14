@@ -428,6 +428,120 @@ async function dragBox(page: Page, a: [number, number], b: [number, number]) {
   await page.mouse.move(end.x, end.y, { steps: 8 }); await page.mouse.up();
 }
 
+async function newCoil(page: Page, name: string) {
+  await page.getByRole("button", { name: "Selection actions", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Change to coil…", exact: true }).hover();
+  await page.getByRole("menuitem", { name: "New coil…", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "Change to a new coil", exact: true });
+  await dialog.getByLabel("Coil name").fill(name);
+  await dialog.getByRole("button", { name: "Move selection", exact: true }).click();
+  await expect(dialog).toBeHidden();
+}
+
+async function changeLayer(page: Page, layer: number) {
+  await page.getByRole("button", { name: "Selection actions", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Change to layer…", exact: true }).hover();
+  await page.getByRole("menuitem", { name: `Layer ${layer}`, exact: true }).click();
+}
+
+test("selection context menu changes coil or layer separately and preserves selection on dismissal", async ({ page }) => {
+  const dialog = await openImport(page);
+  const tools = dialog.getByRole("group", { name: "Segment selection tools" });
+  await expect(tools.getByPlaceholder("Keep coil")).toHaveCount(0);
+  await expect(tools.getByRole("button", { name: "Selection actions" })).toBeDisabled();
+  await clickTrace(page, .5, 0);
+  const point = await tracePoint(page, .5, 0);
+  await page.mouse.click(point.x, point.y, { button: "right" });
+  await expect(page.getByRole("menuitem", { name: "Change to coil…", exact: true })).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(tools).toContainText("1 selected");
+  await expect(dialog).toBeVisible();
+  await page.mouse.click(point.x, point.y, { button: "right" });
+  await page.getByRole("menuitem", { name: "Change to coil…", exact: true }).hover();
+  await page.getByRole("menuitem", { name: "B", exact: true }).click();
+  await expect(dialog.getByRole("option", { name: /Segment 1, coil B, layer 0/ })).toHaveCount(1);
+  await expect(tools).toContainText("1 selected");
+  await page.mouse.click(point.x, point.y, { button: "right" });
+  await page.getByRole("menuitem", { name: "Change to layer…", exact: true }).hover();
+  await page.getByRole("menuitem", { name: "Layer 2", exact: true }).click();
+  await expect(dialog.getByRole("option", { name: /Segment 1, coil B, layer 1/ })).toHaveCount(1);
+  await tools.getByRole("button", { name: "Undo assignment" }).click();
+  await expect(dialog.getByRole("option", { name: /Segment 1, coil B, layer 0/ })).toHaveCount(1);
+});
+
+test("nested layer destinations support Move to, direct clicks, and independent visibility", async ({ page }, testInfo) => {
+  const dialog = await openImport(page);
+  const tools = dialog.getByRole("group", { name: "Segment selection tools" });
+  await dialog.getByRole("button", { name: "Layers", exact: true }).click();
+  const panel = page.getByRole("dialog", { name: "CAD import layers", exact: true });
+  const phaseB = panel.getByRole("group", { name: "Phase B", exact: true });
+  await expect(phaseB.getByRole("button", { name: "Move selection to B, layer 1", exact: true })).toBeDisabled();
+  await expect(phaseB.getByRole("button", { name: "Move selection to B, layer 2", exact: true })).toBeDisabled();
+  await panel.getByRole("button", { name: "Close layers panel" }).click();
+  await clickTrace(page, .5, 0);
+  await dialog.getByRole("button", { name: "Layers", exact: true }).click();
+  await phaseB.getByRole("button", { name: "Move selection to B, layer 2", exact: true }).click({ button: "right" });
+  await page.getByRole("menuitem", { name: "Move to", exact: true }).click();
+  await expect(panel).toBeVisible();
+  await expect(tools).toContainText("1 selected");
+  await expect(dialog.getByRole("option", { name: /Segment 1, coil B, layer 1/ })).toHaveCount(1);
+  await phaseB.getByRole("checkbox", { name: "Show B, layer 2", exact: true }).uncheck();
+  await expect(dialog.getByRole("option", { name: /Segment 1, coil B, layer 1/ })).toHaveCount(0);
+  await expect(dialog.getByRole("option", { name: /coil A, layer 0/ })).toHaveCount(1);
+  await phaseB.getByRole("button", { name: "Move selection to B, layer 2", exact: true }).click();
+  await expect(phaseB.getByRole("checkbox", { name: "Show B, layer 2", exact: true })).toBeChecked();
+  await panel.getByRole("button", { name: "Move selection to Phase A", exact: true }).click();
+  await expect(dialog.getByRole("option", { name: /Segment 1, coil A, layer 1/ })).toHaveCount(1);
+  await page.screenshot({ path: testInfo.outputPath("nested-coil-layers.png") });
+});
+
+test("nested motor layers move selections on mobile and toggle only their own coil/layer", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const dialog = await openImport(page);
+  await dialog.getByRole("button", { name: "Open with this geometry" }).click();
+  await page.getByRole("button", { name: "Expand coil preview" }).click();
+  const motor = page.getByRole("dialog", { name: "Coil Preview", exact: true });
+  await clickTrace(page, .5, 0);
+  await motor.getByRole("button", { name: "Layers", exact: true }).click();
+  const panel = page.getByRole("dialog", { name: "Coil preview layers", exact: true });
+  await panel.getByRole("button", { name: "Move selection to B, layer 2", exact: true }).click();
+  await expect(motor.getByRole("option", { name: /Segment 1, coil B, layer 1/ })).toHaveCount(1);
+  const canvas = motor.locator("canvas");
+  const overlay = motor.getByRole("listbox", { name: "Segment selection preview" }).locator("svg > g");
+  const camera = (await overlay.getAttribute("transform"))!;
+  const before = Number(await canvas.getAttribute("data-segments"));
+  await panel.getByRole("checkbox", { name: "Show B, layer 2", exact: true }).uncheck();
+  await expect.poll(async () => Number(await canvas.getAttribute("data-segments"))).toBeLessThan(before);
+  await expect(overlay).toHaveAttribute("transform", camera);
+  await expect(motor.getByRole("option", { name: /coil A, layer 0/ })).toHaveCount(1);
+  await panel.getByRole("button", { name: "Close layers panel" }).click();
+  await motor.getByRole("button", { name: "Undo assignment" }).click();
+  await expect(motor.getByRole("option", { name: /Segment 1, coil A, layer 0/ })).toHaveCount(1);
+});
+
+test("assignment menus are keyboard accessible and cancelling a new coil preserves geometry", async ({ page }) => {
+  const dialog = await openImport(page);
+  const tools = dialog.getByRole("group", { name: "Segment selection tools" });
+  await clickTrace(page, .5, 0);
+  for (const cancel of [true, false]) {
+    await tools.getByRole("button", { name: "Selection actions" }).focus();
+    await page.keyboard.press("Enter");
+    await page.getByRole("menuitem", { name: "Change to coil…", exact: true }).focus();
+    await page.keyboard.press("ArrowRight");
+    await page.getByRole("menuitem", { name: "New coil…", exact: true }).focus();
+    await page.keyboard.press("Enter");
+    const nameDialog = page.getByRole("dialog", { name: "Change to a new coil", exact: true });
+    await expect(nameDialog.getByRole("button", { name: "Move selection" })).toBeDisabled();
+    await nameDialog.getByLabel("Coil name").fill("  C  ");
+    await page.keyboard.press(cancel ? "Escape" : "Enter");
+    await expect(nameDialog).toBeHidden();
+    await expect(tools).toContainText("1 selected");
+    await expect(dialog.getByRole("option", { name: new RegExp(`Segment 1, coil ${cancel ? 'A' : 'C'}, layer 0`) })).toHaveCount(1);
+  }
+  await dialog.getByRole("button", { name: "Layers", exact: true }).click();
+  await expect(page.getByRole("dialog", { name: "CAD import layers" }).getByRole("group", { name: "Phase C", exact: true }).getByRole("button", { name: "Move selection to C, layer 2", exact: true })).toBeVisible();
+});
+
 test("import selection toggles segments, reassigns coil and layer, and supports undo", async ({ page }, testInfo) => {
   const dialog = await openImport(page);
   const tools = dialog.getByRole("group", { name: "Segment selection tools" });
@@ -436,14 +550,12 @@ test("import selection toggles segments, reassigns coil and layer, and supports 
   await expect(tools).toContainText("2 selected");
   await clickTrace(page, .5, 0, true);
   await expect(tools).toContainText("1 selected");
-  await tools.getByLabel("Assign selected segments to coil").fill("C");
-  await tools.getByLabel("Assign selected segments to layer").selectOption("1");
-  await tools.getByRole("button", { name: "Assign", exact: true }).click();
-  await expectImportCoil(page, "C", true);
-  await expect(dialog.getByRole("option", { name: /Segment 2, coil C, layer 1/ })).toHaveCount(1);
+  await dialog.getByRole("button", { name: "Layers", exact: true }).click();
+  await page.getByRole("button", { name: "Move selection to B, layer 2", exact: true }).click();
+  await page.getByRole("button", { name: "Close layers panel" }).click();
+  await expect(dialog.getByRole("option", { name: /Segment 2, coil B, layer 1/ })).toHaveCount(1);
   await page.screenshot({ path: testInfo.outputPath("cad-segment-selection.png") });
   await tools.getByRole("button", { name: "Undo assignment" }).click();
-  await expectImportCoil(page, "C", false);
   await expect(dialog.getByRole("option", { name: /Segment 2, coil A, layer 0/ })).toHaveCount(1);
 });
 
@@ -453,17 +565,15 @@ test("chain assignments persist into the motor preview and selection tools work 
   await tools.getByRole("button", { name: "Chain", exact: true }).click();
   await clickTrace(page, .5, 0); await clickTrace(page, 1.5, 0);
   await expect(tools).toContainText("2 selected");
-  await tools.getByLabel("Assign selected segments to coil").fill("D");
-  await tools.getByRole("button", { name: "Assign", exact: true }).click();
+  await newCoil(page, "D");
   await dialog.getByRole("button", { name: "Open with this geometry" }).click();
   await page.getByRole("button", { name: "Expand coil preview" }).click();
   const modalTools = page.getByRole("group", { name: "Segment selection tools" });
   await modalTools.getByRole("button", { name: "Chain", exact: true }).click();
   await clickTrace(page, .5, 0); await clickTrace(page, 1.5, 0);
   await expect(modalTools).toContainText("2 selected");
-  await modalTools.getByLabel("Assign selected segments to coil").fill("E");
-  await modalTools.getByLabel("Assign selected segments to layer").selectOption("1");
-  await modalTools.getByRole("button", { name: "Assign", exact: true }).click();
+  await newCoil(page, "E");
+  await changeLayer(page, 2);
   await expect(page.getByRole("option", { name: /Segment 1, coil E, layer 1/ })).toHaveCount(1);
   await page.screenshot({ path: testInfo.outputPath("coil-segment-selection.png") });
   await page.getByRole("button", { name: "Close coil preview" }).click();
@@ -492,8 +602,7 @@ test("default click and drag selection works in CAD and motor viewers without a 
   const motorTools = motor.getByRole("group", { name: "Segment selection tools" });
   await dragBox(page, [-.1, -.1], [1.1, .1]);
   await expect(motorTools).toContainText("1 selected");
-  await motorTools.getByLabel("Assign selected segments to coil").fill("D");
-  await motorTools.getByRole("button", { name: "Assign", exact: true }).click();
+  await newCoil(page, "D");
   await expect(motor.getByRole("option", { name: /Segment 1, coil D/ })).toHaveCount(1);
 });
 
@@ -598,8 +707,7 @@ test("reimport waits for confirmation before discarding segment assignments", as
   const tools = dialog.getByRole("group", { name: "Segment selection tools" });
   await tools.getByRole("button", { name: "Select", exact: true }).click();
   await clickTrace(page, .5, 0);
-  await tools.getByLabel("Assign selected segments to coil").fill("C");
-  await tools.getByRole("button", { name: "Assign", exact: true }).click();
+  await newCoil(page, "C");
   await dialog.getByLabel("Trace width (mm)", { exact: true }).fill("0.5");
   await expect(dialog.getByRole("button", { name: "Reimport", exact: true })).toBeVisible();
   await dialog.getByRole("button", { name: "Reimport", exact: true }).click();

@@ -86,6 +86,7 @@ export interface CoilPreviewDrawInput {
   /** Phase/layer trace visibility predicates (component presentation state). */
   isPhaseVisible: (phaseIdx: number) => boolean;
   isLayerVisible: (layerIdx: number) => boolean;
+  isCoilLayerVisible: (coil: string, layerIdx: number) => boolean;
   showVias: boolean;
   traceMode: "traces" | "centerlines";
   traceWidthMm: number;
@@ -265,7 +266,7 @@ export class CoilPreviewRenderer {
 
     // Per-phase schematic layers, overlaid at their true coordinates.
     for (const ph of coils.phases) {
-      if (!input.isPhaseVisible(ph.phase_idx) || !input.isLayerVisible(ph.layer_idx))
+      if (!input.isPhaseVisible(ph.phase_idx) || !input.isLayerVisible(ph.layer_idx) || !input.isCoilLayerVisible(ph.phase_name, ph.layer_idx))
         continue;
       const layerOpacity = Math.max(0.35, 1 - ph.layer_idx * 0.15);
       const color = PHASE_COLORS[ph.phase_idx % PHASE_COLORS.length];
@@ -352,7 +353,7 @@ export class CoilPreviewRenderer {
       ctx.strokeStyle = "#0f172a";
       ctx.lineWidth = 0.000025;
       for (const ph of input.coils.phases) {
-        if (!input.isPhaseVisible(ph.phase_idx) || !input.isLayerVisible(ph.layer_idx)) continue;
+        if (!input.isPhaseVisible(ph.phase_idx) || !input.isLayerVisible(ph.layer_idx) || !input.isCoilLayerVisible(ph.phase_name, ph.layer_idx)) continue;
         for (const [vx, vy] of ph.via_positions ?? []) {
           const key = `${vx},${vy}`;
           if (seen.has(key)) continue;
