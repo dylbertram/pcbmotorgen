@@ -74,11 +74,11 @@
 <div role="toolbar" aria-label={label} class="flex shrink-0 flex-col">
   <!-- The bottom rule stays after the editing boxes were removed; it is the
        line between the toolbar and the viewer. -->
-  <div class="flex flex-wrap items-start gap-2 border-b border-slate-700 {borderless ? 'py-1.5' : 'border-t py-2'}">
+  <div class="flex flex-wrap items-start gap-2 border-b border-slate-700 {borderless ? 'p-1.5' : 'border-t p-2'}">
   {#if geometry}
     <CadSelectionToolbar tool={selection} {geometry} {disabled} onActivate={activateSelection} />
   {:else if onPrepareGeometry}
-    <button type="button" onclick={prepare} disabled={disabled || preparing} class="rounded border border-slate-700 bg-slate-800 px-2 py-1 text-xs text-slate-300 disabled:opacity-40" title="Create editable geometry to select and reassign segments. Edits stop following the routing settings.">{preparing ? "Preparing segments…" : "Edit segments"}</button>
+    <button type="button" onclick={prepare} disabled={disabled || preparing} class="inline-flex h-8 shrink-0 items-center justify-center rounded border border-slate-700 bg-slate-800 px-4 text-xs text-slate-300 disabled:opacity-40" title="Create editable geometry to select and reassign segments. Edits stop following the routing settings.">{preparing ? "Preparing segments…" : "Edit segments"}</button>
   {/if}
   <CoilPreviewMeasureToolbar {measure} {disabled} onToggle={() => { selection.setMode("pan"); terminalTool?.cancel(); measure.toggleMode(); }} />
   {#if onSimplify}
