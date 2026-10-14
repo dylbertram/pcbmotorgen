@@ -77,6 +77,8 @@ export function nextZoomStepDown(
 // ---------------------------------------------------------------------------
 
 export interface CoilPreviewGesturesOptions {
+  /** CAD editors reserve primary drags for selection and use 2-touch pan / 3-touch zoom. */
+  interactionMode?: "navigation" | "cad";
   /** Virtual drawing-space width. A getter can follow a resizable viewport. */
   virtualW: number;
   /** Virtual drawing-space height. A getter can follow a resizable viewport. */
@@ -104,6 +106,7 @@ interface PointerEntry extends Point {
 export class CoilPreviewGestures {
   // --- options -------------------------------------------------------------
   readonly #options: CoilPreviewGesturesOptions;
+  readonly interactionMode: "navigation" | "cad";
   get virtualW(): number { return this.#options.virtualW; }
   get virtualH(): number { return this.#options.virtualH; }
   readonly minZoom: number;
@@ -124,6 +127,7 @@ export class CoilPreviewGestures {
   #touchCapable: boolean;
   #channel: "none" | "touch" | "pointer" = "none";
   #touchPoints = new Map<number, Point>();
+  #touchCount = 0;
   #pointerPoints = new Map<number, PointerEntry>();
   #panFrame: HTMLDivElement | null = null;
   #panStartClientX = 0;
@@ -134,6 +138,7 @@ export class CoilPreviewGestures {
 
   constructor(options: CoilPreviewGesturesOptions) {
     this.#options = options;
+    this.interactionMode = options.interactionMode ?? "navigation";
     this.minZoom = options.minZoom;
     this.maxZoom = options.maxZoom;
     this.zoomSteps = options.zoomSteps;
@@ -220,17 +225,18 @@ export class CoilPreviewGestures {
     this.#panStartPanY = this.panY;
   }
 
-  /** Resume one-finger panning anchored on the remaining finger/pointer. */
-  #resumePan(frame: HTMLDivElement | null | undefined, x: number, y: number): void {
-    this.#beginPan(frame, x, y);
+  #pointGeometry(points: Point[]): Point & { distance: number } {
+    const x = points.reduce((sum, p) => sum + p.x, 0) / points.length;
+    const y = points.reduce((sum, p) => sum + p.y, 0) / points.length;
+    return { x, y, distance: 2 * Math.sqrt(points.reduce((sum, p) => sum + (p.x - x) ** 2 + (p.y - y) ** 2, 0) / points.length) };
   }
 
-  #beginPinch(frame: HTMLDivElement, a: Point, b: Point): void {
+  #beginPinch(frame: HTMLDivElement, ...points: Point[]): void {
     this.isPanning = false;
-    const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+    const mid = this.#pointGeometry(points);
     const v = this.#clientToVirtual(frame, mid.x, mid.y);
     this.#pinchStart = {
-      distance: Math.hypot(b.x - a.x, b.y - a.y),
+      distance: mid.distance,
       zoom: this.zoom,
       panX: this.panX,
       panY: this.panY,
@@ -251,9 +257,10 @@ export class CoilPreviewGestures {
     this.panY = this.#panStartPanY + dy;
   }
 
-  #updatePinch(frame: HTMLDivElement, a: Point, b: Point): void {
+  #updatePinch(frame: HTMLDivElement, ...points: Point[]): void {
     if (frame.clientWidth === 0 || frame.clientHeight === 0) return;
-    const distance = Math.hypot(b.x - a.x, b.y - a.y);
+    const mid = this.#pointGeometry(points);
+    const distance = mid.distance;
     if (this.#pinchStart.distance <= 0 || distance <= 0) return;
 
     // CONTINUOUS zoom clamped to [minZoom, maxZoom] — no step snapping.
@@ -267,7 +274,6 @@ export class CoilPreviewGestures {
 
     // Focal-point anchoring: the world point under the pinch-start centroid
     // stays pinned under the CURRENT centroid while the zoom level changes.
-    const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
     const v = this.#clientToVirtual(frame, mid.x, mid.y);
     this.#anchorWorld(
       this.#pinchStart.cx,
@@ -284,6 +290,30 @@ export class CoilPreviewGestures {
   #endGesture(): void {
     this.isPanning = false;
     this.#panFrame = null;
+    this.#touchCount = 0;
+  }
+
+  #beginPoints(frame: HTMLDivElement | null, points: Point[], cadTouch: boolean): void {
+    this.isPanning = false;
+    if (!frame) return;
+    if (points.length === (cadTouch ? 3 : 2)) this.#beginPinch(frame, ...points);
+    else if (points.length === (cadTouch ? 2 : 1)) {
+      const center = this.#pointGeometry(points);
+      this.#beginPan(frame, center.x, center.y);
+    }
+  }
+
+  #updatePoints(frame: HTMLDivElement, points: Point[], cadTouch: boolean): void {
+    if (points.length === (cadTouch ? 3 : 2)) this.#updatePinch(frame, ...points);
+    else if (points.length === (cadTouch ? 2 : 1)) {
+      const center = this.#pointGeometry(points);
+      this.#updatePan(frame, center.x, center.y);
+    }
+  }
+
+  #beginPointers(): void {
+    const points = [...this.#pointerPoints.values()];
+    this.#beginPoints(this.#panFrame, points, this.interactionMode === "cad" && points.every(p => p.pointerType === "touch"));
   }
 
   // --- pointer route (mouse / pen; touch only where native touch is absent) --
@@ -307,14 +337,16 @@ export class CoilPreviewGestures {
 
   handlePointerDown = (e: PointerEvent) => {
     const frame = e.currentTarget as HTMLDivElement;
-    // Only the primary mouse button (or a touch/pen pointer) starts a gesture.
-    if (e.pointerType === "mouse" && e.button !== 0) return;
+    // CAD editors pan with the middle button; primary drags belong to selection.
+    if (e.pointerType !== "touch" && e.button !== (this.interactionMode === "cad" ? 1 : 0)) return;
     // Browsers with native TouchEvents own ALL touch there: ignore the
     // touch-compat PointerEvents entirely, so an early `pointerdown` can never
     // claim the channel ahead of `touchstart` and kill the pinch.
     if (e.pointerType === "touch" && this.#touchCapable) return;
     e.preventDefault();
-    this.#capturePointer(frame, e.pointerId);
+    // Touch pointers stay captured by their original overlay so it receives
+    // every release; their navigation events still bubble to the frame.
+    if (!(this.interactionMode === "cad" && e.pointerType === "touch")) this.#capturePointer(frame, e.pointerId);
 
     if (this.#channel === "none") this.#channel = "pointer";
     if (this.#channel !== "pointer") return; // touch owns the gesture
@@ -325,12 +357,7 @@ export class CoilPreviewGestures {
     });
     this.#panFrame = frame;
 
-    if (this.#pointerPoints.size === 2) {
-      const [a, b] = [...this.#pointerPoints.values()];
-      this.#beginPinch(frame, a, b);
-      return;
-    }
-    this.#beginPan(frame, e.clientX, e.clientY);
+    this.#beginPointers();
   };
 
   handlePointerMove = (e: PointerEvent) => {
@@ -345,12 +372,8 @@ export class CoilPreviewGestures {
       pointerType: e.pointerType,
     });
 
-    if (this.#pointerPoints.size === 2) {
-      const [a, b] = [...this.#pointerPoints.values()];
-      this.#updatePinch(frame, a, b);
-      return;
-    }
-    this.#updatePan(frame, e.clientX, e.clientY);
+    const points = [...this.#pointerPoints.values()];
+    this.#updatePoints(frame, points, this.interactionMode === "cad" && points.every(p => p.pointerType === "touch"));
   };
 
   handlePointerEnd = (e: PointerEvent) => {
@@ -359,10 +382,8 @@ export class CoilPreviewGestures {
     this.#releasePointerCapture(this.#panFrame, e.pointerId);
     if (this.#channel !== "pointer") return; // stale compat teardown
 
-    if (this.#pointerPoints.size === 1) {
-      // Pinch → pan handoff: resume on the remaining pointer, no jump.
-      const [remaining] = [...this.#pointerPoints.values()];
-      this.#resumePan(this.#panFrame, remaining.x, remaining.y);
+    if (this.#pointerPoints.size > 0) {
+      this.#beginPointers();
       return;
     }
     if (this.#pointerPoints.size === 0) {
@@ -378,10 +399,11 @@ export class CoilPreviewGestures {
     if (this.#pointerPoints.size === 0) {
       this.#channel = "none";
       this.#endGesture();
-    }
+    } else this.#beginPointers();
   };
 
-  // --- native touch route (two-finger pinch on mobile WebKit/WKWebView) -----
+  // Native touch. CAD uses two fingers to pan and three to pinch; other
+  // previews retain one-finger pan and two-finger pinch.
   /** Rebuild the finger map from the FULL live TouchList so no finger is
    *  ever lost (lifted fingers drop out automatically). */
   #syncTouchPoints(touches: TouchList): void {
@@ -407,13 +429,8 @@ export class CoilPreviewGestures {
     this.#syncTouchPoints(e.touches);
     this.#panFrame = frame;
 
-    if (this.#touchPoints.size === 2) {
-      const [a, b] = [...this.#touchPoints.values()];
-      this.#beginPinch(frame, a, b);
-      return;
-    }
-    const [a] = [...this.#touchPoints.values()];
-    if (a) this.#beginPan(frame, a.x, a.y);
+    this.#touchCount = this.#touchPoints.size;
+    this.#beginPoints(frame, [...this.#touchPoints.values()], this.interactionMode === "cad");
   };
 
   handleTouchMove = (e: TouchEvent) => {
@@ -424,13 +441,12 @@ export class CoilPreviewGestures {
     e.preventDefault();
     this.#syncTouchPoints(e.touches);
 
-    if (this.#touchPoints.size === 2) {
-      const [a, b] = [...this.#touchPoints.values()];
-      this.#updatePinch(frame, a, b);
+    if (this.#touchCount !== this.#touchPoints.size) {
+      this.#touchCount = this.#touchPoints.size;
+      this.#beginPoints(frame, [...this.#touchPoints.values()], this.interactionMode === "cad");
       return;
     }
-    const [a] = [...this.#touchPoints.values()];
-    if (a) this.#updatePan(frame, a.x, a.y);
+    this.#updatePoints(frame, [...this.#touchPoints.values()], this.interactionMode === "cad");
   };
 
   handleTouchEnd = (e: TouchEvent) => {
@@ -438,9 +454,9 @@ export class CoilPreviewGestures {
     // The live list excludes the lifted finger(s); the sync below handles the
     // pinch→pan handoff and the final-finger reset.
     this.#syncTouchPoints(e.touches);
-    if (this.#touchPoints.size === 1) {
-      const [remaining] = [...this.#touchPoints.values()];
-      this.#resumePan(this.#panFrame, remaining.x, remaining.y);
+    this.#touchCount = this.#touchPoints.size;
+    if (this.#touchPoints.size > 0) {
+      this.#beginPoints(this.#panFrame, [...this.#touchPoints.values()], this.interactionMode === "cad");
       return;
     }
     if (this.#touchPoints.size === 0) {
@@ -451,13 +467,19 @@ export class CoilPreviewGestures {
 
   // --- ctrl+wheel pinch zoom (macOS trackpad / browser pinch) ----------------
   handleWheel = (e: WheelEvent) => {
-    // Plain scrolls keep scrolling the surrounding UI.
-    if (!e.ctrlKey) return;
+    // Browsers expose trackpad scroll/pinch as wheel events without finger counts.
+    if (!e.ctrlKey && this.interactionMode !== "cad") return;
     // Stop the browser/OS page zoom. The component attaches this listener
     // non-passively so preventDefault() is honoured.
     e.preventDefault();
     const frame = e.currentTarget as HTMLDivElement;
     if (!frame || frame.clientWidth === 0 || frame.clientHeight === 0) return;
+    if (!e.ctrlKey) {
+      const unit = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? frame.clientHeight : 1;
+      this.panX -= e.deltaX * unit * this.virtualW / frame.clientWidth;
+      this.panY -= e.deltaY * unit * this.virtualH / frame.clientHeight;
+      return;
+    }
 
     // Continuous focal zoom: factor 2 per ~100px of ctrl-scroll.
     const factor = 2 ** (-e.deltaY / 100);

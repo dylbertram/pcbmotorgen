@@ -100,7 +100,7 @@ describe("CAD selection tool", () => {
     tool.pickTrace("splines:0", traces.filter((t) => t.id !== "segments:1"), false);
     expect(tool.notice).toContain("No connected chain");
     expect(tool.anchor).toBe("segments:0");
-    tool.setMode("box");
+    tool.setMode("select");
     expect(tool.anchor).toBeNull();
   });
   it("supports box replacement, addition, subtraction and Shift-add", () => {

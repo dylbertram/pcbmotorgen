@@ -203,6 +203,8 @@ describe("CoilPreviewMeasure (instance-level, no DOM needed)", () => {
       ]),
     );
     expect(m.p1).toBeNull();
+    m.handleTouchEnd(touchEvent([{ identifier: 2, clientX: 260, clientY: 100 }], []));
+    expect(m.p1).toBeNull();
   });
 
   it("a cancelled touch leaves no stale bookkeeping behind", () => {

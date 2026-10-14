@@ -79,9 +79,9 @@ test("overlay visibility and phase selection do not change the camera", async ({
   const frame = dialog.getByRole("img", { name: "Coil preview — expanded", exact: true });
   const box = (await frame.boundingBox())!;
   await page.mouse.move(box.x + 100, box.y + 100);
-  await page.mouse.down();
+  await page.mouse.down({ button: "middle" });
   await page.mouse.move(box.x + 130, box.y + 120);
-  await page.mouse.up();
+  await page.mouse.up({ button: "middle" });
   await expect(canvas).toHaveAttribute("data-test-camera", /\[/);
   const camera = (await canvas.getAttribute("data-test-camera"))!;
   await dialog.getByRole("button", { name: "Layers", exact: true }).click();

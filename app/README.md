@@ -81,6 +81,11 @@ Only numerical roundoff up to 1e-9 mm is allowed when testing collinearity.
 
 CAD import and the expanded motor preview use the same editing tools. Select
 individual segments, chains, or a box to assign coil names and copper layers.
+Click a segment or drag a selection box without choosing a box tool. Drag
+right to select fully contained segments, or left to select crossed segments.
+Shift adds to the selection. Two fingers pan; a three-finger pinch zooms.
+Mouse users can middle-drag to pan. Trackpad scroll pans and Ctrl-scroll or
+browser pinch events zoom, because browsers do not expose trackpad finger counts.
 Use Measure for distances, Set coil terminals for IN/OUT endpoints, and the
 Layers popover for visibility, vias, and trace or centerline display. CAD edits
 remain a draft until **Open with this geometry**. Motor preview edits update
