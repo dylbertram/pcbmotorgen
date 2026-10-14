@@ -148,7 +148,7 @@
       preventScroll={false}
       onEscapeKeydown={(event) => { if (terminalTool?.active) { event.preventDefault(); terminalTool.cancel(); } else if (selection.selected.length || selection.anchor) { event.preventDefault(); selection.clear(); } }}
       aria-label="Coil Preview — expanded"
-      class="fixed inset-4 z-50 overflow-hidden overscroll-contain rounded-lg border border-slate-700 bg-slate-900 shadow-2xl"
+      class="fixed inset-x-6 bottom-6 top-12 z-50 overflow-hidden overscroll-contain rounded-lg border border-slate-700 bg-slate-900 shadow-2xl"
     >
       <!-- Header row -->
       <div class="absolute inset-x-0 top-0 z-30 flex items-center justify-between gap-2 border-b border-slate-700 bg-slate-900/95 px-3 py-2">
