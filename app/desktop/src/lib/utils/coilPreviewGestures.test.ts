@@ -220,3 +220,82 @@ describe("CoilPreviewGestures (instance-level, no DOM needed)", () => {
     expect(g.zoom).toBe(10); // clamped to max
   });
 });
+
+describe("CAD navigation", () => {
+  function touch(points: { x: number; y: number }[]) {
+    return { currentTarget: frame, touches: points.map((p, i) => ({ identifier: i, clientX: p.x, clientY: p.y })), preventDefault: () => {} } as unknown as TouchEvent;
+  }
+  it("reserves one finger for selection and pans with two without changing zoom", () => {
+    const g = makeGestures({ interactionMode: "cad" });
+    g.handleTouchStart(touch([{ x: 100, y: 100 }]));
+    g.handleTouchMove(touch([{ x: 150, y: 130 }]));
+    expect(g.panX).toBe(0);
+    expect(g.isPanning).toBe(false);
+    g.handleTouchStart(touch([{ x: 100, y: 100 }, { x: 200, y: 100 }]));
+    g.handleTouchMove(touch([{ x: 80, y: 100 }, { x: 220, y: 100 }]));
+    expect(g.zoom).toBe(1);
+    expect(g.panX).toBe(0);
+    g.handleTouchMove(touch([{ x: 90, y: 120 }, { x: 230, y: 120 }]));
+    expect(g.panX).toBe(10);
+    expect(g.panY).toBe(20);
+  });
+  it("anchors three-finger pinch and rebases cleanly through 3 to 2 to 1 fingers", () => {
+    const g = makeGestures({ interactionMode: "cad" });
+    const points = [{ x: 100, y: 100 }, { x: 200, y: 100 }, { x: 150, y: 190 }];
+    g.handleTouchStart(touch(points));
+    const original = worldAt(g, 150, 130);
+    const expanded = points.map(p => ({ x: 150 + (p.x - 150) * 2 + 15, y: 130 + (p.y - 130) * 2 - 10 }));
+    g.handleTouchMove(touch(expanded));
+    expect(g.zoom).toBeCloseTo(2);
+    expect(worldAt(g, 165, 120).x).toBeCloseTo(original.x);
+    expect(worldAt(g, 165, 120).y).toBeCloseTo(original.y);
+    const pan = { x: g.panX, y: g.panY };
+    g.handleTouchEnd(touch(expanded.slice(0, 2)));
+    g.handleTouchMove(touch(expanded.slice(0, 2)));
+    expect({ x: g.panX, y: g.panY }).toEqual(pan);
+    g.handleTouchMove(touch(expanded.slice(0, 2).map(p => ({ x: p.x + 10, y: p.y }))));
+    expect(g.panX).toBeCloseTo(pan.x + 10);
+    expect(g.zoom).toBeCloseTo(2);
+    g.handleTouchEnd(touch(expanded.slice(0, 1)));
+    const endPan = g.panX;
+    g.handleTouchMove(touch([{ x: 400, y: 100 }]));
+    expect(g.panX).toBe(endPan);
+    expect(g.isPanning).toBe(false);
+    g.handleTouchEnd(touch([]));
+  });
+  it("supports two-pan and three-pinch on pointer-only touch devices", () => {
+    const g = makeGestures({ interactionMode: "cad" });
+    const pointer = (id: number, x: number, y: number) => ({ currentTarget: frame, pointerId: id, pointerType: "touch", button: 0, clientX: x, clientY: y, preventDefault: () => {} }) as unknown as PointerEvent;
+    g.handlePointerDown(pointer(1, 100, 100));
+    g.handlePointerDown(pointer(2, 200, 100));
+    g.handlePointerMove(pointer(1, 80, 100));
+    g.handlePointerMove(pointer(2, 220, 100));
+    expect(g.zoom).toBe(1);
+    g.handlePointerDown(pointer(3, 150, 190));
+    g.handlePointerMove(pointer(1, 10, 70));
+    g.handlePointerMove(pointer(2, 290, 70));
+    g.handlePointerMove(pointer(3, 150, 250));
+    expect(g.zoom).toBeCloseTo(2);
+    g.handlePointerEnd(pointer(3, 150, 250));
+    const before = g.panX;
+    g.handlePointerMove(pointer(1, 10, 70));
+    expect(g.panX).toBe(before);
+  });
+  it("pans with middle mouse and trackpad scroll, while Ctrl-scroll zooms", () => {
+    const g = makeGestures({ interactionMode: "cad" });
+    const pointer = (button: number, x: number) => ({ currentTarget: frame, pointerId: 1, pointerType: "mouse", button, clientX: x, clientY: 100, preventDefault: () => {} }) as unknown as PointerEvent;
+    g.handlePointerDown(pointer(0, 100));
+    g.handlePointerMove(pointer(0, 200));
+    expect(g.panX).toBe(0);
+    g.handlePointerDown(pointer(1, 100));
+    g.handlePointerMove(pointer(1, 200));
+    g.handlePointerEnd(pointer(1, 200));
+    expect(g.panX).toBe(100);
+    g.handleWheel({ currentTarget: frame, ctrlKey: false, deltaX: 10, deltaY: 20, deltaMode: 0, preventDefault: () => {} } as unknown as WheelEvent);
+    expect(g.panX).toBe(90);
+    expect(g.panY).toBe(-20);
+    expect(g.zoom).toBe(1);
+    wheel(g, 300, 100, -100);
+    expect(g.zoom).toBe(2);
+  });
+});

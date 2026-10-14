@@ -466,10 +466,87 @@ test("chain assignments persist into the motor preview and selection tools work 
   await expect(page.getByRole("option", { name: /Segment 1, coil E, layer 1/ })).toHaveCount(1);
 });
 
+test("default click and drag selection works in CAD and motor viewers without a box tool", async ({ page }) => {
+  const dialog = await openImport(page);
+  const tools = dialog.getByRole("group", { name: "Segment selection tools" });
+  await expect(tools.getByRole("button", { name: "Box", exact: true })).toHaveCount(0);
+  await expect(tools.getByRole("button", { name: "Pan", exact: true })).toHaveCount(0);
+  await clickTrace(page, .5, 0);
+  await expect(tools).toContainText("1 selected");
+  await dragBox(page, [.1, -.1], [1.1, .1]);
+  await expect(tools).toContainText("0 selected");
+  await dragBox(page, [1.1, -.1], [.1, .1]);
+  await expect(tools).toContainText("2 selected");
+  await tools.getByRole("button", { name: "Chain", exact: true }).click();
+  await dragBox(page, [-.1, -.1], [1.1, .1]);
+  await expect(tools).toContainText("1 selected");
+  await dialog.getByRole("button", { name: "Open with this geometry" }).click();
+  await page.getByRole("button", { name: "Expand coil preview" }).click();
+  const motor = page.getByRole("dialog", { name: "Coil Preview", exact: true });
+  const motorTools = motor.getByRole("group", { name: "Segment selection tools" });
+  await dragBox(page, [-.1, -.1], [1.1, .1]);
+  await expect(motorTools).toContainText("1 selected");
+  await motorTools.getByLabel("Assign selected segments to coil").fill("D");
+  await motorTools.getByRole("button", { name: "Assign", exact: true }).click();
+  await expect(motor.getByRole("option", { name: /Segment 1, coil D/ })).toHaveCount(1);
+});
+
+test("touch drag selects, two fingers pan, and three-finger pinch zooms without changing selection", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send("Emulation.setTouchEmulationEnabled", { enabled: true, maxTouchPoints: 3 });
+  const dialog = await openImport(page);
+  const tools = dialog.getByRole("group", { name: "Segment selection tools" });
+  const start = await tracePoint(page, -.1, -.1);
+  const end = await tracePoint(page, 1.1, .1);
+  await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ ...start, id: 1 }] });
+  await cdp.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: [{ ...end, id: 1 }] });
+  await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+  await expect(tools).toContainText("1 selected");
+  for (const viewer of ["cad", "motor"]) {
+  if (viewer === "motor") {
+    await dialog.getByRole("button", { name: "Open with this geometry" }).click();
+    await page.getByRole("button", { name: "Expand coil preview" }).click();
+  }
+  const activeDialog = viewer === "cad" ? dialog : page.getByRole("dialog", { name: "Coil Preview", exact: true });
+  const activeTools = activeDialog.getByRole("group", { name: "Segment selection tools" });
+  const selected = viewer === "cad" ? "1 selected" : "0 selected";
+  const frame = activeDialog.getByRole("img", { name: viewer === "cad" ? "CAD import preview" : "Coil preview — expanded", exact: true });
+  const group = activeDialog.locator('[aria-label="Segment selection preview"] svg > g');
+  const before = await group.evaluate(g => { const m = (g as SVGGraphicsElement).getScreenCTM()!; return { s: m.a, x: m.e, y: m.f }; });
+  const bounds = (await frame.boundingBox())!;
+  const points = [
+    { id: 1, x: bounds.x + bounds.width * .35, y: bounds.y + bounds.height * .4 },
+    { id: 2, x: bounds.x + bounds.width * .6, y: bounds.y + bounds.height * .4 },
+  ];
+  await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: points.slice(0, 1) });
+  await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: points });
+  const panned = points.map(p => ({ ...p, x: p.x + 20, y: p.y + 15 }));
+  await cdp.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: panned });
+  await expect.poll(() => group.evaluate(g => (g as SVGGraphicsElement).getScreenCTM()!.e)).toBeCloseTo(before.x + 20, 0);
+  await expect.poll(() => group.evaluate(g => (g as SVGGraphicsElement).getScreenCTM()!.f)).toBeCloseTo(before.y + 15, 0);
+  await expect(activeDialog.getByRole("button", { name: "Reset zoom", exact: true })).toHaveText("1×");
+  await expect(activeTools).toContainText(selected);
+  const triple = [...panned, { id: 3, x: bounds.x + bounds.width * .475 + 20, y: bounds.y + bounds.height * .65 + 15 }];
+  await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: triple });
+  const center = { x: triple.reduce((sum, p) => sum + p.x, 0) / 3, y: triple.reduce((sum, p) => sum + p.y, 0) / 3 };
+  await cdp.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: triple.map(p => ({ ...p, x: center.x + 2 * (p.x - center.x), y: center.y + 2 * (p.y - center.y) })) });
+  await expect.poll(() => group.evaluate(g => (g as SVGGraphicsElement).getScreenCTM()!.a)).toBeCloseTo(before.s * 2, 0);
+  await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+  await expect(activeTools).toContainText(selected);
+  const tap = await tracePoint(page, .5, 0);
+  await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ ...tap, id: 1 }] });
+  await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+  await expect(activeTools).toContainText("1 selected");
+  }
+  await cdp.detach();
+});
+
 test("box selection supports crossing, contained, add and remove without moving the preview", async ({ page }) => {
   const dialog = await openImport(page);
   const tools = dialog.getByRole("group", { name: "Segment selection tools" });
-  await tools.getByRole("button", { name: "Box", exact: true }).click();
+  await expect(tools.getByRole("button", { name: "Box", exact: true })).toHaveCount(0);
+  await tools.getByLabel("Box coverage").selectOption({ label: "Crossing" });
   await dragBox(page, [.1, -.1], [1.1, .1]);
   await expect(tools).toContainText("2 selected");
   await tools.getByLabel("Box coverage").selectOption({ label: "Contained" });
@@ -492,7 +569,7 @@ test("keyboard selection and short tooltips work at mobile size", async ({ page 
   await page.setViewportSize({ width: 390, height: 844 });
   const dialog = await openImport(page);
   const tools = dialog.getByRole("group", { name: "Segment selection tools" });
-  for (const name of ["Pan", "Select", "Chain", "Box"]) {
+  for (const name of ["Select", "Chain"]) {
     const button = tools.getByRole("button", { name, exact: true });
     await expect(button.locator("svg")).toHaveAttribute("aria-hidden", "true");
     expect((await button.boundingBox())!.width).toBeLessThanOrEqual(36);

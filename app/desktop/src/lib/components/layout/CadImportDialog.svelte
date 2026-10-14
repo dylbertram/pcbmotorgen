@@ -162,6 +162,7 @@
     return fitWorldToView(previewBounds, viewportWidth, viewportHeight, previewPad, zoom);
   }
   const gestures = new CoilPreviewGestures({
+    interactionMode: "cad",
     get virtualW() { return viewportWidth; },
     get virtualH() { return viewportHeight; },
     minZoom: 0.5,

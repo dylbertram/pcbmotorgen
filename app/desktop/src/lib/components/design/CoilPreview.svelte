@@ -194,6 +194,7 @@
   // pointer-capture cleanup live in the gesture utility; this component only
   // reads its reactive view state and binds its handlers.
   const gestures = new CoilPreviewGestures({
+    interactionMode: "cad",
     virtualW: W,
     virtualH: H,
     minZoom: MIN_ZOOM,
@@ -563,8 +564,8 @@
   {#if coils && coils.phases.length > 0}
     <p class="mt-2 text-xs text-slate-500">
       <span class="text-slate-600"
-        >Drag to pan. Pinch, or ctrl+scroll on a trackpad, or use the zoom
-        controls below when zoomed in.</span
+        >Middle-drag or use two fingers to pan. Three-finger pinch or
+        Ctrl-scroll zooms. Open the expanded viewer to select and edit segments.</span
       >
     </p>
   {/if}

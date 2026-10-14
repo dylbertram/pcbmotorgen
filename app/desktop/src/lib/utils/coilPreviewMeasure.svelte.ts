@@ -69,6 +69,8 @@ export class CoilPreviewMeasure {
   #touchCapable: boolean;
   #downs = new Map<number, Point>();
   #touches = new Map<number, Point>();
+  #multiPointer = false;
+  #multiTouch = false;
 
   constructor(options: CoilPreviewMeasureOptions) {
     this.#screenToWorld = options.screenToWorld;
@@ -116,6 +118,7 @@ export class CoilPreviewMeasure {
     // below handles taps; ignore the touch-compat pointer entirely.
     if (e.pointerType === "touch" && this.#touchCapable) return;
     this.#downs.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (this.#downs.size > 1) this.#multiPointer = true;
   };
 
   /** Live preview: while placing the end point, track the pointer (mouse/
@@ -131,6 +134,7 @@ export class CoilPreviewMeasure {
     if (e.pointerType === "touch" && this.#touchCapable) return;
     const down = this.#downs.get(e.pointerId);
     this.#downs.delete(e.pointerId);
+    if (this.#multiPointer) { if (this.#downs.size === 0) this.#multiPointer = false; return; }
     if (!down) return;
     if (this.#downs.size > 0) return; // a second pointer was part of a pinch
     if (Math.hypot(e.clientX - down.x, e.clientY - down.y) <= MEASURE_TAP_PX) {
@@ -140,13 +144,16 @@ export class CoilPreviewMeasure {
 
   handlePointerCancel = (e: PointerEvent) => {
     this.#downs.delete(e.pointerId);
+    if (this.#downs.size === 0) this.#multiPointer = false;
   };
 
   // --- native touch route ------------------------------------------------------
   handleTouchStart = (e: TouchEvent) => {
+    if (e.touches.length > 1) this.#multiTouch = true;
     for (const t of e.changedTouches) {
       this.#touches.set(t.identifier, { x: t.clientX, y: t.clientY });
     }
+    if (this.#touches.size > 1) this.#multiTouch = true;
   };
 
   /** Live preview for touch: track the first finger while placing. */
@@ -161,18 +168,22 @@ export class CoilPreviewMeasure {
   };
 
   handleTouchEnd = (e: TouchEvent) => {
+    const multiTouch = this.#multiTouch;
     for (const t of e.changedTouches) {
       const down = this.#touches.get(t.identifier);
       this.#touches.delete(t.identifier);
+      if (multiTouch) continue;
       if (!down) continue;
       if (e.touches.length > 0) continue; // other fingers still down (pinch)
       if (Math.hypot(t.clientX - down.x, t.clientY - down.y) <= MEASURE_TAP_PX) {
         this.#tapAt(t.clientX, t.clientY);
       }
     }
+    if (e.touches.length === 0) this.#multiTouch = false;
   };
 
   handleTouchCancel = (e: TouchEvent) => {
     for (const t of e.changedTouches) this.#touches.delete(t.identifier);
+    if (e.touches.length === 0) this.#multiTouch = false;
   };
 }

@@ -141,7 +141,7 @@
     <Dialog.Content
       bind:ref={modalPanelRef}
       preventScroll={false}
-      onEscapeKeydown={(event) => { if (selection.mode !== "pan") { event.preventDefault(); selection.clear(); selection.setMode("pan"); } else if (terminalTool?.active) { event.preventDefault(); terminalTool.cancel(); } }}
+      onEscapeKeydown={(event) => { if (terminalTool?.active) { event.preventDefault(); terminalTool.cancel(); } else if (selection.selected.length || selection.anchor) { event.preventDefault(); selection.clear(); } }}
       aria-label="Coil Preview — expanded"
       class="fixed left-1/2 top-1/2 z-50 flex max-h-[calc(100vh-2rem)] w-[calc(100%-2rem)] max-w-7xl -translate-x-1/2 -translate-y-1/2 flex-col gap-3 overflow-y-auto overscroll-contain rounded-lg border border-slate-700 bg-slate-900 p-4 shadow-2xl"
     >
