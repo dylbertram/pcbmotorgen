@@ -91,6 +91,11 @@ test("all toggles live in the Layers popover and survive reopening without resiz
   const toolbarBg = await toolbar.locator("..").evaluate((el) => getComputedStyle(el).backgroundColor);
   expect(toolbarBg).toBe(await dialog.evaluate((el) => getComputedStyle(el).backgroundColor));
   expect(toolbarBg).not.toBe("rgba(0, 0, 0, 0)");
+  // The toolbar's top/bottom padding matches the rail's horizontal padding
+  // around its buttons.
+  const toolbarPad = await toolbar.locator("xpath=./div[1]").evaluate((el) => Number.parseFloat(getComputedStyle(el).paddingTop));
+  const railButtonBox = (await dialog.getByRole("button", { name: "Layers", exact: true }).boundingBox())!;
+  expect(Math.abs(toolbarPad - (railButtonBox.x - railBounds.x))).toBeLessThanOrEqual(1);
   await toolbar.getByRole("button", { name: "Toggle measure tool" }).click();
   await expect(toolbar.getByRole("button", { name: "Toggle measure tool" })).toHaveAttribute("aria-pressed", "true");
   await page.keyboard.press("Escape");
@@ -211,13 +216,27 @@ test("the modal toolbar and zoom controls are bare, the position box is outlined
     // The graph lives in its own fixed popover, never in the position box.
     const popover = dialog.getByRole("dialog", { name: "Phase waveform", exact: true });
     await expect(popover).toBeVisible();
-    await expect(popover.getByRole("img", { name: /Per-phase holding force versus mover position/ })).toBeVisible();
+    const graph = popover.getByRole("img", { name: /Per-phase holding force versus mover position/ });
+    await expect(graph).toBeVisible();
     await expect(positionBox.getByRole("img", { name: /Per-phase/ })).toHaveCount(0);
     const box = (await positionBox.boundingBox())!;
     const pop = (await popover.boundingBox())!;
     expect(pop.width).toBeCloseTo(box.width, 0);
     expect(pop.x).toBeCloseTo(box.x, 0);
     expect(pop.y + pop.height).toBeLessThanOrEqual(box.y + 1);
+    // No heading, one outer border only, and the X overlays the graph's box.
+    await expect(popover.getByRole("heading")).toHaveCount(0);
+    expect(await popover.evaluate((el) => getComputedStyle(el).borderTopWidth)).toBe("1px");
+    expect(await popover.locator("xpath=./div[1]").evaluate((el) => getComputedStyle(el).borderTopWidth)).toBe("0px");
+    const closeBox = (await popover.getByRole("button", { name: "Close phase waveform" }).boundingBox())!;
+    const graphBox = (await graph.boundingBox())!;
+    expect(pop.x + pop.width - (closeBox.x + closeBox.width)).toBeCloseTo(5, 0);
+    expect(closeBox.y - pop.y).toBeCloseTo(5, 0);
+    expect(closeBox.x).toBeGreaterThanOrEqual(pop.x);
+    expect(closeBox.y).toBeGreaterThanOrEqual(pop.y);
+    expect(closeBox.y + closeBox.height).toBeLessThanOrEqual(pop.y + pop.height);
+    expect(graphBox.x).toBeGreaterThanOrEqual(pop.x);
+    expect(graphBox.y + graphBox.height).toBeLessThanOrEqual(pop.y + pop.height);
     // The X closes it and clears the Display item.
     await popover.getByRole("button", { name: "Close phase waveform" }).click();
     await expect(popover).toHaveCount(0);

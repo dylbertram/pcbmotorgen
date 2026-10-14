@@ -74,7 +74,7 @@
 <div role="toolbar" aria-label={label} class="flex shrink-0 flex-col">
   <!-- The bottom rule stays after the editing boxes were removed; it is the
        line between the toolbar and the viewer. -->
-  <div class="flex flex-wrap items-start gap-2 border-b border-slate-700 {borderless ? '' : 'border-t py-2'}">
+  <div class="flex flex-wrap items-start gap-2 border-b border-slate-700 {borderless ? 'py-1.5' : 'border-t py-2'}">
   {#if geometry}
     <CadSelectionToolbar tool={selection} {geometry} {disabled} onActivate={activateSelection} />
   {:else if onPrepareGeometry}
