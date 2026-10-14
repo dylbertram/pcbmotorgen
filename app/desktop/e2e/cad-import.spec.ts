@@ -534,6 +534,7 @@ test("touch drag selects, two fingers pan, and three-finger pinch zooms without 
   await expect.poll(() => group.evaluate(g => (g as SVGGraphicsElement).getScreenCTM()!.a)).toBeCloseTo(before.s * 2, 0);
   await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
   await expect(activeTools).toContainText(selected);
+  await activeDialog.getByRole("button", { name: "Reset zoom", exact: true }).click();
   const tap = await tracePoint(page, .5, 0);
   await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ ...tap, id: 1 }] });
   await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
