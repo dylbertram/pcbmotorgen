@@ -453,6 +453,7 @@ test("selection context menu changes coil or layer separately and preserves sele
   const point = await tracePoint(page, .5, 0);
   await page.mouse.click(point.x, point.y, { button: "right" });
   await expect(page.getByRole("menuitem", { name: "Change to coil…", exact: true })).toBeVisible();
+  await expect(page.getByRole("menu", { name: "Selection actions", exact: true })).toBeFocused();
   await page.keyboard.press("Escape");
   await expect(tools).toContainText("1 selected");
   await expect(dialog).toBeVisible();
@@ -467,6 +468,43 @@ test("selection context menu changes coil or layer separately and preserves sele
   await expect(dialog.getByRole("option", { name: /Segment 1, coil B, layer 1/ })).toHaveCount(1);
   await tools.getByRole("button", { name: "Undo assignment" }).click();
   await expect(dialog.getByRole("option", { name: /Segment 1, coil B, layer 0/ })).toHaveCount(1);
+});
+
+test("outside clicks dismiss context menus and submenus while selecting in CAD and motor viewers", async ({ page }) => {
+  const cad = await openImport(page);
+  for (const viewer of ["cad", "motor"]) {
+    if (viewer === "motor") {
+      await cad.getByRole("button", { name: "Open with this geometry" }).click();
+      await page.getByRole("button", { name: "Expand coil preview" }).click();
+    }
+    const dialog = viewer === "cad" ? cad : page.getByRole("dialog", { name: "Coil Preview", exact: true });
+    const tools = dialog.getByRole("group", { name: "Segment selection tools" });
+    await clickTrace(page, .5, 0);
+    const frame = dialog.getByRole("img", { name: viewer === "cad" ? "CAD import preview" : "Coil preview — expanded", exact: true });
+    const bounds = (await frame.boundingBox())!;
+    const menu = page.getByRole("menu", { name: "Selection actions", exact: true });
+    const openMenu = async () => {
+      await page.mouse.click(bounds.x + bounds.width * .8, bounds.y + bounds.height * .15, { button: "right" });
+      await expect(menu).toBeVisible();
+    };
+    await openMenu();
+    await dialog.getByRole("heading", { name: viewer === "cad" ? "Import CAD" : "Coil Preview", exact: true }).click();
+    await expect(menu).toBeHidden();
+    await expect(dialog).toBeVisible();
+    await expect(tools).toContainText("1 selected");
+    await openMenu();
+    await page.getByRole("menuitem", { name: "Change to coil…", exact: true }).hover();
+    const submenu = page.getByRole("menu", { name: "Change to coil", exact: true });
+    await expect(submenu).toBeVisible();
+    await clickTrace(page, 1.5, 0);
+    await expect(menu).toBeHidden();
+    await expect(submenu).toBeHidden();
+    await expect(dialog.getByRole("option", { name: /Segment 2, coil A, layer 0/ })).toHaveAttribute("aria-selected", "true");
+    await openMenu();
+    await dragBox(page, [-.1, -.1], [2.1, .1]);
+    await expect(menu).toBeHidden();
+    await expect(tools).toContainText("2 selected");
+  }
 });
 
 test("nested layer destinations support Move to, direct clicks, and independent visibility", async ({ page }, testInfo) => {
@@ -493,6 +531,30 @@ test("nested layer destinations support Move to, direct clicks, and independent 
   await panel.getByRole("button", { name: "Move selection to Phase A", exact: true }).click();
   await expect(dialog.getByRole("option", { name: /Segment 1, coil A, layer 1/ })).toHaveCount(1);
   await page.screenshot({ path: testInfo.outputPath("nested-coil-layers.png") });
+});
+
+test("outside clicks dismiss destination and toolbar menus without consuming the next action", async ({ page }) => {
+  const dialog = await openImport(page);
+  await clickTrace(page, .5, 0);
+  await dialog.getByRole("button", { name: "Layers", exact: true }).click();
+  const panel = page.getByRole("dialog", { name: "CAD import layers", exact: true });
+  await panel.getByRole("button", { name: "Move selection to B, layer 2", exact: true }).click({ button: "right" });
+  const destinationMenu = page.getByRole("menu", { name: "Move selection", exact: true });
+  await expect(destinationMenu).toBeVisible();
+  const visibility = panel.getByRole("checkbox", { name: "Show B, layer 1", exact: true });
+  await visibility.uncheck();
+  await expect(destinationMenu).toBeHidden();
+  await expect(visibility).not.toBeChecked();
+  await expect(panel).toBeVisible();
+  await expect(dialog.getByRole("option", { name: /Segment 1, coil A, layer 0/ })).toHaveAttribute("aria-selected", "true");
+  await panel.getByRole("button", { name: "Close layers panel" }).click();
+  await dialog.getByRole("button", { name: "Selection actions", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Change to layer…", exact: true }).hover();
+  await expect(page.getByRole("menu", { name: "Change to layer", exact: true })).toBeVisible();
+  await clickTrace(page, 1.5, 0);
+  await expect(page.getByRole("menu", { name: "Selection actions", exact: true })).toBeHidden();
+  await expect(page.getByRole("menu", { name: "Change to layer", exact: true })).toBeHidden();
+  await expect(dialog.getByRole("option", { name: /Segment 2, coil A, layer 0/ })).toHaveAttribute("aria-selected", "true");
 });
 
 test("nested motor layers move selections on mobile and toggle only their own coil/layer", async ({ page }) => {
@@ -526,9 +588,11 @@ test("assignment menus are keyboard accessible and cancelling a new coil preserv
   for (const cancel of [true, false]) {
     await tools.getByRole("button", { name: "Selection actions" }).focus();
     await page.keyboard.press("Enter");
-    await page.getByRole("menuitem", { name: "Change to coil…", exact: true }).focus();
+    await expect(page.getByRole("menuitem", { name: "Change to coil…", exact: true })).toBeFocused();
     await page.keyboard.press("ArrowRight");
+    await expect(page.getByRole("menuitem", { name: "A", exact: true })).toBeFocused();
     await page.getByRole("menuitem", { name: "New coil…", exact: true }).focus();
+    await expect(page.getByRole("menuitem", { name: "New coil…", exact: true })).toBeFocused();
     await page.keyboard.press("Enter");
     const nameDialog = page.getByRole("dialog", { name: "Change to a new coil", exact: true });
     await expect(nameDialog.getByRole("button", { name: "Move selection" })).toBeDisabled();

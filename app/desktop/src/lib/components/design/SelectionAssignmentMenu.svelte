@@ -19,11 +19,27 @@
     children?: Snippet;
   } = $props();
   const Menu = $derived(variant === "button" ? DropdownMenu : ContextMenu);
+  let open = $state(false);
+  let triggerRef = $state<HTMLElement | null>(null);
+  let contentRef = $state<HTMLElement | null>(null);
+  let coilMenuRef = $state<HTMLElement | null>(null);
+  let layerMenuRef = $state<HTMLElement | null>(null);
+  let outsideDismissal = false;
   let newCoilOpen = $state(false);
   let coilName = $state("");
   let unavailable = $derived(disabled || !geometry || !tool?.selected.length);
   const menuClass = "z-[150] min-w-44 max-h-[var(--bits-menu-content-available-height)] overflow-y-auto rounded-md border border-slate-700 bg-slate-900 p-1 text-xs text-slate-200 shadow-xl";
   const itemClass = "flex cursor-default items-center justify-between gap-4 rounded px-3 py-2 outline-none data-[highlighted]:bg-slate-800 data-[highlighted]:text-emerald-300 data-[disabled]:opacity-40";
+  function dismissOutside(event: PointerEvent) {
+    if (!open || !(event.target instanceof Node)) return;
+    const target = event.target;
+    if ([contentRef, coilMenuRef, layerMenuRef].some((node) => node?.contains(target))) return;
+    if (triggerRef?.contains(target) && (variant === "button" || event.button === 2)) return;
+    // Capture before viewer handlers or new overlays can intercept the event.
+    // Do not consume it: the same click can select, drag, or toggle visibility.
+    outsideDismissal = true;
+    open = false;
+  }
   function change(coil: string, layer: string) {
     if (!unavailable) tool?.apply(coil, layer);
   }
@@ -35,19 +51,24 @@
   }
 </script>
 
-<Menu.Root>
-  <Menu.Trigger disabled={disabled || !geometry || (!destination && !tool?.selected.length)} class={triggerClass} style={passthrough ? "pointer-events: none" : undefined} aria-label={variant === "button" ? "Selection actions" : undefined} title={variant === "button" ? "Change the selected coil or copper layer." : undefined}>
+<svelte:document onpointerdowncapture={dismissOutside} />
+
+<Menu.Root bind:open onOpenChange={(value) => { if (value) outsideDismissal = false; }}>
+  <Menu.Trigger bind:ref={triggerRef} disabled={disabled || !geometry || (!destination && !tool?.selected.length)} class={triggerClass} style={passthrough ? "pointer-events: none" : undefined} aria-label={variant === "button" ? "Selection actions" : undefined} title={variant === "button" ? "Change the selected coil or copper layer." : undefined}>
     {#if children}{@render children()}{:else}<Ellipsis size={16} aria-hidden="true" />{/if}
   </Menu.Trigger>
   <Menu.Portal>
-    <Menu.Content class={menuClass} aria-label={destination ? "Move selection" : "Selection actions"}>
+    <!-- The containing modal already locks page scroll. A menu scroll lock
+         also disables body pointer events and blocks clicks on the CAD viewer. -->
+    <Menu.Content bind:ref={contentRef} preventScroll={false} class={menuClass} aria-label={destination ? "Move selection" : "Selection actions"}
+      onCloseAutoFocus={(event) => { if (outsideDismissal) { event.preventDefault(); outsideDismissal = false; } }}>
       {#if destination}
         <Menu.Item class={itemClass} disabled={unavailable} onSelect={onMove}>Move to</Menu.Item>
       {:else}
         <Menu.Sub>
           <Menu.SubTrigger class={itemClass} disabled={unavailable}>Change to coil…<ChevronRight size={14} aria-hidden="true" /></Menu.SubTrigger>
           <Menu.Portal>
-            <Menu.SubContent class={menuClass} aria-label="Change to coil" sideOffset={4}>
+            <Menu.SubContent bind:ref={coilMenuRef} class={menuClass} aria-label="Change to coil" sideOffset={4}>
               {#each geometry ? cadCoilNames(geometry) : [] as coil (coil)}
                 <Menu.Item class={itemClass} disabled={unavailable} onSelect={() => change(coil, "")}>{coil}</Menu.Item>
               {/each}
@@ -59,7 +80,7 @@
         <Menu.Sub>
           <Menu.SubTrigger class={itemClass} disabled={unavailable}>Change to layer…<ChevronRight size={14} aria-hidden="true" /></Menu.SubTrigger>
           <Menu.Portal>
-            <Menu.SubContent class={menuClass} aria-label="Change to layer" sideOffset={4}>
+            <Menu.SubContent bind:ref={layerMenuRef} class={menuClass} aria-label="Change to layer" sideOffset={4}>
               {#each geometry?.layer_z_mm ?? [] as _, layer (layer)}
                 <Menu.Item class={itemClass} disabled={unavailable} onSelect={() => change("", String(layer))}>Layer {layer + 1}</Menu.Item>
               {/each}

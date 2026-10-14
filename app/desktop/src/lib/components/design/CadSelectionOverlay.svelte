@@ -31,13 +31,13 @@
       touchPointers.add(e.pointerId);
       if (touchPointers.size > 1) multiTouch = true;
       if (multiTouch) { drag = null; return; }
-    } else e.stopPropagation();
+    }
     svg.focus();
     if (drag) { drag = null; return; }
     drag = { id: e.pointerId, start: point(e), end: point(e), clientX: e.clientX, clientY: e.clientY, endClientX: e.clientX, endClientY: e.clientY, shift: e.shiftKey };
     svg.setPointerCapture(e.pointerId);
   }
-  function move(e: PointerEvent) { if (drag?.id === e.pointerId) { if (e.pointerType !== "touch") e.stopPropagation(); drag.end = point(e); drag.endClientX = e.clientX; drag.endClientY = e.clientY; } }
+  function move(e: PointerEvent) { if (drag?.id === e.pointerId) { drag.end = point(e); drag.endClientX = e.clientX; drag.endClientY = e.clientY; } }
   function up(e: PointerEvent) {
     if (e.pointerType === "touch") {
       const wasMultiTouch = multiTouch;
@@ -46,7 +46,6 @@
       if (wasMultiTouch) { drag = null; return; }
     }
     if (!drag || drag.id !== e.pointerId) return;
-    if (e.pointerType !== "touch") e.stopPropagation();
     drag.end = point(e);
     drag.endClientX = e.clientX;
     drag.endClientY = e.clientY;
@@ -60,7 +59,7 @@
 <SelectionAssignmentMenu {geometry} {tool} {disabled} passthrough={disabled} triggerClass="absolute inset-0">
 <div bind:this={svg} class="absolute inset-0 h-full w-full overflow-hidden" style:pointer-events={!disabled ? "auto" : "none"} style:cursor={!disabled ? "crosshair" : undefined}
   role="listbox" aria-label="Segment selection preview" aria-hidden={disabled} aria-multiselectable="true" aria-describedby={`${uid}-help`} aria-activedescendant={traces[focusedIndex] ? `${uid}-${focusedIndex}` : undefined} tabindex={!disabled ? 0 : -1}
-  onpointerdown={down} onpointermove={move} onpointerup={up} onpointercancel={(e) => { if (e.pointerType !== "touch" && drag?.id === e.pointerId) e.stopPropagation(); touchPointers.delete(e.pointerId); if (!touchPointers.size) multiTouch = false; drag = null; }} onlostpointercapture={(e) => { if (drag?.id === e.pointerId) drag = null; }}
+  onpointerdown={down} onpointermove={move} onpointerup={up} onpointercancel={(e) => { touchPointers.delete(e.pointerId); if (!touchPointers.size) multiTouch = false; drag = null; }} onlostpointercapture={(e) => { if (drag?.id === e.pointerId) drag = null; }}
   ontouchstart={(e) => { if (e.touches.length > 1) { drag = null; multiTouch = true; } }}
   ontouchend={(e) => { if (e.touches.length === 0) multiTouch = false; }} ontouchcancel={(e) => { drag = null; if (e.touches.length === 0) multiTouch = false; }}
   onkeydown={(e) => {
