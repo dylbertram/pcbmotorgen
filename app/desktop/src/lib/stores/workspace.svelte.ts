@@ -3,7 +3,7 @@ import { SensorStore } from "./sensor.svelte";
 import { MotionStore } from "./motion.svelte";
 import { ProjectStore } from "./project.svelte";
 import type { RecentFilesStore } from "./recentFiles.svelte";
-import type { DocumentKind, WorkspaceLoad, ForceSweepResult, CoilPathDto, FrictionBudgetDto, PowerBudgetDto, HeightStackResultDto, StackupResultDto } from "../types";
+import type { DocumentKind, WorkspaceLoad, ForceSweepResult, CoilPathDto, FrictionBudgetDto, HeightStackResultDto, DriveAnalysis } from "../types";
 import type { TabId } from "../ui";
 import { PreviewCamera } from "../utils/coilPreviewGestures.svelte";
 import { CoilPreviewViewState } from "../components/design/coilPreviewViewState.svelte";
@@ -25,9 +25,9 @@ export class DocumentSession {
   readonly previewView = new CoilPreviewViewState();
   runtime: {
     activeTab: TabId; coils: CoilPathDto | null; sweep: ForceSweepResult | null;
-    friction: FrictionBudgetDto | null; power: PowerBudgetDto | null;
-    height: HeightStackResultDto | null; stackup: StackupResultDto | null;
-  } = { activeTab: "design", coils: null, sweep: null, friction: null, power: null, height: null, stackup: null };
+    friction: FrictionBudgetDto | null; height: HeightStackResultDto | null;
+    drive: DriveAnalysis | null;
+  } = { activeTab: "design", coils: null, sweep: null, friction: null, height: null, drive: null };
 
   constructor(readonly kind: DocumentKind, recents?: RecentFilesStore) {
     this.projects = new ProjectStore(this.config, this.motion, recents, this.sensor, kind);

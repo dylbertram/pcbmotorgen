@@ -19,6 +19,8 @@ import type {
   BFieldGridDto,
   TravelEnvelopeDto,
   MagnetGrade,
+  DriveSettings,
+  DriveAnalysis,
 } from "../types";
 import { isTauriAvailable } from "./core";
 import {
@@ -31,6 +33,7 @@ import {
   mockBFieldGrid,
   mockTravelEnvelope,
   mockMagnetGrades,
+  mockDriveAnalysis,
 } from "./mocks";
 
 /**
@@ -84,6 +87,23 @@ export async function computeFriction(
 ): Promise<FrictionBudgetDto> {
   if (!isTauriAvailable()) return mockFriction(config);
   return await invoke<FrictionBudgetDto>("compute_friction", { config });
+}
+
+/**
+ * Driver suitability from the routed copper (analyze_drive). `kf` is the
+ * force sweep's mean thrust per ampere; null skips the speed/thrust checks.
+ */
+export async function analyzeDrive(
+  config: LinearMotorConfig,
+  drive: DriveSettings,
+  kf: number | null,
+): Promise<DriveAnalysis> {
+  if (!isTauriAvailable()) return mockDriveAnalysis(config, drive, kf);
+  return await invoke<DriveAnalysis>("analyze_drive", {
+    config,
+    drive,
+    thrustConstantNPerA: kf,
+  });
 }
 
 export async function computeStackup(

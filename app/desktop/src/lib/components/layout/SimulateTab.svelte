@@ -3,23 +3,24 @@
   import type {
     ForceSweepResult,
     FrictionBudgetDto,
-    PowerBudgetDto,
     HeightStackResultDto,
-    StackupResultDto,
+    DriveAnalysis,
   } from "../../types";
   import FluxDiagram from "../simulate/FluxDiagram.svelte";
   import ForceSweepPlot from "../simulate/ForceSweepPlot.svelte";
   import MetricsPanel from "../simulate/MetricsPanel.svelte";
   import DrivePanel from "../design/parameters/DrivePanel.svelte";
+  import DriveSettingsPanel from "../simulate/DriveSettingsPanel.svelte";
+  import DriverSuitability from "../simulate/DriverSuitability.svelte";
 
   let {
     config,
     active,
     sweep,
     friction,
-    power,
     height,
-    stackup,
+    drive,
+    driveError = null,
     error,
     cadGeometryActive = false,
   }: {
@@ -27,9 +28,9 @@
     active: boolean;
     sweep: ForceSweepResult | null;
     friction: FrictionBudgetDto | null;
-    power: PowerBudgetDto | null;
     height: HeightStackResultDto | null;
-    stackup: StackupResultDto | null;
+    drive: DriveAnalysis | null;
+    driveError?: string | null;
     error: string | null;
     cadGeometryActive?: boolean;
   } = $props();
@@ -60,20 +61,20 @@
     {/if}
     <FluxDiagram {config} {active} />
     <ForceSweepPlot result={sweep} />
+    <DriverSuitability analysis={drive} error={driveError} />
   </section>
 
-  <!-- Side column: drive & force targets sit on top so they stay clearly
-       visible while iterating; the metrics summary follows below. -->
+  <!-- Side column: drive & force targets and the driver settings sit on top
+       so they stay visible while iterating; the metrics summary follows. -->
   <aside class="min-w-0 space-y-4">
     <DrivePanel {config} />
+    <DriveSettingsPanel {config} />
     <div class="rounded-lg border border-slate-700 bg-slate-800/40 p-4">
       <MetricsPanel
         {config}
         {sweep}
         {friction}
-        {power}
         {height}
-        {stackup}
       />
     </div>
   </aside>

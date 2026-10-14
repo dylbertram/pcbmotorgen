@@ -1,0 +1,153 @@
+/**
+ * Driver suitability analysis (analyze_drive). Mirrors
+ * `pcbmotorgen_simulation::drive` field-for-field; SI units on the wire.
+ */
+
+/** Datasheet limits of one three-phase driver IC. */
+export interface DriverSpec {
+  name: string;
+  min_supply_v: number;
+  max_supply_v: number;
+  /** Peak output / overcurrent trip [A]. */
+  peak_current_a: number;
+  /** Continuous RMS output per phase [A]. */
+  continuous_rms_a: number;
+  /** High side + low side on-resistance in the current path [Ω]. */
+  rds_on_ohm: number;
+  max_pwm_hz: number;
+}
+
+/** Operating point and board assumptions for the analysis. */
+export interface DriveSettings {
+  driver: DriverSpec;
+  pwm_hz: number;
+  target_speed_m_s: number;
+  outer_copper_oz: number;
+  inner_copper_oz: number;
+  via_plating_m: number;
+  winding_temp_c: number;
+  allowed_rise_c: number;
+  ripple_limit_fraction: number;
+  voltage_headroom: number;
+}
+
+export interface PhaseElectrical {
+  net: string;
+  strands: number;
+  layers: number[];
+  strand_length_m: number;
+  total_length_m: number;
+  active_length_m: number;
+  vias_per_strand: number;
+  vias_total: number;
+  resistance_20c_ohm: number;
+  resistance_hot_ohm: number;
+  via_resistance_ohm: number;
+  self_inductance_h: number;
+  max_trace_share: number;
+  connected: boolean;
+}
+
+export type CheckStatus = "pass" | "warn" | "fail" | "unknown";
+
+export interface DriveCheck {
+  id: string;
+  label: string;
+  status: CheckStatus;
+  value: number;
+  limit: number;
+  unit: string;
+  detail: string;
+}
+
+export interface SpeedVoltagePoint {
+  speed_m_s: number;
+  required_v: number;
+}
+
+export interface DriveAnalysis {
+  driver_name: string;
+  phases: PhaseElectrical[];
+  trace_width_m: number;
+  outer_copper_m: number;
+  inner_copper_m: number;
+  via_resistance_each_ohm: number;
+  phase_resistance_ohm: number;
+  phase_inductance_h: number;
+  mutual_inductance_h: number;
+  line_inductance_h: number;
+  synchronous_inductance_h: number;
+  line_resistance_ohm: number;
+  time_constant_s: number;
+  bus_voltage_v: number;
+  phase_current_a: number;
+  pwm_hz: number;
+  target_speed_m_s: number;
+  thrust_constant_n_per_a: number | null;
+  back_emf_constant_v_s_per_m: number | null;
+  holding_voltage_v: number;
+  speed_voltage_v: number | null;
+  available_voltage_v: number;
+  voltage_limited_current_a: number;
+  max_speed_m_s: number | null;
+  ripple_pp_a: number;
+  min_pwm_hz: number;
+  added_inductance_h: number;
+  peak_current_a: number;
+  trace_ampacity_a: number;
+  copper_loss_w: number;
+  thrust_n: number | null;
+  max_continuous_current_a: number;
+  limiting_factor: string;
+  max_continuous_thrust_n: number | null;
+  checks: DriveCheck[];
+  speed_curve: SpeedVoltagePoint[];
+  notes: string[];
+}
+
+/**
+ * Driver presets. Typical datasheet values: check them against the revision
+ * you design with. Editing any limit switches the selection to "Custom".
+ */
+export const DRIVER_PRESETS: DriverSpec[] = [
+  {
+    name: "DRV8311",
+    min_supply_v: 3,
+    max_supply_v: 20,
+    peak_current_a: 5,
+    continuous_rms_a: 1.5,
+    rds_on_ohm: 0.21,
+    max_pwm_hz: 200e3,
+  },
+  {
+    name: "DRV8316",
+    min_supply_v: 4.5,
+    max_supply_v: 35,
+    peak_current_a: 8,
+    continuous_rms_a: 3,
+    rds_on_ohm: 0.19,
+    max_pwm_hz: 200e3,
+  },
+  {
+    name: "DRV8313",
+    min_supply_v: 8,
+    max_supply_v: 60,
+    peak_current_a: 2.5,
+    continuous_rms_a: 1.75,
+    rds_on_ohm: 0.48,
+    max_pwm_hz: 250e3,
+  },
+];
+
+export const DEFAULT_DRIVE_SETTINGS: DriveSettings = {
+  driver: { ...DRIVER_PRESETS[0] },
+  pwm_hz: 100e3,
+  target_speed_m_s: 0.5,
+  outer_copper_oz: 1,
+  inner_copper_oz: 1,
+  via_plating_m: 25e-6,
+  winding_temp_c: 75,
+  allowed_rise_c: 20,
+  ripple_limit_fraction: 0.3,
+  voltage_headroom: 0.85,
+};

@@ -178,6 +178,10 @@ pub struct ProjectConfigStateIpc {
     pub max_layers: u32,
     pub drive_frequency_hz: f64,
     pub max_temperature_rise_c: f64,
+
+    // --- Driver suitability (Simulation tab) ---
+    /// Driver IC limits and operating assumptions; absent in older files.
+    pub drive: pcbmotorgen_simulation::drive::DriveSettings,
 }
 
 /// Defaults mirror the frontend `ConfigStore` initial values (the app's
@@ -220,6 +224,7 @@ impl Default for ProjectConfigStateIpc {
             max_layers: 12,
             drive_frequency_hz: 500.0,
             max_temperature_rise_c: 20.0,
+            drive: pcbmotorgen_simulation::drive::DriveSettings::default(),
         }
     }
 }

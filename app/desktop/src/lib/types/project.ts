@@ -14,6 +14,7 @@
 import type { CommutationMode } from "./enums";
 import type { CadGeometry } from "./dxf";
 import type { SensorConfig } from "./sensor";
+import type { DriveSettings } from "./drive";
 
 export type DocumentKind = "motor" | "sensor";
 
@@ -80,6 +81,10 @@ export interface ProjectConfigState {
   max_layers: number;
   drive_frequency_hz: number;
   max_temperature_rise_c: number;
+
+  // --- Driver suitability (Simulation tab) ---
+  /** Missing in files saved before the driver check existed. */
+  drive?: DriveSettings;
 }
 
 /** The saved working state: design inputs + mover position. */

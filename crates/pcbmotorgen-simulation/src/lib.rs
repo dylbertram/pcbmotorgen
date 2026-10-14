@@ -20,6 +20,7 @@
 //! - [`magnetic`] — magnet arrays, coil current model, force evaluator.
 //! - [`stackup`] — height stack, power budget, friction budget.
 
+pub mod drive;
 pub mod magnet_grades;
 pub mod magnetic;
 pub mod params;

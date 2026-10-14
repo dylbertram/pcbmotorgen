@@ -23,7 +23,7 @@ import type {
   ProjectVersionInfo,
   DocumentKind,
 } from "../types";
-import { DEFAULT_SENSOR_CONFIG } from "../types";
+import { DEFAULT_DRIVE_SETTINGS, DEFAULT_SENSOR_CONFIG } from "../types";
 import { readPreferences } from "../preferences";
 import {
   confirmDiscardChanges,
@@ -171,6 +171,7 @@ export class ProjectStore {
         max_layers: this.config.max_layers,
         drive_frequency_hz: this.config.drive_frequency_hz,
         max_temperature_rise_c: this.config.max_temperature_rise_c,
+        drive: $state.snapshot(this.config.drive),
       },
       mover_position_mm: this.motion.positionMm,
       cad_geometry: this.cadGeometry,
@@ -225,6 +226,9 @@ export class ProjectStore {
     this.config.max_layers = c.max_layers;
     this.config.drive_frequency_hz = c.drive_frequency_hz;
     this.config.max_temperature_rise_c = c.max_temperature_rise_c;
+    this.config.drive = c.drive
+      ? { ...DEFAULT_DRIVE_SETTINGS, ...c.drive, driver: { ...DEFAULT_DRIVE_SETTINGS.driver, ...c.drive.driver } }
+      : structuredClone(DEFAULT_DRIVE_SETTINGS);
     this.motion.positionMm = state.mover_position_mm;
     this.cadGeometry = state.cad_geometry ?? null;
     this.sensor?.apply(state.sensor_config);

@@ -13,8 +13,9 @@ import type {
   RoutingPatternInfo,
   RoutingParamDef,
   MagnetGrade,
+  DriveSettings,
 } from "../types";
-import { getRemanence, MAGNET_GRADES, extractBaseGrade } from "../types";
+import { getRemanence, MAGNET_GRADES, extractBaseGrade, DEFAULT_DRIVE_SETTINGS } from "../types";
 import {
   layerOptions as layerOptionsFor,
   nearestLayer,
@@ -117,6 +118,11 @@ export class ConfigStore {
   max_layers = $state(12);
   drive_frequency_hz = $state(500);
   max_temperature_rise_c = $state(20);
+
+  // --- Driver suitability (Simulation tab) ------------------------------
+  /** Driver limits and operating assumptions for `analyze_drive`. Replace
+   *  the whole object to edit it, so dependents see one change. */
+  drive = $state<DriveSettings>(structuredClone(DEFAULT_DRIVE_SETTINGS));
 
   // ---------------------------------------------------------------------
   // Derived geometry (mm, for the UI)

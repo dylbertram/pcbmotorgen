@@ -434,6 +434,41 @@ fn linspace(lo: f64, hi: f64, n: usize) -> Vec<f64> {
 }
 
 // ===========================================================================
+// analyze_drive — driver suitability from the routed copper
+// ===========================================================================
+
+/// Check whether a three-phase driver can run the routed coils: phase
+/// resistance and inductance measured from the routing result (network
+/// solve + Neumann integral), then bus-voltage headroom, PWM ripple, peak
+/// and continuous current, trace ampacity, and thrust.
+///
+/// `thrust_constant_n_per_a` is the force sweep's mean thrust per ampere;
+/// without it the at-speed voltage and thrust checks report `unknown`.
+#[tauri::command]
+pub async fn analyze_drive(
+    config: LinearMotorConfigIpc,
+    drive: pcbmotorgen_simulation::drive::DriveSettings,
+    thrust_constant_n_per_a: Option<f64>,
+) -> Result<pcbmotorgen_simulation::drive::DriveAnalysis, String> {
+    let core = config.to_core();
+    tauri::async_runtime::spawn_blocking(move || {
+        let routing = pcbmotorgen_routing::generate_routing_result(
+            &core.routing_context(),
+            &core.routing_pattern_id(),
+        )
+        .map_err(|e| format!("routing pattern failed: {e}"))?;
+        Ok(pcbmotorgen_simulation::drive::analyze_drive(
+            &core.to_simulation(),
+            &routing,
+            &drive,
+            thrust_constant_n_per_a,
+        ))
+    })
+    .await
+    .map_err(|e| format!("analyze_drive worker failed: {e}"))?
+}
+
+// ===========================================================================
 // travel_envelope
 // ===========================================================================
 
@@ -580,3 +615,25 @@ mod travel_envelope_tests {
     }
 }
 
+#[cfg(test)]
+mod analyze_drive_tests {
+    use super::*;
+
+    /// The command runs on the app's default design and reports the routed
+    /// braid: three connected phases with five strands each.
+    #[test]
+    fn command_reports_the_default_braid() {
+        let ipc = crate::ipc::ProjectConfigStateIpc::default().to_linear_motor_ipc();
+        let a = tauri::async_runtime::block_on(analyze_drive(
+            ipc,
+            pcbmotorgen_simulation::drive::DriveSettings::default(),
+            Some(0.4),
+        ))
+        .expect("command");
+        assert_eq!(a.phases.len(), 3);
+        assert!(a.phases.iter().all(|p| p.connected && p.strands >= 1));
+        assert!(a.phase_resistance_ohm > 0.0);
+        assert!(a.line_inductance_h > 0.0);
+        assert_eq!(a.checks.len(), 9);
+    }
+}

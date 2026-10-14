@@ -4,9 +4,7 @@
     CommutationMode,
     ForceSweepResult,
     FrictionBudgetDto,
-    PowerBudgetDto,
     HeightStackResultDto,
-    StackupResultDto,
   } from "../../types";
   import { rippleStatus } from "../../format";
 
@@ -23,16 +21,12 @@
     config,
     sweep,
     friction,
-    power,
     height,
-    stackup,
   }: {
     config: ConfigStore;
     sweep: ForceSweepResult | null;
     friction: FrictionBudgetDto | null;
-    power: PowerBudgetDto | null;
     height: HeightStackResultDto | null;
-    stackup: StackupResultDto | null;
   } = $props();
 
   let netUsableN = $derived.by(() => {
@@ -108,23 +102,6 @@
     {/if}
   </div>
 
-  <!-- Power / thermal -->
-  <div class="rounded-md bg-slate-800/60 border border-slate-700 px-3 py-2">
-    <div class="text-xs text-slate-400 mb-1">Power &amp; Thermal</div>
-    {#if power}
-      <div class="grid grid-cols-2 gap-x-3 gap-y-1 text-xs font-mono">
-        <span class="text-slate-300">Phase R: <span class="text-slate-100">{power.phase_resistance_ohm.toFixed(3)} Ω</span></span>
-        <span class="text-slate-300">Cont. loss: <span class="text-amber-300">{power.continuous_power_w.toFixed(2)} W</span></span>
-        <span class="text-slate-300">Burst: <span class="text-amber-300">{power.burst_power_w.toFixed(2)} W</span></span>
-        <span class="text-slate-300">ΔT: <span class="text-rose-300">+{power.temperature_rise_c.toFixed(1)} °C</span></span>
-        <span class="text-slate-300">Cap: <span class="text-slate-100">{power.capacitor_required_uf.toFixed(0)} µF</span></span>
-        <span class="text-slate-300">η: <span class="text-emerald-300">{power.efficiency_pct.toFixed(1)}%</span></span>
-      </div>
-    {:else}
-      <div class="text-xs text-slate-500">Awaiting power budget…</div>
-    {/if}
-  </div>
-
   <!-- Friction breakdown -->
   <div class="rounded-md bg-slate-800/60 border border-slate-700 px-3 py-2">
     <div class="text-xs text-slate-400 mb-1">Friction Breakdown</div>
@@ -153,21 +130,6 @@
       </div>
     {:else}
       <div class="text-xs text-slate-500">Awaiting height stack…</div>
-    {/if}
-  </div>
-
-  <!-- Stackup summary -->
-  <div class="rounded-md bg-slate-800/60 border border-slate-700 px-3 py-2">
-    <div class="text-xs text-slate-400 mb-1">Layer Stackup</div>
-    {#if stackup}
-      <div class="grid grid-cols-2 gap-x-3 gap-y-1 text-xs font-mono">
-        <span class="text-slate-300">Layers: <span class="text-slate-100">{stackup.layer_count}</span></span>
-        <span class="text-slate-300">Est. thrust: <span class="text-emerald-300">{stackup.estimated_force_n.toFixed(3)} N</span></span>
-        <span class="text-slate-300">Via grid: <span class="text-slate-100">{stackup.via_grid_rows}×{stackup.via_grid_cols}</span></span>
-        <span class="text-slate-300">R_phase: <span class="text-slate-100">{stackup.estimated_dc_resistance_ohm.toFixed(3)} Ω</span></span>
-      </div>
-    {:else}
-      <div class="text-xs text-slate-500">Awaiting stackup…</div>
     {/if}
   </div>
 

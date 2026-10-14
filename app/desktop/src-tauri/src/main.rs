@@ -73,6 +73,7 @@ fn main() {
             commands::physics::compute_stackup,
             commands::physics::compute_power_budget,
             commands::physics::compute_friction,
+            commands::physics::analyze_drive,
             commands::kicad::connect_kicad,
             commands::kicad::write_coils_to_board,
             commands::kicad::write_sensor_to_board,

@@ -8,9 +8,8 @@
     generateSensorGeometry,
     fetchTravelEnvelope,
     computeFriction,
-    computePowerBudget,
     computeHeightStack,
-    computeStackup,
+    analyzeDrive,
     exportSensorDxf,
     exportCadGeometryDxf,
     exportCoilsDxf,
@@ -20,9 +19,8 @@
     ForceSweepResult,
     CoilPathDto,
     FrictionBudgetDto,
-    PowerBudgetDto,
     HeightStackResultDto,
-    StackupResultDto,
+    DriveAnalysis,
     SensorConfig,
   } from "./lib/types";
   import { TABS, type TabId } from "./lib/ui";
@@ -84,9 +82,9 @@
    * never the configured numbers. Null until the first payload arrives.
    */
   let friction = $state<FrictionBudgetDto | null>(untrack(() => session.runtime.friction));
-  let power = $state<PowerBudgetDto | null>(untrack(() => session.runtime.power));
   let height = $state<HeightStackResultDto | null>(untrack(() => session.runtime.height));
-  let stackup = $state<StackupResultDto | null>(untrack(() => session.runtime.stackup));
+  let drive = $state<DriveAnalysis | null>(untrack(() => session.runtime.drive));
+  let driveError = $state<string | null>(null);
   let loading = $state(false);
   let error = $state<string | null>(null);
 
@@ -276,9 +274,8 @@
   function clearSimulationResults(): void {
     sweep = null;
     friction = null;
-    power = null;
     height = null;
-    stackup = null;
+    drive = null;
   }
 
   async function runSimulation(generation: number): Promise<void> {
@@ -301,21 +298,17 @@
       const results = await Promise.allSettled([
         evaluateForceSweep(ipc),
         computeFriction(ipc),
-        computePowerBudget(ipc),
         computeHeightStack(ipc),
-        computeStackup(ipc),
       ]);
 
       if (!isCurrentSimulation(generation)) return;
 
-      const [s, f, p, h, st] = results;
+      const [s, f, h] = results;
       // Apply each successful result independently. A failed calculation does
       // not erase the last good value from the other simulation panels.
       if (s.status === "fulfilled") sweep = s.value;
       if (f.status === "fulfilled") friction = f.value;
-      if (p.status === "fulfilled") power = p.value;
       if (h.status === "fulfilled") height = h.value;
-      if (st.status === "fulfilled") stackup = st.value;
 
       const reasons = results
         .filter(
@@ -392,6 +385,44 @@
     scheduleSimulation(generation);
   });
 
+  // Driver suitability runs after each sweep (it needs the thrust constant)
+  // and again when only the driver settings change, without re-running the
+  // sweep. It shares the Simulation-tab gate.
+  let driveGeneration = 0;
+  const scheduleDrive = debounce((generation: number) => {
+    if (generation !== driveGeneration || !active || activeTab !== "simulate") return;
+    void runDrive(generation);
+  }, 120);
+
+  async function runDrive(generation: number): Promise<void> {
+    if (!valid) {
+      drive = null;
+      return;
+    }
+    const kf = sweep && sweep.current_a > 0 ? Math.abs(sweep.mean_thrust_n) / sweep.current_a : null;
+    try {
+      const result = await analyzeDrive(config.toIpc(), $state.snapshot(config.drive), kf);
+      if (generation !== driveGeneration) return;
+      drive = result;
+      driveError = null;
+    } catch (e) {
+      if (generation !== driveGeneration) return;
+      driveError = e instanceof Error ? e.message : String(e);
+    }
+  }
+
+  $effect(() => {
+    void sweep;
+    void JSON.stringify(config.drive);
+    void valid;
+    const generation = ++driveGeneration;
+    if (!active || activeTab !== "simulate") {
+      scheduleDrive.cancel();
+      return;
+    }
+    scheduleDrive(generation);
+  });
+
   // -----------------------------------------------------------------------
   // App-owned DRC controller
   // -----------------------------------------------------------------------
@@ -456,13 +487,15 @@
   }
 
   onDestroy(() => {
-    session.runtime = { activeTab, coils, sweep, friction, power, height, stackup };
+    session.runtime = { activeTab, coils, sweep, friction, height, drive };
     ++previewGeneration;
     ++sensorGeneration;
     ++simulationGeneration;
     scheduleCoilPreview.cancel();
     scheduleSensorGeometry.cancel();
     scheduleSimulation.cancel();
+    ++driveGeneration;
+    scheduleDrive.cancel();
   });
 </script>
 
@@ -597,11 +630,11 @@
               active={active && activeTab === "simulate"}
               {sweep}
               {friction}
-              {power}
               {height}
-               {stackup}
-               {error}
-               cadGeometryActive={projects.cadGeometry !== null}
+              {drive}
+              {driveError}
+              {error}
+              cadGeometryActive={projects.cadGeometry !== null}
             />
           </Tabs.Content>
         </div>

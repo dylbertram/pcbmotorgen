@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { warningClasses, warningLabel, pluralize, rippleStatus } from "./format";
+import { warningClasses, warningLabel, pluralize, rippleStatus, formatSi } from "./format";
 
 describe("warningClasses", () => {
   it("returns a distinct tailwind triple per severity", () => {
@@ -40,5 +40,15 @@ describe("rippleStatus", () => {
     expect(rippleStatus(null)).toBe("na");
     expect(rippleStatus(undefined)).toBe("na");
     expect(rippleStatus(Number.NaN)).toBe("na");
+  });
+});
+describe("formatSi", () => {
+  it("picks the prefix and keeps significant digits", () => {
+    expect(formatSi(2.2e-6, "H")).toBe("2.20 µH");
+    expect(formatSi(100e3, "Hz")).toBe("100 kHz");
+    expect(formatSi(1.046, "Ω")).toBe("1.05 Ω");
+    expect(formatSi(0.0015, "Ω")).toBe("1.50 mΩ");
+    expect(formatSi(0, "A")).toBe("0 A");
+    expect(formatSi(Infinity, "A")).toBe("—");
   });
 });
