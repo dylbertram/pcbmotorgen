@@ -1,12 +1,14 @@
 <script lang="ts">
   import { onMount, tick } from "svelte";
-  import { Dialog, DropdownMenu } from "bits-ui";
+  import { ContextMenu, Dialog } from "bits-ui";
   import { getCurrentWindow } from "@tauri-apps/api/window";
   import { invoke } from "@tauri-apps/api/core";
   import { listen } from "@tauri-apps/api/event";
   import DocumentEditor from "./DocumentEditor.svelte";
   import NewFileDialog from "./lib/components/layout/NewFileDialog.svelte";
-  import { WorkspaceStore, type UnsavedChoice } from "./lib/stores/workspace.svelte";
+  import ProjectControls from "./lib/components/layout/ProjectControls.svelte";
+  import { WorkspaceStore, type DocumentSession, type UnsavedChoice } from "./lib/stores/workspace.svelte";
+  import type { ProjectStore } from "./lib/stores/project.svelte";
   import { recentFiles } from "./lib/stores/recentFiles.svelte";
   import { bindProjectMenuActions, isTauriAvailable } from "./lib/ipc";
   import type { DocumentKind } from "./lib/types";
@@ -19,8 +21,14 @@
   let recentLoading = $state(true);
   let editor = $state<DocumentEditor | undefined>();
   let preferencesConfig = $state.raw<ConfigStore | null>(null);
+  let renameTarget = $state<ProjectStore | null>(null);
+  let openPaths = $derived(
+    workspace.documents
+      .map((d) => d.projects.currentPath)
+      .filter((p): p is string => p !== null),
+  );
   const button = "rounded px-3 py-1.5 text-xs text-slate-300 hover:bg-slate-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400 disabled:opacity-50";
-  const item = "cursor-pointer rounded px-3 py-2 text-sm outline-none data-[highlighted]:bg-slate-700 data-[disabled]:opacity-40";
+  const item = "cursor-pointer rounded px-3 py-2 text-xs outline-none data-[highlighted]:bg-slate-700 data-[disabled]:opacity-40";
 
   function decide(choice: UnsavedChoice): void {
     const pending = unsaved;
@@ -30,6 +38,17 @@
 
   async function create(kind: DocumentKind): Promise<void> {
     if (await workspace.create(kind)) newFileOpen = false;
+  }
+
+  async function openFromDialog(path: string): Promise<void> {
+    if (await workspace.openPath(path)) newFileOpen = false;
+  }
+
+  async function openTabVersions(document: DocumentSession, creating: boolean): Promise<void> {
+    if (workspace.pending) return;
+    workspace.activate(document.id);
+    await tick();
+    editor?.openVersions(creating);
   }
 
   function action(name: string): void {
@@ -96,43 +115,42 @@
 
 <main class="flex min-h-screen flex-col bg-slate-900 text-slate-100 lg:h-screen lg:overflow-hidden">
   <header class="shrink-0 border-b border-slate-700 bg-slate-950/60">
-    <div class="flex min-h-10 items-center gap-2 pl-[95px] pr-3" data-tauri-drag-region>
-      <DropdownMenu.Root>
-        <DropdownMenu.Trigger class={button}>File</DropdownMenu.Trigger>
-        <DropdownMenu.Portal>
-          <DropdownMenu.Content sideOffset={5} class="z-[130] min-w-56 rounded-lg border border-slate-600 bg-slate-800 p-1 text-slate-100 shadow-xl">
-            <DropdownMenu.Item class={item} disabled={workspace.pending} onSelect={() => (newFileOpen = true)}>New…</DropdownMenu.Item>
-            <DropdownMenu.Item class={item} disabled={workspace.pending} onSelect={() => void workspace.newProject()}>New Project</DropdownMenu.Item>
-            <DropdownMenu.Item class={item} disabled={workspace.pending} onSelect={() => void workspace.open()}>Open…</DropdownMenu.Item>
-            <DropdownMenu.Separator class="my-1 h-px bg-slate-600" />
-            <DropdownMenu.Item class={item} disabled={workspace.pending} onSelect={() => saveFile()}>Save</DropdownMenu.Item>
-            <DropdownMenu.Item class={item} disabled={workspace.pending} onSelect={() => saveFile(true)}>Save As…</DropdownMenu.Item>
-            <DropdownMenu.Item class={item} disabled={workspace.pending || !workspace.active} onSelect={() => action("versions")}>Save new version…</DropdownMenu.Item>
-            <DropdownMenu.Item class={item} disabled={workspace.pending} onSelect={() => void workspace.saveAll()}>Save All</DropdownMenu.Item>
-            <DropdownMenu.Item class={item} disabled={workspace.pending} onSelect={() => void workspace.save()}>Save Project</DropdownMenu.Item>
-            <DropdownMenu.Item class={item} disabled={workspace.pending} onSelect={() => void workspace.save(true)}>Save Project As…</DropdownMenu.Item>
-            <DropdownMenu.Separator class="my-1 h-px bg-slate-600" />
-            <DropdownMenu.Item class={item} disabled={workspace.pending || !workspace.active} onSelect={() => action("import")}>Import CAD…</DropdownMenu.Item>
-            <DropdownMenu.Item class={item} disabled={workspace.pending || !workspace.active} onSelect={() => action("export")}>Export DXF…</DropdownMenu.Item>
-            <DropdownMenu.Item class={item} disabled={workspace.pending || !workspace.active} onSelect={() => action("kicad")}>Send to KiCad…</DropdownMenu.Item>
-            <DropdownMenu.Item class={item} disabled={workspace.pending} onSelect={() => action("settings")}>Settings…</DropdownMenu.Item>
-          </DropdownMenu.Content>
-        </DropdownMenu.Portal>
-      </DropdownMenu.Root>
-      <span class="min-w-0 flex-1 truncate text-center text-xs text-slate-400" title={workspace.path ?? "Unsaved workspace"} data-tauri-drag-region>{workspace.label}{workspace.isDirty ? " •" : ""}</span>
-      <button type="button" class={button} disabled={workspace.pending} onclick={() => void workspace.save()}>Save Project</button>
-    </div>
-    <nav class="flex items-stretch overflow-x-auto" aria-label="Open files">
+    <nav class="flex min-h-10 items-stretch overflow-x-auto pl-[95px]" aria-label="Open files" data-tauri-drag-region>
       <div role="tablist" aria-label="Coil files" class="flex items-stretch">
       {#each workspace.documents as document (document.id)}
-        <div class="flex shrink-0 items-center border-r border-slate-700 border-t-2 {workspace.activeId === document.id ? 'border-t-emerald-400 bg-slate-800' : 'border-t-transparent bg-slate-950/30'}">
-          <button type="button" role="tab" id={`file-tab-${document.id}`} aria-controls="active-document" aria-selected={workspace.activeId === document.id} tabindex={workspace.activeId === document.id ? 0 : -1} onkeydown={(event) => void fileTabKeydown(event, document.id)} class="flex items-center gap-2 px-3 py-2 text-xs focus-visible:outline focus-visible:outline-emerald-400 disabled:opacity-50" disabled={workspace.pending} title={document.projects.currentPath ?? document.projects.defaultFileName} onclick={() => workspace.activate(document.id)}>
-            <span class={document.kind === "motor" ? "text-emerald-300" : "text-sky-300"}>{document.kind === "motor" ? "M" : "S"}</span>
-            <span>{document.projects.fileName ?? `Untitled ${document.kind} ${document.id}`}</span>
-            {#if document.projects.isDirty || document.projects.currentPath === null}<span class="text-amber-300" aria-label={document.projects.isDirty ? "Unsaved changes" : "Unsaved file"}>●</span>{/if}
-          </button>
-          <button type="button" class="mr-1 rounded px-1.5 text-slate-500 hover:bg-slate-700 hover:text-slate-100 focus-visible:outline focus-visible:outline-emerald-400 disabled:opacity-50" disabled={workspace.pending} aria-label={`Close ${document.projects.fileName ?? `Untitled ${document.kind} ${document.id}`}`} onclick={() => void workspace.close(document.id)}>×</button>
-        </div>
+        {@const tabTitle = document.projects.fileName ?? `Untitled ${document.kind} ${document.id}`}
+        <ContextMenu.Root>
+          <ContextMenu.Trigger class="flex shrink-0 items-center gap-1 border-r border-slate-700 border-t-2 pr-1 {workspace.activeId === document.id ? 'border-t-emerald-400 bg-slate-800' : 'border-t-transparent bg-slate-950/30'}">
+            <button type="button" role="tab" id={`file-tab-${document.id}`} aria-controls="active-document" aria-selected={workspace.activeId === document.id} tabindex={workspace.activeId === document.id ? 0 : -1} onkeydown={(event) => void fileTabKeydown(event, document.id)} class="flex items-center gap-2 px-3 py-2 text-xs focus-visible:outline focus-visible:outline-emerald-400 disabled:opacity-50" disabled={workspace.pending} title={document.projects.currentPath ?? document.projects.defaultFileName} onclick={() => workspace.activate(document.id)}>
+              <span class={document.kind === "motor" ? "text-emerald-300" : "text-sky-300"}>{document.kind === "motor" ? "M" : "S"}</span>
+              <span>{tabTitle}</span>
+              {#if document.projects.isDirty || document.projects.currentPath === null}<span class="text-amber-300" aria-label={document.projects.isDirty ? "Unsaved changes" : "Unsaved file"}>●</span>{/if}
+            </button>
+            <button
+              type="button"
+              onclick={() => void openTabVersions(document, false)}
+              disabled={workspace.pending}
+              aria-label={workspace.activeId === document.id || workspace.documents.length === 1 ? "Project versions" : `Project versions for ${tabTitle}`}
+              class="shrink-0 rounded border border-slate-700 bg-slate-900/70 px-1.5 py-0.5 text-[10px] text-slate-300 hover:border-emerald-500/50 hover:text-emerald-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400 disabled:opacity-50"
+            >
+              {document.projects.activeVersionId !== null ? `Version ${document.projects.activeVersionId}` : "Versions"}
+            </button>
+            <button type="button" class="rounded px-1.5 py-0.5 text-slate-500 hover:bg-slate-700 hover:text-slate-100 focus-visible:outline focus-visible:outline-emerald-400 disabled:opacity-50" disabled={workspace.pending} aria-label={`Close ${tabTitle}`} onclick={() => void workspace.close(document.id)}>×</button>
+          </ContextMenu.Trigger>
+          <ContextMenu.Portal>
+            <ContextMenu.Content
+              preventScroll={false}
+              onCloseAutoFocus={(event) => { if (renameTarget) event.preventDefault(); }}
+              class="z-[150] min-w-44 rounded-lg border border-slate-600 bg-slate-800 p-1 text-slate-100 shadow-xl"
+            >
+              <ContextMenu.Item class={item} disabled={workspace.pending} onSelect={() => { renameTarget = document.projects; }}>Rename</ContextMenu.Item>
+              <ContextMenu.Item class={item} disabled={workspace.pending} onSelect={() => { void document.projects.save(false); }}>Save</ContextMenu.Item>
+              <ContextMenu.Item class={item} disabled={workspace.pending} onSelect={() => { void openTabVersions(document, true); }}>Save new version</ContextMenu.Item>
+              <ContextMenu.Separator class="my-1 h-px bg-slate-600" />
+              <ContextMenu.Item class={item} disabled={workspace.pending} onSelect={() => { void workspace.close(document.id); }}>Close</ContextMenu.Item>
+            </ContextMenu.Content>
+          </ContextMenu.Portal>
+        </ContextMenu.Root>
       {/each}
       </div>
       <button type="button" class="shrink-0 px-4 py-2 text-slate-400 hover:bg-slate-800 focus-visible:outline focus-visible:outline-emerald-400 disabled:opacity-50" disabled={workspace.pending} aria-label="New coil file" onclick={() => (newFileOpen = true)}>+</button>
@@ -171,7 +189,19 @@
     </section>
   {/if}
 
-  {#if newFileOpen}<NewFileDialog busy={workspace.pending} onCreate={(kind) => void create(kind)} onClose={() => (newFileOpen = false)} />{/if}
+  {#if newFileOpen}
+    <NewFileDialog
+      busy={workspace.pending}
+      directories={workspace.directories}
+      {openPaths}
+      onCreate={(kind) => void create(kind)}
+      onOpenFile={(path) => void openFromDialog(path)}
+      onClose={() => (newFileOpen = false)}
+    />
+  {/if}
+  {#if renameTarget}
+    <ProjectControls projects={renameTarget} onClose={() => (renameTarget = null)} />
+  {/if}
   {#if preferencesConfig}<PreferencesDialog config={preferencesConfig} disabled={workspace.pending} onClose={() => (preferencesConfig = null)} />{/if}
 
   <Dialog.Root open={unsaved !== null} onOpenChange={(open) => { if (!open) decide("cancel"); }}>

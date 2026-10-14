@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 import { gotoDesignApp } from "./helpers";
 
 test.beforeEach(async ({ page }) => {
@@ -18,11 +18,20 @@ test.beforeEach(async ({ page }) => {
   }));
 });
 
-test("title popover saves, renames and moves while keeping the unsaved draft", async ({ page }) => {
+function activeFileTab(page: Page) {
+  return page.getByRole("tablist", { name: "Coil files" }).getByRole("tab").first();
+}
+
+async function openRenameModal(page: Page) {
+  await activeFileTab(page).click({ button: "right" });
+  await page.getByRole("menuitem", { name: "Rename", exact: true }).click();
+  return page.getByRole("form", { name: "File name and location" });
+}
+
+test("tab context menu Rename modal saves, renames and moves while keeping the unsaved draft", async ({ page }) => {
   await gotoDesignApp(page);
-  const title = page.getByRole("button", { name: "Change file name and location" });
-  await title.click();
-  const form = page.getByRole("form", { name: "File name and location" });
+  const tab = activeFileTab(page);
+  const form = await openRenameModal(page);
   const name = form.getByLabel("Name:");
   await expect(name).toBeFocused();
   await expect(name).toHaveValue("untitled.pmmotor");
@@ -32,27 +41,27 @@ test("title popover saves, renames and moves while keeping the unsaved draft", a
   await expect(form.getByText("Documents", { exact: true })).toBeVisible();
   await form.getByRole("button", { name: "Save", exact: true }).click();
   await expect(form).toBeHidden();
-  await expect(title).toContainText("Motor.pmmotor");
+  await expect(tab).toContainText("Motor.pmmotor");
 
   await page.locator("#magnet-count").fill("8");
   await page.locator("#magnet-count").press("Enter");
   await expect(page.getByLabel("Unsaved changes", { exact: true })).toBeVisible();
-  await title.click();
+  await openRenameModal(page);
   await expect(name).toHaveValue("Motor.pmmotor");
   await name.fill("Motor revised.pmmotor");
   await name.press("Enter");
   await expect(form).toBeHidden();
-  await expect(title).toContainText("Motor revised.pmmotor");
+  await expect(tab).toContainText("Motor revised.pmmotor");
   await expect(page.getByLabel("Unsaved changes", { exact: true })).toBeVisible();
   await expect(page.locator("#magnet-count")).toHaveValue("8");
   await expect(page.getByRole("button", { name: "Project versions", exact: true })).toHaveText("Version 1");
-  await title.click();
+  await openRenameModal(page);
   await page.evaluate(() => (window as any).__folder = "/Users/designer/Desktop");
   await form.getByRole("button", { name: "Choose project folder" }).click();
   await expect(form.getByText("Desktop", { exact: true })).toBeVisible();
   await form.getByRole("button", { name: "Apply", exact: true }).click();
   await expect(form).toBeHidden();
-  await expect(title).toHaveAttribute("title", "/Users/designer/Desktop/Motor revised.pmmotor");
+  await expect(tab).toHaveAttribute("title", "/Users/designer/Desktop/Motor revised.pmmotor");
   await expect(page.getByLabel("Unsaved changes", { exact: true })).toBeVisible();
   expect(await page.evaluate(() => (window as any).__moves)).toEqual([
     { sourcePath: null, path: "/Users/designer/Documents/Motor.pmmotor" },
@@ -63,26 +72,24 @@ test("title popover saves, renames and moves while keeping the unsaved draft", a
 
 test("cancel, Escape and clicking outside discard name and folder edits", async ({ page }) => {
   await gotoDesignApp(page);
-  const title = page.getByRole("button", { name: "Change file name and location" });
-  const form = page.getByRole("form", { name: "File name and location" });
+  const tab = activeFileTab(page);
   for (const action of ["cancel", "escape", "outside"]) {
-    await title.click();
+    const form = await openRenameModal(page);
     await expect(form.getByLabel("Name:")).toHaveValue("untitled.pmmotor");
     await form.getByLabel("Name:").fill("Discard this");
     if (action === "cancel") await form.getByRole("button", { name: "Cancel", exact: true }).click();
     else if (action === "escape") await page.keyboard.press("Escape");
-    else await page.locator("#tab-design").click();
+    else await page.mouse.click(5, 5);
     await expect(form).toBeHidden();
-    await expect(title).toContainText("untitled design");
+    await expect(tab).toContainText("Untitled motor");
   }
   expect(await page.evaluate(() => (window as any).__moves)).toEqual([]);
 });
 
-test("invalid names, folder cancellation and file failures leave the popover open", async ({ page }) => {
+test("invalid names, folder cancellation and file failures leave the modal open", async ({ page }) => {
   await gotoDesignApp(page);
-  const title = page.getByRole("button", { name: "Change file name and location" });
-  await title.click();
-  const form = page.getByRole("form", { name: "File name and location" });
+  const tab = activeFileTab(page);
+  const form = await openRenameModal(page);
   await form.getByLabel("Name:").fill("../Invalid");
   await form.getByRole("button", { name: "Save", exact: true }).click();
   await expect(form.getByRole("alert")).toContainText("Enter a file name");
@@ -94,6 +101,6 @@ test("invalid names, folder cancellation and file failures leave the popover ope
   await page.evaluate(() => { (window as any).__cancelFolder = false; (window as any).__moveError = "A file with this name already exists"; });
   await form.getByRole("button", { name: "Save", exact: true }).click();
   await expect(form.getByRole("alert")).toContainText("already exists");
-  await expect(title).toContainText("untitled design");
+  await expect(tab).toContainText("Untitled motor");
   await expect(form.getByLabel("Name:")).toHaveValue("Valid");
 });

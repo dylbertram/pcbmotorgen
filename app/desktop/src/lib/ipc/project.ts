@@ -44,9 +44,9 @@ export async function resolveDocumentPath(path: string): Promise<string> {
   return await invoke("resolve_document_path", { path });
 }
 
-export async function confirmLegacyMigration(): Promise<boolean> {
-  if (!isTauriAvailable()) return false;
-  return await confirm("This older project contains motor and sensor designs together. Convert it to a new workspace with separate .pmmotor and .pmsensor files? Every saved version is preserved. The original project will not change.", { title: "Convert older project", okLabel: "Choose new workspace", cancelLabel: "Cancel" });
+export async function listCoilFiles(directory: string): Promise<string[]> {
+  if (!isTauriAvailable()) return [];
+  return await invoke("list_coil_files", { directory });
 }
 
 export async function loadWorkspace(path: string): Promise<WorkspaceLoad> {
@@ -57,11 +57,6 @@ export async function loadWorkspace(path: string): Promise<WorkspaceLoad> {
 export async function saveWorkspace(path: string, files: string[], activeFile: string | null): Promise<void> {
   if (!isTauriAvailable()) throw new Error("Saving workspaces requires the desktop app.");
   await invoke("save_workspace", { path, files, activeFile });
-}
-
-export async function migrateWorkspace(source: string, destination: string): Promise<WorkspaceLoad> {
-  if (!isTauriAvailable()) throw new Error("Migrating projects requires the desktop app.");
-  return await invoke("migrate_workspace", { source, destination });
 }
 
 export async function pickWorkspaceSavePath(defaultPath = "untitled.pmproj"): Promise<string | null> {

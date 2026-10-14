@@ -1,5 +1,5 @@
-//! Editable project versions stored together in a single .pmproj file.
-use super::project::{ProjectFileEnvelope, ProjectStateIpc, PROJECT_FORMAT_VERSION};
+//! Editable project versions stored together in a single archive.
+use super::project::{ProjectStateIpc, PROJECT_FORMAT_VERSION};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -150,14 +150,6 @@ pub fn parse_project_archive(json: &str) -> Result<(ProjectArchive, u32), String
         return Err(format!("project file was saved by a newer version of pcbmotorgen (format v{raw_version}); this build supports up to v{PROJECT_FORMAT_VERSION}. Update the app to open this file."));
     }
     let source = raw_version as u32;
-    if source == 1 {
-        let legacy: ProjectFileEnvelope = serde_json::from_value(value)
-            .map_err(|e| format!("malformed project file (format v1): {e}"))?;
-        return Ok((
-            ProjectArchive::new(legacy.state, legacy.saved_at_unix_ms.max(0)),
-            source,
-        ));
-    }
     if source != PROJECT_FORMAT_VERSION {
         return Err(format!("no migration path from project format v{source}"));
     }
@@ -189,19 +181,6 @@ mod tests {
         let mut state = ProjectStateIpc::default();
         state.config.desired_travel_mm = travel;
         state
-    }
-
-    #[test]
-    fn legacy_migration_preserves_state_and_save_time() {
-        let legacy = ProjectFileEnvelope::build(&design(55.0), 1234);
-        let (archive, source) =
-            parse_project_archive(&serde_json::to_string(&legacy).unwrap()).unwrap();
-        assert_eq!(source, 1);
-        assert_eq!(archive.format_version, 2);
-        assert_eq!(archive.latest().project.config.desired_travel_mm, 55.0);
-        assert_eq!(archive.latest().info.created_at_unix_ms, 1234);
-        assert_eq!(archive.latest().info.last_edited_at_unix_ms, 1234);
-        assert_eq!(archive.next_version_id, 2);
     }
 
     #[test]

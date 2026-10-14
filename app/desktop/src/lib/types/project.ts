@@ -21,7 +21,6 @@ export interface WorkspaceLoad {
   path: string;
   files: string[];
   active_file: string | null;
-  legacy: boolean;
 }
 
 /** Every user-facing design input, in UI units (mm + SI engineering
