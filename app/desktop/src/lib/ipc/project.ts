@@ -49,6 +49,11 @@ export async function listCoilFiles(directory: string): Promise<string[]> {
   return await invoke("list_coil_files", { directory });
 }
 
+export async function revealInFinder(path: string): Promise<void> {
+  if (!isTauriAvailable()) throw new Error("Revealing files in Finder requires the desktop app.");
+  await invoke("reveal_in_finder", { path });
+}
+
 export async function loadWorkspace(path: string): Promise<WorkspaceLoad> {
   if (!isTauriAvailable()) throw new Error("Opening workspaces requires the desktop app.");
   return await invoke("load_workspace", { path });

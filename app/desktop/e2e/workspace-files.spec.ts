@@ -11,6 +11,8 @@ test.beforeEach(async ({ page }) => {
       let serial = 0, time = 1700000000000;
       window.__savePaths = [];
       export async function resolveDocumentPath(path) { return path; }
+      window.__revealed = [];
+      export async function revealInFinder(path) { window.__revealed.push(path); }
       export async function listCoilFiles(directory) {
         const prefix = directory.replace(/\\\\/g, '/').replace(/\\/+$/, '') + '/';
         return Object.keys(disk).filter(p => p.startsWith(prefix) && (/\\.(pmmotor|pmsensor)$/i).test(p)).sort();
@@ -116,17 +118,22 @@ test("Save All, workspace reopen, and + dialog listing other files in folder and
   await expect(page.locator("#magnet-count")).toHaveValue("6");
 });
 
-test("tab context menu supports Save, Save new version, Rename and Close", async ({ page }) => {
+test("tab context menu supports Save, Save new version, Rename, Reveal in Finder and Close", async ({ page }) => {
   await page.goto("/");
   await create(page, "motor");
   const tab = page.getByRole("navigation", { name: "Open files" }).getByRole("tab", { name: /^M Untitled motor 1/ });
   await tab.click({ button: "right" });
+  await expect(page.getByRole("menuitem", { name: "Reveal in Finder", exact: true })).toHaveAttribute("data-disabled", "");
   await page.getByRole("menuitem", { name: "Save", exact: true }).click();
   await expect(page.getByRole("button", { name: "Project versions", exact: true })).toHaveText("Version 1");
 
   await page.locator("#magnet-count").fill("8");
   await page.locator("#magnet-count").press("Enter");
   const savedTab = page.getByRole("navigation", { name: "Open files" }).getByRole("tab", { name: /M coil-1.pmmotor/ });
+  await savedTab.click({ button: "right" });
+  await page.getByRole("menuitem", { name: "Reveal in Finder", exact: true }).click();
+  expect(await page.evaluate(() => (window as any).__revealed)).toEqual(["/workspace/coil-1.pmmotor"]);
+
   await savedTab.click({ button: "right" });
   await page.getByRole("menuitem", { name: "Save new version", exact: true }).click();
   const versions = page.getByRole("dialog", { name: "Project versions", exact: true });
