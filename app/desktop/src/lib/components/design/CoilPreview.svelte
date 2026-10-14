@@ -38,7 +38,7 @@
   import type { ConfigStore } from "../../stores/config.svelte";
   import type { MotionStore } from "../../stores/motion.svelte";
   import type { CadGeometry, CoilPathDto } from "../../types";
-  import { simplifyCadLines } from "../../cadSimplify";
+  import { CadSimplifyTool } from "../../utils/cadSimplifyTool.svelte";
   import { CoilTerminalTool } from "../../utils/coilTerminalTool.svelte";
   import CoilTerminalOverlay from "./CoilTerminalOverlay.svelte";
   import {
@@ -67,6 +67,7 @@
   import { CoilPreviewMeasure } from "../../utils/coilPreviewMeasure.svelte";
   import CoilPreviewControls from "./CoilPreviewControls.svelte";
   import CoilPreviewLightbox from "./CoilPreviewLightbox.svelte";
+  import PreviewFrame from "./PreviewFrame.svelte";
   import {
     PREVIEW_H,
     PREVIEW_W,
@@ -84,10 +85,9 @@
   }: { config: ConfigStore; coils: CoilPathDto | null; motion: MotionStore; importedGeometry?: CadGeometry | null; onGeometryChange?: (geometry: CadGeometry) => void } =
     $props();
 
-  let beforeSimplify = $state.raw<CadGeometry | null>(null);
-  let simplifiedGeometry = $state.raw<CadGeometry | null>(null);
-  let canUndoSimplify = $derived(Boolean(beforeSimplify && importedGeometry === simplifiedGeometry));
-  let simplifyNotice = $state("");
+  const simplifyTool = new CadSimplifyTool({ getGeometry: () => importedGeometry, onChange: (geometry) => onGeometryChange?.(geometry) });
+  let canUndoSimplify = $derived(simplifyTool.canUndo);
+  let simplifyNotice = $derived(simplifyTool.notice);
   async function startSegmentEditing(): Promise<boolean> {
     if (!onGeometryChange) return false;
     const accepted = await confirm("Create editable geometry from this design? Segment edits will no longer follow routing settings. You can return to generated geometry from Import CAD.", { title: "Edit generated segments", kind: "warning", okLabel: "Create editable geometry", cancelLabel: "Keep generated" });
@@ -100,21 +100,10 @@
     return true;
   }
   function simplifyImportedLines(): void {
-    if (!importedGeometry || !onGeometryChange) return;
-    const simplified = simplifyCadLines(importedGeometry);
-    const removed = importedGeometry.routing.segments.length - simplified.routing.segments.length;
-    simplifyNotice = removed ? `${removed} line(s) merged. Save the project to keep this change.` : "No collinear lines to merge.";
-    if (!removed) return;
-    beforeSimplify = importedGeometry;
-    simplifiedGeometry = simplified;
-    onGeometryChange(simplified);
+    if (onGeometryChange) simplifyTool.simplify();
   }
   function undoSimplify(): void {
-    if (!canUndoSimplify || !beforeSimplify || !onGeometryChange) return;
-    onGeometryChange(beforeSimplify);
-    beforeSimplify = null;
-    simplifiedGeometry = null;
-    simplifyNotice = "Line simplification undone.";
+    if (onGeometryChange) simplifyTool.undo();
   }
 
   // Virtual drawing space. The CSS box keeps the same 760:260 aspect ratio as
@@ -497,10 +486,7 @@
       showPolePitch: view.showPolePitch,
       bandRows: visibleBandRows,
       poleRegions: view.showPoleRegions ? visiblePoleRegionZones : [],
-      measure:
-        expanded && measure.mode
-          ? { p1: measure.p1, p2: measure.p2, cursor: measure.cursor }
-          : null,
+      measure: null,
     });
   });
 
@@ -517,22 +503,6 @@
     expanded = true;
   }
 
-  // ctrl+wheel (macOS trackpad pinches / browser pinch-zoom) must be able to
-  // preventDefault page zoom, so the utility handler is attached NON-passively
-  // to both the inline and the expanded frames.
-  $effect(() => {
-    const frame = frameRef;
-    if (!frame) return;
-    frame.addEventListener("wheel", gestures.handleWheel, { passive: false });
-    return () => frame.removeEventListener("wheel", gestures.handleWheel);
-  });
-
-  $effect(() => {
-    const frame = modalFrameRef;
-    if (!frame) return;
-    frame.addEventListener("wheel", gestures.handleWheel, { passive: false });
-    return () => frame.removeEventListener("wheel", gestures.handleWheel);
-  });
 </script>
 
 <div class="rounded-lg bg-slate-800/40 border border-slate-700 p-4">
@@ -557,25 +527,7 @@
   <!-- Frame div owns the ARIA label (the canvas is the paint surface; data-*
        attributes on the canvas carry the introspection counters). All pan/
        pinch/scroll-zoom handling is delegated to the gesture utility. -->
-  <div
-    bind:this={frameRef}
-    class="relative w-full touch-none select-none {gestures.isPanning
-      ? 'cursor-grabbing'
-      : 'cursor-grab'}"
-    role="img"
-    aria-label="Coil preview"
-    style="aspect-ratio: {W} / {H};"
-    onpointerdown={gestures.handlePointerDown}
-    onpointermove={gestures.handlePointerMove}
-    onpointerup={gestures.handlePointerEnd}
-    onpointercancel={gestures.handlePointerEnd}
-    onlostpointercapture={gestures.handleLostPointerCapture}
-    ontouchstart={gestures.handleTouchStart}
-    ontouchmove={gestures.handleTouchMove}
-    ontouchend={gestures.handleTouchEnd}
-    ontouchcancel={gestures.handleTouchEnd}
-    ondblclick={onInlineDoubleClick}
-  >
+  <PreviewFrame bind:frame={frameRef} {gestures} label="Coil preview" aspectRatio={W / H} ondblclick={onInlineDoubleClick}>
     <!-- data-segments / data-vias / data-pole-pitch / data-band-widths /
          data-pole-regions / data-revision are written imperatively by the
          renderer (canvas.dataset in coilPreviewCanvas.ts), NOT bound
@@ -584,7 +536,7 @@
     {#if importedGeometry}
       <CoilTerminalOverlay geometry={importedGeometry} transform={worldTransform} panX={gestures.panX} panY={gestures.panY} width={W} height={H} isVisible={isTerminalVisible} />
     {/if}
-  </div>
+  </PreviewFrame>
 
   <!-- Zoom + reset view, pinned to the bottom-right of the preview. -->
   <div class="mt-2">

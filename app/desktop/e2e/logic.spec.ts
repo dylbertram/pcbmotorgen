@@ -69,12 +69,14 @@ test.describe("routing dimensions -> preview overlays", () => {
     await page
       .locator(`${ASIDE} button[aria-label='Expand coil preview']`)
       .click();
-    const dialog = page.getByRole("dialog", { name: "Coil Preview — expanded" });
+    const dialog = page.getByRole("dialog", { name: "Coil Preview", exact: true });
     const modalCanvas = dialog.locator("canvas[data-pole-pitch]");
-    const polePitch = dialog.getByRole("checkbox", {
+    await dialog.getByRole("button", { name: "Layers", exact: true }).click();
+    const panel = page.getByRole("dialog", { name: "Coil preview layers", exact: true });
+    const polePitch = panel.getByRole("checkbox", {
       name: "Show pole-pitch dimension ruler",
     });
-    const bandWidths = dialog.getByRole("checkbox", {
+    const bandWidths = panel.getByRole("checkbox", {
       name: "Show band-width diagnostics",
     });
 
@@ -110,11 +112,13 @@ test.describe("routing dimensions -> preview overlays", () => {
     await page
       .locator(`${ASIDE} button[aria-label='Expand coil preview']`)
       .click();
-    const dialog = page.getByRole("dialog", { name: "Coil Preview — expanded" });
+    const dialog = page.getByRole("dialog", { name: "Coil Preview", exact: true });
     const modalCanvas = dialog.locator("canvas[data-pole-regions]");
-    const regionsToggle = dialog.getByRole("checkbox", { name: "Show pole regions" });
-    const phaseSelect = dialog.getByRole("combobox", { name: "Pole regions phase" });
-    const phaseB = dialog.getByRole("checkbox", { name: "Show phase B" });
+    await dialog.getByRole("button", { name: "Layers", exact: true }).click();
+    const panel = page.getByRole("dialog", { name: "Coil preview layers", exact: true });
+    const regionsToggle = panel.getByRole("checkbox", { name: "Show pole regions" });
+    const phaseSelect = panel.getByRole("combobox", { name: "Pole regions phase" });
+    const phaseB = panel.getByRole("checkbox", { name: "Show phase B" });
 
     await expect(modalCanvas).toBeVisible();
     await expect(regionsToggle).toBeChecked();

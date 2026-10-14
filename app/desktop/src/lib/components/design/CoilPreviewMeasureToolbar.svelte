@@ -22,13 +22,14 @@
   import type { CoilPreviewMeasure } from "../../utils/coilPreviewMeasure.svelte";
   import { Ruler, RotateCcw } from "@lucide/svelte";
 
-  let { measure, onToggle }: { measure: CoilPreviewMeasure; onToggle?: () => void } = $props();
+  let { measure, onToggle, disabled = false }: { measure: CoilPreviewMeasure; onToggle?: () => void; disabled?: boolean } = $props();
 </script>
 
 <div class="flex items-center gap-3 flex-wrap">
   <div class="flex items-center gap-2">
     <button
       type="button"
+      {disabled}
       class="px-2 py-0.5 text-xs rounded border transition-colors {measure.mode
         ? 'bg-pink-500/15 border-pink-500 text-pink-300'
         : 'bg-slate-800 border-slate-700 text-slate-300 hover:text-pink-300 hover:border-pink-600'}"
@@ -40,6 +41,7 @@
     {#if measure.mode}
       <button
         type="button"
+        {disabled}
         class="px-2 py-0.5 text-xs rounded bg-slate-800 border border-slate-700 text-slate-300 hover:text-rose-300 hover:border-rose-600 transition-colors"
         aria-label="Clear measurement"
         title="Clear the current measurement."

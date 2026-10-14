@@ -5,7 +5,7 @@
   let { tool }: { tool: CoilTerminalTool } = $props();
 </script>
 
-<section class="shrink-0 border-b border-slate-700 border-l-2 border-l-emerald-400 p-3" aria-label="Set coil terminals">
+<section class="max-h-48 shrink-0 overflow-y-auto overscroll-contain border-b border-slate-700 border-l-2 border-l-emerald-400 p-3" aria-label="Set coil terminals">
   <h4 class="text-sm font-semibold text-slate-200">Set coil terminals</h4>
   <label class="my-3 block text-xs text-slate-300">
     Coil
