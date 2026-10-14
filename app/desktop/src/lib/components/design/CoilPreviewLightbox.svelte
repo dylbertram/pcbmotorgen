@@ -167,15 +167,21 @@
         </div>
       </div>
 
-      <div class="absolute left-2 right-12 top-12 z-20 max-h-[30%] overflow-y-auto bg-slate-900/95 px-2">
-      <GeometryEditingToolbar label="Coil preview tools" geometry={onGeometryChange ? importedGeometry : null}
-        {selection} {measure} {terminalTool} {onSimplify} {onUndoSimplify} {simplifyNotice} borderless
-        onActivateSelection={activateSelection} onPrepareGeometry={onStartSegmentEditing} {onStartTerminals} />
-      {#if terminalTool?.active}<CoilTerminalPanel tool={terminalTool} />{/if}
-      {#if importedGeometry}
-        <CoilTerminalSummary geometry={importedGeometry} tool={terminalTool} onEdit={(coil) => { selection.setMode("pan"); onStartTerminals?.(coil); }} {onGeometryChange} />
-      {/if}
+      <!-- The toolbar floats straight on the drawing: no padding band, flush
+           under the header and against the left edge. -->
+      <div class="absolute left-0 right-11 top-10 z-20">
+        <GeometryEditingToolbar label="Coil preview tools" geometry={onGeometryChange ? importedGeometry : null}
+          {selection} {measure} {terminalTool} {onSimplify} {onUndoSimplify} {simplifyNotice} borderless
+          onActivateSelection={activateSelection} onPrepareGeometry={onStartSegmentEditing} {onStartTerminals} />
       </div>
+      {#if terminalTool?.active || importedGeometry}
+        <div class="absolute left-2 right-12 top-24 z-20 max-h-[40%] overflow-y-auto rounded-md bg-slate-900/95 px-2">
+          {#if terminalTool?.active}<CoilTerminalPanel tool={terminalTool} />{/if}
+          {#if importedGeometry}
+            <CoilTerminalSummary geometry={importedGeometry} tool={terminalTool} onEdit={(coil) => { selection.setMode("pan"); onStartTerminals?.(coil); }} {onGeometryChange} />
+          {/if}
+        </div>
+      {/if}
 
        <div class="absolute inset-0">
       <!-- Modal frame div owns the ARIA label (the canvas is the paint
@@ -202,7 +208,7 @@
           label="Coil preview layers" {hasPolePitchData} {hasBandWidthData} {hasPoleRegionData} {poleRegionPhases} />
         </div>
        </div>
-        <div class="absolute top-[32%] right-12 z-20 bg-slate-900/95 p-2 sm:top-auto sm:bottom-12">
+        <div class="absolute right-11 z-20 top-[32%] sm:top-auto sm:bottom-12">
       <CoilPreviewControls
         zoomLabel={gestures.zoomLabel}
         canZoomIn={gestures.canZoomIn}
