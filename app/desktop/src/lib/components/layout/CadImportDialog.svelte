@@ -95,6 +95,10 @@
   let busy = $state(false);
   let refreshScheduled = $state(false);
   let previewFrameRef = $state<HTMLDivElement | undefined>(undefined);
+  let previewWidth = $state(PREVIEW_W);
+  let previewHeight = $state(PREVIEW_H);
+  let viewportWidth = $derived(Math.max(1, previewWidth));
+  let viewportHeight = $derived(Math.max(1, previewHeight));
   let backdropRef = $state<HTMLDivElement | undefined>(undefined);
   let dialogRef = $state<HTMLDivElement | undefined>(undefined);
   let previewRefreshTimer: ReturnType<typeof setTimeout> | undefined;
@@ -147,11 +151,11 @@
       : { segments: [], curves: [] },
   );
   function worldTransformFor(zoom: number): WorldTransform {
-    return fitWorldToView(previewBounds, PREVIEW_W, PREVIEW_H, previewPad, zoom);
+    return fitWorldToView(previewBounds, viewportWidth, viewportHeight, previewPad, zoom);
   }
   const gestures = new CoilPreviewGestures({
-    virtualW: PREVIEW_W,
-    virtualH: PREVIEW_H,
+    get virtualW() { return viewportWidth; },
+    get virtualH() { return viewportHeight; },
     minZoom: 0.5,
     maxZoom: Infinity,
     zoomSteps: [0.5, 1, 1.5, 2, 3, 4, 6, 8, 10],
@@ -451,13 +455,14 @@
       {#if imported}
         <section class="flex min-h-0 flex-1 flex-col gap-3" aria-label="CAD import preview">
           <CadSelectionToolbar tool={selection} geometry={imported.geometry} disabled={busy || !previewIsCurrent} />
-          <div class="flex min-h-0 flex-1 items-center overflow-hidden rounded-md border border-slate-700 bg-slate-950">
+          <div class="flex min-h-0 flex-1 overflow-hidden rounded-md border border-slate-700 bg-slate-950">
           <div
             bind:this={previewFrameRef}
-            class="relative w-full touch-none select-none overflow-hidden bg-slate-950 {gestures.isPanning ? 'cursor-grabbing' : 'cursor-grab'}"
+            bind:clientWidth={previewWidth}
+            bind:clientHeight={previewHeight}
+            class="relative h-full min-h-0 w-full touch-none select-none overflow-hidden bg-slate-950 {gestures.isPanning ? 'cursor-grabbing' : 'cursor-grab'}"
             role="img"
             aria-label="CAD import preview"
-            style={`aspect-ratio: ${PREVIEW_W} / ${PREVIEW_H}`}
             onpointerdown={gestures.handlePointerDown}
             onpointermove={gestures.handlePointerMove}
             onpointerup={gestures.handlePointerEnd}
@@ -469,7 +474,7 @@
             ontouchcancel={gestures.handleTouchEnd}
           >
             <svg
-              viewBox={`0 0 ${PREVIEW_W} ${PREVIEW_H}`}
+              viewBox={`0 0 ${viewportWidth} ${viewportHeight}`}
               aria-hidden="true"
               preserveAspectRatio="xMidYMid meet"
               class="block h-full w-full"
@@ -502,7 +507,7 @@
                 </g>
               </g>
             </svg>
-            <CadSelectionOverlay geometry={imported.geometry} tool={selection} transform={worldTransform} panX={gestures.panX} panY={gestures.panY} width={PREVIEW_W} height={PREVIEW_H} isVisible={(coil, layer) => !coilHidden(coil) && previewView.isLayerVisible(layer)} disabled={busy || !previewIsCurrent} />
+            <CadSelectionOverlay geometry={imported.geometry} tool={selection} transform={worldTransform} panX={gestures.panX} panY={gestures.panY} width={viewportWidth} height={viewportHeight} isVisible={(coil, layer) => !coilHidden(coil) && previewView.isLayerVisible(layer)} disabled={busy || !previewIsCurrent} />
           </div>
           </div>
           <div class="flex flex-wrap gap-3" role="group" aria-label="Coil visibility">
@@ -589,7 +594,7 @@
 </div>
 
 <style>
-  .import-layout { display: grid; grid-template-columns: 17rem minmax(0, 1fr); }
+  .import-layout { display: grid; grid-template-columns: 17rem minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); }
   .import-settings :global(.via-guide) { grid-template-columns: minmax(0, 1fr) 5rem; gap: .5rem; }
   .import-settings :global(.via-inputs label) { flex-direction: column; align-items: flex-start; }
   .import-settings :global(.via-inputs input) { width: 100%; }

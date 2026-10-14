@@ -77,9 +77,9 @@ export function nextZoomStepDown(
 // ---------------------------------------------------------------------------
 
 export interface CoilPreviewGesturesOptions {
-  /** Virtual drawing-space width (the canvas maps to 760 virtual px). */
+  /** Virtual drawing-space width. A getter can follow a resizable viewport. */
   virtualW: number;
-  /** Virtual drawing-space height. */
+  /** Virtual drawing-space height. A getter can follow a resizable viewport. */
   virtualH: number;
   minZoom: number;
   maxZoom: number;
@@ -103,8 +103,9 @@ interface PointerEntry extends Point {
 
 export class CoilPreviewGestures {
   // --- options -------------------------------------------------------------
-  readonly virtualW: number;
-  readonly virtualH: number;
+  readonly #options: CoilPreviewGesturesOptions;
+  get virtualW(): number { return this.#options.virtualW; }
+  get virtualH(): number { return this.#options.virtualH; }
   readonly minZoom: number;
   readonly maxZoom: number;
   readonly zoomSteps: readonly number[];
@@ -132,8 +133,7 @@ export class CoilPreviewGestures {
   #pinchStart = { distance: 0, cx: 0, cy: 0, zoom: 1, panX: 0, panY: 0 };
 
   constructor(options: CoilPreviewGesturesOptions) {
-    this.virtualW = options.virtualW;
-    this.virtualH = options.virtualH;
+    this.#options = options;
     this.minZoom = options.minZoom;
     this.maxZoom = options.maxZoom;
     this.zoomSteps = options.zoomSteps;

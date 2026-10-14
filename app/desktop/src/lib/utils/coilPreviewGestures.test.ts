@@ -156,6 +156,26 @@ describe("preview edge zoom anchoring", () => {
 });
 
 describe("CoilPreviewGestures (instance-level, no DOM needed)", () => {
+  it("reads resized viewport dimensions when anchoring zoom", () => {
+    let width = 760;
+    let height = 260;
+    const g = new CoilPreviewGestures({
+      get virtualW() { return width; },
+      get virtualH() { return height; },
+      minZoom: 0.5,
+      maxZoom: Infinity,
+      zoomSteps: STEPS,
+      getWorldTransform: (zoom) => ({ s: zoom, tx: 0, ty: 0 }),
+    });
+    width = 1000;
+    height = 600;
+    const center = worldAt(g, width / 2, height / 2);
+    g.zoomIn();
+    expect(g.virtualW).toBe(width);
+    expect(g.virtualH).toBe(height);
+    expect(worldAt(g, width / 2, height / 2)).toEqual(center);
+  });
+
   it("starts at 1×", () => {
     const g = makeGestures();
     expect(g.zoom).toBe(1);

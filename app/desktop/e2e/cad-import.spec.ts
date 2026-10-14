@@ -186,6 +186,28 @@ async function openImport(page: Page) {
   return dialog;
 }
 
+test("CAD import viewer fills its container after resizing without distorting traces", async ({ page }) => {
+  const dialog = await openImport(page);
+  const frame = dialog.getByRole("img", { name: "CAD import preview", exact: true });
+  for (const viewport of [{ width: 1280, height: 800 }, { width: 1600, height: 1000 }, { width: 390, height: 844 }]) {
+    await page.setViewportSize(viewport);
+    await expect.poll(() => frame.evaluate((element) => {
+      const parent = element.parentElement!;
+      return Math.abs(element.clientHeight - parent.clientHeight);
+    })).toBeLessThanOrEqual(1);
+    await expect.poll(() => frame.locator(":scope > svg > g").evaluate((group) => {
+      const matrix = (group as SVGGraphicsElement).getScreenCTM()!;
+      return Math.abs(Math.abs(matrix.a) - Math.abs(matrix.d));
+    })).toBeLessThan(0.01);
+    const tools = dialog.getByRole("group", { name: "Segment selection tools" });
+    await tools.getByRole("button", { name: "Select", exact: true }).click();
+    await clickTrace(page, .5, 0);
+    await expect(tools).toContainText("1 selected");
+    await page.keyboard.press("Escape");
+    expect(await dialog.evaluate((element) => element.scrollHeight <= element.clientHeight)).toBe(true);
+  }
+});
+
 test("source-layer assignments preserve coil visibility and import simplification is reversible", async ({ page }, testInfo) => {
   const dialog = await openImport(page);
   const summary = dialog.getByText(/\d+ lines,/);
