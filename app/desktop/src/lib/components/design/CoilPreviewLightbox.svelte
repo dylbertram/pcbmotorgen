@@ -222,16 +222,26 @@
 
       <!-- Mover position: same controls as the Design reflection on the
            shared MotionStore, so the slider lives next to the strip it
-           moves inside the lightbox. -->
-        <div class="absolute bottom-12 left-2 z-20 max-h-[40%] w-[min(420px,calc(100%-4rem))] overflow-y-auto bg-slate-900/95 px-2 py-1">
-          <MoverPositionControls {config} {motion} showWaveform={false} compact>
-          <button type="button" aria-label="Show frequency graph" aria-pressed={view.showWaveform}
-            class="mt-2 text-xs {view.showWaveform ? 'text-emerald-300' : 'text-slate-400'} hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
-            onclick={() => { view.showWaveform = !view.showWaveform; }}>
-            {view.showWaveform ? "Hide frequency graph" : "Show frequency graph"}
-          </button>
-          {#if view.showWaveform}<HoldingForceChart {config} {motion} />{/if}
-          </MoverPositionControls>
+           moves inside the lightbox. The phase-waveform popover is anchored
+           directly above this box at the same width, so it cannot be moved. -->
+        <div class="absolute bottom-12 left-2 z-20 flex w-[min(420px,calc(100%-4rem))] flex-col gap-2">
+          {#if view.showWaveform}
+            <div role="dialog" aria-label="Phase waveform"
+              class="flex max-h-[min(32rem,45vh)] flex-col overflow-hidden rounded-md border border-slate-700 bg-slate-900/95 text-slate-200 shadow-xl shadow-black/40">
+              <header class="flex shrink-0 items-center justify-between border-b border-slate-700 px-3 py-2">
+                <h3 class="text-sm font-semibold">Phase waveform</h3>
+                <button type="button" aria-label="Close phase waveform"
+                  class="rounded p-1 text-slate-400 hover:bg-slate-800 hover:text-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
+                  onclick={() => { view.showWaveform = false; }}><X size={16} aria-hidden="true" /></button>
+              </header>
+              <div class="min-h-0 overflow-y-auto overscroll-contain p-2">
+                <HoldingForceChart {config} {motion} />
+              </div>
+            </div>
+          {/if}
+          <div class="rounded-md border border-slate-700 bg-slate-900/95 p-3">
+            <MoverPositionControls {config} {motion} showWaveform={false} compact />
+          </div>
        </div>
 
       </div>
