@@ -13,7 +13,7 @@
   import { attachBackdropScrollGuard, lockPageScroll } from "../../utils/pageScrollLock";
   import { fitWorldToView, type WorldTransform } from "../../chart";
   import CoilPreviewControls from "../design/CoilPreviewControls.svelte";
-  import LayerVisibilityControls from "../design/LayerVisibilityControls.svelte";
+  import CadImportLayersPopover from "../design/CadImportLayersPopover.svelte";
   import { PREVIEW_H, PREVIEW_W } from "../design/coilPreviewCanvas";
   import { CoilPreviewViewState } from "../design/coilPreviewViewState.svelte";
   import {
@@ -162,6 +162,7 @@
     getWorldTransform: worldTransformFor,
   });
   let worldTransform = $derived(worldTransformFor(gestures.zoom));
+  let renderedStrokeWidth = $derived(previewView.traceMode === "centerlines" ? 1 / worldTransform.s : previewStrokeWidth);
   let previewLayers = $derived(
     imported?.geometry.layer_z_mm.map((_, idx) => ({ idx })) ?? [],
   );
@@ -482,7 +483,7 @@
               <g transform={`matrix(${worldTransform.s} 0 0 ${-worldTransform.s} ${worldTransform.tx + gestures.panX} ${worldTransform.ty + gestures.panY})`}>
                 {#each imported.geometry.layer_z_mm as _, layer (layer)}
                   {#if previewView.isLayerVisible(layer)}
-                    <g fill="none" stroke-width={previewStrokeWidth} stroke-linecap="round" stroke-linejoin="round">
+                    <g fill="none" stroke-width={renderedStrokeWidth} stroke-linecap="round" stroke-linejoin="round">
                       {#each joinedPreview.segments.filter((segment) => segment.layer === layer && !coilHidden(segment.net)) as segment (segment)}
                         <path stroke={coilColor(segment.net)} d={`M ${segment.start.x} ${segment.start.y} L ${segment.end.x} ${segment.end.y}`} />
                       {/each}
@@ -495,6 +496,7 @@
                     </g>
                   {/if}
                 {/each}
+                {#if previewView.showVias}
                 <g fill="#fbbf24" stroke="#0f172a" stroke-width={previewStrokeWidth * 0.25}>
                   {#each imported.geometry.routing.vias.filter((via) => !coilHidden(via.net) && (previewView.isLayerVisible(via.from_layer) || previewView.isLayerVisible(via.to_layer))) as via (via)}
                     <circle fill={coilColor(via.net)} cx={via.position.x} cy={via.position.y} r={viaPadRadius} />
@@ -505,25 +507,19 @@
                     <circle cx={via.position.x} cy={via.position.y} r={viaDrillRadius} />
                   {/each}
                 </g>
+                {/if}
               </g>
             </svg>
             <CadSelectionOverlay geometry={imported.geometry} tool={selection} transform={worldTransform} panX={gestures.panX} panY={gestures.panY} width={viewportWidth} height={viewportHeight} isVisible={(coil, layer) => !coilHidden(coil) && previewView.isLayerVisible(layer)} disabled={busy || !previewIsCurrent} />
           </div>
           </div>
-          <div class="flex flex-wrap gap-3" role="group" aria-label="Coil visibility">
-            {#each previewCoils as coil (coil)}
-              <label class="flex items-center gap-1.5 text-xs text-slate-300">
-                <input type="checkbox" aria-label={`Coil ${coil}`} checked={!coilHidden(coil)} onchange={(event) => { hiddenCoils = { ...hiddenCoils, [coil]: !event.currentTarget.checked }; }} />
-                <span class="h-2 w-2 rounded-full" style:background-color={coilColor(coil)}></span>
-                Coil {coil}
-              </label>
-            {/each}
-          </div>
           <div class="flex flex-wrap items-center justify-between gap-3">
-            <LayerVisibilityControls
+            <CadImportLayersPopover
+              view={previewView}
               layers={previewLayers}
-              isVisible={(layerIdx) => previewView.isLayerVisible(layerIdx)}
-              onToggle={(layerIdx) => previewView.toggleLayer(layerIdx)}
+              coils={previewCoils.map((name, colorIdx) => ({ name, colorIdx }))}
+              isCoilVisible={(name) => !coilHidden(name)}
+              onToggleCoil={(name) => { hiddenCoils = { ...hiddenCoils, [name]: !coilHidden(name) }; }}
             />
             <CoilPreviewControls
               zoomLabel={gestures.zoomLabel}

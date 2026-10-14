@@ -41,7 +41,7 @@ async function openTerminalTool(page: Page, { layered = false } = {}) {
   await page.addInitScript(({ layered }) => { (window as any).__cadNoVias = !layered; (window as any).__cadLayered = layered; }, { layered });
   const dialog = await openImport(page);
   await dialog.getByLabel("Coil for source layer holes").fill("A");
-  await expect(dialog.getByRole("checkbox", { name: "Coil holes", exact: true })).toHaveCount(0);
+  await expectImportCoil(page, "holes", false);
   await dialog.getByRole("button", { name: "Open with this geometry" }).click();
   await page.getByRole("button", { name: "Expand coil preview" }).click();
   const tools = page.getByRole("toolbar", { name: "Coil preview tools" });
@@ -186,6 +186,69 @@ async function openImport(page: Page) {
   return dialog;
 }
 
+async function expectImportCoil(page: Page, name: string, present: boolean) {
+  await page.getByRole("button", { name: "Layers", exact: true }).click();
+  const panel = page.getByRole("dialog", { name: "CAD import layers", exact: true });
+  await expect(panel.getByRole("checkbox", { name: `Coil ${name}`, exact: true })).toHaveCount(present ? 1 : 0);
+  await panel.getByRole("button", { name: "Close layers panel" }).click();
+}
+
+test("CAD layer popover toggles visibility and display without resizing the viewer", async ({ page }, testInfo) => {
+  const dialog = await openImport(page);
+  const trigger = dialog.getByRole("button", { name: "Layers", exact: true });
+  const panel = page.getByRole("dialog", { name: "CAD import layers", exact: true });
+  const frame = dialog.getByRole("img", { name: "CAD import preview", exact: true });
+  const traces = frame.locator(":scope > svg path");
+  const vias = frame.locator(":scope > svg circle");
+  for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 }]) {
+    await page.setViewportSize(viewport);
+    const before = await frame.boundingBox();
+    await expect(panel).toBeHidden();
+    await trigger.focus();
+    await page.keyboard.press("Enter");
+    await expect(panel).toBeVisible();
+    await expect(trigger).toHaveAttribute("aria-expanded", "true");
+    expect(await frame.boundingBox()).toEqual(before);
+    await expect(panel.getByRole("checkbox", { name: "Show phase waveform" })).toHaveCount(0);
+    await panel.getByRole("checkbox", { name: "Show layer 0", exact: true }).uncheck();
+    await expect(traces).toHaveCount(0);
+    await panel.getByRole("checkbox", { name: "Show layer 0", exact: true }).check();
+    await panel.getByRole("checkbox", { name: "Coil B", exact: true }).uncheck();
+    await expect(traces).toHaveCount(2);
+    await panel.getByRole("radio", { name: "Centerlines", exact: true }).check();
+    await expect.poll(() => traces.first().evaluate((path) => {
+      const matrix = (path as SVGGraphicsElement).getScreenCTM()!;
+      return Number(getComputedStyle(path).strokeWidth.replace("px", "")) * Math.abs(matrix.a);
+    })).toBeCloseTo(1, 2);
+    await panel.getByRole("checkbox", { name: "Show vias", exact: true }).uncheck();
+    await expect(vias).toHaveCount(0);
+    await page.screenshot({ path: testInfo.outputPath(`cad-layers-${viewport.width}.png`) });
+    const bounds = (await panel.boundingBox())!;
+    expect(bounds.x).toBeGreaterThanOrEqual(0);
+    expect(bounds.y).toBeGreaterThanOrEqual(0);
+    expect(bounds.x + bounds.width).toBeLessThanOrEqual(viewport.width);
+    expect(bounds.y + bounds.height).toBeLessThanOrEqual(viewport.height);
+    await page.keyboard.press("Escape");
+    await expect(panel).toBeHidden();
+    await expect(trigger).toBeFocused();
+    await expect(dialog).toBeVisible();
+    await trigger.click();
+    await expect(panel.getByRole("checkbox", { name: "Coil B", exact: true })).not.toBeChecked();
+    await expect(panel.getByRole("radio", { name: "Centerlines", exact: true })).toBeChecked();
+    await panel.getByRole("checkbox", { name: "Coil B", exact: true }).check();
+    await panel.getByRole("checkbox", { name: "Show vias", exact: true }).check();
+    await panel.getByRole("radio", { name: "Traces", exact: true }).check();
+    await panel.getByRole("button", { name: "Close layers panel" }).click();
+    await expect(panel).toBeHidden();
+    await trigger.click();
+    await dialog.getByRole("heading", { name: "Import CAD", exact: true }).click();
+    await expect(panel).toBeHidden();
+    await trigger.click();
+    await trigger.click();
+    await expect(panel).toBeHidden();
+  }
+});
+
 test("CAD import viewer fills its container after resizing without distorting traces", async ({ page }) => {
   const dialog = await openImport(page);
   const frame = dialog.getByRole("img", { name: "CAD import preview", exact: true });
@@ -214,12 +277,15 @@ test("source-layer assignments preserve coil visibility and import simplificatio
   await expect(summary).toContainText("4 lines");
   await expect(dialog.getByRole("checkbox", { name: "Simplify collinear lines on import" })).not.toBeChecked();
   await dialog.getByLabel("Coil for source layer holes").fill("A");
-  await expect(dialog.getByRole("checkbox", { name: "Coil holes", exact: true })).toHaveCount(0);
+  await expectImportCoil(page, "holes", false);
   const preview = dialog.locator('div[role="img"][aria-label="CAD import preview"] > svg');
   expect(await preview.locator("path").evaluateAll(paths => new Set(paths.map(p => p.getAttribute("stroke"))).size)).toBe(2);
-  await dialog.getByRole("checkbox", { name: "Coil B", exact: true }).uncheck();
+  await dialog.getByRole("button", { name: "Layers", exact: true }).click();
+  const panel = page.getByRole("dialog", { name: "CAD import layers", exact: true });
+  await panel.getByRole("checkbox", { name: "Coil B", exact: true }).uncheck();
   await expect(preview.locator("path")).toHaveCount(2);
-  await dialog.getByRole("checkbox", { name: "Coil B", exact: true }).check();
+  await panel.getByRole("checkbox", { name: "Coil B", exact: true }).check();
+  await panel.getByRole("button", { name: "Close layers panel" }).click();
   await dialog.getByRole("checkbox", { name: "Simplify collinear lines on import" }).check();
   await expect(summary).toContainText("2 lines");
   await page.screenshot({ path: testInfo.outputPath("cad-layer-assignments.png") });
@@ -235,7 +301,7 @@ test("source-layer assignments preserve coil visibility and import simplificatio
 test("imported motor preview simplifies saved geometry and supports undo beside Measure", async ({ page }, testInfo) => {
   const dialog = await openImport(page);
   await dialog.getByLabel("Coil for source layer holes").fill("A");
-  await expect(dialog.getByRole("checkbox", { name: "Coil holes", exact: true })).toHaveCount(0);
+  await expectImportCoil(page, "holes", false);
   await dialog.getByRole("button", { name: "Open with this geometry" }).click();
   await expect(dialog).toBeHidden();
   await page.getByRole("button", { name: "Expand coil preview" }).click();
@@ -281,11 +347,11 @@ test("import selection toggles segments, reassigns coil and layer, and supports 
   await tools.getByLabel("Assign selected segments to coil").fill("C");
   await tools.getByLabel("Assign selected segments to layer").selectOption("1");
   await tools.getByRole("button", { name: "Assign", exact: true }).click();
-  await expect(dialog.getByRole("checkbox", { name: "Coil C", exact: true })).toBeVisible();
+  await expectImportCoil(page, "C", true);
   await expect(dialog.getByRole("option", { name: /Segment 2, coil C, layer 1/ })).toHaveCount(1);
   await page.screenshot({ path: testInfo.outputPath("cad-segment-selection.png") });
   await tools.getByRole("button", { name: "Undo assignment" }).click();
-  await expect(dialog.getByRole("checkbox", { name: "Coil C", exact: true })).toHaveCount(0);
+  await expectImportCoil(page, "C", false);
   await expect(dialog.getByRole("option", { name: /Segment 2, coil A, layer 0/ })).toHaveCount(1);
 });
 
@@ -367,10 +433,10 @@ test("reimport waits for confirmation before discarding segment assignments", as
   await dialog.getByLabel("Trace width (mm)", { exact: true }).fill("0.5");
   await expect(dialog.getByRole("button", { name: "Reimport", exact: true })).toBeVisible();
   await dialog.getByRole("button", { name: "Reimport", exact: true }).click();
-  await expect(dialog.getByRole("checkbox", { name: "Coil C", exact: true })).toBeVisible();
+  await expectImportCoil(page, "C", true);
   await page.evaluate(() => { (window as any).__cadConfirmResult = true; });
   await dialog.getByRole("button", { name: "Reimport", exact: true }).click();
-  await expect(dialog.getByRole("checkbox", { name: "Coil C", exact: true })).toHaveCount(0);
+  await expectImportCoil(page, "C", false);
   await expect(tools).toContainText("0 selected");
   await expect(dialog.getByRole("button", { name: "Open with this geometry" })).toBeVisible();
 });
