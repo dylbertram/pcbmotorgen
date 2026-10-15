@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { GitMerge, Undo2, Plug } from "@lucide/svelte";
+  import { GitMerge, Undo2 } from "@lucide/svelte";
   import type { CadGeometry } from "../../types";
   import type { CadSelectionTool } from "../../utils/cadSelectionTool.svelte";
   import type { CoilTerminalTool } from "../../utils/coilTerminalTool.svelte";
@@ -8,7 +8,7 @@
   import CoilPreviewMeasureToolbar from "./CoilPreviewMeasureToolbar.svelte";
 
   let { label, geometry, selection, measure, terminalTool, disabled = false,
-    onActivateSelection, onStartTerminals, onSimplify, onUndoSimplify,
+    onActivateSelection, onSimplify, onUndoSimplify,
     simplifyNotice = "", onPrepareGeometry, borderless = false }: {
     label: string;
     geometry: CadGeometry | null;
@@ -17,7 +17,6 @@
     terminalTool?: CoilTerminalTool;
     disabled?: boolean;
     onActivateSelection?: () => void;
-    onStartTerminals?: (coil?: string) => void;
     onSimplify?: () => void;
     onUndoSimplify?: () => void;
     simplifyNotice?: string;
@@ -85,9 +84,6 @@
     <button type="button" aria-label="Simplify lines" onclick={() => { selection.clear(); selection.setMode("pan"); onSimplify?.(); }} disabled={disabled || terminalTool?.active} class="icon-tool" title="Simplify lines: merge collinear lines in saved and exported geometry."><GitMerge size={16} aria-hidden="true" /></button>
     {#if onUndoSimplify}<button type="button" aria-label="Undo simplify" onclick={() => { selection.clear(); onUndoSimplify?.(); }} disabled={disabled || terminalTool?.active} class="icon-tool" title="Undo line simplification."><Undo2 size={16} aria-hidden="true" /></button>{/if}
   {/if}
-  {#if terminalTool && onStartTerminals}
-    <button type="button" aria-label="Set coil terminals" onclick={() => { selection.setMode("pan"); onStartTerminals?.(); }} {disabled} aria-pressed={terminalTool.active} class="icon-tool" title="Set coil terminals: review open ends, change either endpoint, or flip IN and OUT."><Plug size={16} aria-hidden="true" /></button>
-  {/if}
   </div>
   <div class="flex h-5 min-w-0 items-center text-xs text-slate-400 {borderless ? 'absolute inset-x-0 top-full' : ''}">
     <span role="status" class="truncate" title={status}>{status}</span>
@@ -97,7 +93,6 @@
 <style>
   .icon-tool { display: inline-flex; align-items: center; justify-content: center; width: 2rem; height: 2rem; flex-shrink: 0; border: 1px solid rgb(var(--slate-700)); border-radius: .25rem; background: rgb(var(--slate-800)); color: rgb(var(--slate-300)); }
   .icon-tool:hover { color: #6ee7b7; }
-  .icon-tool[aria-pressed="true"] { border-color: #34d399; color: #6ee7b7; background: #064e3b; }
   .icon-tool:disabled { opacity: .4; }
   button:focus-visible { outline: 2px solid #34d399; outline-offset: 2px; }
 </style>

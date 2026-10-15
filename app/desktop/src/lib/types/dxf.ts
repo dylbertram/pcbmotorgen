@@ -70,6 +70,8 @@ export interface CadGeometry {
   source_layer_coils?: Record<string, string>;
   /** Explicit IN/OUT selections keyed by coil/net; coordinates are mm. */
   coil_terminals?: Record<string, CadCoilTerminals>;
+  /** Connection convention for terminal selection, not generated connecting traces. */
+  terminal_connection?: "star" | "delta";
   /** Coil/net → motor phase label. Coils sharing a phase join one net and
    *  drive in parallel. A coil named after a phase needs no entry. */
   coil_phases?: Record<string, string>;

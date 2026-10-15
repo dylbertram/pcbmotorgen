@@ -35,6 +35,8 @@ export class CoilPreviewViewState {
   poleRegionPhase = $state("");
   /** Inter-layer via markers. Toggle lives in the expanded lightbox only. */
   showVias = $state(true);
+  showTerminals = $state(true);
+  terminalPanelOpen = $state(false);
 
   // --- per-phase + per-layer trace visibility -------------------------------
   // `coils.phases` is one entry per (phase, layer) pair, so phase toggles

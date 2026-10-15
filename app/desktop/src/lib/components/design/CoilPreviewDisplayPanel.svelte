@@ -37,6 +37,10 @@
 
   <fieldset>
     <legend>Overlays</legend>
+    <label class="layer-row" class:hidden-row={!view.showTerminals}>
+      <input type="checkbox" bind:checked={view.showTerminals} aria-label="Show terminal arrows" />
+      <span class="swatch" style:background-color="#34d399"></span><span>IN/OUT arrows</span>
+    </label>
     <label class="layer-row" class:hidden-row={!view.showVias}>
       <input type="checkbox" bind:checked={view.showVias} aria-label="Show vias" />
       <span class="swatch" style:background-color="#fbbf24"></span><span>Vias</span>

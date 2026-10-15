@@ -180,6 +180,7 @@
    *  `routing_dimensions` overlay geometry (pole-pitch ruler, band-width
    *  rows, pole regions) so the camera never clips an annotation. */
   function worldTransformFor(zoom: number): WorldTransform {
+    const fitWidth = expanded && view.terminalPanelOpen ? W * Math.max(0.15, 1 - 284 / modalWidth) : W;
     // A command focuses the selected coil, not the unrelated magnet array.
     if (terminalTool.active && terminalTool.coil) {
       const points = terminalTool.candidates.map((p) => p.position);
@@ -189,10 +190,10 @@
         const minX = Math.min(...xs), maxX = Math.max(...xs);
         const minY = Math.min(...ys), maxY = Math.max(...ys);
         const pad = Math.max(maxX - minX, maxY - minY, 0.001) * 0.08;
-        return fitWorldToView({ minX: minX - pad, minY: minY - pad, maxX: maxX + pad, maxY: maxY + pad }, W, H, PAD, zoom);
+        return fitWorldToView({ minX: minX - pad, minY: minY - pad, maxX: maxX + pad, maxY: maxY + pad }, fitWidth, H, PAD, zoom);
       }
     }
-    return fitWorldToView(overlayFitBounds, W, H, PAD, zoom);
+    return fitWorldToView(overlayFitBounds, fitWidth, H, PAD, zoom);
   }
 
   // All pan/pinch/zoom state, cursor maths, touch/pointer coordination and
@@ -541,7 +542,7 @@
          reactively — see the counter comment there. -->
     <canvas bind:this={canvasRef} class="block h-full w-full"></canvas>
     {#if importedGeometry}
-      <CoilTerminalOverlay geometry={importedGeometry} transform={worldTransform} panX={gestures.panX} panY={gestures.panY} width={W} height={H} isVisible={isTerminalVisible} />
+      <CoilTerminalOverlay geometry={importedGeometry} transform={worldTransform} panX={gestures.panX} panY={gestures.panY} width={W} height={H} isVisible={isTerminalVisible} showMarkers={view.showTerminals} />
     {/if}
   </PreviewFrame>
 
