@@ -3,7 +3,7 @@
   import type { RoutingParamDef } from "../../types";
   import NumberField from "../ui/NumberField.svelte";
   import HelpTag from "../ui/HelpTag.svelte";
-  import WindingConnectionFigure from "./WindingConnectionFigure.svelte";
+  import WindingConnectionHelp from "./WindingConnectionHelp.svelte";
 
   let { config }: { config: ConfigStore } = $props();
 
@@ -13,12 +13,10 @@
     return typeof value === "number" && Number.isFinite(value) ? value : def.default;
   }
 
-  // The braid's winding-connection choice gets an explanatory figure.
-  const connectionDef = $derived(
-    config.routing_pattern === "infinity-braid"
-      ? config.routing_param_defs.find((def) => def.key === "connection")
-      : undefined,
-  );
+  /** The braid's winding connection gets a wiring diagram in its tooltip. */
+  function hasDiagram(def: RoutingParamDef): boolean {
+    return def.key === "connection" && config.routing_pattern === "infinity-braid";
+  }
 
   function onParamInput(def: RoutingParamDef, value: number): void {
     if (!Number.isFinite(value)) return;
@@ -37,7 +35,11 @@
             <span class="min-w-0 truncate text-xs text-slate-300">
               {def.label}
               <span class="font-mono text-[10px] text-slate-500">({def.key})</span>
-              {#if def.description}
+              {#if hasDiagram(def)}
+                <HelpTag label="About winding connection">
+                  <WindingConnectionHelp />
+                </HelpTag>
+              {:else if def.description}
                 <HelpTag tip={def.description} />
               {/if}
             </span>
@@ -78,8 +80,5 @@
         </label>
       {/each}
     </div>
-    {#if connectionDef}
-      <WindingConnectionFigure value={valueFor(connectionDef)} />
-    {/if}
   {/if}
 </div>

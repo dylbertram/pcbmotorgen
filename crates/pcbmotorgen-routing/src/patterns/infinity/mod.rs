@@ -149,15 +149,14 @@ impl RoutingPattern for InfinityBraidPattern {
             PatternParameter::int(
                 "connection",
                 "Winding connection",
-                Connection::CLOSED,
-                Connection::CLOSED,
+                Connection::DELTA,
+                Connection::DELTA,
                 Connection::STAR,
             )
             .with_description(
-                "Closed keeps each phase as a closed ring. Delta opens each phase and brings both ends out to x = 0 above the board width. Star does the same and ties the layer-1 ends together into a neutral.",
+                "How each phase winding terminates. Delta joins each phase end to the next phase start. Star joins the three phase ends into one neutral.",
             )
             .with_options(vec![
-                ParamOption::new(Connection::CLOSED, "Closed loop"),
                 ParamOption::new(Connection::DELTA, "Delta"),
                 ParamOption::new(Connection::STAR, "Star (wye)"),
             ]),
