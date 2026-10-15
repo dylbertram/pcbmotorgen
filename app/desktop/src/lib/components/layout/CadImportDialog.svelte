@@ -18,8 +18,7 @@
   import GeometryEditingToolbar from "../design/GeometryEditingToolbar.svelte";
   import GeometryEditingOverlay from "../design/GeometryEditingOverlay.svelte";
   import PreviewMeasureOverlay from "../design/PreviewMeasureOverlay.svelte";
-  import CoilTerminalPanel from "../design/CoilTerminalPanel.svelte";
-  import CoilTerminalSummary from "../design/CoilTerminalSummary.svelte";
+  import PreviewLayerSlider from "../design/PreviewLayerSlider.svelte";
   import { CoilTerminalTool } from "../../utils/coilTerminalTool.svelte";
   import { CoilPreviewMeasure } from "../../utils/coilPreviewMeasure.svelte";
   import { CadSimplifyTool } from "../../utils/cadSimplifyTool.svelte";
@@ -162,7 +161,7 @@
       : { segments: [], curves: [] },
   );
   function worldTransformFor(zoom: number): WorldTransform {
-    return fitWorldToView(previewBounds, viewportWidth, viewportHeight, previewPad, zoom);
+    return fitWorldToView(previewBounds, previewView.terminalPanelOpen ? Math.max(120, viewportWidth - 240) : viewportWidth, viewportHeight, previewPad, zoom);
   }
   const gestures = new CoilPreviewGestures({
     interactionMode: "cad",
@@ -208,15 +207,6 @@
   let previewLayers = $derived(
     imported?.geometry.layer_z_mm.map((_, idx) => ({ idx })) ?? [],
   );
-  let visibleLayers = $derived(previewLayers.filter(({ idx }) => previewView.isLayerVisible(idx)));
-  let layerStep = $derived(visibleLayers.length === previewLayers.length ? 0 : visibleLayers.length === 1 ? visibleLayers[0].idx + 1 : 0);
-  let layerStepLabel = $derived(visibleLayers.length === previewLayers.length ? "All" : visibleLayers.length === 1 ? `Layer ${layerStep}` : "Custom layers");
-
-  function selectLayerStep(step: number): void {
-    previewView.layerVisibility = Object.fromEntries(previewLayers.map(({ idx }) => [idx, step === 0 || idx === step - 1]));
-    previewView.coilLayerVisibility = {};
-    hiddenCoils = {};
-  }
 
   $effect(() => {
     if (!backdropRef || !dialogRef) return;
@@ -510,11 +500,8 @@
       {#if imported}
         <section class="flex min-h-0 flex-1 flex-col gap-3" aria-label="CAD import preview">
           <GeometryEditingToolbar label="CAD import tools" geometry={imported.geometry} {selection} {measure} {terminalTool}
-            disabled={busy || !previewIsCurrent} onStartTerminals={startTerminals} onSimplify={simplifyTool.simplify}
+            disabled={busy || !previewIsCurrent} onSimplify={simplifyTool.simplify}
             onUndoSimplify={simplifyTool.canUndo ? simplifyTool.undo : undefined} simplifyNotice={simplifyTool.notice} />
-          {#if terminalTool.active}
-            <CoilTerminalPanel tool={terminalTool} />
-          {/if}
           <div class="relative flex min-h-0 flex-1 overflow-hidden rounded-md border border-slate-700 bg-slate-950 pr-11">
           <PreviewFrame bind:frame={previewFrameRef} bind:width={previewWidth} bind:height={previewHeight}
             {gestures} {measure} interactive={terminalTool.active} label="CAD import preview">
@@ -554,13 +541,14 @@
                 {/if}
               </g>
             </svg>
-            <GeometryEditingOverlay geometry={imported.geometry} {selection} {terminalTool} transform={worldTransform} panX={gestures.panX} panY={gestures.panY} width={viewportWidth} height={viewportHeight} isVisible={traceVisible} disabled={busy || !previewIsCurrent || measure.mode} />
+            <GeometryEditingOverlay geometry={imported.geometry} {selection} {terminalTool} showTerminals={previewView.showTerminals} markerRightInset={previewView.terminalPanelOpen ? 240 : 0} transform={worldTransform} panX={gestures.panX} panY={gestures.panY} width={viewportWidth} height={viewportHeight} isVisible={traceVisible} disabled={busy || !previewIsCurrent || measure.mode} />
             <PreviewMeasureOverlay {measure} transform={worldTransform} panX={gestures.panX} panY={gestures.panY} width={viewportWidth} height={viewportHeight} metresToWorld={1000} />
           </PreviewFrame>
             <div class="absolute inset-y-0 right-0 z-20 w-11">
             <PreviewSideRail
               label="CAD import layers"
               displayLabel="CAD import display"
+              {terminalTool} onStartTerminals={startTerminals} terminalsDisabled={busy || !previewIsCurrent}
               geometry={imported.geometry} {selection} assignmentDisabled={busy || !previewIsCurrent || measure.mode || terminalTool.active}
               view={previewView}
               layers={previewLayers}
@@ -571,19 +559,7 @@
             </div>
           </div>
           <div class="flex flex-wrap items-center justify-between gap-3">
-            {#if previewLayers.length > 0}
-              <div class="layer-stepper" role="group" aria-label="Layer isolation">
-                <input class="layer-slider" type="range" min="0" max={previewLayers.length} step="1"
-                  value={layerStep} aria-label="Preview layer" aria-valuetext={layerStepLabel}
-                  oninput={(event) => selectLayerStep(Number(event.currentTarget.value))} />
-                <div class="layer-step-labels">
-                  {#each ["All", ...previewLayers.map(({ idx }) => `Layer ${idx + 1}`)] as label, step (label)}
-                    <button type="button" class:active={layerStepLabel === label} style:left={`${step / previewLayers.length * 100}%`}
-                      aria-pressed={layerStepLabel === label} onclick={() => selectLayerStep(step)}>{label}</button>
-                  {/each}
-                </div>
-              </div>
-            {/if}
+            <PreviewLayerSlider view={previewView} layers={previewLayers} onSelect={(layer) => { hiddenCoils = {}; if (layer !== null && terminalTool.active) terminalTool.chooseLayer(layer); }} />
             <div class="ml-auto shrink-0">
             <CoilPreviewControls
               zoomLabel={gestures.zoomLabel}
@@ -596,11 +572,6 @@
             />
             </div>
           </div>
-          {#if Object.keys(imported.geometry.coil_terminals ?? {}).length}
-            <div class="max-h-24 shrink-0 overflow-y-auto overscroll-contain">
-              <CoilTerminalSummary geometry={imported.geometry} tool={terminalTool} onEdit={startTerminals} onGeometryChange={updateImportedGeometry} />
-            </div>
-          {/if}
           {#if !viaSizingValid}
             <p role="alert" class="text-xs text-rose-200">Via drill and annular ring must be positive values.</p>
           {/if}
@@ -660,18 +631,6 @@
 </div>
 
 <style>
-  .layer-stepper { flex: 1 1 8rem; max-width: 28rem; min-width: 0; padding: 0 1.5rem; }
-  .layer-slider { display: block; appearance: none; width: 100%; height: 1rem; margin: 0; background: transparent; cursor: pointer; }
-  .layer-slider::-webkit-slider-runnable-track { height: 2px; border-radius: 1px; background: rgb(var(--slate-600)); }
-  .layer-slider::-moz-range-track { height: 2px; border-radius: 1px; background: rgb(var(--slate-600)); }
-  .layer-slider::-moz-range-progress { background: transparent; }
-  .layer-slider::-webkit-slider-thumb { appearance: none; width: 10px; height: 10px; margin-top: -4px; border: 0; border-radius: 50%; background: #34d399; }
-  .layer-slider::-moz-range-thumb { width: 10px; height: 10px; border: 0; border-radius: 50%; background: #34d399; }
-  .layer-slider:focus-visible { outline: 2px solid #34d399; outline-offset: 3px; border-radius: 2px; }
-  .layer-step-labels { position: relative; height: 1rem; margin: 0 5px; }
-  .layer-step-labels button { position: absolute; transform: translateX(-50%); white-space: nowrap; font-size: 10px; line-height: 1rem; color: rgb(var(--slate-400)); }
-  .layer-step-labels button.active, .layer-step-labels button:hover { color: #34d399; }
-  .layer-step-labels button:focus-visible { outline: 2px solid #34d399; outline-offset: 2px; }
   .import-layout { display: grid; grid-template-columns: 17rem minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); }
   .import-settings :global(.via-guide) { grid-template-columns: minmax(0, 1fr) 5rem; gap: .5rem; }
   .import-settings :global(.via-inputs label) { flex-direction: column; align-items: flex-start; }
