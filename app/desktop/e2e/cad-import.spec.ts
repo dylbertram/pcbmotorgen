@@ -193,6 +193,48 @@ async function expectImportCoil(page: Page, name: string, present: boolean) {
   await panel.getByRole("button", { name: "Close layers panel" }).click();
 }
 
+test("CAD layer slider isolates each layer and restores all layers", async ({ page }, testInfo) => {
+  await page.addInitScript(() => { (window as any).__cadLayered = true; (window as any).__cadNoVias = true; });
+  const dialog = await openImport(page);
+  const slider = dialog.getByRole("slider", { name: "Preview layer" });
+  const steps = dialog.getByRole("group", { name: "Layer isolation" });
+  const traces = dialog.locator('div[role="img"][aria-label="CAD import preview"] > svg path');
+  await expect(slider).toHaveAttribute("aria-valuetext", "All");
+  await expect(traces).toHaveCount(5);
+
+  await slider.focus();
+  await slider.press("ArrowRight");
+  await expect(slider).toHaveAttribute("aria-valuetext", "Layer 1");
+  await expect(traces).toHaveCount(4);
+  await slider.press("ArrowRight");
+  await expect(slider).toHaveAttribute("aria-valuetext", "Layer 2");
+  await expect(traces).toHaveCount(1);
+  await steps.getByRole("button", { name: "All", exact: true }).click();
+  await expect(traces).toHaveCount(5);
+  await steps.getByRole("button", { name: "Layer 1", exact: true }).click();
+  await expect(traces).toHaveCount(4);
+
+  const stepBox = (await steps.boundingBox())!;
+  const zoomBox = (await dialog.getByRole("group", { name: "Zoom controls" }).boundingBox())!;
+  expect(stepBox.x + stepBox.width).toBeLessThan(zoomBox.x);
+  expect(Math.abs(stepBox.y + stepBox.height / 2 - zoomBox.y - zoomBox.height / 2)).toBeLessThan(2);
+  await page.screenshot({ path: testInfo.outputPath("cad-layer-slider.png") });
+
+  // Side-panel visibility changes and the slider share the same layer state.
+  await dialog.getByRole("button", { name: "Display", exact: true }).click();
+  const display = page.getByRole("dialog", { name: "CAD import display", exact: true });
+  await expect(display.getByRole("checkbox", { name: "Show layer 0", exact: true })).toBeChecked();
+  await expect(display.getByRole("checkbox", { name: "Show layer 1", exact: true })).not.toBeChecked();
+  await dialog.getByRole("button", { name: "Display", exact: true }).click();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await steps.getByRole("button", { name: "Layer 2", exact: true }).click();
+  await expect(traces).toHaveCount(1);
+  const mobileStepBox = (await steps.boundingBox())!;
+  const mobileZoomBox = (await dialog.getByRole("group", { name: "Zoom controls" }).boundingBox())!;
+  expect(Math.abs(mobileStepBox.y - mobileZoomBox.y)).toBeLessThan(2);
+  await page.screenshot({ path: testInfo.outputPath("cad-layer-slider-mobile.png") });
+});
+
 test("shared editing tools measure and edit CAD drafts, then keep those edits in motor preview", async ({ page }, testInfo) => {
   await page.addInitScript(() => { (window as any).__cadNoVias = true; });
   const dialog = await openImport(page);
