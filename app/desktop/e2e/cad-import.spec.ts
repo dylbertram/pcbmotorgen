@@ -27,7 +27,7 @@ test.beforeEach(async ({ page }) => {
           segments: ['A', 'B'].flatMap((coil, row) => [0, 1].map(x => ({
             start: { x, y: row * 2 }, end: { x: x + 1, y: row * 2 },
             layer: 0, net: source_layer_coils['L0_' + coil], is_active: true,
-          }))).concat(window.__cadLayered ? [{ start: { x: 0, y: 0 }, end: { x: 2, y: 0 }, layer: 1, net: source_layer_coils.L0_A, is_active: true }] : []),
+          }))).concat(window.__cadLayered ? [{ start: { x: 0, y: 0 }, end: { x: 2, y: 0 }, layer: 1, net: source_layer_coils.L0_A, is_active: true }] : []).concat(window.__cadAmbiguous ? [{ start: { x: 1, y: 0 }, end: { x: 1, y: 1 }, layer: 0, net: source_layer_coils.L0_A, is_active: true }] : []),
           vias: window.__cadNoVias ? [] : [{ position: { x: 2, y: 0 }, from_layer: 0, to_layer: 1, net: source_layer_coils.holes }],
         },
       }};
@@ -52,7 +52,7 @@ async function openTerminalTool(page: Page, { layered = false } = {}) {
   return { command, tools };
 }
 
-test("terminal defaults need only confirmation, overrides preserve the other end, and labels survive simplify", async ({ page }, testInfo) => {
+test("terminal defaults are selected automatically, overrides infer the other end, and labels survive simplify", async ({ page }, testInfo) => {
   const { command, tools } = await openTerminalTool(page);
   await expect(command.getByRole("status")).toContainText("Review A");
   await expect(command).toContainText("Driver end");
@@ -122,8 +122,8 @@ test("overlapping endpoints are disambiguated by copper layer and support keyboa
     const { x, y, width, height } = card.getBoundingClientRect();
     return { x, y, width, height };
   }));
-  expect(cards).toHaveLength(2);
-  expect(cards[0].x + cards[0].width <= cards[1].x || cards[1].x + cards[1].width <= cards[0].x || cards[0].y + cards[0].height <= cards[1].y || cards[1].y + cards[1].height <= cards[0].y).toBe(true);
+  expect(cards).toHaveLength(4);
+  for (const [i, a] of cards.entries()) for (const b of cards.slice(i + 1)) expect(a.x + a.width <= b.x || b.x + b.width <= a.x || a.y + a.height <= b.y || b.y + b.height <= a.y).toBe(true);
   await page.screenshot({ path: testInfo.outputPath("offset-terminal-arrows.png") });
   await expect(command.getByRole("combobox")).toHaveCount(0);
   await command.getByRole("button", { name: "Select driver end for coil A", exact: true }).click();
@@ -139,6 +139,7 @@ test("overlapping endpoints are disambiguated by copper layer and support keyboa
 });
 
 test("ambiguous linked coils require manual picks instead of unsafe defaults", async ({ page }) => {
+  await page.addInitScript(() => { (window as any).__cadAmbiguous = true; });
   const dialog = await openImport(page);
   await dialog.getByRole("button", { name: "Open with this geometry" }).click();
   await page.getByRole("button", { name: "Expand coil preview" }).click();

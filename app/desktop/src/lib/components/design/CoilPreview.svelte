@@ -42,6 +42,8 @@
   import { CadSimplifyTool } from "../../utils/cadSimplifyTool.svelte";
   import { CoilTerminalTool } from "../../utils/coilTerminalTool.svelte";
   import CoilTerminalOverlay from "./CoilTerminalOverlay.svelte";
+  import { withAutomaticCadTerminals } from "../../cadTerminals";
+  import { generatedTerminalGeometry } from "../../generatedTerminalGeometry";
   import {
     clientToVirtual,
     computePreviewGeometry,
@@ -125,8 +127,9 @@
   // views. The toggles live in the lightbox UI; the draw effect below
   // reads the same instance, so a flip there repaints the schematic.
   // -------------------------------------------------------------------
+  let terminalGeometry = $derived(importedGeometry ? withAutomaticCadTerminals(importedGeometry) : coils ? generatedTerminalGeometry(coils, config.num_layers, config.pcb_thickness_mm, config.min_trace_mm, config.routing_pattern === "infinity-braid" ? config.routing_params.connection : undefined) : null);
   const terminalTool = new CoilTerminalTool({
-    getGeometry: () => importedGeometry,
+    getGeometry: () => terminalGeometry,
     onChange: (geometry) => onGeometryChange?.(geometry),
     onReveal: (coil, layer) => {
       const phase = coils?.phases.find((p) => p.phase_name === coil);
@@ -137,7 +140,7 @@
     onFit: () => gestures.resetView(),
   });
   function startTerminalTool(coil?: string): void {
-    if (!importedGeometry || !onGeometryChange) return;
+    if (!terminalGeometry || !onGeometryChange) return;
     measure.mode = false;
     measure.clear();
     view.oneSection = false;
@@ -541,8 +544,8 @@
          renderer (canvas.dataset in coilPreviewCanvas.ts), NOT bound
          reactively — see the counter comment there. -->
     <canvas bind:this={canvasRef} class="block h-full w-full"></canvas>
-    {#if importedGeometry}
-      <CoilTerminalOverlay geometry={importedGeometry} transform={worldTransform} panX={gestures.panX} panY={gestures.panY} width={W} height={H} isVisible={isTerminalVisible} showMarkers={view.showTerminals} />
+    {#if terminalGeometry}
+      <CoilTerminalOverlay geometry={terminalGeometry} transform={worldTransform} panX={gestures.panX} panY={gestures.panY} width={W} height={H} isVisible={isTerminalVisible} showMarkers={view.showTerminals} />
     {/if}
   </PreviewFrame>
 
@@ -566,7 +569,8 @@
       onSimplify={importedGeometry && onGeometryChange ? simplifyImportedLines : undefined}
       onUndoSimplify={canUndoSimplify ? undoSimplify : undefined}
       {simplifyNotice}
-      terminalTool={importedGeometry && onGeometryChange ? terminalTool : undefined}
+      terminalTool={terminalGeometry && onGeometryChange ? terminalTool : undefined}
+      {terminalGeometry}
       onStartTerminals={startTerminalTool}
       {importedGeometry}
       {onGeometryChange}

@@ -17,6 +17,7 @@
   import type { CadGeometry } from "../../types";
   import type { WorldTransform } from "../../chart";
   import type { CoilTerminalTool } from "../../utils/coilTerminalTool.svelte";
+  import CoilTerminalOverlay from "./CoilTerminalOverlay.svelte";
   import PreviewLayerSlider from "./PreviewLayerSlider.svelte";
   import type { CoilPreviewGestures } from "../../utils/coilPreviewGestures.svelte";
   import type { CoilPreviewMeasure } from "../../utils/coilPreviewMeasure.svelte";
@@ -51,6 +52,7 @@
     terminalTool,
     onStartTerminals,
     importedGeometry = null,
+    terminalGeometry = null,
     onGeometryChange,
     onStartSegmentEditing,
     worldTransform,
@@ -79,6 +81,7 @@
     terminalTool?: CoilTerminalTool;
     onStartTerminals?: (coil?: string) => void;
     importedGeometry?: CadGeometry | null;
+    terminalGeometry?: CadGeometry | null;
     onGeometryChange?: (geometry: CadGeometry) => void;
     onStartSegmentEditing?: () => Promise<boolean>;
     worldTransform: WorldTransform;
@@ -183,7 +186,10 @@
             <canvas bind:this={modalCanvasRef} class="block h-full w-full"
             ></canvas>
             {#if importedGeometry}
-              <GeometryEditingOverlay geometry={importedGeometry} {selection} {terminalTool} showTerminals={view.showTerminals} markerRightInset={terminalPanelOpen ? 284 : 44} transform={worldTransform} panX={gestures.panX} panY={gestures.panY} width={W} height={H} worldScale={1e-3} isVisible={isTerminalVisible} disabled={!onGeometryChange || measure.mode || view.oneSection} />
+              <GeometryEditingOverlay geometry={importedGeometry} {selection} {terminalTool} renderTerminals={!terminalGeometry} showTerminals={view.showTerminals} markerRightInset={terminalPanelOpen ? 284 : 44} transform={worldTransform} panX={gestures.panX} panY={gestures.panY} width={W} height={H} worldScale={1e-3} isVisible={isTerminalVisible} disabled={!onGeometryChange || measure.mode || view.oneSection} />
+            {/if}
+            {#if terminalGeometry}
+              <CoilTerminalOverlay geometry={terminalGeometry} tool={terminalTool} transform={worldTransform} panX={gestures.panX} panY={gestures.panY} width={W} height={H} worldScale={1e-3} isVisible={isTerminalVisible} showMarkers={view.showTerminals} rightInset={terminalPanelOpen ? 284 : 44} />
             {/if}
             <PreviewMeasureOverlay {measure} transform={worldTransform} panX={gestures.panX} panY={gestures.panY} width={W} height={H} />
           </PreviewFrame>
@@ -202,7 +208,7 @@
         <div class="absolute bottom-0 right-0 z-20 w-11" style:top={`${toolbarHeight}px`}>
           <PreviewSideRail {view} layers={importedGeometry ? importedGeometry.layer_z_mm.map((_, idx) => ({ idx })) : uniqueLayers} phases={importedGeometry ? [] : uniquePhases}
             {terminalTool} {onStartTerminals} terminalsDisabled={!onGeometryChange}
-           geometry={importedGeometry} {selection} assignmentDisabled={!onGeometryChange || measure.mode || !!terminalTool?.active || view.oneSection}
+           geometry={terminalGeometry ?? importedGeometry} selection={importedGeometry ? selection : undefined} assignmentDisabled={!importedGeometry || !onGeometryChange || measure.mode || !!terminalTool?.active || view.oneSection}
           coils={importedGeometry ? uniquePhases.map((phase) => ({ name: phase.name, colorIdx: phase.colorIdx })) : []}
           isCoilVisible={(name) => view.isPhaseVisible(uniquePhases.find((phase) => phase.name === name)?.idx ?? -1)}
           onToggleCoil={(name) => { const phase = uniquePhases.find((phase) => phase.name === name); if (phase) view.phaseVisibility[phase.idx] = !view.isPhaseVisible(phase.idx); }} showMotorControls={true}

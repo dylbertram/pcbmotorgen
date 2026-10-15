@@ -70,6 +70,21 @@ export function defaultCadTerminals(geometry: CadGeometry, coil: string): CadCoi
       else parents[root(index)] = root(first);
     }
   }
+  // A termination can meet the middle of another coil's lead, including on
+  // the other side of a via. Intersections away from an endpoint are not
+  // inferred as terminals: only nodes belonging to this winding are tested.
+  for (const entry of nodes) {
+    if (!entry.owners.has(coil)) continue;
+    for (const segment of geometry.routing.segments) {
+      if (segment.net === coil || segment.layer !== entry.point.layer) continue;
+      const dx = segment.end.x - segment.start.x, dy = segment.end.y - segment.start.y;
+      const length = Math.hypot(dx, dy);
+      if (length === 0) continue;
+      const px = entry.point.position.x - segment.start.x, py = entry.point.position.y - segment.start.y;
+      const along = (px * dx + py * dy) / length;
+      if (Math.abs(px * dy - py * dx) / length <= tolerance && along >= -tolerance && along <= length + tolerance) entry.owners.add(segment.net);
+    }
+  }
   const groups = new Map<number, { owners: Set<string>; via: boolean; point: CadTerminal }>();
   nodes.forEach((entry, index) => {
     const id = root(index), group = groups.get(id) ?? { owners: new Set<string>(), via: false, point: entry.point };
@@ -85,17 +100,24 @@ export function defaultCadTerminals(geometry: CadGeometry, coil: string): CadCoi
     from.push(b); to.push(a); adjacency.set(a, from); adjacency.set(b, to);
   }
   const ends: CadTerminal[] = [];
+  const free: CadTerminal[] = [];
+  const joined: CadTerminal[] = [];
+  let isolatedChain = true;
   for (const [id, group] of groups) {
     if (!group.owners.has(coil)) continue;
     const degree = adjacency.get(id)?.length ?? 0;
-    if (group.owners.size !== 1 || degree === 0 || degree > 2) return null;
+    if (degree === 0) return null;
+    if (group.owners.size !== 1 || degree > 2) isolatedChain = false;
     if (degree === 1) {
-      // A dangling via is not a free trace end.
-      if (group.via) return null;
-      ends.push(group.point);
+      // Retain a real endpoint on this coil, not another coil's endpoint
+      // which happened to be encountered first at the shared junction.
+      const endpoint = nodes.find((entry, index) => root(index) === id && entry.owners.has(coil))!.point;
+      if (group.owners.size > 1) joined.push(endpoint);
+      else if (!group.via) free.push(endpoint);
+      if (group.via) isolatedChain = false;
+      ends.push(endpoint);
     }
   }
-  if (ends.length !== 2) return null;
   const visited = new Set<number>();
   const queue = [adjacency.keys().next().value!];
   for (let i = 0; i < queue.length; i++) {
@@ -104,8 +126,23 @@ export function defaultCadTerminals(geometry: CadGeometry, coil: string): CadCoi
     visited.add(id); queue.push(...adjacency.get(id)!);
   }
   if (visited.size !== adjacency.size) return null;
+  if (free.length === 1 && joined.length === 1) return { input: free[0], output: joined[0] };
+  if (!isolatedChain || ends.length !== 2) return null;
   ends.sort((a, b) => a.layer - b.layer || a.position.x - b.position.x || a.position.y - b.position.y);
   return { input: ends[0], output: ends[1] };
+}
+
+/** Presentation defaults never replace explicit selections or mutate a project. */
+export function withAutomaticCadTerminals(geometry: CadGeometry): CadGeometry {
+  let changed = false;
+  const terminals = { ...geometry.coil_terminals };
+  const coils = new Set([...geometry.routing.segments, ...geometry.routing.curves, ...(geometry.routing.splines ?? [])].map((trace) => trace.net));
+  for (const coil of coils) {
+    if (Object.hasOwn(terminals, coil)) continue;
+    const inferred = defaultCadTerminals(geometry, coil);
+    if (inferred) { terminals[coil] = inferred; changed = true; }
+  }
+  return changed ? { ...geometry, coil_terminals: terminals } : geometry;
 }
 
 export function assignCadTerminals(geometry: CadGeometry, coil: string, terminals: CadCoilTerminals): CadGeometry {

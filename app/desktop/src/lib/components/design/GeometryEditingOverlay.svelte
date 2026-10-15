@@ -7,7 +7,7 @@
   import CoilTerminalOverlay from "./CoilTerminalOverlay.svelte";
 
   let { geometry, selection, terminalTool, transform, panX, panY, width, height,
-    worldScale = 1, isVisible, disabled = false, showTerminals = true, markerRightInset = 0 }: {
+    worldScale = 1, isVisible, disabled = false, showTerminals = true, markerRightInset = 0, renderTerminals = true }: {
     geometry: CadGeometry;
     selection: CadSelectionTool;
     terminalTool?: CoilTerminalTool;
@@ -18,8 +18,9 @@
     disabled?: boolean;
     showTerminals?: boolean;
     markerRightInset?: number;
+    renderTerminals?: boolean;
   } = $props();
 </script>
 
-<CoilTerminalOverlay {geometry} tool={terminalTool} {transform} {panX} {panY} {width} {height} {worldScale} {isVisible} showMarkers={showTerminals} rightInset={markerRightInset} />
+{#if renderTerminals}<CoilTerminalOverlay {geometry} tool={terminalTool} {transform} {panX} {panY} {width} {height} {worldScale} {isVisible} showMarkers={showTerminals} rightInset={markerRightInset} />{/if}
 <CadSelectionOverlay {geometry} tool={selection} {transform} {panX} {panY} {width} {height} {worldScale} {isVisible} disabled={disabled || terminalTool?.active} />
