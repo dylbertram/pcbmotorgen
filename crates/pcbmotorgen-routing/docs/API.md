@@ -541,7 +541,9 @@ never sanitised.** Rules:
   `[0, board_width_mm]` (inclusive, with a `1e-6` epsilon so exact-boundary
   coordinates pass). Inactive segments (`is_active: false` — end turns and
   terminal leads) are exempt from the y bound so leads can leave the board
-  width; they must still be finite and inside the x range.
+  width; they must still be finite and inside the x range. A via that sits
+  on an end of an inactive segment (a terminal joint on a lead) is exempt
+  from the y bound too.
 - **Layer range** — `layer` / `from_layer` / `to_layer` inside `[0, num_layers)`.
 - **Vias** — `from_layer` must differ from `to_layer`.
 - **Non-degenerate** — segments have non-zero length; arcs have start/mid/end
