@@ -16,17 +16,28 @@ function fixture(ambiguous = false) {
 }
 
 describe("CoilTerminalTool", () => {
+  it("infers the opposite end when either free end is chosen as the driver end", () => {
+    const { tool, getGeometry } = fixture();
+    tool.begin(); tool.change("input");
+    expect(tool.candidates).toEqual([point(0), point(2)]);
+    tool.pick(point(2));
+    expect(tool.input).toEqual(point(2));
+    expect(tool.output).toEqual(point(0));
+    expect(tool.canApply).toBe(true);
+    tool.setConnection("delta"); tool.done();
+    expect(getGeometry().coil_terminals!.A).toEqual({ input: point(2), output: point(0) });
+  });
   it("persists the connection convention without losing draft endpoints", () => {
     const { tool, getGeometry } = fixture();
     expect(tool.connection).toBe("star");
-    tool.begin(); tool.change("input"); tool.pick(point(1));
+    tool.begin(); tool.change("input"); tool.pick(point(2));
     tool.setConnection("delta");
     expect(tool.connection).toBe("delta");
     expect(tool.active).toBe(true);
-    expect(tool.input).toEqual(point(1));
+    expect(tool.input).toEqual(point(2));
     tool.done();
     expect(getGeometry().terminal_connection).toBe("delta");
-    expect(getGeometry().coil_terminals!.A.input).toEqual(point(1));
+    expect(getGeometry().coil_terminals!.A.input).toEqual(point(2));
   });
   it("opens the first coil with inferred endpoints ready to apply, without changing the project", () => {
     const { tool, onChange, getGeometry } = fixture();
@@ -40,9 +51,9 @@ describe("CoilTerminalTool", () => {
     expect(tool.active).toBe(false);
   });
   it("starts on a requested coil and remembers saved manual endpoints rather than replacing them", () => {
-    const { tool, onChange } = fixture();
+    const { tool, onChange } = fixture(true);
     tool.begin("B"); expect(tool.input).toEqual(point(0, 0, 2));
-    tool.begin("A"); tool.change("input"); tool.pick(point(1)); tool.flip(); tool.done();
+    tool.begin("A"); tool.change("output"); tool.pick(point(2)); tool.change("input"); tool.pick(point(1)); tool.flip(); tool.done();
     onChange.mockClear();
     tool.begin("A");
     expect(tool.defaultKind).toBe("saved");
@@ -50,8 +61,8 @@ describe("CoilTerminalTool", () => {
     expect(onChange).not.toHaveBeenCalled();
   });
   it("overrides IN or OUT in one pick without discarding the opposite endpoint", () => {
-    const { tool, getGeometry } = fixture();
-    tool.begin(); tool.change("input"); tool.pick(point(1));
+    const { tool, getGeometry } = fixture(true);
+    tool.begin(); tool.change("output"); tool.pick(point(2)); tool.change("input"); tool.pick(point(1));
     expect(tool.step).toBe("review"); expect(tool.output).toEqual(point(2));
     tool.change("output"); tool.pick(point(0));
     expect(tool.step).toBe("review"); expect(tool.input).toEqual(point(1));
@@ -75,8 +86,8 @@ describe("CoilTerminalTool", () => {
     tool.done(); expect(onChange).toHaveBeenCalledTimes(1);
   });
   it("rejects identical endpoints, invalid points and wrong layers without clearing the draft", () => {
-    const { tool } = fixture();
-    tool.begin(); tool.change("output");
+    const { tool } = fixture(true);
+    tool.begin(); tool.pick(point(0)); tool.pick(point(2)); tool.change("output");
     tool.pick(point(0)); expect(tool.error).toContain("different"); expect(tool.output).toEqual(point(2));
     tool.pick(point(99)); tool.pick(point(1, 1)); expect(tool.step).toBe("output");
     tool.pick(point(1)); expect(tool.error).toBe(""); expect(tool.step).toBe("review");

@@ -23,7 +23,7 @@
     return `left:${x / width * 100}%;top:${y / height * 100}%;`;
   }
   let candidates = $derived(tool?.active && (tool.step === "input" || tool.step === "output")
-    ? tool.candidates.filter((p) => p.layer === tool.layer && isVisible(tool.coil, p.layer)) : []);
+    ? tool.candidates.filter((p) => isVisible(tool.coil, p.layer)) : []);
   let labels = $derived.by(() => {
     const result: { coil: string; role: "IN" | "OUT"; point: CadTerminal; draft: boolean }[] = [];
     for (const [coil, terminals] of Object.entries(geometry.coil_terminals ?? {})) {
@@ -39,6 +39,9 @@
   let renderedWidth = $state(0);
   let renderedHeight = $state(0);
   const markerId = $props.id();
+  function endLabel(role: "IN" | "OUT") {
+    return role === "IN" ? "Driver end" : (tool?.connection ?? geometry.terminal_connection ?? "star") === "star" ? "Neutral end" : "Delta end";
+  }
   let callouts = $derived(layoutTerminalMarkers(labels.map(({ point }) => ({
     x: (point.position.x * worldScale * transform.s + transform.tx + panX) / width * renderedWidth,
     y: (-point.position.y * worldScale * transform.s + transform.ty + panY) / height * renderedHeight,
@@ -95,13 +98,13 @@
         {@const p = callouts[index]}
         {@const color = label.role === "IN" ? "#34d399" : "#fbbf24"}
         {@const lx = p.labelX > p.x ? p.labelX : p.labelX + 132}
-        <g role="img" aria-label={`Coil ${label.coil} ${label.role}, ${terminalDescription(label.point)}${label.draft ? ", preview" : ""}`}>
-          <title>{label.coil} {label.role} · {terminalDescription(label.point)}</title>
+        <g role="img" aria-label={`Coil ${label.coil} ${endLabel(label.role)}, ${terminalDescription(label.point)}${label.draft ? ", preview" : ""}`}>
+          <title>{label.coil} {endLabel(label.role)} · {terminalDescription(label.point)}</title>
           <line x1={p.x} y1={p.y} x2={lx} y2={p.labelY + 12} stroke="#020617" stroke-width="6" />
           <line x1={p.x} y1={p.y} x2={lx} y2={p.labelY + 12} stroke={color} stroke-width="2" marker-start={label.role === "IN" ? `url(#${markerId}-IN)` : undefined} marker-end={label.role === "OUT" ? `url(#${markerId}-OUT)` : undefined} />
           <circle cx={p.x} cy={p.y} r="3" fill={color} stroke="#020617" stroke-width="1" />
           <rect x={p.labelX} y={p.labelY} width="132" height="24" rx="4" fill="#020617" stroke={color} />
-          <text x={p.labelX + 8} y={p.labelY + 16} fill={color} font-size="11" font-weight="600" textLength={label.coil.length > 10 ? 116 : undefined} lengthAdjust="spacingAndGlyphs">{label.coil} {label.role} · L{label.point.layer + 1}</text>
+          <text x={p.labelX + 8} y={p.labelY + 16} fill={color} font-size="11" font-weight="600" textLength={label.coil.length > 3 ? 116 : undefined} lengthAdjust="spacingAndGlyphs">{label.coil} {endLabel(label.role)} · L{label.point.layer + 1}</text>
         </g>
       {/each}
     </svg>
