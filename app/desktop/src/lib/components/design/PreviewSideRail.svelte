@@ -101,7 +101,7 @@
     </button>
     {#if geometry && terminalTool && onStartTerminals}
       <button type="button" bind:this={triggers.terminals} aria-label="Set coil terminals" aria-expanded={open === "terminals"} disabled={terminalsDisabled} onclick={() => toggle("terminals")}
-        class="flex h-8 w-8 items-center justify-center rounded-md border border-transparent text-slate-300 hover:bg-slate-800 aria-expanded:border-emerald-500 aria-expanded:text-emerald-300 disabled:opacity-40 focus-visible:ring-2 focus-visible:ring-emerald-500" title="Select phase IN/OUT terminals.">
+        class="flex h-8 w-8 items-center justify-center rounded-md border border-transparent text-slate-300 hover:bg-slate-800 aria-expanded:border-emerald-500 aria-expanded:text-emerald-300 disabled:opacity-40 focus-visible:ring-2 focus-visible:ring-emerald-500" title="Select the driver end of each coil.">
         <Plug size={16} aria-hidden="true" />
       </button>
     {/if}
@@ -110,7 +110,7 @@
   {#if open === "terminals" && geometry && terminalTool && onStartTerminals}
     <div role="dialog" aria-label="Coil terminals" aria-modal="false" class={`${panelClass} ${showMotorControls ? 'max-sm:bottom-20' : ''}`} transition:fly={{ x: 16, duration: 140 }}>
       <header class="flex shrink-0 items-center justify-between border-b border-slate-700 px-3 py-2">
-        <h3 class="text-sm font-semibold">IN/OUT terminals</h3>
+        <h3 class="text-sm font-semibold">Coil ends</h3>
         <button type="button" aria-label="Close terminals panel" onclick={close} class="rounded p-1 text-slate-400 hover:bg-slate-800"><X size={16} aria-hidden="true" /></button>
       </header>
       <div class="min-h-0 overflow-y-auto overscroll-contain p-3">

@@ -113,7 +113,7 @@ export function assignCadTerminals(geometry: CadGeometry, coil: string, terminal
   if (!candidates.some((p) => sameTerminal(p, terminals.input)) || !candidates.some((p) => sameTerminal(p, terminals.output))) {
     throw new Error("Choose trace endpoints belonging to this coil.");
   }
-  if (sameTerminal(terminals.input, terminals.output)) throw new Error("IN and OUT must be different endpoints.");
+  if (sameTerminal(terminals.input, terminals.output)) throw new Error("The driver end and opposite end must be different endpoints.");
   const copy = (terminal: CadTerminal): CadTerminal => ({ position: { ...terminal.position }, layer: terminal.layer });
   return { ...geometry, coil_terminals: { ...geometry.coil_terminals, [coil]: { input: copy(terminals.input), output: copy(terminals.output) } } };
 }
