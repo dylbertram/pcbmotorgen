@@ -289,7 +289,6 @@
     {connected}
     {writeResult}
     {drcReady}
-    {drcLoading}
     {drcError}
     {overrideDrc}
     {zeroItemWrite}

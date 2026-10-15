@@ -353,7 +353,7 @@ export class CoilPreviewRenderer {
       ctx.globalAlpha = 1;
       ctx.strokeStyle = "#0f172a";
       ctx.lineWidth = 0.000025;
-      for (const ph of input.coils.phases) {
+      for (const ph of coils.phases) {
         if (!input.isPhaseVisible(ph.phase_idx) || !input.isLayerVisible(ph.layer_idx) || !input.isCoilLayerVisible(ph.phase_name, ph.layer_idx)) continue;
         for (const [vx, vy] of ph.via_positions ?? []) {
           const key = `${vx},${vy}`;

@@ -62,22 +62,17 @@ fn main() {
             }
         })
         .invoke_handler(tauri::generate_handler![
-            commands::physics::compute_config_derived,
-            commands::physics::validate_config,
             commands::physics::get_magnet_grades,
             commands::physics::compute_height_stack,
             commands::physics::generate_coils,
             commands::physics::evaluate_force_sweep,
             commands::physics::sample_b_field,
             commands::physics::travel_envelope,
-            commands::physics::compute_stackup,
-            commands::physics::compute_power_budget,
             commands::physics::compute_friction,
             commands::physics::analyze_drive,
             commands::kicad::connect_kicad,
             commands::kicad::write_coils_to_board,
             commands::kicad::write_sensor_to_board,
-            commands::kicad::ping_kicad,
             commands::kicad::get_board_diagnostics,
             commands::kicad::validate_write_preconditions,
             commands::kicad::preview_coils,

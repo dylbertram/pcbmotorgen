@@ -5,13 +5,10 @@
 
 import { describe, expect, it } from "vitest";
 import {
-  mockConfigDerived,
   mockCoils,
   mockForceSweep,
   mockHeightStack,
-  mockPowerBudget,
   mockFriction,
-  mockStackup,
   mockBoardDiagnostics,
   mockPreviewCoils,
   mockDxfExportResult,
@@ -66,18 +63,6 @@ function makeConfig(overrides: Partial<LinearMotorConfig> = {}): LinearMotorConf
     ...overrides,
   };
 }
-
-describe("mockConfigDerived", () => {
-  it("derives the same geometry the real backend reports", () => {
-    const c = makeConfig();
-    const d = mockConfigDerived(c);
-    expect(d.pole_pitch_m).toBe(c.magnet_pitch_m);
-    expect(d.magnet_array_span_m).toBe(c.magnet_count * c.magnet_pitch_m);
-    expect(d.travel_m).toBeCloseTo(c.active_area_length_m - c.magnet_count * c.magnet_pitch_m);
-    expect(d.min_via_pad_m).toBe(c.min_via_drill_m + 2 * c.min_via_annular_ring_m);
-    expect(d.minimum_drive_force_n).toBe(c.friction_n * 1.3);
-  });
-});
 
 describe("mockMagnetGrades", () => {
   it("mirrors the static TS grade catalog in wire shape", () => {
@@ -236,15 +221,6 @@ describe("mockFriction", () => {
   });
 });
 
-describe("mockPowerBudget", () => {
-  it("keeps efficiency in the 2–15% band", () => {
-    const p = mockPowerBudget(makeConfig());
-    expect(p.efficiency_pct).toBeGreaterThanOrEqual(2);
-    expect(p.efficiency_pct).toBeLessThanOrEqual(15);
-    expect(p.burst_power_w).toBeGreaterThan(p.continuous_power_w);
-  });
-});
-
 describe("mockHeightStack", () => {
   it("sums the full stack including tolerance", () => {
     const c = makeConfig();
@@ -253,15 +229,6 @@ describe("mockHeightStack", () => {
       h.pcb_thickness_m + h.cu_protrusion_m + h.solder_mask_m + h.air_gap_m +
         h.magnet_height_m + h.tolerance_m,
     );
-  });
-});
-
-describe("mockStackup", () => {
-  it("mirrors the layer count in its arrays", () => {
-    const s = mockStackup(makeConfig({ num_layers: 6 }));
-    expect(s.layer_count).toBe(6);
-    expect(s.trace_widths_m).toHaveLength(6);
-    expect(s.cu_thickness_m).toHaveLength(6);
   });
 });
 
@@ -281,7 +248,7 @@ describe("mockPreviewCoils", () => {
     expect(p.num_layers).toBe(2);
     expect(p.layers).toHaveLength(2);
     const segsPerLayer = Math.max(2, 4 * 2) * 2 - 1; // 15
-    expect(p.total_tracks).toBe(15 * 3 * 2);
+    expect(p.total_tracks).toBe(segsPerLayer * 3 * 2);
     expect(p.total_vias).toBe(0);
     expect(p.pattern_id).toBe(c.routing_pattern);
   });

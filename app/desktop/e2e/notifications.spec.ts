@@ -21,6 +21,9 @@ test.beforeEach(async ({ page }) => {
   await gotoDesignApp(page);
   await page.mouse.move(0, 0);
   await page.clock.install();
+  // Freeze time so the real seconds spent on assertions never count toward
+  // the 4 s timeout; tests advance it explicitly with runFor.
+  await page.clock.pauseAt(Date.now() + 1000);
 });
 
 async function exportDxf(page: Page) {

@@ -401,13 +401,10 @@ mod tests {
         RoutingResult {
             format_version: pcbmotorgen_routing::model::FORMAT_VERSION,
             segments,
-            curves: Vec::new(),
             vias,
-            pole_regions: Vec::new(),
-            leg_grid: None,
-            phase_bands: Vec::new(),
             io_pads: Vec::new(),
             io_traces: Vec::new(),
+            ..RoutingResult::default()
         }
     }
 
@@ -566,13 +563,10 @@ mod tests {
         RoutingResult {
             format_version: pcbmotorgen_routing::model::FORMAT_VERSION,
             segments,
-            curves: Vec::new(),
             vias,
-            pole_regions: Vec::new(),
-            leg_grid: None,
-            phase_bands: Vec::new(),
             io_pads,
             io_traces,
+            ..RoutingResult::default()
         }
     }
 

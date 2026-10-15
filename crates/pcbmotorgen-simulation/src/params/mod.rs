@@ -11,26 +11,20 @@
 //! ## Module layout
 //! - [`validation`](self::validation) — `SimulationInput::new` / `validate`
 //! - [`derived`](self::derived) — derived-geometry accessors
-//! - [`stackup_result`] — `StackupResult`
 //! - [`height_stack_result`] — `HeightStackResult`
 //! - [`friction_budget`] — `FrictionBudget`
-//! - [`power_budget`] — `PowerBudget`
 
 use serde::{Deserialize, Serialize};
 
 mod derived;
 mod friction_budget;
 mod height_stack_result;
-mod power_budget;
 mod phase_band;
-mod stackup_result;
 mod validation;
 
 pub use friction_budget::FrictionBudget;
 pub use height_stack_result::HeightStackResult;
 pub use phase_band::{phase_bands_from_routing, PhaseBandPosition};
-pub use power_budget::PowerBudget;
-pub use stackup_result::StackupResult;
 
 /// Safety margin for minimum drive force calculation.
 pub(crate) const SAFETY_MARGIN: f64 = 1.3;
@@ -109,9 +103,7 @@ pub struct SimulationInput {
     pub spacing_ratio: f64,
 
     // --- Drive electronics ---
-    /// Peak phase current [A]. The power model derives
-    /// `I_rms = I_peak/√2` from this for continuous (thermal) loss;
-    /// burst loss and capacitor sizing remain peak-referenced.
+    /// Peak phase current [A].
     pub max_current_a: f64,
     /// Drive electronics supply voltage [V].
     pub supply_voltage_v: f64,

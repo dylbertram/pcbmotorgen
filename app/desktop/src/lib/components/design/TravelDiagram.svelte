@@ -22,7 +22,6 @@
   import type { ConfigStore } from "../../stores/config.svelte";
   import type { MotionStore } from "../../stores/motion.svelte";
   import { stripBoundsDomainMm, type TraceMeasure } from "../../previewGeometry";
-  import { ISO_Z_EXAG } from "../../geometry";
   import MoverPositionControls from "./MoverPositionControls.svelte";
   import TravelIsoView from "./TravelIsoView.svelte";
   import TravelStackupView from "./TravelStackupView.svelte";
@@ -38,9 +37,6 @@
      *  the coil canvas draws. Null until the first payload arrives. */
     measuredTrace?: TraceMeasure | null;
   } = $props();
-
-  /** Vertical exaggeration of the iso view — single-sourced in lib/geometry. */
-  const Z_EXAG = ISO_Z_EXAG;
 
   let invalid = $derived(config.travel_mm <= 0);
 

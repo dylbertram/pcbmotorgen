@@ -1,104 +1,13 @@
-//! Physics / simulation command handlers: config derived + validation, magnet
-//! grades, height stack, coil generation, force sweep, stackup, power budget,
-//! friction, and B-field grid sampling.
+//! Physics / simulation command handlers: magnet grades, height stack, coil
+//! generation, force sweep, friction, driver suitability, B-field grid
+//! sampling, and the travel envelope.
 
 use crate::ipc::*;
 
 use pcbmotorgen_simulation::magnetic::{
     CommutationMode as CoreCommutationMode, ForceEvaluator, MagnetArray,
 };
-use pcbmotorgen_simulation::stackup::{FrictionEstimator, HeightStackCalculator, PowerEstimator};
-
-// ===========================================================================
-// compute_config_derived — REAL (core derived methods)
-// ===========================================================================
-
-/// Compute read-only derived geometry values (travel, magnet_array_span,
-/// pole_pitch, phase_band_pitch, magnet_gap, min_via_pad,
-/// acceleration/min-drive force).
-///
-/// This calls the **real** `pcbmotorgen `config::LinearMotorConfig``
-/// derived methods — not a stub. The core's math is the authoritative source.
-#[tauri::command]
-pub async fn compute_config_derived(
-    config: LinearMotorConfigIpc,
-) -> Result<ConfigDerivedIpc, String> {
-    let core = config.to_core();
-    tauri::async_runtime::spawn_blocking(move || Ok(ConfigDerivedIpc::from_core(&core)))
-        .await
-        .map_err(|e| format!("config_derived worker failed: {e}"))?
-}
-
-// ===========================================================================
-// validate_config — REAL (core validate())
-// ===========================================================================
-
-/// Validate the config using the core's full validation logic (mirrors
-/// Python `_validate_base` + `_validate_linear`). Returns errors/warnings.
-#[tauri::command]
-pub async fn validate_config(
-    config: LinearMotorConfigIpc,
-) -> Result<ValidationResultIpc, String> {
-    let core = config.to_core();
-    tauri::async_runtime::spawn_blocking(move || {
-        let mut errors = Vec::new();
-        let mut warnings = Vec::new();
-        match core.validate() {
-            Ok(()) => {}
-            Err(e) => errors.push(e.to_string()),
-        }
-        // Extra UI-level warning: travel getting small.
-        let travel = core.travel_m();
-        if travel <= 0.0 {
-            errors.push(format!(
-                "Travel is zero or negative ({:.1} mm) — active_area_length must exceed \
-                 the magnet array span",
-                travel * 1e3
-            ));
-        } else if travel < 5e-3 {
-            warnings.push(format!(
-                "Travel is very small ({:.1} mm) — consider a longer active area",
-                travel * 1e3
-            ));
-        }
-        let valid = errors.is_empty();
-        let derived = DerivedValuesIpc {
-            magnet_array_span_mm: core.magnet_array_span_m() * 1e3,
-            travel_mm: core.travel_m() * 1e3,
-            pole_pitch_mm: core.pole_pitch_m() * 1e3,
-            magnet_gap_mm: core.magnet_gap_m() * 1e3,
-        };
-        Ok(ValidationResultIpc {
-            valid,
-            errors,
-            warnings,
-            derived,
-        })
-    })
-    .await
-    .map_err(|e| format!("validate_config worker failed: {e}"))?
-}
-
-/// Validation result (errors/warnings + derived values in mm for display).
-/// This is a bonus command not yet called by the frontend but useful for
-/// pre-flight checks.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub struct ValidationResultIpc {
-    pub valid: bool,
-    pub errors: Vec<String>,
-    pub warnings: Vec<String>,
-    pub derived: DerivedValuesIpc,
-}
-
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub struct DerivedValuesIpc {
-    pub magnet_array_span_mm: f64,
-    pub travel_mm: f64,
-    pub pole_pitch_mm: f64,
-    pub magnet_gap_mm: f64,
-}
+use pcbmotorgen_simulation::stackup::{FrictionEstimator, HeightStackCalculator};
 
 // ===========================================================================
 // get_magnet_grades — REAL (core static table)
@@ -263,76 +172,6 @@ pub async fn evaluate_force_sweep(
     })
     .await
     .map_err(|e| format!("force_sweep worker failed: {e}"))?
-}
-
-// ===========================================================================
-// compute_stackup — STUB (no core StackupCalculator exists)
-// ===========================================================================
-
-/// Compute the PCB stackup recommendation (trace widths, copper thicknesses,
-/// via grid).
-///
-/// **STUB**: No core `StackupCalculator` or `LayerOptimizer` exists in
-/// `pcbmotorgen_simulation::stackup`. The core `StackupResult` struct is used as an
-/// *input* to `PowerEstimator::estimate()`, not produced by a calculator.
-/// This returns a plausible per-layer allocation (outer layers thinner, inner
-/// layers thicker) ported from the frontend mock.
-#[tauri::command]
-pub async fn compute_stackup(config: LinearMotorConfigIpc) -> Result<StackupResultIpc, String> {
-    let cfg = config.clone();
-    tauri::async_runtime::spawn_blocking(move || {
-        let lc = cfg.num_layers as usize;
-        let trace_widths: Vec<f64> = (0..lc)
-            .map(|i| 0.2e-3 * (1.0 + (i as f64 - (lc as f64 - 1.0) / 2.0).abs() * 0.05))
-            .collect();
-        let cu_thicknesses: Vec<f64> = (0..lc)
-            .map(|i| if i == 0 || i == lc - 1 { 35e-6 } else { 70e-6 })
-            .collect();
-        let est_force = 0.4 * cfg.magnet_remanence_t * cfg.max_current_a * cfg.num_layers as f64;
-        Ok(StackupResultIpc {
-            layer_count: cfg.num_layers,
-            trace_widths_m: trace_widths,
-            cu_thickness_m: cu_thicknesses,
-            via_drill_m: cfg.min_via_drill_m,
-            via_annular_ring_m: cfg.min_via_annular_ring_m,
-            via_grid_rows: 2,
-            via_grid_cols: 4,
-            estimated_force_n: est_force,
-            estimated_dc_resistance_ohm: 1.2,
-            notes: vec!["Stub stackup — no core StackupCalculator exists yet".into()],
-        })
-    })
-    .await
-    .map_err(|e| format!("stackup worker failed: {e}"))?
-}
-
-// ===========================================================================
-// compute_power_budget — REAL (core PowerEstimator)
-// ===========================================================================
-
-/// Estimate phase resistance, continuous/burst power, and thermal rise.
-///
-/// Uses the real `pcbmotorgen_simulation::stackup::PowerEstimator` with default
-/// parameters (2 layers per phase, 2 oz copper approximation when no stackup
-/// is provided).
-#[tauri::command]
-pub async fn compute_power_budget(
-    config: LinearMotorConfigIpc,
-) -> Result<PowerBudgetIpc, String> {
-    let core = config.to_core();
-    tauri::async_runtime::spawn_blocking(move || {
-        let pb = PowerEstimator::default().estimate(&core.to_simulation(), None);
-        Ok(PowerBudgetIpc {
-            phase_resistance_ohm: pb.phase_resistance_ohm,
-            continuous_power_w: pb.continuous_power_w,
-            burst_power_w: pb.burst_power_w,
-            temperature_rise_c: pb.temperature_rise_c,
-            capacitor_required_uf: pb.capacitor_required_uf,
-            efficiency_pct: pb.efficiency_pct,
-        })
-    })
-    .await
-    .map_err(|e| format!("power_budget worker failed: {e}"))?
 }
 
 // ===========================================================================

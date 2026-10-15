@@ -2,8 +2,7 @@
  * Native file-system helpers for export features.
  *
  * Currently one primitive: "save string content via native dialog".
- * Extracted from DxfPanel so future export targets (JSON, SVG) share the
- * same save flow.
+ * Every export target shares this save flow.
  */
 
 import { save } from "@tauri-apps/plugin-dialog";

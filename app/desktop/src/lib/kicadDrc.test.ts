@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import example from "../../e2e/fixtures/pcbway.kicad_dru?raw";
 import { describe, expect, it } from "vitest";
 import { DEFAULT_RULES } from "./preferences";
 import { importKicadDrc } from "./kicadDrc";
@@ -7,7 +7,6 @@ const load = (body: string) => importKicadDrc(`(version 1)\n${body}`, DEFAULT_RU
 
 describe("KiCad DRC import", () => {
   it("imports the active PCBWay rules, not commented alternatives or pad rules", () => {
-    const example = readFileSync(new URL("../../e2e/fixtures/pcbway.kicad_dru", import.meta.url), "utf8");
     const result = importKicadDrc(example, DEFAULT_RULES);
     expect(result.rules).toEqual({
       min_trace_mm: 0.127,

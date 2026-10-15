@@ -61,16 +61,3 @@ export interface LinearMotorConfig {
   name: string | null;
 }
 
-/** Derived geometry values (compute_config_derived). */
-export interface ConfigDerived {
-  pole_pitch_m: number;
-  magnet_array_span_m: number;
-  travel_m: number;
-  /** Vernier-adjusted phase-band pitch: (pole_pitch/phases) × spacing_ratio. */
-  phase_band_pitch_m: number;
-  magnet_gap_m: number;
-  min_via_pad_m: number;
-  acceleration_force_n: number;
-  minimum_drive_force_n: number;
-  active_length_m: number;
-}

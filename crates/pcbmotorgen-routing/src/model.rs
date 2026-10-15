@@ -234,17 +234,6 @@ impl RoutingResult {
             && self.io_pads.is_empty()
             && self.io_traces.is_empty()
     }
-
-    /// Total number of geometric elements (segments, curves, vias, IO pads,
-    /// and IO traces).
-    pub fn element_count(&self) -> usize {
-        self.segments.len()
-            + self.curves.len()
-            + self.splines.len()
-            + self.vias.len()
-            + self.io_pads.len()
-            + self.io_traces.len()
-    }
 }
 
 #[cfg(test)]

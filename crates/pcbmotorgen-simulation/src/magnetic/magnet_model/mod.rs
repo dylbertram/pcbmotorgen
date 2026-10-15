@@ -70,17 +70,6 @@ impl<'a> MagnetArray<'a> {
             .collect()
     }
 
-    /// Z-polarisation of main magnets, shape `(magnet_count, 3)` [T].
-    pub fn polarizations_t(&self) -> Vec<[f64; 3]> {
-        let br = self.config.magnet_remanence_t;
-        (0..self.config.magnet_count)
-            .map(|k| {
-                let pol_z = br * if k % 2 == 0 { 1.0 } else { -1.0 };
-                [0.0, 0.0, pol_z]
-            })
-            .collect()
-    }
-
     // ------------------------------------------------------------------
     // B-field sampling
     // ------------------------------------------------------------------

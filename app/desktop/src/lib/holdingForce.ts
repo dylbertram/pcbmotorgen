@@ -90,14 +90,14 @@ export function holdingForceAtPhase(
 }
 
 /** Stroke palette per phase (cycles if phases > colours). */
-export const PHASE_STROKES = [
+const PHASE_STROKES = [
   "stroke-emerald-400",
   "stroke-sky-400",
   "stroke-violet-400",
 ] as const;
 
 /** Marker-dot fill per phase (matches PHASE_STROKES). */
-export const PHASE_FILLS = ["fill-emerald-300", "fill-sky-300", "fill-violet-300"] as const;
+const PHASE_FILLS = ["fill-emerald-300", "fill-sky-300", "fill-violet-300"] as const;
 
 export function phaseStroke(phaseIdx: number): string {
   return PHASE_STROKES[phaseIdx % PHASE_STROKES.length];

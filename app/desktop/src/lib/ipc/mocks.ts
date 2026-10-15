@@ -11,7 +11,6 @@ import type {
   DriveAnalysis,
   DriveSettings,
   LinearMotorConfig,
-  ConfigDerived,
   CoilArcDto,
   CoilPathDto,
   CoilSegmentDto,
@@ -20,16 +19,13 @@ import type {
   RoutingDimensionsDto,
   PhaseBandWidthDto,
   ForceSweepResult,
-  StackupResultDto,
   HeightStackResultDto,
   FrictionBudgetDto,
-  PowerBudgetDto,
   BoardDiagnostics,
   PreconditionWarning,
   CoilPreview,
   KicadConnection,
   KicadWriteResult,
-  KicadPingResult,
   BFieldGridDto,
   DxfExportResult,
   TravelEnvelopeDto,
@@ -62,10 +58,6 @@ const COPPER_PROTRUSION_1OZ_M = 35e-6;
 const SOLDER_MASK_M = 20e-6;
 /** Assembly tolerance allowance in the height stack (m). */
 const TOLERANCE_M = 0.1e-3;
-/** Nominal trace width for the mock stackup/spec (m). */
-const NOMINAL_TRACE_W_M = 0.2e-3;
-/** Copper foil thickness for inner layers in the mock stackup (m). */
-const INNER_CU_THICKNESS_M = 70e-6;
 /** Copper resistivity (Ω·m). */
 const RHO = 1.72e-8;
 
@@ -89,24 +81,6 @@ const REF_SLOT_WIDTH_M = 1.1662e-4;
  */
 export function mockMagnetGrades(): MagnetGrade[] {
   return Object.values(MAGNET_GRADES).map((g) => ({ ...g }));
-}
-
-export function mockConfigDerived(c: LinearMotorConfig): ConfigDerived {
-  const pole_pitch_m = c.magnet_pitch_m;
-  const magnet_array_span_m = c.magnet_count * c.magnet_pitch_m;
-  const travel_m = c.active_area_length_m - magnet_array_span_m;
-  const phase_band_pitch_m = (pole_pitch_m / c.phases) * c.spacing_ratio;
-  return {
-    pole_pitch_m,
-    magnet_array_span_m,
-    travel_m,
-    phase_band_pitch_m,
-    magnet_gap_m: c.magnet_gap_m,
-    min_via_pad_m: c.min_via_drill_m + 2 * c.min_via_annular_ring_m,
-    acceleration_force_n: c.carriage_mass_kg * c.max_accel_m_s2,
-    minimum_drive_force_n: c.friction_n * FRICTION_SAFETY_K,
-    active_length_m: c.active_area_length_m,
-  };
 }
 
 /**
@@ -357,23 +331,6 @@ export function mockHeightStack(c: LinearMotorConfig): HeightStackResultDto {
   };
 }
 
-export function mockPowerBudget(c: LinearMotorConfig): PowerBudgetDto {
-  // Crude I²R estimate based on coil length.
-  const coilLen = c.active_area_length_m * c.board_width_m * c.num_layers * 2;
-  const traceArea = COPPER_PROTRUSION_1OZ_M * NOMINAL_TRACE_W_M; // 1oz, 0.2mm trace
-  const r = (RHO * coilLen) / traceArea;
-  const cont = c.max_current_a ** 2 * r * c.phases;
-  const burst = (c.max_current_a * 1.5) ** 2 * r * c.phases;
-  return {
-    phase_resistance_ohm: r,
-    continuous_power_w: cont,
-    burst_power_w: burst,
-    temperature_rise_c: Math.min(c.max_temperature_rise_c, cont * 4),
-    capacitor_required_uf: c.capacitor_bank_uf,
-    efficiency_pct: Math.max(2, Math.min(15, (0.25 * 0.1) / (c.supply_voltage_v * c.max_current_a) * 100)),
-  };
-}
-
 export function mockFriction(c: LinearMotorConfig): FrictionBudgetDto {
   const total = c.friction_n;
   return {
@@ -383,28 +340,6 @@ export function mockFriction(c: LinearMotorConfig): FrictionBudgetDto {
     cogging_n: 0,
     total_n: total,
     minimum_drive_force_n: total * FRICTION_SAFETY_K,
-  };
-}
-
-export function mockStackup(c: LinearMotorConfig): StackupResultDto {
-  const lc = c.num_layers;
-  const traceW = Array.from({ length: lc }, (_, i) =>
-    NOMINAL_TRACE_W_M * (1 + Math.abs(i - (lc - 1) / 2) * 0.05),
-  );
-  const cuT = Array.from({ length: lc }, (_, i) =>
-    i === 0 || i === lc - 1 ? COPPER_PROTRUSION_1OZ_M : INNER_CU_THICKNESS_M,
-  );
-  return {
-    layer_count: lc,
-    trace_widths_m: traceW,
-    cu_thickness_m: cuT,
-    via_drill_m: c.min_via_drill_m,
-    via_annular_ring_m: c.min_via_annular_ring_m,
-    via_grid_rows: 2,
-    via_grid_cols: 4,
-    estimated_force_n: FORCE_BASELINE_K * c.magnet_remanence_t * c.max_current_a * lc,
-    estimated_dc_resistance_ohm: 1.2,
-    notes: ["Mock stackup — backend not connected"],
   };
 }
 
@@ -434,11 +369,6 @@ export function mockBoardDiagnostics(): BoardDiagnostics {
 /** Mock KiCad connection state — no board is open in dev mode. */
 export function mockKicadConnection(): KicadConnection {
   return { connected: false, board_name: "(not connected)", copper_layers: 0 };
-}
-
-/** Mock KiCad ping — the backend (and KiCad) are absent in dev mode. */
-export function mockKicadPing(): KicadPingResult {
-  return { ok: false, version: "" };
 }
 
 /** Mock write result — surfacing that no backend exists. */

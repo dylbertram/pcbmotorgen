@@ -49,7 +49,7 @@
     onComplete: (coilType: "motor" | "sensor") => void;
   } = $props();
 
-  let coilType = $state(untrack(() => initialCoilType));
+  const coilType = untrack(() => initialCoilType);
   let existingGeometry = $derived(coilType === "sensor" ? sensor.cadGeometry : projects.cadGeometry);
   let unitsToMm = $state("1");
   let zToleranceDraft = $state("0.05");
@@ -341,12 +341,6 @@
 
   function assignSourceLayer(name: string, coil: string): void {
     sourceLayerCoils = { ...sourceLayerCoils, [name]: coil };
-    schedulePreviewRefresh();
-  }
-
-  function updateCoilType(event: Event): void {
-    coilType = (event.currentTarget as HTMLSelectElement).value as "motor" | "sensor";
-    selectedLayersOverride = null;
     schedulePreviewRefresh();
   }
 

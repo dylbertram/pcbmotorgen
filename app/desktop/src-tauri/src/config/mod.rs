@@ -4,7 +4,7 @@
 //! its validation error [`ConfigError`] and the orchestration/derived-method
 //! helpers. All physics and shared result types have moved into the leaf
 //! crates — [`SimulationInput`](pcbmotorgen_simulation::params::SimulationInput),
-//! `StackupResult`/`HeightStackResult`/`FrictionBudget`/`PowerBudget` live in
+//! `HeightStackResult`/`FrictionBudget` live in
 //! `pcbmotorgen_simulation::params`; `RoutingContext` lives in
 //! `pcbmotorgen_routing` and `DesignRules` in `pcbmotorgen-dfm` (kata 0rgs).
 //! The parent delegates derived arithmetic to the
@@ -246,10 +246,8 @@ impl std::error::Error for ConfigError {}
 #[cfg(test)]
 mod tests {
     use super::*;
-    use pcbmotorgen_simulation::units::{mm, mils_to_m, oz_to_m};
-    use pcbmotorgen_simulation::params::{
-        FrictionBudget, HeightStackResult, PowerBudget, StackupResult,
-    };
+    use pcbmotorgen_simulation::units::{mm, mils_to_m};
+    use pcbmotorgen_simulation::params::{FrictionBudget, HeightStackResult};
 
     fn default_config() -> LinearMotorConfig {
         LinearMotorConfig {
@@ -308,74 +306,6 @@ mod tests {
     #[test]
     fn test_default_max_layers_even() {
         assert!(LinearMotorConfig::default().max_layers % 2 == 0);
-    }
-
-    // --- Leaf-crate result types (StackupResult / HeightStackResult /
-    // FrictionBudget / PowerBudget) ---
-
-    fn base_4layer() -> StackupResult {
-        StackupResult {
-            layer_count: 4,
-            trace_widths_m: vec![mm(0.15), mm(0.25), mm(0.25), mm(0.15)],
-            cu_thickness_m: vec![oz_to_m(1.0), oz_to_m(2.0), oz_to_m(2.0), oz_to_m(1.0)],
-            via_drill_m: mm(0.2),
-            via_annular_ring_m: mm(0.1),
-            via_grid_rows: 2,
-            via_grid_cols: 3,
-            estimated_force_n: 0.42,
-            estimated_dc_resistance_ohm: 3.1,
-            notes: vec!["4-layer stackup chosen by test fixture".into()],
-        }
-    }
-
-    #[test]
-    fn test_stackup_4layer_validates() {
-        assert!(base_4layer().validate().is_ok());
-    }
-
-    #[test]
-    fn test_stackup_odd_layer_count_raises() {
-        let mut s = base_4layer();
-        s.layer_count = 3;
-        assert!(s.validate().is_err());
-    }
-
-    #[test]
-    fn test_stackup_trace_width_count_mismatch() {
-        let mut s = base_4layer();
-        s.trace_widths_m = vec![mm(0.15), mm(0.25), mm(0.15)];
-        assert!(s.validate().is_err());
-    }
-
-    #[test]
-    fn test_stackup_outer_layer_ids() {
-        let s = base_4layer();
-        assert_eq!(s.outer_layer_ids(), (0, 3));
-    }
-
-    #[test]
-    fn test_stackup_inner_layer_ids() {
-        let s = base_4layer();
-        assert_eq!(s.inner_layer_ids(), vec![1, 2]);
-    }
-
-    #[test]
-    fn test_stackup_via_pad() {
-        let s = base_4layer();
-        let expected = mm(0.2) + 2.0 * mm(0.1);
-        assert!((s.via_pad_m() - expected).abs() < 1e-12);
-    }
-
-    #[test]
-    fn test_stackup_via_grid_count() {
-        assert_eq!(base_4layer().via_grid_count(), 6);
-    }
-
-    #[test]
-    fn test_stackup_summary() {
-        let s = base_4layer();
-        let summary = s.summary();
-        assert!(summary.contains("4 layers"));
     }
 
     // --- HeightStackResult ---
@@ -444,23 +374,6 @@ mod tests {
             cogging_n: 0.0,
         };
         assert!((fb.minimum_drive_force_n() - 0.13).abs() < 1e-12);
-    }
-
-    // --- PowerBudget ---
-
-    #[test]
-    fn test_power_budget_summary() {
-        let pb = PowerBudget {
-            phase_resistance_ohm: 3.1,
-            continuous_power_w: 0.5,
-            burst_power_w: 1.0,
-            temperature_rise_c: 7.5,
-            capacitor_required_uf: 500.0,
-            efficiency_pct: 5.0,
-        };
-        let s = pb.summary();
-        assert!(s.contains("3.100"));
-        assert!(s.contains("500"));
     }
 
     // --- Serde round-trip ---

@@ -1,5 +1,5 @@
-//! IPC wire format for the motor configuration (`LinearMotorConfigIpc`) and
-//! derived geometry (`ConfigDerivedIpc`), plus core↔IPC converters.
+//! IPC wire format for the motor configuration (`LinearMotorConfigIpc`) plus
+//! core↔IPC converters.
 
 use serde::{Deserialize, Serialize};
 
@@ -196,53 +196,6 @@ impl From<&CoreConfig> for LinearMotorConfigIpc {
             n_positions: 50,
             meshing: 20,
             name: c.name.clone(),
-        }
-    }
-}
-
-// ===========================================================================
-// ConfigDerived (compute_config_derived)
-// ===========================================================================
-
-/// Derived geometry values — READ-ONLY outputs (PRODUCT_GOALS.md §3.A).
-///
-/// Mirrors `types.ts` `ConfigDerived` exactly.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub struct ConfigDerivedIpc {
-    pub pole_pitch_m: f64,
-    /// Mover magnet-array span [m]: magnet_count × pole pitch (see glossary;
-    /// end-to-end physical span is one inter-magnet gap shorter).
-    pub magnet_array_span_m: f64,
-    pub travel_m: f64,
-    /// Vernier-adjusted phase-band pitch [m]: (pole_pitch / phases) × spacing_ratio.
-    pub phase_band_pitch_m: f64,
-    /// Vernier rest offset [m] — phase offset between a coil center and the
-    /// nearest pole center. Zero for 1:1 spacing, positive for Vernier ratios.
-    pub rest_offset_m: f64,
-    pub magnet_gap_m: f64,
-    pub min_via_pad_m: f64,
-    pub acceleration_force_n: f64,
-    pub minimum_drive_force_n: f64,
-    pub active_length_m: f64,
-}
-
-impl ConfigDerivedIpc {
-    /// Build from the **core** config using its real derived methods.
-    /// This is a REAL implementation (not a stub) — the core's
-    /// `LinearMotorConfig` carries all the math.
-    pub fn from_core(c: &CoreConfig) -> Self {
-        Self {
-            pole_pitch_m: c.pole_pitch_m(),
-            magnet_array_span_m: c.magnet_array_span_m(),
-            travel_m: c.travel_m(),
-            phase_band_pitch_m: c.phase_band_pitch_m(),
-            rest_offset_m: c.rest_offset_m(),
-            magnet_gap_m: c.magnet_gap_m(),
-            min_via_pad_m: c.min_via_pad_m(),
-            acceleration_force_n: c.acceleration_force_n(),
-            minimum_drive_force_n: c.minimum_drive_force_n(),
-            active_length_m: c.active_length_m(),
         }
     }
 }

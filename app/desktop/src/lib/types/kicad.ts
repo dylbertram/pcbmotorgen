@@ -39,11 +39,6 @@ export interface KicadWriteResult {
   commit_id: string;
 }
 
-export interface KicadPingResult {
-  ok: boolean;
-  version: string;
-}
-
 /** Live snapshot of the open KiCad board (get_board_diagnostics). */
 export interface BoardDiagnostics {
   /** File name of the open board, e.g. `"board.kicad_pcb"`. */

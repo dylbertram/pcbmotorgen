@@ -95,12 +95,11 @@ test("the side rail docks the Layers and Display panels without resizing the vie
   await display.getByRole("radio", { name: "Centerlines" }).check();
   await display.getByRole("button", { name: "Close display panel" }).click();
   await expect(display).toHaveCount(0);
-  // The toolbar has the slate-900 backing and meets the header: its top lines
-  // up with the drawing top, with no gap.
-  // The toolbar is backed with the same slate-900 as the modal; the zoom
-  // buttons below are the only bare dock.
-  const toolbarBg = await toolbar.locator("..").evaluate((el) => getComputedStyle(el).backgroundColor);
-  expect(toolbarBg).toBe(await dialog.evaluate((el) => getComputedStyle(el).backgroundColor));
+  // The toolbar's button row carries the same slate-900 as the header; the
+  // modal and the status hint below the row stay transparent over the
+  // drawing, and the zoom buttons are the only bare dock.
+  const toolbarBg = await toolbar.locator("xpath=./div[1]").evaluate((el) => getComputedStyle(el).backgroundColor);
+  expect(toolbarBg).toBe(await dialog.locator("header").first().evaluate((el) => getComputedStyle(el).backgroundColor));
   expect(toolbarBg).not.toBe("rgba(0, 0, 0, 0)");
   // The toolbar's top/bottom padding matches the rail's horizontal padding
   // around its buttons.
@@ -203,9 +202,10 @@ test("the modal toolbar and zoom controls are bare, the position box is outlined
     for (const bare of [toolbar, toolbar.locator(".."), zoom, zoom.locator("..")]) {
       expect(await bare.evaluate((el) => getComputedStyle(el).borderTopWidth)).toBe("0px");
     }
-    // Only the zoom dock is bare; the toolbar keeps its slate-900 backing.
+    // Only the zoom dock is bare; the toolbar's button row keeps its
+    // slate-900 backing.
     expect(await zoom.locator("..").evaluate((el) => getComputedStyle(el).backgroundColor)).toBe("rgba(0, 0, 0, 0)");
-    expect(await toolbar.locator("..").evaluate((el) => getComputedStyle(el).backgroundColor)).not.toBe("rgba(0, 0, 0, 0)");
+    expect(await toolbar.locator("xpath=./div[1]").evaluate((el) => getComputedStyle(el).backgroundColor)).not.toBe("rgba(0, 0, 0, 0)");
     // The position box has its outline and backing back.
     expect(await positionBox.evaluate((el) => getComputedStyle(el).borderTopWidth)).not.toBe("0px");
     expect(await positionBox.evaluate((el) => getComputedStyle(el).backgroundColor)).not.toBe("rgba(0, 0, 0, 0)");

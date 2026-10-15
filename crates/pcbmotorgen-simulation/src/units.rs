@@ -1,7 +1,6 @@
 //! Unit conversion helpers. All internal calculations use SI (metres, Tesla,
 //! Amperes, Ohms, Watts).
 
-use serde::{Deserialize, Serialize};
 
 // --- Physical constants ---
 
@@ -18,10 +17,6 @@ pub const CU_1OZ_M: f64 = 35.0e-6;
 pub fn mm(value: f64) -> f64 {
     value * 1e-3
 }
-/// Convert micrometres → metres.
-pub fn um(value: f64) -> f64 {
-    value * 1e-6
-}
 /// Convert mils (thou, 1/1000 inch) → metres.
 pub fn mils_to_m(value: f64) -> f64 {
     value * 25.4e-6
@@ -30,14 +25,6 @@ pub fn mils_to_m(value: f64) -> f64 {
 pub fn m_to_mm(value: f64) -> f64 {
     value * 1e3
 }
-/// Convert metres → micrometres.
-pub fn m_to_um(value: f64) -> f64 {
-    value * 1e6
-}
-/// Convert metres → mils.
-pub fn m_to_mils(value: f64) -> f64 {
-    value / 25.4e-6
-}
 
 // --- Magnetic flux density ---
 
@@ -45,29 +32,8 @@ pub fn m_to_mils(value: f64) -> f64 {
 pub fn mt_to_t(value: f64) -> f64 {
     value * 1e-3
 }
-/// Convert tesla → millitesla.
-pub fn t_to_mt(value: f64) -> f64 {
-    value * 1e3
-}
 
 // --- Copper weight / thickness ---
-
-/// Standard PCB copper weight preset.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CopperWeight {
-    pub oz: f64,
-    pub thickness_m: f64,
-    pub label: &'static str,
-}
-
-/// Standard copper weight presets (JLCPCB / PCBWay).
-pub const STANDARD_CU_WEIGHTS: &[CopperWeight] = &[
-    CopperWeight { oz: 0.5, thickness_m: 17.5e-6, label: "0.5 oz (17.5 µm)" },
-    CopperWeight { oz: 1.0, thickness_m: 35.0e-6, label: "1 oz (35 µm)" },
-    CopperWeight { oz: 2.0, thickness_m: 70.0e-6, label: "2 oz (70 µm)" },
-    CopperWeight { oz: 3.0, thickness_m: 105.0e-6, label: "3 oz (105 µm)" },
-    CopperWeight { oz: 4.0, thickness_m: 140.0e-6, label: "4 oz (140 µm)" },
-];
 
 /// Convert PCB copper weight (oz/ft²) → nominal thickness [m].
 pub fn oz_to_m(oz: f64) -> f64 {

@@ -13,6 +13,7 @@
 
 import { unionBounds, type ViewportBBox, type WorldTransform } from "./chart";
 import type {
+  CoilArcDto,
   CoilPathDto,
   CoilSegmentDto,
   PhaseCoilDto,
@@ -569,11 +570,6 @@ export interface BandWidthRow {
   status: BandWidthStatus;
 }
 
-/**
- * @deprecated use BandWidthRow
- */
-export type SlotWidthRow = BandWidthRow;
-
 function medianValues(values: number[]): number | null {
   if (values.length === 0) return null;
   const sorted = [...values].sort((a, b) => a - b);
@@ -592,7 +588,7 @@ export function medianActiveX(coil: PhaseCoilDto): number | null {
 }
 
 /** Median active-conductor y (start/end) of a phase coil, in metres. */
-export function medianActiveY(coil: PhaseCoilDto): number | null {
+function medianActiveY(coil: PhaseCoilDto): number | null {
   const ys: number[] = [];
   for (const seg of coil.segments) {
     if (!seg.is_active) continue;
@@ -653,7 +649,7 @@ export function computeBandWidthRows(
       status:
         maxM === null
           ? "no-limit"
-          : marginM >= -MARGIN_EPS
+          : (marginM ?? 0) >= -MARGIN_EPS
             ? "ok"
             : "over-budget",
     });
@@ -667,17 +663,6 @@ export function computeBandWidthRows(
     row.y += (i - (n - 1) / 2) * rowStrideM;
   });
   return rows;
-}
-
-/**
- * @deprecated use computeBandWidthRows
- */
-export function computeSlotWidthRows(
-  coils: CoilPathDto | null,
-  dimensions: Pick<RoutingDimensionsDto, "phase_band_widths"> | null | undefined,
-  rowStrideM = 0.001,
-): BandWidthRow[] {
-  return computeBandWidthRows(coils, dimensions, rowStrideM);
 }
 
 // ===========================================================================
@@ -835,7 +820,7 @@ export function computePoleRegionBounds(
 }
 
 /** World-space box the pole-pitch ruler occupies (camera-fit input). */
-export function polePitchRulerBounds(ruler: PolePitchRuler): ViewportBBox {
+function polePitchRulerBounds(ruler: PolePitchRuler): ViewportBBox {
   const padX = Math.max(ruler.pitchM * 0.1, 0.001);
   return {
     minX: ruler.x1 - padX,
@@ -846,7 +831,7 @@ export function polePitchRulerBounds(ruler: PolePitchRuler): ViewportBBox {
 }
 
 /** World-space box a band-width row occupies (camera-fit input). */
-export function bandWidthRowBounds(row: BandWidthRow): ViewportBBox {
+function bandWidthRowBounds(row: BandWidthRow): ViewportBBox {
   // Include the optional top-down limit too: the canvas draws it as a dashed
   // reference bracket so a generous phase band cannot be clipped at reset.
   const extentM = Math.max(row.bandM, row.maxM ?? 0);

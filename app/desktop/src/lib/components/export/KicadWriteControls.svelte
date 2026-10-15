@@ -7,7 +7,6 @@
     connected,
     writeResult,
     drcReady,
-    drcLoading,
     drcError,
     overrideDrc,
     zeroItemWrite,
@@ -25,7 +24,6 @@
     connected: boolean;
     writeResult: KicadWriteResult | null;
     drcReady: boolean;
-    drcLoading: boolean;
     drcError: string | null;
     overrideDrc: boolean;
     zeroItemWrite: boolean;

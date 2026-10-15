@@ -5,18 +5,13 @@
 //!
 //! | Command                       | Status        | Notes                                    |
 //! |-------------------------------|---------------|------------------------------------------|
-//! | `compute_config_derived`      | REAL          | Uses core `LinearMotorConfig` methods.  |
 //! | `get_magnet_grades`           | REAL          | Reads core `magnet_grades::MAGNET_GRADES`.|
 //! | `compute_height_stack`        | REAL          | Uses core `HeightStackCalculator`.       |
 //! | `generate_coils`              | REAL          | Resolves the selected routing pattern and returns geometry plus dimensions. |
 //! | `evaluate_force_sweep`        | REAL          | Uses core `ForceEvaluator` (Lorentz).    |
-//! | `compute_stackup`             | STUB          | No core `StackupCalculator` exists yet.  |
-//! | `compute_power_budget`        | REAL          | Uses core `PowerEstimator`.              |
 //! | `compute_friction`            | REAL          | Uses core `FrictionEstimator`.           |
-//! | `validate_config`             | REAL          | Delegates to core `validate()`.          |
 //! | `connect_kicad`               | REAL          | KiCad IPC: connect + query open board.   |
 //! | `write_coils_to_board`        | REAL          | KiCad IPC: generate + atomic commit.     |
-//! | `ping_kicad`                  | REAL          | KiCad IPC: connect + GetVersion.         |
 //! | `get_board_diagnostics`       | REAL          | KiCad IPC: live board snapshot.          |
 //! | `validate_write_preconditions`| REAL (pure)   | Config-vs-board rule check (no IPC).     |
 //! | `preview_coils`               | REAL (pure)   | Dry-run coil geometry preview (no IPC).  |

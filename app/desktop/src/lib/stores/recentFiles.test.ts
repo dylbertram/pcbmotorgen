@@ -178,7 +178,7 @@ describe("RecentFilesStore — prune/remove/clear", () => {
     await store.record("/gone.pmproj");
     await store.record("/live.pmproj");
     // Flip the disk verdict on "/gone.pmproj" after recording.
-    port.exists = (p) => p !== "/gone.pmproj";
+    port.exists = async (p) => p !== "/gone.pmproj";
 
     const missing = await store.pruneMissing();
     expect(missing).toEqual(["/gone.pmproj"]);

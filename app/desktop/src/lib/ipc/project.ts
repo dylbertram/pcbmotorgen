@@ -32,9 +32,6 @@ const PROJECT_FILE_FILTERS = [
   { name: "pcbmotorgen files", extensions: ["pmproj", "pmmotor", "pmsensor"] },
 ];
 
-/** Default artifact file name offered by the Save As dialog. */
-export const DEFAULT_PROJECT_FILE_NAME = "untitled.pmmotor";
-
 export function documentExtension(kind: DocumentKind): string {
   return kind === "motor" ? "pmmotor" : "pmsensor";
 }

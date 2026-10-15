@@ -119,7 +119,7 @@ export function renderInline(text: string): string {
         out += `<code class="md-link-ref">${escapeText(bare)}</code>`;
       }
       i += linkHere[0].length;
-    } else {
+    } else if (codeHere !== null) {
       out += `<code>${escapeText(codeHere[1])}</code>`;
       i += codeHere[0].length;
     }

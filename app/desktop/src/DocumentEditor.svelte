@@ -677,7 +677,7 @@
           sensor={sensorStore}
           initialCoilType={designType}
           onClose={() => (cadImportDialogOpen = false)}
-          onComplete={(coilType) => {
+          onComplete={() => {
              selectTab("design");
              cadImportDialogOpen = false;
           }}

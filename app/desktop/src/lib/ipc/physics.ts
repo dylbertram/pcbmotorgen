@@ -12,10 +12,8 @@ import type {
   LinearMotorConfig,
   CoilPathDto,
   ForceSweepResult,
-  StackupResultDto,
   HeightStackResultDto,
   FrictionBudgetDto,
-  PowerBudgetDto,
   BFieldGridDto,
   TravelEnvelopeDto,
   MagnetGrade,
@@ -28,9 +26,7 @@ import {
   mockCoils,
   mockForceSweep,
   mockHeightStack,
-  mockPowerBudget,
   mockFriction,
-  mockStackup,
   mockBFieldGrid,
   mockTravelEnvelope,
   mockMagnetGrades,
@@ -78,13 +74,6 @@ export async function computeHeightStack(
   return await invoke<HeightStackResultDto>("compute_height_stack", { config });
 }
 
-export async function computePowerBudget(
-  config: LinearMotorConfig,
-): Promise<PowerBudgetDto> {
-  if (!isTauriAvailable()) return mockPowerBudget(config);
-  return await invoke<PowerBudgetDto>("compute_power_budget", { config });
-}
-
 export async function computeFriction(
   config: LinearMotorConfig,
 ): Promise<FrictionBudgetDto> {
@@ -109,13 +98,6 @@ export async function analyzeDrive(
     thrustConstantNPerA: kf,
     cadGeometry,
   });
-}
-
-export async function computeStackup(
-  config: LinearMotorConfig,
-): Promise<StackupResultDto> {
-  if (!isTauriAvailable()) return mockStackup(config);
-  return await invoke<StackupResultDto>("compute_stackup", { config });
 }
 
 /**

@@ -167,9 +167,9 @@ fn generate_with_report(
 pub fn generate_coils_from_context(ctx: &RoutingContext, id: &str) -> Vec<PhaseCoil> {
     match generate_routing_result(ctx, id) {
         Ok(result) => routing_result_to_phase_coils(&result, id),
-        Err(e) => {
+        Err(_e) => {
             #[cfg(debug_assertions)]
-            eprintln!("routing generation failed: {e}");
+            eprintln!("routing generation failed: {_e}");
             Vec::new()
         }
     }

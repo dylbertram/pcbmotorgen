@@ -1,5 +1,5 @@
-//! IPC physics-result DTOs: B-field grid, force sweep, stackup, height stack,
-//! friction budget, and power budget.
+//! IPC physics-result DTOs: B-field grid, force sweep, height stack, friction
+//! budget, and travel envelope.
 
 use serde::{Deserialize, Serialize};
 
@@ -93,24 +93,8 @@ pub struct ForceSweepResultIpc {
 }
 
 // ===========================================================================
-// Stackup / height / power / friction (compute_*)
+// Height / friction (compute_*)
 // ===========================================================================
-
-/// PCB stackup recommendation (trace widths, copper, vias).
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub struct StackupResultIpc {
-    pub layer_count: u32,
-    pub trace_widths_m: Vec<f64>,
-    pub cu_thickness_m: Vec<f64>,
-    pub via_drill_m: f64,
-    pub via_annular_ring_m: f64,
-    pub via_grid_rows: u32,
-    pub via_grid_cols: u32,
-    pub estimated_force_n: f64,
-    pub estimated_dc_resistance_ohm: f64,
-    pub notes: Vec<String>,
-}
 
 /// Explicit vertical stack from PCB bottom to magnet top.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -165,16 +149,4 @@ impl From<pcbmotorgen_simulation::equilibrium::TravelEnvelope> for TravelEnvelop
             electrical_period_m: env.electrical_period_m,
         }
     }
-}
-
-/// Continuous and burst power / thermal analysis.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub struct PowerBudgetIpc {
-    pub phase_resistance_ohm: f64,
-    pub continuous_power_w: f64,
-    pub burst_power_w: f64,
-    pub temperature_rise_c: f64,
-    pub capacitor_required_uf: f64,
-    pub efficiency_pct: f64,
 }

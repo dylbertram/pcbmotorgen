@@ -21,20 +21,6 @@ export interface ForceSweepResult {
   n_positions: number;
 }
 
-/** Layer stackup summary (compute_stackup). */
-export interface StackupResultDto {
-  layer_count: number;
-  trace_widths_m: number[];
-  cu_thickness_m: number[];
-  via_drill_m: number;
-  via_annular_ring_m: number;
-  via_grid_rows: number;
-  via_grid_cols: number;
-  estimated_force_n: number;
-  estimated_dc_resistance_ohm: number;
-  notes: string[];
-}
-
 /** Height stack cross-section (compute_height_stack). */
 export interface HeightStackResultDto {
   pcb_thickness_m: number;
@@ -54,16 +40,6 @@ export interface FrictionBudgetDto {
   cogging_n: number;
   total_n: number;
   minimum_drive_force_n: number;
-}
-
-/** Power / thermal budget (compute_power_budget). */
-export interface PowerBudgetDto {
-  phase_resistance_ohm: number;
-  continuous_power_w: number;
-  burst_power_w: number;
-  temperature_rise_c: number;
-  capacitor_required_uf: number;
-  efficiency_pct: number;
 }
 
 /** One B-field sample on the X–Z sampling grid (sample_b_field). */

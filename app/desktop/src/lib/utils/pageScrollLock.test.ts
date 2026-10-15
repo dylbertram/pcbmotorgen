@@ -92,19 +92,22 @@ describe("lockPageScroll", () => {
 });
 
 describe("blocksBackdropScroll", () => {
-  const panel = { contains: (node: unknown) => node === "inside" };
+  // Stand-in event targets: the panel only compares identity.
+  const inside = {} as EventTarget;
+  const outside = {} as EventTarget;
+  const panel = { contains: (node: unknown) => node === inside };
 
   it("blocks when the event landed outside the scrollable panel", () => {
-    expect(blocksBackdropScroll("outside", panel)).toBe(true);
+    expect(blocksBackdropScroll(outside, panel)).toBe(true);
   });
 
   it("allows events inside the panel so it can scroll itself", () => {
-    expect(blocksBackdropScroll("inside", panel)).toBe(false);
+    expect(blocksBackdropScroll(inside, panel)).toBe(false);
   });
 
   it("blocks by default when no panel is known yet", () => {
-    expect(blocksBackdropScroll("inside", null)).toBe(true);
-    expect(blocksBackdropScroll("inside", undefined)).toBe(true);
+    expect(blocksBackdropScroll(inside, null)).toBe(true);
+    expect(blocksBackdropScroll(inside, undefined)).toBe(true);
   });
 
   it("blocks a null target", () => {

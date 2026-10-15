@@ -14,7 +14,6 @@ import type {
   LinearMotorConfig,
   KicadConnection,
   KicadWriteResult,
-  KicadPingResult,
   BoardDiagnostics,
   PreconditionWarning,
   CoilPreview,
@@ -26,7 +25,6 @@ import {
   mockPreviewCoils,
   mockKicadConnection,
   mockKicadWrite,
-  mockKicadPing,
 } from "./mocks";
 
 export async function connectKicad(): Promise<KicadConnection> {
@@ -58,11 +56,6 @@ export async function writeCoilsToBoard(
     dryRun,
     cadGeometry,
   });
-}
-
-export async function pingKicad(): Promise<KicadPingResult> {
-  if (!isTauriAvailable()) return mockKicadPing();
-  return await invoke<KicadPingResult>("ping_kicad");
 }
 
 // ---------------------------------------------------------------------------

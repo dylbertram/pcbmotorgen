@@ -38,7 +38,7 @@ import {
   distanceMm,
   computeMeasureRuler,
 } from "./previewGeometry";
-import type { CoilPathDto, PhaseCoilDto, PoleRegionDto, PhaseBandWidthDto } from "./types";
+import type { CoilPathDto, CoilSegmentDto, PhaseCoilDto, PoleRegionDto, PhaseBandWidthDto } from "./types";
 
 /** Default-config-like magnet layout (12 poles, 6 mm pole pitch: P_e/2). */
 const CONFIG = { magnet_count: 12, magnet_width_mm: 4.5, magnet_gap_mm: 1.5 };
@@ -53,7 +53,7 @@ function braidLikeFixture(): CoilPathDto {
   const phases: PhaseCoilDto[] = [];
   for (let layer = 0; layer < 2; layer++) {
     for (let p = 0; p < 3; p++) {
-      const segs = [];
+      const segs: CoilSegmentDto[] = [];
       const offset = p * 0.003;
       for (let i = 0; i < 4; i++) {
         const x = offset + i * 0.004;

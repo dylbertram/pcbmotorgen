@@ -5,7 +5,7 @@ use crate::ipc::*;
 
 use pcbmotorgen_dfm::DesignRules;
 use pcbmotorgen_export::proto::common::commands::{
-    GetOpenDocuments, GetOpenDocumentsResponse, GetVersion, GetVersionResponse,
+    GetOpenDocuments, GetOpenDocumentsResponse,
 };
 use pcbmotorgen_export::{BoardHandle, DocumentSpecifier, DocumentType, KiCadClient};
 use pcbmotorgen_routing::{generate_sensor, SensorConfig};
@@ -52,20 +52,10 @@ pub struct KicadWriteResult {
     pub commit_id: String,
 }
 
-/// KiCad ping result.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub struct KicadPingResult {
-    pub ok: bool,
-    pub version: String,
-}
-
 /// Type URL for the `GetOpenDocuments` command.
 const GET_OPEN_DOCUMENTS_TYPE_URL: &str =
     "type.googleapis.com/kiapi.common.commands.GetOpenDocuments";
 
-/// Type URL for the `GetVersion` command.
-const GET_VERSION_TYPE_URL: &str = "type.googleapis.com/kiapi.common.commands.GetVersion";
 
 /// Query the first open PCB document from KiCad.
 ///
@@ -360,33 +350,3 @@ pub async fn preview_coils(
     .map_err(|e| format!("preview_coils worker failed: {e}"))?
 }
 
-/// Ping KiCad and return the version string.
-///
-/// Returns `ok: false` (not an `Err`) if the connection fails, so the
-/// frontend can show a graceful "not connected" state.
-#[tauri::command]
-pub async fn ping_kicad() -> Result<KicadPingResult, String> {
-    tauri::async_runtime::spawn_blocking(move || {
-        let mut client = KiCadClient::new(None, None, 1000);
-        if client.connect().is_err() {
-            return Ok(KicadPingResult {
-                ok: false,
-                version: String::new(),
-            });
-        }
-
-        let version = match client
-            .send::<GetVersion, GetVersionResponse>(GET_VERSION_TYPE_URL, &GetVersion {})
-        {
-            Ok(resp) => resp
-                .version
-                .map(|v| v.full_version)
-                .unwrap_or_else(|| "connected".to_string()),
-            Err(_) => "connected".to_string(),
-        };
-
-        Ok(KicadPingResult { ok: true, version })
-    })
-    .await
-    .map_err(|e| format!("ping_kicad worker failed: {e}"))?
-}

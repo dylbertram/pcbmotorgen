@@ -96,30 +96,6 @@ impl CoilCurrentModel {
         samples
     }
 
-    /// Build conductor samples for all phases, with a current per phase.
-    ///
-    /// Returns `(phase_samples, phase_currents)` where `phase_samples` is
-    /// a vec of `(phase_idx, Vec<ConductorSample>)` and `phase_currents`
-    /// is the signed current per phase [A].
-    pub fn build_all_phases_samples<'a>(
-        &self,
-        coils: &'a [PhaseCoil],
-        currents_a: &[f64],
-    ) -> Vec<(&'a PhaseCoil, f64, Vec<ConductorSample>)> {
-        assert_eq!(
-            coils.len(),
-            currents_a.len(),
-            "coils ({}) and currents_a ({}) must have the same length",
-            coils.len(),
-            currents_a.len()
-        );
-        coils
-            .iter()
-            .zip(currents_a.iter())
-            .map(|(coil, &current)| (coil, current, self.build_phase_samples(coil)))
-            .collect()
-    }
-
     /// Convert one segment to sub-segment samples (midpoint + dL).
     ///
     /// Appends `meshing` samples to `out`.
@@ -152,25 +128,6 @@ impl CoilCurrentModel {
                 dl_3d: [dl_x, dl_y, dl_z],
             });
         }
-    }
-
-    /// Sample B-field at each active conductor midpoint (for debugging).
-    ///
-    /// Returns `Vec<[f64; 3]>` of B vectors [T], one per active segment.
-    pub fn bfield_at_conductor_midpoints(
-        &self,
-        coil: &PhaseCoil,
-        b_at: impl Fn(&[[f64; 3]]) -> Vec<[f64; 3]>,
-    ) -> Vec<[f64; 3]> {
-        let midpoints: Vec<[f64; 3]> = coil
-            .active_segments()
-            .iter()
-            .map(|seg| {
-                let mid = seg.midpoint();
-                [mid.0 * MM_TO_M, mid.1 * MM_TO_M, self.layer_z_m]
-            })
-            .collect();
-        b_at(&midpoints)
     }
 }
 

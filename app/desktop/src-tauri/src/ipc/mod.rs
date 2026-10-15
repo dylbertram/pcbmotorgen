@@ -27,7 +27,6 @@
 //! this level so `use crate::ipc::*;` in the command handlers keeps resolving:
 //! - [`enums`] — `CommutationModeIpc`, `PreconditionLevelIpc`.
 //! - [`config`] — `LinearMotorConfigIpc` (+ `to_core`/`From<&CoreConfig>`)
-//!   and `ConfigDerivedIpc` (+ `from_core`).
 //! - [`coils`] — `CoilSegmentIpc` / `PhaseCoilIpc` / `CoilPathIpc` geometry.
 //! - [`physics`] — B-field grid, force sweep, stackup/height/power/friction.
 //! - [`magnets`] — `MagnetGradeIpc` + `magnet_grades()` + temp tables.

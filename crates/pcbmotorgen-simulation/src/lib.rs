@@ -1,7 +1,7 @@
 //! # pcbmotorgen-simulation
 //!
 //! Analytical magnetic field, Lorentz force, and multiphysics simulation for
-//! coreless linear PCB motors (physics / stackup / power / friction).
+//! coreless linear PCB motors (physics / stackup / friction / driver suitability).
 //!
 //! This crate is **parent-free**: it does not depend on the monolithic
 //! `pcbmotorgen` app crate or on `pcbmotorgen-export`. It MAY depend on the
@@ -18,7 +18,8 @@
 //! - [`params`] — [`SimulationInput`] inputs + shared result types.
 //! - [`physics`] — thin adapter over `magba`.
 //! - [`magnetic`] — magnet arrays, coil current model, force evaluator.
-//! - [`stackup`] — height stack, power budget, friction budget.
+//! - [`stackup`] — height stack, friction budget.
+//! - [`drive`] — driver suitability from routed copper.
 
 pub mod drive;
 pub mod magnet_grades;
@@ -34,9 +35,9 @@ pub use magnetic::{CommutationMode, ForceEvaluator, ForceResult, MagnetArray, BF
 pub use magnetic::coil_model::{CoilCurrentModel, ConductorSample};
 pub use params::{
     phase_bands_from_routing, BearingType, FrictionBudget, HeightStackResult, PhaseBandPosition,
-    PowerBudget, SimulationError, SimulationInput, StackupResult,
+    SimulationError, SimulationInput,
 };
-pub use stackup::{FrictionEstimator, HeightStackCalculator, PowerEstimator};
+pub use stackup::{FrictionEstimator, HeightStackCalculator};
 
 /// Re-export the coil presentation types the simulation consumes, which the
 /// sibling `pcbmotorgen-routing` crate owns.

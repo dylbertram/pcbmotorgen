@@ -15,10 +15,6 @@ export async function gotoDesignApp(page: Page): Promise<void> {
   await expect(dialog).toBeHidden();
 }
 
-export function boundingBox(locator: Locator) {
-  return locator.boundingBox();
-}
-
 /**
  * Geometry of an element relative to the viewport, as integers.
  * Returns null when the element is hidden/not attached.

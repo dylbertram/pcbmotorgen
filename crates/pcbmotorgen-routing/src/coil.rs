@@ -47,29 +47,6 @@ impl CoilSegment {
         )
     }
 
-    /// True if the segment is parallel to the board-width (y) axis.
-    ///
-    /// NOTE: for the bundled braid pattern, active conductors are diagonal; do
-    /// not use verticality to infer active vs end-turn.
-    pub fn is_vertical(&self, tol: f64) -> bool {
-        (self.end.0 - self.start.0).abs() < tol
-    }
-
-    /// True if the segment is parallel to the travel (x) axis
-    /// (end-turn connector in straight-sided patterns).
-    pub fn is_horizontal(&self, tol: f64) -> bool {
-        (self.end.1 - self.start.1).abs() < tol
-    }
-
-    /// Convenience: is_vertical with default tolerance.
-    pub fn is_vert(&self) -> bool {
-        self.is_vertical(1e-6)
-    }
-
-    /// Convenience: is_horizontal with default tolerance.
-    pub fn is_horiz(&self) -> bool {
-        self.is_horizontal(1e-6)
-    }
 }
 
 /// Complete coil path for one (phase, layer) group of a routing result.
@@ -202,11 +179,6 @@ impl PhaseCoil {
             }
         }
         true
-    }
-
-    /// X positions of all active conductors, in order [mm].
-    pub fn active_conductor_x_positions(&self) -> Vec<f64> {
-        self.active_segments().iter().map(|s| s.start.0).collect()
     }
 }
 

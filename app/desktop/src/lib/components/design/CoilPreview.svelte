@@ -113,6 +113,7 @@
   // these virtual px so it matches the SVG markup exactly. The paint routines
   // live in ./coilPreviewCanvas.ts, which shares these constants.
   const W = PREVIEW_W;
+  let expanded = $state(false);
   let modalWidth = $state(PREVIEW_W);
   let modalHeight = $state(PREVIEW_H);
   const H = $derived(expanded && modalWidth > 0 ? W * modalHeight / modalWidth : PREVIEW_H);
@@ -294,26 +295,24 @@
     if (resolved !== view.poleRegionPhase) view.poleRegionPhase = resolved;
   });
 
-  let overlayFitBounds = $derived(
-    (() => {
-      const base = computeOverlayFitBounds(
-        computeMoverStripBounds(
-          g.fitBounds,
-          magnets,
-          maxMoverOffsetM,
-          g.magnetTop,
-          0.003,
-        ),
-        // Keep the camera independent of overlay visibility and phase selection.
-        poleRuler,
-        bandRows,
-        poleRegionZones,
-        g.boardRect.y,
-        g.boardRect.y + g.boardRect.h,
-      );
-      return lockedMeasureBounds ? unionBounds(base, lockedMeasureBounds) : base;
-    })(),
-  );
+  let overlayFitBounds = $derived.by(() => {
+    const base = computeOverlayFitBounds(
+      computeMoverStripBounds(
+        g.fitBounds,
+        magnets,
+        maxMoverOffsetM,
+        g.magnetTop,
+        0.003,
+      ),
+      // Keep the camera independent of overlay visibility and phase selection.
+      poleRuler,
+      bandRows,
+      poleRegionZones,
+      g.boardRect.y,
+      g.boardRect.y + g.boardRect.h,
+    );
+    return lockedMeasureBounds ? unionBounds(base, lockedMeasureBounds) : base;
+  });
   let hasPolePitchData = $derived(poleRuler !== null);
   let hasBandWidthData = $derived(bandRows.length > 0);
 
@@ -385,7 +384,6 @@
   let canvasRef: HTMLCanvasElement | undefined = $state();
   let modalFrameRef: HTMLDivElement | undefined = $state();
   let modalCanvasRef: HTMLCanvasElement | undefined = $state();
-  let expanded = $state(false);
   let frameSize = $state(0); // frame CSS-pixel width, measured by the RO
 
   // The pair that is currently visible: the inline canvas while collapsed,
