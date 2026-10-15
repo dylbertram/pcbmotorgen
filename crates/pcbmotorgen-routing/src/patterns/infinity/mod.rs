@@ -1014,6 +1014,63 @@ mod tests {
         assert!(Validator::validate(&r, &fader_ctx(2.0), false).is_ok());
     }
 
+    /// Copper graph over every net's lead traces and vias (the star neutral
+    /// joins different nets, so nets are ignored here).
+    fn lead_graph(segments: &[RouteSegment], vias: &[Via]) -> HashMap<NodeKey, Vec<NodeKey>> {
+        let mut g: HashMap<NodeKey, Vec<NodeKey>> = HashMap::new();
+        let mut link = |a: NodeKey, b: NodeKey| {
+            g.entry(a).or_default().push(b);
+            g.entry(b).or_default().push(a);
+        };
+        for s in segments.iter().filter(|s| !s.is_active) {
+            link(node(s.layer, s.start), node(s.layer, s.end));
+        }
+        for v in vias {
+            link(node(v.from_layer, v.position), node(v.to_layer, v.position));
+        }
+        g
+    }
+
+    fn reaches(g: &HashMap<NodeKey, Vec<NodeKey>>, from: NodeKey, to: NodeKey) -> bool {
+        let mut seen = std::collections::HashSet::from([from]);
+        let mut stack = vec![from];
+        while let Some(n) = stack.pop() {
+            if n == to {
+                return true;
+            }
+            for m in g.get(&n).into_iter().flatten() {
+                if seen.insert(*m) {
+                    stack.push(*m);
+                }
+            }
+        }
+        false
+    }
+
+    #[test]
+    fn star_neutral_joins_every_layer_zero_end_on_layer_zero() {
+        let r = InfinityBraidPattern.generate(&fader_ctx(2.0)).unwrap();
+        let end = |i: usize, layer: u32| node(layer, Point::new(BREAK_X[i], 8.0));
+        let g = lead_graph(&r.segments, &r.vias);
+        for i in 1..3 {
+            assert!(reaches(&g, end(0, 0), end(i, 0)), "phase {i} layer-0 end on the neutral");
+        }
+        for i in 0..3 {
+            assert!(!reaches(&g, end(i, 1), end(0, 0)), "lead {i} stays off the neutral");
+        }
+
+        // B's stub must stay on layer 0: on layer 1 it would lie on B's own
+        // lead riser and leave B's layer-0 end off the neutral.
+        let mut moved = r.segments.clone();
+        let stub = moved
+            .iter_mut()
+            .find(|s| s.net == "B" && s.layer == 0 && !s.is_active)
+            .unwrap();
+        stub.layer = 1;
+        let g = lead_graph(&moved, &r.vias);
+        assert!(!reaches(&g, end(1, 0), end(0, 0)));
+    }
+
     #[test]
     fn validator_rejects_a_stray_via_above_the_board() {
         let mut r = InfinityBraidPattern.generate(&fader_ctx(1.0)).unwrap();
