@@ -47,7 +47,7 @@ async function openTerminalTool(page: Page, { layered = false } = {}) {
   const tools = page.getByRole("toolbar", { name: "Coil preview tools" });
   await page.getByRole("toolbar", { name: "Preview side tools" }).getByRole("button", { name: "Set coil terminals", exact: true }).click();
   const command = page.getByRole("region", { name: "Set coil terminals", exact: true });
-  await command.getByRole("button", { name: "Select IN for coil A", exact: true }).click();
+  await command.getByRole("button", { name: "Select driver end for coil A", exact: true }).click();
   await command.getByRole("button", { name: "Keep current points", exact: true }).click();
   return { command, tools };
 }
@@ -55,25 +55,26 @@ async function openTerminalTool(page: Page, { layered = false } = {}) {
 test("terminal defaults need only confirmation, overrides preserve the other end, and labels survive simplify", async ({ page }, testInfo) => {
   const { command, tools } = await openTerminalTool(page);
   await expect(command.getByRole("status")).toContainText("Review A");
-  await expect(command).toContainText("IN");
+  await expect(command).toContainText("Driver end");
   await expect(command).toContainText("X 2 mm");
   await expect(page.getByRole("region", { name: "Configured coil terminals" })).toHaveCount(0);
-  await command.getByRole("button", { name: "Select IN for coil A", exact: true }).click();
+  await command.getByRole("button", { name: "Select driver end for coil A", exact: true }).click();
   const input = page.getByRole("button", { name: "Endpoint coil A, L0, X 0 mm, Y 0 mm", exact: true });
-  await expect(command.getByRole("status")).toContainText("Choose IN");
+  await expect(command.getByRole("status")).toContainText("Select the driver end");
   const box = (await input.boundingBox())!;
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
   await page.mouse.down();
   await page.mouse.move(box.x + box.width / 2 + 40, box.y + box.height / 2);
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
   await page.mouse.up();
-  await expect(command.getByRole("status")).toContainText("Choose IN");
+  await expect(command.getByRole("status")).toContainText("Select the driver end");
   await input.click();
   await expect(command.getByRole("status")).toContainText("Review A");
-  await command.getByRole("button", { name: "Select OUT for coil A", exact: true }).click();
-  await input.click();
-  await expect(command.getByRole("alert")).toContainText("must be different");
+  await expect(command.getByRole("button", { name: "Select neutral end for coil A", exact: true })).toHaveCount(0);
+  await expect(command).toContainText("Automatic");
+  await command.getByRole("button", { name: "Select driver end for coil A", exact: true }).click();
   await page.getByRole("button", { name: "Endpoint coil A, L0, X 2 mm, Y 0 mm", exact: true }).click();
+  await expect(page.getByRole("img", { name: "Coil A Neutral end, L0, X 0 mm, Y 0 mm, preview", exact: true })).toBeVisible();
   await expect(command.getByRole("status")).toContainText("Review A");
   await expect(page.getByRole("region", { name: "Configured coil terminals" })).toHaveCount(0);
   await expect(tools.getByRole("button", { name: "Simplify lines", exact: true })).toBeDisabled();
@@ -93,21 +94,21 @@ test("terminal defaults need only confirmation, overrides preserve the other end
 test("terminal drafts support Flip, keeping current points, Cancel, Escape and switching to Measure", async ({ page }) => {
   const { command, tools } = await openTerminalTool(page);
   await command.getByRole("button", { name: "Flip", exact: true }).click();
-  await expect(page.getByRole("img", { name: "Coil A IN, L0, X 2 mm, Y 0 mm, preview", exact: true })).toBeVisible();
-  await command.getByRole("button", { name: "Select IN for coil A", exact: true }).click();
+  await expect(page.getByRole("img", { name: "Coil A Driver end, L0, X 2 mm, Y 0 mm, preview", exact: true })).toBeVisible();
+  await command.getByRole("button", { name: "Select driver end for coil A", exact: true }).click();
   await command.getByRole("button", { name: "Keep current points", exact: true }).click();
   await expect(command.getByRole("button", { name: "Apply terminals", exact: true })).toBeEnabled();
   await command.getByRole("button", { name: "Cancel", exact: true }).click();
   await expect(command.getByRole("button", { name: "Apply terminals", exact: true })).toHaveCount(0);
   await expect(page.getByRole("region", { name: "Configured coil terminals" })).toHaveCount(0);
-  await command.getByRole("button", { name: "Select IN for coil A", exact: true }).click();
+  await command.getByRole("button", { name: "Select driver end for coil A", exact: true }).click();
   await command.getByRole("button", { name: "Keep current points", exact: true }).click();
   await command.getByRole("button", { name: "Flip", exact: true }).click();
   await page.keyboard.press("Escape");
   await expect(command).toHaveCount(0);
   await expect(tools).toBeVisible();
   await page.getByRole("button", { name: "Set coil terminals", exact: true }).click();
-  await command.getByRole("button", { name: "Select IN for coil A", exact: true }).click();
+  await command.getByRole("button", { name: "Select driver end for coil A", exact: true }).click();
   await tools.getByRole("button", { name: "Toggle measure tool" }).click();
   await expect(command.getByRole("button", { name: "Apply terminals", exact: true })).toHaveCount(0);
   await expect(page.getByRole("region", { name: "Configured coil terminals" })).toHaveCount(0);
@@ -116,7 +117,7 @@ test("terminal drafts support Flip, keeping current points, Cancel, Escape and s
 test("overlapping endpoints are disambiguated by copper layer and support keyboard selection", async ({ page }, testInfo) => {
   const { command } = await openTerminalTool(page, { layered: true });
   await expect(command.getByRole("status")).toContainText("Review A");
-  await expect(page.getByRole("img", { name: "Coil A OUT, L1, X 0 mm, Y 0 mm, preview", exact: true })).toBeVisible();
+  await expect(page.getByRole("img", { name: "Coil A Neutral end, L1, X 0 mm, Y 0 mm, preview", exact: true })).toBeVisible();
   const cards = await page.getByRole("dialog", { name: "Coil Preview", exact: true }).getByRole("group", { name: "IN/OUT direction arrows", exact: true }).locator("rect").evaluateAll((cards) => cards.map((card) => {
     const { x, y, width, height } = card.getBoundingClientRect();
     return { x, y, width, height };
@@ -124,15 +125,17 @@ test("overlapping endpoints are disambiguated by copper layer and support keyboa
   expect(cards).toHaveLength(2);
   expect(cards[0].x + cards[0].width <= cards[1].x || cards[1].x + cards[1].width <= cards[0].x || cards[0].y + cards[0].height <= cards[1].y || cards[1].y + cards[1].height <= cards[0].y).toBe(true);
   await page.screenshot({ path: testInfo.outputPath("offset-terminal-arrows.png") });
-  await command.getByRole("button", { name: "Select OUT for coil A", exact: true }).click();
-  await command.getByLabel("Copper layer for terminal selection").selectOption("1");
+  await expect(command.getByRole("combobox")).toHaveCount(0);
+  await command.getByRole("button", { name: "Select driver end for coil A", exact: true }).click();
+  const slider = page.getByRole("slider", { name: "Preview layer", exact: true });
+  await slider.focus(); await page.keyboard.press("End");
   await expect(page.getByRole("button", { name: /Endpoint coil A, L0/ })).toHaveCount(0);
-  const output = page.getByRole("button", { name: "Endpoint coil A, L1, X 2 mm, Y 0 mm", exact: true });
+  const output = page.getByRole("button", { name: "Endpoint coil A, L1, X 0 mm, Y 0 mm", exact: true });
   await output.focus(); await page.keyboard.press("Enter");
   await expect(command.getByRole("status")).toContainText("Review A");
   await command.getByRole("button", { name: "Apply terminals", exact: true }).click();
   await expect(command).toContainText("L0, X 0 mm");
-  await expect(command).toContainText("L1, X 2 mm");
+  await expect(command).toContainText("L1, X 0 mm");
 });
 
 test("ambiguous linked coils require manual picks instead of unsafe defaults", async ({ page }) => {
@@ -141,10 +144,12 @@ test("ambiguous linked coils require manual picks instead of unsafe defaults", a
   await page.getByRole("button", { name: "Expand coil preview" }).click();
   await page.getByRole("button", { name: "Set coil terminals", exact: true }).click();
   const command = page.getByRole("region", { name: "Set coil terminals", exact: true });
-  await command.getByRole("button", { name: "Select IN for coil A", exact: true }).click();
+  await command.getByRole("button", { name: "Select driver end for coil A", exact: true }).click();
   await expect(command).toContainText("Not selected");
   await expect(command.getByRole("button", { name: "Apply terminals", exact: true })).toBeDisabled();
   await page.getByRole("button", { name: "Endpoint coil A, L0, X 0 mm, Y 0 mm", exact: true }).click();
+  await expect(command.getByRole("status")).toContainText("Couldn't identify the opposite end");
+  await expect(command.getByRole("button", { name: "Select neutral end for coil A", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Endpoint coil A, L0, X 2 mm, Y 0 mm", exact: true }).click();
   await command.getByRole("button", { name: "Apply terminals", exact: true }).click();
   await expect(command).toContainText("L0, X 0 mm");
@@ -157,27 +162,29 @@ test("terminal panel configures multiple phases, switches topology and temporari
   await expect(modal.getByRole("dialog", { name: "Phase waveform", exact: true })).toHaveCount(0);
   await expect(command.getByRole("radio", { name: "Star (wye)", exact: true })).toBeChecked();
   await command.getByRole("radio", { name: "Delta", exact: true }).check();
-  await expect(command).toContainText("closing the delta");
+  await expect(command).toContainText("next coil's driver end");
+  await expect(command).toContainText("Delta end");
+  await expect(command.getByRole("button", { name: "Select delta end for coil A", exact: true })).toHaveCount(0);
   await command.getByRole("button", { name: "Apply terminals", exact: true }).click();
-  await command.getByRole("button", { name: "Select IN for coil B", exact: true }).click();
+  await command.getByRole("button", { name: "Select driver end for coil B", exact: true }).click();
   await command.getByRole("button", { name: "Keep current points", exact: true }).click();
   await command.getByRole("button", { name: "Apply terminals", exact: true }).click();
-  await command.getByRole("button", { name: "Select IN for coil A", exact: true }).click();
+  await command.getByRole("button", { name: "Select driver end for coil A", exact: true }).click();
   await command.getByRole("button", { name: "Flip", exact: true }).click();
-  await expect(page.getByRole("img", { name: "Coil A IN, L0, X 2 mm, Y 0 mm, preview", exact: true })).toBeVisible();
+  await expect(page.getByRole("img", { name: "Coil A Driver end, L0, X 2 mm, Y 0 mm, preview", exact: true })).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath("coil-terminal-defaults-and-flip.png") });
   await command.getByRole("button", { name: "Apply terminals", exact: true }).click();
-  await expect(modal.getByRole("img", { name: "Coil A IN, L0, X 2 mm, Y 0 mm", exact: true })).toBeVisible();
+  await expect(modal.getByRole("img", { name: "Coil A Driver end, L0, X 2 mm, Y 0 mm", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Close terminals panel" }).click();
   await expect(modal.getByRole("slider", { name: "Preview layer" })).toHaveCount(0);
   await expect(modal.getByRole("dialog", { name: "Phase waveform", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Display", exact: true }).click();
   await page.getByRole("checkbox", { name: "Show terminal arrows", exact: true }).uncheck();
-  await expect(modal.getByRole("img", { name: /Coil A IN,/ })).toHaveCount(0);
+  await expect(modal.getByRole("img", { name: /Coil A Driver end,/ })).toHaveCount(0);
   await page.getByRole("checkbox", { name: "Show terminal arrows", exact: true }).check();
   await page.getByRole("button", { name: "Close coil preview" }).click();
   await page.getByRole("button", { name: "Expand coil preview" }).click();
-  await expect(modal.getByRole("img", { name: "Coil A IN, L0, X 2 mm, Y 0 mm", exact: true })).toBeVisible();
+  await expect(modal.getByRole("img", { name: "Coil A Driver end, L0, X 2 mm, Y 0 mm", exact: true })).toBeVisible();
 });
 
 test("changing a terminal keeps the inspection zoom and offers keyboard-accessible overrides on mobile", async ({ page }) => {
@@ -187,7 +194,7 @@ test("changing a terminal keeps the inspection zoom and offers keyboard-accessib
   await modal.getByRole("group", { name: "Coil preview — expanded", exact: true }).dispatchEvent("wheel", { deltaY: -50, ctrlKey: true });
   const zoomControl = modal.getByRole("button", { name: "Reset zoom", exact: true, includeHidden: true });
   const zoom = await zoomControl.textContent();
-  await command.getByRole("button", { name: "Select OUT for coil A", exact: true }).click();
+  await command.getByRole("button", { name: "Select driver end for coil A", exact: true }).click();
   await expect(zoomControl).toHaveText(zoom!);
   await command.getByRole("button", { name: "Keep current points", exact: true }).click();
   await command.getByRole("button", { name: "Flip", exact: true }).focus();
@@ -280,14 +287,14 @@ test("shared editing tools measure and edit CAD drafts, then keep those edits in
   await expect(dialog.getByRole("img", { name: "Measurement 2.00 mm", exact: true })).toBeVisible();
   await dialog.getByRole("button", { name: "Set coil terminals" }).click();
   const command = dialog.getByRole("region", { name: "Set coil terminals", exact: true });
-  await command.getByRole("button", { name: "Select OUT for coil A", exact: true }).click();
+  await command.getByRole("button", { name: "Select driver end for coil A", exact: true }).click();
   await expect(tools.getByRole("button", { name: "Toggle measure tool" })).toHaveAttribute("aria-pressed", "false");
-  const endpoint = dialog.getByRole("button", { name: "Endpoint coil A, L0, X 2 mm, Y 0 mm", exact: true });
+  const endpoint = dialog.getByRole("button", { name: "Endpoint coil A, L0, X 0 mm, Y 0 mm", exact: true });
   await endpoint.focus();
   await page.keyboard.press("Enter");
   await command.getByRole("button", { name: "Flip", exact: true }).click();
   await command.getByRole("button", { name: "Apply terminals", exact: true }).click();
-  await expect(dialog.getByRole("img", { name: "Coil A IN, L0, X 2 mm, Y 0 mm", exact: true })).toBeVisible();
+  await expect(dialog.getByRole("img", { name: "Coil A Driver end, L0, X 2 mm, Y 0 mm", exact: true })).toBeVisible();
   await tools.getByRole("button", { name: "Simplify lines", exact: true }).click();
   await expect(summary).toContainText("2 lines");
   await dialog.getByRole("button", { name: "Open with this geometry" }).click();
@@ -295,7 +302,7 @@ test("shared editing tools measure and edit CAD drafts, then keep those edits in
   const motor = page.getByRole("dialog", { name: "Coil Preview", exact: true });
   const motorTools = motor.getByRole("toolbar", { name: "Coil preview tools" });
   expect(await motorTools.getByRole("button").evaluateAll(buttons => buttons.map(button => button.getAttribute("aria-label")).filter(Boolean))).toEqual(toolNames);
-  await expect(motor.getByRole("img", { name: "Coil A IN, L0, X 2 mm, Y 0 mm", exact: true })).toBeVisible();
+  await expect(motor.getByRole("img", { name: "Coil A Driver end, L0, X 2 mm, Y 0 mm", exact: true })).toBeVisible();
   await motorTools.getByRole("button", { name: "Toggle measure tool" }).click();
   for (const x of [0, 2]) {
     const point = await motor.locator('[aria-label="Segment selection preview"] svg > g').evaluate((group, x) => {
@@ -310,19 +317,19 @@ test("shared editing tools measure and edit CAD drafts, then keep those edits in
   await motorTools.getByRole("button", { name: "Toggle measure tool" }).click();
   await motor.getByRole("button", { name: "Set coil terminals", exact: true }).click();
   const motorCommand = motor.getByRole("region", { name: "Set coil terminals", exact: true });
-  await motorCommand.getByRole("button", { name: "Select IN for coil A", exact: true }).click();
+  await motorCommand.getByRole("button", { name: "Select driver end for coil A", exact: true }).click();
   await motorCommand.getByRole("button", { name: "Flip", exact: true }).click();
   await motorCommand.getByRole("button", { name: "Apply terminals", exact: true }).click();
-  await expect(motor.getByRole("img", { name: "Coil A IN, L0, X 0 mm, Y 0 mm", exact: true })).toBeVisible();
+  await expect(motor.getByRole("img", { name: "Coil A Driver end, L0, X 0 mm, Y 0 mm", exact: true })).toBeVisible();
   await motor.getByRole("button", { name: "Layers", exact: true }).click();
   const layers = page.getByRole("dialog", { name: "Coil preview layers", exact: true });
   await layers.getByRole("checkbox", { name: "Coil A", exact: true }).uncheck();
-  await expect(motor.getByRole("img", { name: /Coil A IN/ })).toHaveCount(0);
+  await expect(motor.getByRole("img", { name: /Coil A Driver end/ })).toHaveCount(0);
   await layers.getByRole("checkbox", { name: "Coil A", exact: true }).check();
   await layers.getByRole("button", { name: "Close layers panel" }).click();
   await motor.getByRole("button", { name: "Close coil preview" }).click();
   await page.getByRole("button", { name: "Expand coil preview" }).click();
-  await expect(motor.getByRole("img", { name: "Coil A IN, L0, X 0 mm, Y 0 mm", exact: true })).toBeVisible();
+  await expect(motor.getByRole("img", { name: "Coil A Driver end, L0, X 0 mm, Y 0 mm", exact: true })).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath("shared-motor-editor.png") });
 });
 
@@ -333,14 +340,14 @@ test("CAD terminal editing works on mobile and changing tools cancels unapplied 
   const tools = dialog.getByRole("toolbar", { name: "CAD import tools" });
   await dialog.getByRole("button", { name: "Set coil terminals" }).click();
   const command = dialog.getByRole("region", { name: "Set coil terminals", exact: true });
-  await command.getByRole("button", { name: "Select IN for coil A", exact: true }).click();
+  await command.getByRole("button", { name: "Select driver end for coil A", exact: true }).click();
   await command.getByRole("button", { name: "Flip", exact: true }).click();
   await tools.getByRole("button", { name: "Select", exact: true }).click();
   await expect(command.getByRole("button", { name: "Apply terminals", exact: true })).toHaveCount(0);
-  await command.getByRole("button", { name: "Select IN for coil A", exact: true }).click();
+  await command.getByRole("button", { name: "Select driver end for coil A", exact: true }).click();
   await command.getByRole("button", { name: "Keep current points", exact: true }).click();
   await command.getByRole("button", { name: "Apply terminals", exact: true }).click();
-  await expect(dialog.getByRole("img", { name: "Coil A IN, L0, X 0 mm, Y 0 mm", exact: true })).toBeVisible();
+  await expect(dialog.getByRole("img", { name: "Coil A Driver end, L0, X 0 mm, Y 0 mm", exact: true })).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(command).toHaveCount(0);
   await expect(dialog).toBeVisible();
@@ -732,7 +739,7 @@ test("Ctrl+Z undoes the last assignment, simplify and terminal edit", async ({ p
   // Terminal change.
   await dialog.getByRole("button", { name: "Set coil terminals", exact: true }).click();
   const terminalPanel = dialog.getByRole("region", { name: "Set coil terminals", exact: true });
-  await terminalPanel.getByRole("button", { name: "Select IN for coil A", exact: true }).click();
+  await terminalPanel.getByRole("button", { name: "Select driver end for coil A", exact: true }).click();
   await terminalPanel.getByRole("button", { name: "Keep current points", exact: true }).click();
   await terminalPanel.getByRole("button", { name: "Apply terminals", exact: true }).click();
   await expect(markers.getByRole("img")).toHaveCount(2);

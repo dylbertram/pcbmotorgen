@@ -35,7 +35,12 @@ export class CoilTerminalTool {
     this.notice = "Terminal change undone.";
   };
   get coils(): string[] { const g = this.#options.getGeometry(); return g ? cadCoilNames(g).filter((coil) => cadTerminalCandidates(g, coil).length >= 2) : []; }
-  get candidates(): CadTerminal[] { return this.active && this.#base ? cadTerminalCandidates(this.#base, this.coil) : []; }
+  get inferredPair() { return this.#base && this.active ? defaultCadTerminals(this.#base, this.coil) : null; }
+  get candidates(): CadTerminal[] {
+    if (!this.active || !this.#base) return [];
+    const pair = this.inferredPair;
+    return pair ? [pair.input, pair.output] : cadTerminalCandidates(this.#base, this.coil);
+  }
   get layers(): number[] { return [...new Set(this.candidates.map((p) => p.layer))]; }
   get nextCoil(): string | undefined { const index = this.coils.indexOf(this.coil); return index >= 0 ? this.coils[index + 1] : undefined; }
   get canApply(): boolean { return this.active && this.step === "review" && this.input !== null && this.output !== null; }
@@ -69,7 +74,7 @@ export class CoilTerminalTool {
     if (!this.active || !this.#base || !this.coils.includes(coil)) return;
     this.coil = coil;
     const saved = Object.hasOwn(this.#base.coil_terminals ?? {}, coil) ? this.#base.coil_terminals![coil] : undefined;
-    const candidates = this.candidates;
+    const candidates = cadTerminalCandidates(this.#base, coil);
     const savedValid = saved && !sameTerminal(saved.input, saved.output)
       && [saved.input, saved.output].every((point) => candidates.some((candidate) => sameTerminal(candidate, point)));
     const defaults = savedValid ? saved : defaultCadTerminals(this.#base, coil);
@@ -99,10 +104,20 @@ export class CoilTerminalTool {
   };
 
   pick = (point: CadTerminal) => {
-    if (!this.active || (this.step !== "input" && this.step !== "output") || point.layer !== this.layer || !this.candidates.some((p) => sameTerminal(p, point))) return;
+    if (!this.active || (this.step !== "input" && this.step !== "output") || !this.candidates.some((p) => sameTerminal(p, point))) return;
+    const pair = this.inferredPair;
+    if (pair && this.step === "input") {
+      this.input = point;
+      this.output = sameTerminal(point, pair.input) ? pair.output : pair.input;
+      this.defaultKind = null;
+      this.step = "review";
+      this.error = "";
+      this.#options.onReveal(this.coil, this.output.layer);
+      return;
+    }
     const other = this.step === "input" ? this.output : this.input;
     if (other && sameTerminal(other, point)) {
-      this.error = "IN and OUT must be different. Choose another endpoint.";
+      this.error = "The driver end and opposite end must be different. Choose another endpoint.";
       return;
     }
     this[this.step] = point;
