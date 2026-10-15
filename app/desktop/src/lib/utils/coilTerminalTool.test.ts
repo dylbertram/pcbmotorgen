@@ -16,6 +16,18 @@ function fixture(ambiguous = false) {
 }
 
 describe("CoilTerminalTool", () => {
+  it("persists the connection convention without losing draft endpoints", () => {
+    const { tool, getGeometry } = fixture();
+    expect(tool.connection).toBe("star");
+    tool.begin(); tool.change("input"); tool.pick(point(1));
+    tool.setConnection("delta");
+    expect(tool.connection).toBe("delta");
+    expect(tool.active).toBe(true);
+    expect(tool.input).toEqual(point(1));
+    tool.done();
+    expect(getGeometry().terminal_connection).toBe("delta");
+    expect(getGeometry().coil_terminals!.A.input).toEqual(point(1));
+  });
   it("opens the first coil with inferred endpoints ready to apply, without changing the project", () => {
     const { tool, onChange, getGeometry } = fixture();
     tool.begin();

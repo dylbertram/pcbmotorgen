@@ -29,11 +29,21 @@ pub struct CadGeometry {
     /// Explicit terminal positions in mm, keyed by coil/net identity.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub coil_terminals: BTreeMap<String, CadCoilTerminals>,
+    /// Selection convention only; does not add connecting copper.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub terminal_connection: Option<TerminalConnection>,
     /// Coil/net identity → motor phase label (`A`, `B`, `C`, …). Coils that
     /// share a phase join the same KiCad net and drive in parallel. A coil
     /// already named after a phase maps to it without an entry.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub coil_phases: BTreeMap<String, String>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TerminalConnection {
+    Star,
+    Delta,
 }
 
 impl CadGeometry {
@@ -225,6 +235,7 @@ pub fn sensor_geometry_to_cad_geometry(sensor: &SensorGeometry) -> CadGeometry {
         source_layer_coils: BTreeMap::new(),
         source_file_name: None,
         coil_terminals: BTreeMap::new(),
+        terminal_connection: None,
         coil_phases: BTreeMap::new(),
     }
 }
@@ -411,6 +422,7 @@ pub fn phase_coils_to_cad_geometry(
         source_layer_coils: BTreeMap::new(),
         source_file_name: None,
         coil_terminals: BTreeMap::new(),
+        terminal_connection: None,
         coil_phases: BTreeMap::new(),
     };
     validate_geometry(&geometry)?;
@@ -903,6 +915,7 @@ pub fn import_3d_dxf_with_coils(
         source_layer_coils,
         source_file_name: None,
         coil_terminals: BTreeMap::new(),
+        terminal_connection: None,
         coil_phases: BTreeMap::new(),
     };
     validate_geometry(&geometry)?;
@@ -1356,6 +1369,7 @@ mod tests {
             source_layer_coils: BTreeMap::new(),
             source_file_name: None,
             coil_terminals: BTreeMap::new(),
+            terminal_connection: None,
             coil_phases: BTreeMap::new(),
         };
         let text = cad_geometry_to_3d_dxf(&geometry).unwrap();
@@ -1414,6 +1428,7 @@ mod tests {
             source_layer_coils: BTreeMap::new(),
             source_file_name: None,
             coil_terminals: BTreeMap::new(),
+            terminal_connection: None,
             coil_phases: BTreeMap::new(),
         }
     }
@@ -1477,6 +1492,7 @@ mod tests {
     #[test]
     fn explicit_terminals_round_trip_in_projects_and_validate_coil_and_layer() {
         let mut geometry = sample();
+        geometry.terminal_connection = Some(TerminalConnection::Delta);
         geometry.coil_terminals.insert(
             "A".into(),
             CadCoilTerminals {
@@ -1498,6 +1514,13 @@ mod tests {
         );
         let mut legacy: serde_json::Value = serde_json::from_str(&json).unwrap();
         legacy.as_object_mut().unwrap().remove("coil_terminals");
+        legacy.as_object_mut().unwrap().remove("terminal_connection");
+        assert_eq!(
+            serde_json::from_value::<CadGeometry>(legacy.clone())
+                .unwrap()
+                .terminal_connection,
+            None
+        );
         assert!(serde_json::from_value::<CadGeometry>(legacy)
             .unwrap()
             .coil_terminals

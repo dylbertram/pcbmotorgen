@@ -444,6 +444,7 @@ mod tests {
                     "Bottom winding".into(),
                     "A".into(),
                 )]),
+                terminal_connection: None,
                 coil_terminals: std::collections::BTreeMap::from([(
                     "A".into(),
                     pcbmotorgen_export::cad_dxf::CadCoilTerminals {

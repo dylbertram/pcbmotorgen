@@ -3,7 +3,8 @@
   import type { WorldTransform } from "../../chart";
   import type { CoilTerminalTool } from "../../utils/coilTerminalTool.svelte";
   import { terminalDescription } from "../../cadTerminals";
-  let { geometry, tool, transform, panX, panY, width, height, isVisible, worldScale = 1e-3 }: {
+  import { layoutTerminalMarkers } from "../../terminalMarkerLayout";
+  let { geometry, tool, transform, panX, panY, width, height, isVisible, worldScale = 1e-3, showMarkers = true, rightInset = 0 }: {
     geometry: CadGeometry;
     tool?: CoilTerminalTool;
     transform: WorldTransform;
@@ -13,6 +14,8 @@
     height: number;
     isVisible: (coil: string, layer: number) => boolean;
     worldScale?: number;
+    showMarkers?: boolean;
+    rightInset?: number;
   } = $props();
   function location(point: CadTerminal): string {
     const x = point.position.x * worldScale * transform.s + transform.tx + panX;
@@ -33,6 +36,13 @@
     }
     return result.filter((label) => isVisible(label.coil, label.point.layer));
   });
+  let renderedWidth = $state(0);
+  let renderedHeight = $state(0);
+  const markerId = $props.id();
+  let callouts = $derived(layoutTerminalMarkers(labels.map(({ point }) => ({
+    x: (point.position.x * worldScale * transform.s + transform.tx + panX) / width * renderedWidth,
+    y: (-point.position.y * worldScale * transform.s + transform.ty + panY) / height * renderedHeight,
+  })), Math.max(140, renderedWidth - rightInset), renderedHeight));
   const downs = new Map<number, { x: number; y: number; moved: boolean }>();
   let suppressClick = false;
   function pointerDown(event: PointerEvent): void {
@@ -63,7 +73,7 @@
   }
 }} />
 
-<div class="pointer-events-none absolute inset-0 overflow-hidden" role="group" aria-label="Coil terminal markers">
+<div bind:clientWidth={renderedWidth} bind:clientHeight={renderedHeight} class="pointer-events-none absolute inset-0 overflow-hidden" role="group" aria-label="Coil terminal markers">
   {#each candidates as point (`${point.layer}:${point.position.x}:${point.position.y}`)}
     <button type="button" class="pointer-events-auto absolute flex h-5 w-5 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full focus:outline-none focus:ring-2 focus:ring-emerald-400" style={location(point)}
       aria-label={`Endpoint coil ${tool?.coil}, ${terminalDescription(point)}`}
@@ -74,17 +84,26 @@
       <span class="h-2.5 w-2.5 rounded-full border border-emerald-200 bg-slate-950/90"></span>
     </button>
   {/each}
-  {#each labels as label (`${label.coil}:${label.role}`)}
-    <span class="absolute -translate-x-1/2 -translate-y-1/2" style={location(label.point)}>
-      <span role="img" aria-label={`Coil ${label.coil} ${label.role}, ${terminalDescription(label.point)}${label.draft ? ", preview" : ""}`} class="block h-3 w-3 rounded-full border-2 border-slate-950" style:background-color={label.role === "IN" ? "#34d399" : "#fbbf24"}></span>
-      {#if label.draft}
-        <button type="button" class="pointer-events-auto absolute {label.role === 'IN' ? 'bottom-4' : 'top-4'} left-0 whitespace-nowrap rounded border border-slate-600 bg-slate-950/95 px-1.5 py-0.5 text-[10px] font-semibold text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-400" aria-label={`Change ${label.role} for coil ${label.coil}`} title={`Choose a different ${label.role} endpoint in the preview.`}
-          onpointerdown={pointerDown} onpointermove={pointerMove} onpointerup={pointerUp}
-           onpointercancel={(event) => { if (event.pointerType !== "touch") event.stopPropagation(); downs.delete(event.pointerId); suppressClick = true; }}
-          onclick={(event) => { event.stopPropagation(); if (event.detail === 0 || !suppressClick) tool?.change(label.role === "IN" ? "input" : "output"); }}>{label.coil} {label.role} · L{label.point.layer}</button>
-      {:else}
-        <span class="absolute {label.role === 'IN' ? 'bottom-4' : 'top-4'} left-0 whitespace-nowrap rounded border border-slate-600 bg-slate-950/95 px-1.5 py-0.5 text-[10px] font-semibold text-slate-100">{label.coil} {label.role} · L{label.point.layer}</span>
-      {/if}
-    </span>
-  {/each}
+  {#if showMarkers && renderedWidth && renderedHeight}
+    <svg class="absolute inset-0 h-full w-full overflow-hidden" viewBox={`0 0 ${renderedWidth} ${renderedHeight}`} aria-label="IN/OUT direction arrows" role="group">
+      <defs>
+        {#each ["IN", "OUT"] as role (role)}
+          <marker id={`${markerId}-${role}`} viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse" markerUnits="userSpaceOnUse"><path d="M 1 1 L 9 5 L 1 9 Z" fill={role === "IN" ? "#34d399" : "#fbbf24"} stroke="#020617" stroke-width="1" /></marker>
+        {/each}
+      </defs>
+      {#each labels as label, index (`${label.coil}:${label.role}`)}
+        {@const p = callouts[index]}
+        {@const color = label.role === "IN" ? "#34d399" : "#fbbf24"}
+        {@const lx = p.labelX > p.x ? p.labelX : p.labelX + 132}
+        <g role="img" aria-label={`Coil ${label.coil} ${label.role}, ${terminalDescription(label.point)}${label.draft ? ", preview" : ""}`}>
+          <title>{label.coil} {label.role} · {terminalDescription(label.point)}</title>
+          <line x1={p.x} y1={p.y} x2={lx} y2={p.labelY + 12} stroke="#020617" stroke-width="6" />
+          <line x1={p.x} y1={p.y} x2={lx} y2={p.labelY + 12} stroke={color} stroke-width="2" marker-start={label.role === "IN" ? `url(#${markerId}-IN)` : undefined} marker-end={label.role === "OUT" ? `url(#${markerId}-OUT)` : undefined} />
+          <circle cx={p.x} cy={p.y} r="3" fill={color} stroke="#020617" stroke-width="1" />
+          <rect x={p.labelX} y={p.labelY} width="132" height="24" rx="4" fill="#020617" stroke={color} />
+          <text x={p.labelX + 8} y={p.labelY + 16} fill={color} font-size="11" font-weight="600" textLength={label.coil.length > 10 ? 116 : undefined} lengthAdjust="spacingAndGlyphs">{label.coil} {label.role} · L{label.point.layer + 1}</text>
+        </g>
+      {/each}
+    </svg>
+  {/if}
 </div>

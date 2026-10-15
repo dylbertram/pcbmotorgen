@@ -39,6 +39,17 @@ export class CoilTerminalTool {
   get layers(): number[] { return [...new Set(this.candidates.map((p) => p.layer))]; }
   get nextCoil(): string | undefined { const index = this.coils.indexOf(this.coil); return index >= 0 ? this.coils[index + 1] : undefined; }
   get canApply(): boolean { return this.active && this.step === "review" && this.input !== null && this.output !== null; }
+  get connection(): "star" | "delta" { return this.#options.getGeometry()?.terminal_connection ?? "star"; }
+  setConnection = (connection: "star" | "delta") => {
+    const before = this.#options.getGeometry();
+    if (!before || this.connection === connection) return;
+    const active = this.active;
+    const geometry = { ...before, terminal_connection: connection };
+    this.#before = before;
+    this.#after = geometry;
+    this.#options.onChange(geometry);
+    if (active) this.#base = geometry;
+  };
 
   begin = (coil?: string) => {
     this.#base = this.#options.getGeometry();
