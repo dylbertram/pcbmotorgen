@@ -46,6 +46,49 @@ import {
 import type { WorldTransform } from "../../chart";
 import { arcSvgPath, splineSvgPath } from "../../curvePaths";
 
+/**
+ * World geometry reaches the canvas in micrometres, not metres. WebKit (the
+ * desktop app's engine) mis-rasterises paths whose user-space coordinates are
+ * ~1e-3 under a ~1e5 scale: short traces vanish and long ones shift. Scaling
+ * the coordinates up and the transform down by the same factor draws the
+ * same picture with well-conditioned numbers.
+ */
+const WORLD_UNITS = 1e6;
+
+/** Canvas facade for world-metre drawing: scales coordinates and lengths. */
+class WorldPen {
+  constructor(private readonly ctx: CanvasRenderingContext2D) {}
+  set strokeStyle(v: string) { this.ctx.strokeStyle = v; }
+  set fillStyle(v: string) { this.ctx.fillStyle = v; }
+  set globalAlpha(v: number) { this.ctx.globalAlpha = v; }
+  set lineCap(v: CanvasLineCap) { this.ctx.lineCap = v; }
+  set lineJoin(v: CanvasLineJoin) { this.ctx.lineJoin = v; }
+  set lineWidth(v: number) { this.ctx.lineWidth = v * WORLD_UNITS; }
+  setLineDash(d: number[]) { this.ctx.setLineDash(d.map((v) => v * WORLD_UNITS)); }
+  beginPath() { this.ctx.beginPath(); }
+  moveTo(x: number, y: number) { this.ctx.moveTo(x * WORLD_UNITS, y * WORLD_UNITS); }
+  lineTo(x: number, y: number) { this.ctx.lineTo(x * WORLD_UNITS, y * WORLD_UNITS); }
+  arc(x: number, y: number, r: number, a0: number, a1: number) {
+    this.ctx.arc(x * WORLD_UNITS, y * WORLD_UNITS, r * WORLD_UNITS, a0, a1);
+  }
+  rect(x: number, y: number, w: number, h: number) {
+    this.ctx.rect(x * WORLD_UNITS, y * WORLD_UNITS, w * WORLD_UNITS, h * WORLD_UNITS);
+  }
+  roundRect(x: number, y: number, w: number, h: number, r: number) {
+    this.ctx.roundRect(x * WORLD_UNITS, y * WORLD_UNITS, w * WORLD_UNITS, h * WORLD_UNITS, r * WORLD_UNITS);
+  }
+  fillRect(x: number, y: number, w: number, h: number) {
+    this.ctx.fillRect(x * WORLD_UNITS, y * WORLD_UNITS, w * WORLD_UNITS, h * WORLD_UNITS);
+  }
+  strokeRect(x: number, y: number, w: number, h: number) {
+    this.ctx.strokeRect(x * WORLD_UNITS, y * WORLD_UNITS, w * WORLD_UNITS, h * WORLD_UNITS);
+  }
+  fill() { this.ctx.fill(); }
+  stroke(path?: Path2D) { if (path) this.ctx.stroke(path); else this.ctx.stroke(); }
+  /** A world point in canvas units, for building Path2D strings. */
+  point(p: { x: number; y: number }) { return { x: p.x * WORLD_UNITS, y: p.y * WORLD_UNITS }; }
+}
+
 /** Virtual drawing-space width (the canvas maps to 760 virtual px). */
 export const PREVIEW_W = 760;
 /** Virtual drawing-space height (the canvas maps to 260 virtual px). */
@@ -205,19 +248,20 @@ export class CoilPreviewRenderer {
       ctx.restore();
     };
     ctx.translate(wt.tx + input.panX, wt.ty + input.panY);
-    ctx.scale(s, -s);
+    ctx.scale(s / WORLD_UNITS, -s / WORLD_UNITS);
+    const w = new WorldPen(ctx);
 
     let segments = 0;
     let vias = 0;
 
     // Dark PCB panel: fill + slate stroke, 1 screen px.
-    ctx.fillStyle = "#0f172a";
-    ctx.strokeStyle = "#334155";
-    ctx.lineWidth = 1 / s;
-    ctx.setLineDash([]);
-    ctx.beginPath();
+    w.fillStyle = "#0f172a";
+    w.strokeStyle = "#334155";
+    w.lineWidth = 1 / s;
+    w.setLineDash([]);
+    w.beginPath();
     if (typeof ctx.roundRect === "function") {
-      ctx.roundRect(
+      w.roundRect(
         g.boardRect.x,
         g.boardRect.y,
         g.boardRect.w,
@@ -226,10 +270,10 @@ export class CoilPreviewRenderer {
       );
     } else {
       // roundRect is not available in every engine — fall back to a plain rect.
-      ctx.rect(g.boardRect.x, g.boardRect.y, g.boardRect.w, g.boardRect.h);
+      w.rect(g.boardRect.x, g.boardRect.y, g.boardRect.w, g.boardRect.h);
     }
-    ctx.fill();
-    ctx.stroke();
+    w.fill();
+    w.stroke();
 
     // Active-copper band (always on): the copper active area — the full
     // routing domain the traces route across (the braid's end turns are
@@ -240,13 +284,13 @@ export class CoilPreviewRenderer {
       if (aw > 0 && ax + aw <= g.boardRect.x + g.boardRect.w) {
         const ay = g.boardRect.y;
         const ah = g.boardRect.h;
-        ctx.fillStyle = "rgba(52, 211, 153, 0.07)";
-        ctx.fillRect(ax, ay, aw, ah);
-        ctx.strokeStyle = "rgba(52, 211, 153, 0.55)";
-        ctx.lineWidth = 1 / s;
-        ctx.setLineDash([0.0012, 0.0012]);
-        ctx.strokeRect(ax, ay, aw, ah);
-        ctx.setLineDash([]);
+        w.fillStyle = "rgba(52, 211, 153, 0.07)";
+        w.fillRect(ax, ay, aw, ah);
+        w.strokeStyle = "rgba(52, 211, 153, 0.55)";
+        w.lineWidth = 1 / s;
+        w.setLineDash([0.0012, 0.0012]);
+        w.strokeRect(ax, ay, aw, ah);
+        w.setLineDash([]);
       }
     }
 
@@ -258,9 +302,9 @@ export class CoilPreviewRenderer {
       const zoneY = g.boardRect.y;
       const zoneH = g.boardRect.h;
       for (const zone of input.poleRegions) {
-        ctx.fillStyle =
+        w.fillStyle =
           zone.polarity > 0 ? POLE_REGION_EVEN_FILL : POLE_REGION_ODD_FILL;
-        ctx.fillRect(zone.x0, zoneY, zone.x1 - zone.x0, zoneH);
+        w.fillRect(zone.x0, zoneY, zone.x1 - zone.x0, zoneH);
         drawnPoleRegions += 1;
       }
     }
@@ -286,62 +330,62 @@ export class CoilPreviewRenderer {
       // Copper width stays constant in world metres, independent of camera zoom.
       const traceWidth = band?.trace_width_m ?? coils.trace_width_m ?? input.traceWidthMm / 1000;
       const lineWidth = centerlines ? 1 / s : traceWidth;
-      ctx.lineCap = "round";
-      ctx.lineJoin = "round";
+      w.lineCap = "round";
+      w.lineJoin = "round";
 
       // a. Active conductors.
-      ctx.strokeStyle = color;
-      ctx.lineWidth = lineWidth;
-      ctx.setLineDash([]);
-      ctx.globalAlpha = layerOpacity;
-      ctx.beginPath();
+      w.strokeStyle = color;
+      w.lineWidth = lineWidth;
+      w.setLineDash([]);
+      w.globalAlpha = layerOpacity;
+      w.beginPath();
       for (const seg of segs) {
         if (!seg.is_active) continue;
-        ctx.moveTo(seg.start[0], seg.start[1]);
-        ctx.lineTo(seg.end[0], seg.end[1]);
+        w.moveTo(seg.start[0], seg.start[1]);
+        w.lineTo(seg.end[0], seg.end[1]);
         segments += 1;
       }
-      ctx.stroke();
+      w.stroke();
 
       // b. End-turns are dashed only in centerline mode.
-      ctx.strokeStyle = color;
-      ctx.lineWidth = lineWidth;
-      ctx.setLineDash(centerlines ? [3 / s, 2 / s] : []);
-      ctx.globalAlpha = layerOpacity;
-      ctx.beginPath();
+      w.strokeStyle = color;
+      w.lineWidth = lineWidth;
+      w.setLineDash(centerlines ? [3 / s, 2 / s] : []);
+      w.globalAlpha = layerOpacity;
+      w.beginPath();
       for (const seg of segs) {
         if (seg.is_active) continue;
-        ctx.moveTo(seg.start[0], seg.start[1]);
-        ctx.lineTo(seg.end[0], seg.end[1]);
+        w.moveTo(seg.start[0], seg.start[1]);
+        w.lineTo(seg.end[0], seg.end[1]);
         segments += 1;
       }
-      ctx.stroke();
-      ctx.setLineDash([]);
+      w.stroke();
+      w.setLineDash([]);
 
       // d. Corner arcs use the same copper width as straight traces.
-      ctx.strokeStyle = color;
-      ctx.lineWidth = lineWidth;
+      w.strokeStyle = color;
+      w.lineWidth = lineWidth;
       for (const arc of arcs) {
-        ctx.setLineDash(centerlines && !arc.is_active ? [3 / s, 2 / s] : []);
-        ctx.globalAlpha = layerOpacity;
-        ctx.stroke(new Path2D(arcSvgPath({
-          start: { x: arc.start[0], y: arc.start[1] },
-          mid: { x: arc.mid[0], y: arc.mid[1] },
-          end: { x: arc.end[0], y: arc.end[1] },
+        w.setLineDash(centerlines && !arc.is_active ? [3 / s, 2 / s] : []);
+        w.globalAlpha = layerOpacity;
+        w.stroke(new Path2D(arcSvgPath({
+          start: w.point({ x: arc.start[0], y: arc.start[1] }),
+          mid: w.point({ x: arc.mid[0], y: arc.mid[1] }),
+          end: w.point({ x: arc.end[0], y: arc.end[1] }),
           layer: ph.layer_idx, net: ph.phase_name, is_active: arc.is_active ?? false,
         })));
       }
       for (const spline of ph.splines ?? []) {
-        ctx.setLineDash(centerlines && !spline.is_active ? [3 / s, 2 / s] : []);
-        ctx.globalAlpha = layerOpacity;
-        ctx.lineWidth = lineWidth;
-        ctx.stroke(new Path2D(splineSvgPath(spline)));
+        w.setLineDash(centerlines && !spline.is_active ? [3 / s, 2 / s] : []);
+        w.globalAlpha = layerOpacity;
+        w.lineWidth = lineWidth;
+        w.stroke(new Path2D(splineSvgPath({ ...spline, control_points: spline.control_points.map((p) => w.point(p)) })));
         segments += 1;
       }
     }
 
-    ctx.lineCap = "butt";
-    ctx.lineJoin = "miter";
+    w.lineCap = "butt";
+    w.lineJoin = "miter";
 
     // Paint pads and drill holes after all traces so other layers cannot
     // obscure the holes. Shared via coordinates are drawn only once. A via
@@ -351,26 +395,26 @@ export class CoilPreviewRenderer {
       const seen = new Set<string>();
       const drillRadius = Math.max(0, input.viaDrillMm / 2) * 1e-3;
       const padRadius = drillRadius + Math.max(0, input.viaAnnularRingMm) * 1e-3;
-      ctx.setLineDash([]);
-      ctx.globalAlpha = 1;
-      ctx.strokeStyle = "#0f172a";
-      ctx.lineWidth = 0.000025;
+      w.setLineDash([]);
+      w.globalAlpha = 1;
+      w.strokeStyle = "#0f172a";
+      w.lineWidth = 0.000025;
       for (const ph of coils.phases) {
         if (!input.isPhaseVisible(ph.phase_idx)) continue;
         for (const [vx, vy] of ph.via_positions ?? []) {
           const key = `${vx},${vy}`;
           if (seen.has(key)) continue;
           seen.add(key);
-          ctx.fillStyle = "#fbbf24";
-          ctx.beginPath();
-          ctx.arc(vx, vy, padRadius, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.stroke();
-          ctx.fillStyle = "#020617";
-          ctx.beginPath();
-          ctx.arc(vx, vy, drillRadius, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.stroke();
+          w.fillStyle = "#fbbf24";
+          w.beginPath();
+          w.arc(vx, vy, padRadius, 0, Math.PI * 2);
+          w.fill();
+          w.stroke();
+          w.fillStyle = "#020617";
+          w.beginPath();
+          w.arc(vx, vy, drillRadius, 0, Math.PI * 2);
+          w.fill();
+          w.stroke();
           vias += 1;
         }
       }
@@ -380,15 +424,15 @@ export class CoilPreviewRenderer {
     // track the shared mover position (shifted by `motion.offsetFromRestMm`),
     // so the strip slides over the fixed stator zones as the slider moves.
     for (const mag of input.visibleMagnets) {
-      ctx.globalAlpha = 0.7;
-      ctx.fillStyle = mag.pole > 0 ? "#f97316" : "#3b82f6";
+      w.globalAlpha = 0.7;
+      w.fillStyle = mag.pole > 0 ? "#f97316" : "#3b82f6";
       // Paint the configured solid width exactly. A fixed 0.5 mm inset here
       // adds an unmodelled gap and moves the visible pole centre away from the
       // leg-zone anchor.
-      ctx.fillRect(mag.x, g.magnetTop, Math.max(mag.w, 0.0005), 0.003);
+      w.fillRect(mag.x, g.magnetTop, Math.max(mag.w, 0.0005), 0.003);
     }
-    ctx.globalAlpha = 1;
-    ctx.setLineDash([]);
+    w.globalAlpha = 1;
+    w.setLineDash([]);
 
     // -----------------------------------------------------------------
     // routing_dimensions overlays — still in world metres, under the same
@@ -401,27 +445,27 @@ export class CoilPreviewRenderer {
       const r = input.poleRuler;
       const tick = 0.0012;
       const labelY = r.y + tick + 0.0004;
-      ctx.globalAlpha = 0.95;
-      ctx.setLineDash([]);
-      ctx.strokeStyle = "#a5b4fc"; // indigo-300: ruler line
-      ctx.fillStyle = "#cbd5e1";
-      ctx.lineWidth = 1.4 / s;
+      w.globalAlpha = 0.95;
+      w.setLineDash([]);
+      w.strokeStyle = "#a5b4fc"; // indigo-300: ruler line
+      w.fillStyle = "#cbd5e1";
+      w.lineWidth = 1.4 / s;
       // Double-ended baseline between the two magnet centres.
-      ctx.beginPath();
-      ctx.moveTo(r.x1, r.y);
-      ctx.lineTo(r.x2, r.y);
+      w.beginPath();
+      w.moveTo(r.x1, r.y);
+      w.lineTo(r.x2, r.y);
       // End ticks (+y side; the magnet strip sits below the ruler).
-      ctx.moveTo(r.x1, r.y);
-      ctx.lineTo(r.x1, r.y + tick);
-      ctx.moveTo(r.x2, r.y);
-      ctx.lineTo(r.x2, r.y + tick);
-      ctx.stroke();
+      w.moveTo(r.x1, r.y);
+      w.lineTo(r.x1, r.y + tick);
+      w.moveTo(r.x2, r.y);
+      w.lineTo(r.x2, r.y + tick);
+      w.stroke();
       // Centre markers at each end.
-      ctx.fillStyle = "#a5b4fc";
+      w.fillStyle = "#a5b4fc";
       for (const x of [r.x1, r.x2]) {
-        ctx.beginPath();
-        ctx.arc(x, r.y, 0.00035, 0, Math.PI * 2);
-        ctx.fill();
+        w.beginPath();
+        w.arc(x, r.y, 0.00035, 0, Math.PI * 2);
+        w.fill();
       }
       // Caption (mm), honestly labelled. Paint it upright in virtual space;
       // the world group is y-flipped for the schematic geometry.
@@ -453,31 +497,31 @@ export class CoilPreviewRenderer {
           row.maxM !== null && row.maxM > 0
             ? Math.max(row.maxM / 2, 0.0004)
             : null;
-        ctx.globalAlpha = 0.9;
+        w.globalAlpha = 0.9;
         // Optional top-down maximum: a dashed neutral reference bracket.
         if (maxHalfM !== null) {
-          ctx.setLineDash([3 / s, 2 / s]);
-          ctx.strokeStyle = "#94a3b8";
-          ctx.lineWidth = 0.8 / s;
-          ctx.beginPath();
-          ctx.moveTo(row.anchorX - maxHalfM, row.y);
-          ctx.lineTo(row.anchorX + maxHalfM, row.y);
-          ctx.stroke();
+          w.setLineDash([3 / s, 2 / s]);
+          w.strokeStyle = "#94a3b8";
+          w.lineWidth = 0.8 / s;
+          w.beginPath();
+          w.moveTo(row.anchorX - maxHalfM, row.y);
+          w.lineTo(row.anchorX + maxHalfM, row.y);
+          w.stroke();
         }
 
-        ctx.setLineDash([]);
-        ctx.strokeStyle = strokeColor;
-        ctx.fillStyle = strokeColor;
-        ctx.lineWidth = 1.2 / s;
+        w.setLineDash([]);
+        w.strokeStyle = strokeColor;
+        w.fillStyle = strokeColor;
+        w.lineWidth = 1.2 / s;
         // Effective-width bracket + short perpendicular end ticks.
-        ctx.beginPath();
-        ctx.moveTo(row.anchorX - halfM, row.y);
-        ctx.lineTo(row.anchorX + halfM, row.y);
-        ctx.moveTo(row.anchorX - halfM, row.y);
-        ctx.lineTo(row.anchorX - halfM, row.y + endTick);
-        ctx.moveTo(row.anchorX + halfM, row.y);
-        ctx.lineTo(row.anchorX + halfM, row.y + endTick);
-        ctx.stroke();
+        w.beginPath();
+        w.moveTo(row.anchorX - halfM, row.y);
+        w.lineTo(row.anchorX + halfM, row.y);
+        w.moveTo(row.anchorX - halfM, row.y);
+        w.lineTo(row.anchorX - halfM, row.y + endTick);
+        w.moveTo(row.anchorX + halfM, row.y);
+        w.lineTo(row.anchorX + halfM, row.y + endTick);
+        w.stroke();
 
         // Compact one-line label above the bracket:
         //   L0 A 2.00 mm / max 4.00 mm · Δ +2.00 mm
@@ -493,7 +537,7 @@ export class CoilPreviewRenderer {
         );
         drawnBandWidths += 1;
       }
-      ctx.globalAlpha = 1;
+      w.globalAlpha = 1;
     }
 
     // c. Lightbox measure ruler (two-click dimension tool, lightbox only).
@@ -512,28 +556,28 @@ export class CoilPreviewRenderer {
         const len = Math.max(Math.hypot(dx, dy), 1e-9);
         const nx = -dy / len;
         const ny = dx / len;
-        ctx.globalAlpha = placing ? 0.75 : 0.95;
-        ctx.setLineDash(placing ? [4 / s, 3 / s] : []);
-        ctx.strokeStyle = "#f472b6"; // pink-400: user measure ruler
-        ctx.fillStyle = "#f9a8d4";
-        ctx.lineWidth = 1.4 / s;
-        ctx.beginPath();
-        ctx.moveTo(ruler.p1.x, ruler.p1.y);
-        ctx.lineTo(ruler.p2.x, ruler.p2.y);
+        w.globalAlpha = placing ? 0.75 : 0.95;
+        w.setLineDash(placing ? [4 / s, 3 / s] : []);
+        w.strokeStyle = "#f472b6"; // pink-400: user measure ruler
+        w.fillStyle = "#f9a8d4";
+        w.lineWidth = 1.4 / s;
+        w.beginPath();
+        w.moveTo(ruler.p1.x, ruler.p1.y);
+        w.lineTo(ruler.p2.x, ruler.p2.y);
         // Perpendicular end ticks.
-        ctx.moveTo(ruler.p1.x, ruler.p1.y);
-        ctx.lineTo(ruler.p1.x + nx * tick, ruler.p1.y + ny * tick);
-        ctx.moveTo(ruler.p2.x, ruler.p2.y);
-        ctx.lineTo(ruler.p2.x + nx * tick, ruler.p2.y + ny * tick);
-        ctx.stroke();
-        ctx.setLineDash([]);
+        w.moveTo(ruler.p1.x, ruler.p1.y);
+        w.lineTo(ruler.p1.x + nx * tick, ruler.p1.y + ny * tick);
+        w.moveTo(ruler.p2.x, ruler.p2.y);
+        w.lineTo(ruler.p2.x + nx * tick, ruler.p2.y + ny * tick);
+        w.stroke();
+        w.setLineDash([]);
         drawWorldCaption(
           formatMetresMm(ruler.mm / 1000),
           ruler.label.x,
           ruler.label.y,
           "#f9a8d4",
         );
-        ctx.globalAlpha = 1;
+        w.globalAlpha = 1;
       }
     }
 
