@@ -167,9 +167,22 @@ fn validate_vias(
     ctx: &RoutingContext,
     bounds: &Bounds,
 ) -> Result<(), RoutingError> {
+    // A via that ends an inactive conductor (a terminal joint on a lead) may
+    // sit past the board-width edges with that lead.
+    let lead_bounds = Bounds {
+        y_unbounded: true,
+        ..*bounds
+    };
+    let ends_a_lead = |p: Point| {
+        result.segments.iter().any(|s| {
+            !s.is_active
+                && (length(s.start, p) <= bounds.eps || length(s.end, p) <= bounds.eps)
+        })
+    };
     for (i, v) in result.vias.iter().enumerate() {
         let idx = i + 1;
-        check_point(&v.position, bounds, &format!("vias[{i}].position"), idx)?;
+        let b = if ends_a_lead(v.position) { &lead_bounds } else { bounds };
+        check_point(&v.position, b, &format!("vias[{i}].position"), idx)?;
         check_layer(
             v.from_layer,
             ctx.num_layers,
