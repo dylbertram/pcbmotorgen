@@ -344,7 +344,9 @@ export class CoilPreviewRenderer {
     ctx.lineJoin = "miter";
 
     // Paint pads and drill holes after all traces so other layers cannot
-    // obscure the holes. Shared via coordinates are drawn only once.
+    // obscure the holes. Shared via coordinates are drawn only once. A via
+    // spans the board, so only the via toggle and its phase hide it — not
+    // the copper layer its preview group happens to sit on.
     if (input.showVias) {
       const seen = new Set<string>();
       const drillRadius = Math.max(0, input.viaDrillMm / 2) * 1e-3;
@@ -354,7 +356,7 @@ export class CoilPreviewRenderer {
       ctx.strokeStyle = "#0f172a";
       ctx.lineWidth = 0.000025;
       for (const ph of coils.phases) {
-        if (!input.isPhaseVisible(ph.phase_idx) || !input.isLayerVisible(ph.layer_idx) || !input.isCoilLayerVisible(ph.phase_name, ph.layer_idx)) continue;
+        if (!input.isPhaseVisible(ph.phase_idx)) continue;
         for (const [vx, vy] of ph.via_positions ?? []) {
           const key = `${vx},${vy}`;
           if (seen.has(key)) continue;
