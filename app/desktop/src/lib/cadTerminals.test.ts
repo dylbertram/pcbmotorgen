@@ -99,10 +99,10 @@ describe("CAD terminals", () => {
     );
     expect(defaultCadTerminals(geometry, "A")).toBeNull();
   });
-  it("does not default a coil linked to another net by a shared endpoint or via", () => {
+  it("infers an end junction but rejects an ambiguous internal foreign via", () => {
     const shared = terminalFixture();
     shared.routing.segments.push({ start: { x: 2, y: 0 }, end: { x: 3, y: 0 }, layer: 0, net: "B", is_active: true });
-    expect(defaultCadTerminals(shared, "A")).toBeNull();
+    expect(defaultCadTerminals(shared, "A")).toEqual({ input: { position: { x: 1, y: 0 }, layer: 1 }, output: { position: { x: 2, y: 0 }, layer: 0 } });
     const linked = terminalFixture();
     linked.routing.vias[0].net = "B";
     expect(defaultCadTerminals(linked, "A")).toBeNull();
