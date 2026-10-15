@@ -43,15 +43,13 @@ const MOCK_BRAID_PARAMS: RoutingParamDef[] = [
   {
     key: "connection",
     label: "Winding connection",
-    description:
-      "Closed keeps each phase as a closed ring. Delta opens each phase and brings both ends out to x = 0 above the board width. Star does the same and ties the layer-1 ends together into a neutral.",
+    description: "How each phase winding terminates.",
     param_type: "int",
-    default: 0,
-    min: 0,
+    default: 1,
+    min: 1,
     max: 2,
     step: 1,
     options: [
-      { value: 0, label: "Closed loop" },
       { value: 1, label: "Delta" },
       { value: 2, label: "Star (wye)" },
     ],
