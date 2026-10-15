@@ -3,6 +3,7 @@
   import type { RoutingParamDef } from "../../types";
   import NumberField from "../ui/NumberField.svelte";
   import HelpTag from "../ui/HelpTag.svelte";
+  import WindingConnectionFigure from "./WindingConnectionFigure.svelte";
 
   let { config }: { config: ConfigStore } = $props();
 
@@ -11,6 +12,13 @@
     const value = config.routing_params[def.key];
     return typeof value === "number" && Number.isFinite(value) ? value : def.default;
   }
+
+  // The braid's winding-connection choice gets an explanatory figure.
+  const connectionDef = $derived(
+    config.routing_pattern === "infinity-braid"
+      ? config.routing_param_defs.find((def) => def.key === "connection")
+      : undefined,
+  );
 
   function onParamInput(def: RoutingParamDef, value: number): void {
     if (!Number.isFinite(value)) return;
@@ -70,5 +78,8 @@
         </label>
       {/each}
     </div>
+    {#if connectionDef}
+      <WindingConnectionFigure value={valueFor(connectionDef)} />
+    {/if}
   {/if}
 </div>

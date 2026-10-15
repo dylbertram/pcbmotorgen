@@ -28,6 +28,36 @@ export async function listRoutingPatterns(): Promise<RoutingPatternInfo[]> {
   return await invoke<RoutingPatternInfo[]>("list_routing_patterns");
 }
 
+/** Browser-mode mirror of the bundled braid's declared parameters. */
+const MOCK_BRAID_PARAMS: RoutingParamDef[] = [
+  {
+    key: "num_strands",
+    label: "Strands per period",
+    description: "Number of parallel braided paths in each period.",
+    param_type: "int",
+    default: 5,
+    min: 2,
+    max: 99,
+    step: 1,
+  },
+  {
+    key: "connection",
+    label: "Winding connection",
+    description:
+      "Closed keeps each phase as a closed ring. Delta opens each phase and brings both ends out to x = 0 above the board width. Star does the same and ties the layer-1 ends together into a neutral.",
+    param_type: "int",
+    default: 0,
+    min: 0,
+    max: 2,
+    step: 1,
+    options: [
+      { value: 0, label: "Closed loop" },
+      { value: 1, label: "Delta" },
+      { value: 2, label: "Star (wye)" },
+    ],
+  },
+];
+
 /**
  * Query the user-editable parameters a routing pattern exposes. Returns
  * the declared `RoutingParamDef`s so the UI can render one editable
@@ -36,7 +66,9 @@ export async function listRoutingPatterns(): Promise<RoutingPatternInfo[]> {
 export async function routingPatternParameters(
   patternId: string,
 ): Promise<RoutingParamDef[]> {
-  if (!isTauriAvailable()) return [];
+  if (!isTauriAvailable()) {
+    return patternId === "infinity-braid" ? MOCK_BRAID_PARAMS : [];
+  }
   return await invoke<RoutingParamDef[]>("routing_pattern_parameters", {
     patternId,
   });
