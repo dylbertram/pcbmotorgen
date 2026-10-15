@@ -301,6 +301,14 @@ pub async fn analyze_drive(
     cad_geometry: Option<pcbmotorgen_export::cad_dxf::CadGeometry>,
 ) -> Result<pcbmotorgen_simulation::drive::DriveAnalysis, String> {
     let core = config.to_core();
+    // Pattern-owned contract from motor-coil-generator-add-inputs:
+    // 0 = closed, 1 = delta, 2 = star/wye. Imported copper is independent.
+    let delta = cad_geometry.is_none()
+        && core.routing_pattern_id() == "infinity-braid"
+        && core.routing_params.get("connection").is_some_and(|value| value.round() == 1.0);
+    if let Some(error) = pcbmotorgen_simulation::drive::driver_connection_error(&drive.driver, delta) {
+        return Err(error);
+    }
     tauri::async_runtime::spawn_blocking(move || {
         if let Some(cad) = cad_geometry.as_ref() {
             let board = super::cad_source::CadBoard::new(cad, &core)?;
@@ -478,6 +486,20 @@ mod travel_envelope_tests {
 #[cfg(test)]
 mod analyze_drive_tests {
     use super::*;
+
+    #[test]
+    fn command_rejects_delta_before_running_star_analysis() {
+        let mut ipc = crate::ipc::ProjectConfigStateIpc::default().to_linear_motor_ipc();
+        ipc.routing_params.insert("connection".into(), 1.0);
+        let mut drive = pcbmotorgen_simulation::drive::DriveSettings::default();
+        let error = tauri::async_runtime::block_on(analyze_drive(ipc.clone(), drive.clone(), None, None))
+            .unwrap_err();
+        assert!(error.contains("Star (wye) configuration is required"));
+        drive.driver.supports_delta = true;
+        let error = tauri::async_runtime::block_on(analyze_drive(ipc, drive, None, None))
+            .unwrap_err();
+        assert!(error.contains("delta electrical analysis is not yet available"));
+    }
 
     /// The command runs on the app's default design and reports the routed
     /// braid: three connected phases with five strands each.

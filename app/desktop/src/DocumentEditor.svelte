@@ -417,12 +417,16 @@
       driveError = null;
     } catch (e) {
       if (generation !== driveGeneration) return;
+      drive = null;
       driveError = e instanceof Error ? e.message : String(e);
     }
   }
 
   $effect(() => {
     void sweep;
+    // Read all IPC inputs synchronously: reads inside the debounced async
+    // run are not effect dependencies. A failed sweep must not block updates.
+    void JSON.stringify(config.toIpc());
     void JSON.stringify(config.drive);
     void geometryKey(projects.cadGeometry);
     void valid;
@@ -644,6 +648,7 @@
             class="h-full overflow-y-auto p-4 lg:pr-0"
           >
             <SimulateTab
+              onConfigureWinding={() => selectTab("design")}
               {config}
               active={active && activeTab === "simulate"}
               {sweep}

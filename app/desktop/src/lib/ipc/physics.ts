@@ -8,6 +8,7 @@
  */
 
 import { invoke } from "@tauri-apps/api/core";
+import { driverConnectionError, usesDeltaConnection } from "../driverConnection";
 import type {
   LinearMotorConfig,
   CoilPathDto,
@@ -91,6 +92,8 @@ export async function analyzeDrive(
   kf: number | null,
   cadGeometry: CadGeometry | null = null,
 ): Promise<DriveAnalysis> {
+  const connectionError = driverConnectionError(drive.driver, usesDeltaConnection(config, cadGeometry !== null));
+  if (connectionError) throw new Error(connectionError);
   if (!isTauriAvailable()) return mockDriveAnalysis(config, drive, kf);
   return await invoke<DriveAnalysis>("analyze_drive", {
     config,

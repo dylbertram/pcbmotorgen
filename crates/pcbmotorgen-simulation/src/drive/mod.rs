@@ -50,6 +50,9 @@ const RHO_REF_C: f64 = 20.0;
 pub struct DriverSpec {
     /// Display name, e.g. `DRV8311`.
     pub name: String,
+    /// Confirmed built-in delta handling by the driver/controller. Unconfirmed
+    /// legacy specs require star/wye for evaluation, not a hardware prohibition.
+    pub supports_delta: bool,
     /// Minimum motor supply voltage [V].
     pub min_supply_v: f64,
     /// Maximum motor supply voltage [V].
@@ -69,6 +72,7 @@ impl Default for DriverSpec {
         // TI DRV8311 (integrated FET, 3-phase).
         Self {
             name: "DRV8311".to_string(),
+            supports_delta: false,
             min_supply_v: 3.0,
             max_supply_v: 20.0,
             peak_current_a: 5.0,
@@ -76,6 +80,47 @@ impl Default for DriverSpec {
             rds_on_ohm: 0.21,
             max_pwm_hz: 200e3,
         }
+    }
+}
+
+/// Keep hardware compatibility separate from model availability. The present
+/// voltage/current/ripple equations assume star/wye and cannot evaluate delta.
+pub fn driver_connection_error(driver: &DriverSpec, delta: bool) -> Option<String> {
+    if !delta {
+        return None;
+    }
+    let hint = "Go to Design > Topology & Board > Winding connection and select Star (wye).";
+    Some(if driver.supports_delta {
+        format!("Delta handling is declared for {}, but delta electrical analysis is not yet available. {hint}", driver.name)
+    } else {
+        format!("{} has no declared built-in delta handling. Star (wye) configuration is required. {hint}", driver.name)
+    })
+}
+
+#[cfg(test)]
+mod connection_tests {
+    use super::*;
+
+    #[test]
+    fn unconfirmed_delta_requires_star_wye() {
+        let driver = DriverSpec::default();
+        assert!(driver_connection_error(&driver, false).is_none());
+        let error = driver_connection_error(&driver, true).unwrap();
+        assert!(error.contains("Star (wye) configuration is required"));
+        assert!(error.contains("Design > Topology & Board > Winding connection"));
+    }
+
+    #[test]
+    fn declared_delta_support_does_not_enable_star_equations_for_delta() {
+        let driver = DriverSpec { supports_delta: true, ..DriverSpec::default() };
+        let error = driver_connection_error(&driver, true).unwrap();
+        assert!(error.contains("delta electrical analysis is not yet available"));
+    }
+
+    #[test]
+    fn legacy_driver_specs_default_to_unconfirmed_delta_support() {
+        let driver: DriverSpec = serde_json::from_str(r#"{"name":"Legacy"}"#).unwrap();
+        assert!(!driver.supports_delta);
     }
 }
 

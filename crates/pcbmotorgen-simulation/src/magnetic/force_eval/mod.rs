@@ -37,12 +37,10 @@
 //! FOC is rejected as misconfigured (sin vs cos, wrong per-coil offset,
 //! etc.) and `evaluate`/`evaluate_at` return `Err(SimulationError)`.
 //!
-//! The guard tries `phase_shift = 0` first; if that fails it tries
-//! `phase_shift = π` (the "flipped" polarity). If neither produces
-//! positive forward thrust at all three test points, the FOC is
-//! rejected. This catches real FOC errors (90° sin-vs-cos, wrong
-//! per-coil offset) without masking the legitimate 180° polarity
-//! inversion needed by the default config.
+//! The guard tries the nominal and reversed polarities first. If neither
+//! works, it measures the quadrature response and aligns the common electrical
+//! reference to the winding. Per-phase offsets remain unchanged. The aligned
+//! law must still produce forward thrust at every test point or it is rejected.
 //!
 //! ## Module layout
 //! - [`commutation`](self::commutation) — `CommutationMode` + current law
@@ -77,7 +75,7 @@ pub struct ForceEvaluator {
     /// Z depth of the conductor plane [m]. 0 = PCB top surface.
     pub layer_z_m: f64,
     /// Dynamic phase shift set by the self-calibration guard [rad].
-    /// 0.0 or π (180°).
+    /// Includes the winding's common electrical reference alignment.
     phase_shift: f64,
     /// Whether self-calibration has been performed.
     calibrated: bool,
@@ -137,9 +135,7 @@ impl ForceEvaluator {
         coils: &[PhaseCoil],
     ) -> Result<ForceResult, SimulationError> {
         // Self-calibration guard (FOC spec §4.3): 3-point polarity + alignment
-        // check. Tries phase_shift = 0 first, then phase_shift = π as a
-        // fallback. Returns Err if neither produces positive forward thrust
-        // at all 3 test points.
+        // check, including a common winding-reference alignment if needed.
         if !self.calibrated {
             self.self_calibrate(config, coils)?;
         }
@@ -281,27 +277,24 @@ impl ForceEvaluator {
     /// 3-point polarity + alignment check (FOC spec §4.3).
     ///
     /// Evaluates the mover force at three test positions (10%, 60%, 110% of
-    /// `τ_p`) for both `phase_shift = 0` and `phase_shift = π`. The first
-    /// polarity state that produces `F_mover.x > 0` at **all three** test
-    /// points is accepted; otherwise the FOC is rejected as misconfigured.
-    ///
-    /// Why the fallback to `phase_shift = π`: the spec's strict reading
-    /// ("no legitimate polarity inversion") is incompatible with the
-    /// default `SimulationInput` (whose alternating-pole array produces a
-    /// 180°-flipped FOC direction at `phase_shift = 0`). The fallback
-    /// preserves the spec's *intent* — catching real FOC errors (sin vs
-    /// cos, wrong per-coil offset) — without rejecting the production
-    /// default config.
+    /// `τ_p`). Tries the nominal and reversed polarities, then a common
+    /// winding-reference alignment derived from the quadrature response.
+    /// Relative phase offsets stay fixed; every test point must still pass.
     ///
     /// # Errors
-    /// Returns `Err(SimulationError)` if neither polarity state produces
-    /// positive forward thrust at all three test points. This usually
-    /// means the FOC formula is wrong (sin vs cos, wrong per-coil offset).
+    /// Returns `Err(SimulationError)` if no tested reference produces
+    /// forward thrust at all three test points.
     fn self_calibrate(
         &mut self,
         config: &SimulationInput,
         coils: &[PhaseCoil],
     ) -> Result<(), SimulationError> {
+        // Fixed-phase excitation intentionally changes thrust sign with mover
+        // position. It is not FOC and must not pass a forward-thrust guard.
+        if self.commutation == CommutationMode::PhaseAOnly {
+            self.calibrated = true;
+            return Ok(());
+        }
         // 3-point polarity + alignment check (FOC spec §4.3)
         let test_positions = [
             0.1 * config.pole_pitch_m(),
@@ -311,9 +304,9 @@ impl ForceEvaluator {
 
         // Try phase_shift = 0 first.
         self.phase_shift = 0.0;
-        if test_positions.iter().all(|&p| {
-            self.evaluate_force_raw(config, coils, p).0[0] >= 0.0
-        }) {
+        let in_phase: Vec<f64> = test_positions.iter()
+            .map(|&p| self.evaluate_force_raw(config, coils, p).0[0]).collect();
+        if in_phase.iter().all(|&force| force >= 0.0) {
             self.calibrated = true;
             return Ok(());
         }
@@ -321,22 +314,33 @@ impl ForceEvaluator {
         // Fall back to phase_shift = π (the "flipped" polarity, needed by
         // the default `SimulationInput`).
         self.phase_shift = std::f64::consts::PI;
-        if test_positions.iter().all(|&p| {
-            self.evaluate_force_raw(config, coils, p).0[0] >= 0.0
-        }) {
+        if in_phase.iter().all(|&force| force <= 0.0) {
             self.calibrated = true;
             return Ok(());
         }
 
-        // Neither polarity state produced positive forward thrust at all
-        // three test points. This is almost always a real FOC error
-        // (wrong sin/cos, wrong per-coil offset). Reject.
+        // A translated or braided winding need not have its electrical zero
+        // at the first magnet's centre. Polarity alone cannot align it.
+        // Lorentz force is linear in current, so at each position
+        // F(delta) = F(0) cos(delta) + F(pi/2) sin(delta).
+        // Align the COMMON reference to maximize the summed test thrust,
+        // without changing any relative per-phase offsets or force signs.
+        self.phase_shift = std::f64::consts::FRAC_PI_2;
+        let quadrature: Vec<f64> = test_positions.iter()
+            .map(|&p| self.evaluate_force_raw(config, coils, p).0[0]).collect();
+        if let Some(alignment) = winding_reference_alignment(&in_phase, &quadrature) {
+            self.phase_shift = alignment;
+            self.calibrated = true;
+            return Ok(());
+        }
+
+        // Even a common reference alignment cannot produce forward thrust.
         self.phase_shift = 0.0;
-        self.calibrated = true;
-        Err(SimulationError(format!(
+        self.calibrated = false;
+        Err(SimulationError(String::from(
             "FOC misconfiguration: forward thrust is negative at one or more \
-             test positions (10%, 60%, 110% of pole pitch) for both \
-             phase_shift=0 and phase_shift=π. This usually means the FOC \
+             test positions (10%, 60%, 110% of pole pitch) after nominal/reversed \
+             polarity and winding-reference alignment. This usually means the FOC \
              formula or per-coil offset does not match the winding geometry \
              (per-coil offset must be π·τ_s/τ_p for coils spaced one \
              phase-band pitch apart). \
@@ -406,6 +410,18 @@ impl ForceEvaluator {
     }
 }
 
+/// Maximize summed thrust with one common electrical reference. Reject a
+/// reference that reverses any test point, has no coupling, or is non-finite.
+fn winding_reference_alignment(in_phase: &[f64], quadrature: &[f64]) -> Option<f64> {
+    let a: f64 = in_phase.iter().sum();
+    let b: f64 = quadrature.iter().sum();
+    let angle = b.atan2(a);
+    (a.is_finite() && b.is_finite() && a.hypot(b) > 1e-12
+        && in_phase.iter().zip(quadrature)
+            .all(|(a, b)| a * angle.cos() + b * angle.sin() > 0.0))
+        .then_some(angle)
+}
+
 /// Linear space from `start` to `end` with `n` points (inclusive both ends).
 fn linspace(start: f64, end: f64, n: usize) -> Vec<f64> {
     if n == 1 {
@@ -420,6 +436,15 @@ mod tests {
     use super::*;
     use crate::params::PhaseBandPosition;
     use pcbmotorgen_routing::CoilSegment;
+
+    #[test]
+    fn winding_reference_alignment_preserves_forward_thrust_guard() {
+        let angle = winding_reference_alignment(&[-1.0, 1.0, 0.0], &[2.0, 2.0, 2.0]).unwrap();
+        assert!((angle - std::f64::consts::FRAC_PI_2).abs() < 1e-12);
+        assert!(winding_reference_alignment(&[1.0, -2.0, 1.0], &[0.0; 3]).is_none());
+        assert!(winding_reference_alignment(&[0.0; 3], &[0.0; 3]).is_none());
+        assert!(winding_reference_alignment(&[f64::NAN; 3], &[1.0; 3]).is_none());
+    }
 
     /// Generate infinity-braid coils for a config (mirrors the old
     /// `crate::geometry::generate_coils_for_board` for test purposes).
@@ -560,6 +585,47 @@ mod tests {
     }
 
     #[test]
+    fn desktop_default_braid_simulates() {
+        let cfg = SimulationInput {
+            magnet_pitch_m: 0.006,
+            magnet_dims_m: [0.0045, 0.010, 0.003],
+            magnet_count: 12,
+            active_area_length_m: 0.147,
+            num_layers: 4,
+            min_trace_m: 0.000127,
+            min_space_m: 0.000127,
+            ..SimulationInput::default()
+        };
+        let coils = generate_coils(&cfg);
+        let mut ev = ForceEvaluator::new(9, 3, CommutationMode::MaxThrust, 0.0);
+        let result = ev.evaluate(&cfg, &coils).expect("desktop default braid must simulate");
+        assert!(result.force_x_n.iter().all(|force| force.is_finite()));
+        for fraction in [0.1, 0.6, 1.1] {
+            assert!(ev.evaluate_force_raw(&cfg, &coils, fraction * cfg.pole_pitch_m()).0[0] > 0.0);
+        }
+    }
+
+    #[test]
+    fn fixed_phase_excitation_is_allowed_to_reverse_thrust() {
+        let cfg = SimulationInput::default();
+        let coils = vec![make_test_coil(0, "A", 0.0)];
+        let mut ev = ForceEvaluator::new(3, 2, CommutationMode::PhaseAOnly, 0.0);
+        let first = ev.evaluate_at(&cfg, &coils, 0.0).unwrap().0[0];
+        let next = ev.evaluate_at(&cfg, &coils, cfg.pole_pitch_m()).unwrap().0[0];
+        assert!(first * next < 0.0);
+    }
+
+    #[test]
+    fn failed_calibration_does_not_bypass_guard_on_retry() {
+        let cfg = SimulationInput { max_current_a: f64::NAN, ..SimulationInput::default() };
+        let coils = vec![make_test_coil(0, "A", 0.0)];
+        let mut ev = ForceEvaluator::new(3, 1, CommutationMode::MaxThrust, 0.0);
+        assert!(ev.evaluate(&cfg, &coils).is_err());
+        assert!(!ev.calibrated);
+        assert!(ev.evaluate_at(&cfg, &coils, 0.0).is_err());
+    }
+
+    #[test]
     fn test_evaluate_basic() {
         let cfg = SimulationInput::default();
         let coils = vec![
@@ -633,22 +699,9 @@ mod tests {
         assert!(!coils.is_empty(), "infinity-braid must produce coils for the default config");
 
         let mut ev = ForceEvaluator::new(50, 20, CommutationMode::MaxThrust, 0.0);
-        match ev.evaluate(&cfg, &coils) {
-            Ok(result) => {
-                assert_eq!(result.n_positions(), 50);
-                for f in &result.force_x_n {
-                    assert!(f.is_finite(), "force_x not finite: {f}");
-                }
-                // Mean thrust must be finite (FOC produces a forward force when
-                // the braid aligns with the cos-FOC law).
-                assert!(result.mean_thrust_n().is_finite());
-            }
-            Err(_) => {
-                // The braid is a staggered two-layer weave; if its conductors
-                // do not align with the cos-FOC law the 3-point guard rejects
-                // the config. That is the guard doing its job — never a panic.
-            }
-        }
+        let result = ev.evaluate(&cfg, &coils).expect("default braid must simulate");
+        assert_eq!(result.n_positions(), 50);
+        assert!(result.force_x_n.iter().all(|force| force.is_finite()));
     }
 
     /// End-to-end robustness: the 4:5 Vernier config (spacing_ratio=0.8, 3

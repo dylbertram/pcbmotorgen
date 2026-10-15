@@ -6,6 +6,8 @@
 /** Datasheet limits of one three-phase driver IC. */
 export interface DriverSpec {
   name: string;
+  /** Confirmed built-in driver/controller delta handling. Absent means unconfirmed. */
+  supports_delta?: boolean;
   min_supply_v: number;
   max_supply_v: number;
   /** Peak output / overcurrent trip [A]. */
@@ -107,11 +109,12 @@ export interface DriveAnalysis {
 
 /**
  * Driver presets. Typical datasheet values: check them against the revision
- * you design with. Editing any limit switches the selection to "Custom".
+ * you design with. Additional parts can be added from the Simulation tab.
  */
 export const DRIVER_PRESETS: DriverSpec[] = [
   {
     name: "DRV8311",
+    supports_delta: false,
     min_supply_v: 3,
     max_supply_v: 20,
     peak_current_a: 5,
@@ -121,6 +124,7 @@ export const DRIVER_PRESETS: DriverSpec[] = [
   },
   {
     name: "DRV8316",
+    supports_delta: false,
     min_supply_v: 4.5,
     max_supply_v: 35,
     peak_current_a: 8,
@@ -130,6 +134,7 @@ export const DRIVER_PRESETS: DriverSpec[] = [
   },
   {
     name: "DRV8313",
+    supports_delta: false,
     min_supply_v: 8,
     max_supply_v: 60,
     peak_current_a: 2.5,
