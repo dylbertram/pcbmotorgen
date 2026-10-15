@@ -49,6 +49,28 @@
 //! the full along-travel span of its pole regions as extent, the full board
 //! width as y-extent, and the braided shape. The declaration is consistent
 //! with the `pole_regions` emission by construction.
+//!
+//! ## Winding connection
+//!
+//! Every phase of the braid is a closed copper ring. The `connection`
+//! parameter keeps that ring (`closed`) or opens it into a winding with two
+//! ends and brings the ends out as leads:
+//!
+//! - The ring is opened at the last peak of the first period (the top vertex
+//!   of the last strand's first diamond) by omitting the via there. Its
+//!   layer-0 and layer-1 traces become the winding's two ends.
+//! - Each end rises straight up past the board width to a per-phase lead
+//!   height, then runs left to `x = 0` on its own layer. Phase `i` uses
+//!   height `board_width + (i + 1) · lead_pitch`, and its break point lies
+//!   further right than every earlier phase's, so the leads nest without
+//!   crossing.
+//! - `delta` leaves both ends of every phase at the edge (six leads for three
+//!   phases); the delta junctions are made where the leads are terminated.
+//! - `star` additionally ties the layer-1 ends together with a neutral bus
+//!   at `x = 0`, leaving the layer-0 ends as the line terminals.
+//!
+//! Leads are inactive (non-thrust) conductors and are the only copper the
+//! braid places outside the board width.
 
 mod diamonds;
 mod peaks_valleys;
@@ -59,12 +81,37 @@ use crate::error::{RoutingError, RoutingErrorKind};
 use crate::model::{
     LegGrid, PhaseBand, PhaseBandShape, Point, PoleRegion, RouteSegment, RoutingResult, Via,
 };
-use crate::pattern::RoutingPattern;
+use crate::pattern::{ParamOption, RoutingPattern};
 
 use self::diamonds::{compute_diamonds, compute_endpoints, compute_pole_region_xs};
 use self::segments::{compute_bottom_layer_segments, compute_top_layer_segments};
 
 const PHASE_NAMES: &[&str] = &["A", "B", "C", "D", "E", "F"];
+
+/// How the phase windings are terminated (the `connection` parameter).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Connection {
+    /// Each phase stays a closed ring with no leads.
+    Closed,
+    /// Each phase is opened and both ends are brought out as leads.
+    Delta,
+    /// As [`Connection::Delta`], with the layer-1 ends tied by a neutral bus.
+    Star,
+}
+
+impl Connection {
+    const CLOSED: f64 = 0.0;
+    const DELTA: f64 = 1.0;
+    const STAR: f64 = 2.0;
+
+    fn from_param(value: f64) -> Self {
+        match value.round() as i64 {
+            1 => Self::Delta,
+            2 => Self::Star,
+            _ => Self::Closed,
+        }
+    }
+}
 
 /// The bundled infinity-braid pattern.
 #[derive(Debug, Clone, Default)]
@@ -99,6 +146,21 @@ impl RoutingPattern for InfinityBraidPattern {
         vec![
             PatternParameter::int("num_strands", "Strands per period", 5.0, 2.0, 99.0)
                 .with_description("Number of parallel braided paths in each period."),
+            PatternParameter::int(
+                "connection",
+                "Winding connection",
+                Connection::CLOSED,
+                Connection::CLOSED,
+                Connection::STAR,
+            )
+            .with_description(
+                "Closed keeps each phase as a closed ring. Delta opens each phase and brings both ends out to x = 0 above the board width. Star does the same and ties the layer-1 ends together into a neutral.",
+            )
+            .with_options(vec![
+                ParamOption::new(Connection::CLOSED, "Closed loop"),
+                ParamOption::new(Connection::DELTA, "Delta"),
+                ParamOption::new(Connection::STAR, "Star (wye)"),
+            ]),
         ]
     }
 
@@ -128,7 +190,17 @@ impl RoutingPattern for InfinityBraidPattern {
         // Amplitude = half the board width, mapping diamond ±A onto [0, board_width].
         let amplitude_mm = ctx.board_width_mm / 2.0;
 
-        let geometry = braid_geometry(layout, amplitude_mm, phases, num_strands);
+        let connection = Connection::from_param(ctx.param("connection", Connection::CLOSED));
+        let lead_pitch = lead_pitch_mm(layout, amplitude_mm, ctx);
+
+        let geometry = braid_geometry(
+            layout,
+            amplitude_mm,
+            phases,
+            num_strands,
+            connection,
+            lead_pitch,
+        );
 
         // Pattern-declared leg grid: the braid's active legs populate a
         // uniform interleave grid of one slot per phase/strand position per
@@ -264,6 +336,18 @@ fn resolve_braid_layout(
     }
 }
 
+/// Centre-to-centre spacing of the lead runs above the board [mm].
+///
+/// Matches the depth of the braid's first crossing below its peaks (the
+/// interleave step times the diamond edge slope), so the first lead sits at
+/// the same spacing as the braid's own copper. Never tighter than one trace
+/// plus one clearance.
+fn lead_pitch_mm(layout: BraidLayout, amplitude_mm: f64, ctx: &RoutingContext) -> f64 {
+    let period_length = layout.d_phase / layout.n_periods as f64;
+    let crossing_depth = layout.o.abs() * amplitude_mm / period_length;
+    crossing_depth.max(ctx.min_trace_mm + ctx.min_space_mm)
+}
+
 /// Generated braid geometry across all phases.
 struct BraidGeometry {
     segments: Vec<RouteSegment>,
@@ -274,12 +358,15 @@ struct BraidGeometry {
 
 /// Emit the per-phase diamond geometry: two segment layers (top / bottom),
 /// one via per peak/valley/edge endpoint, and the pole regions at
-/// board-centre height.
+/// board-centre height. Unless the connection is closed, each phase's ring is
+/// opened at its break via and leads are added (see the module docs).
 fn braid_geometry(
     layout: BraidLayout,
     amplitude_mm: f64,
     phases: i64,
     num_strands: i64,
+    connection: Connection,
+    lead_pitch: f64,
 ) -> BraidGeometry {
     let offset_step = layout.o * num_strands as f64 * -1.0;
     let mut geometry = BraidGeometry {
@@ -350,13 +437,47 @@ fn braid_geometry(
                 is_active: true,
             });
         }
+        // The top vertex of the last strand's first diamond is the last peak
+        // of the first period; its via is where the ring is opened.
+        let break_point = diamonds[0][num_strands as usize - 1][0];
         for p in flatlist {
+            if connection != Connection::Closed && p == break_point {
+                continue;
+            }
             geometry.vias.push(Via {
                 position: p,
                 from_layer: 0,
                 to_layer: 1,
                 net: net.clone(),
             });
+        }
+
+        if connection != Connection::Closed {
+            let lead_y = 2.0 * amplitude_mm + (i + 1) as f64 * lead_pitch;
+            let corner = Point::new(break_point.x, lead_y);
+            let edge = Point::new(0.0, lead_y);
+            for layer in 0..2u32 {
+                for (start, end) in [(break_point, corner), (corner, edge)] {
+                    geometry.segments.push(RouteSegment {
+                        start,
+                        end,
+                        layer,
+                        net: net.clone(),
+                        is_active: false,
+                    });
+                }
+            }
+            // Neutral bus: join this phase's layer-1 lead end to the next
+            // phase's, one piece per adjacent pair.
+            if connection == Connection::Star && i + 1 < phases {
+                geometry.segments.push(RouteSegment {
+                    start: edge,
+                    end: Point::new(0.0, lead_y + lead_pitch),
+                    layer: 1,
+                    net: net.clone(),
+                    is_active: false,
+                });
+            }
         }
     }
 
@@ -668,6 +789,168 @@ mod tests {
             .phase_bands
             .iter()
             .all(|record| !record.derived));
+    }
+
+    /// The Fader workspace braid: 6 mm pole pitch, 3 phases × 3 strands,
+    /// 8 mm board, 14 periods spanning x ∈ [0, 89.333].
+    fn fader_ctx(connection: f64) -> RoutingContext {
+        let mut params = HashMap::new();
+        params.insert("num_strands".to_string(), 3.0);
+        params.insert("connection".to_string(), connection);
+        RoutingContext {
+            active_area_length_mm: 89.0 + 1.0 / 3.0,
+            board_width_mm: 8.0,
+            num_layers: 2,
+            phases: 3,
+            min_trace_mm: 0.127,
+            min_space_mm: 0.127,
+            expects_continuous: false,
+            params,
+            magnet_pitch_mm: Some(6.0),
+            magnet_array_span_mm: Some(30.0),
+            ..RoutingContext::default()
+        }
+    }
+
+    type NodeKey = (u32, i64, i64);
+
+    fn node(layer: u32, p: Point) -> NodeKey {
+        (layer, (p.x * 1e6).round() as i64, (p.y * 1e6).round() as i64)
+    }
+
+    /// Per-net conductor graph: trace endpoints per layer, joined by
+    /// segments and by vias between layers 0 and 1.
+    fn net_graph(r: &RoutingResult, net: &str) -> HashMap<NodeKey, Vec<NodeKey>> {
+        let mut g: HashMap<NodeKey, Vec<NodeKey>> = HashMap::new();
+        let mut link = |a: NodeKey, b: NodeKey| {
+            g.entry(a).or_default().push(b);
+            g.entry(b).or_default().push(a);
+        };
+        for s in r.segments.iter().filter(|s| s.net == net) {
+            link(node(s.layer, s.start), node(s.layer, s.end));
+        }
+        for v in r.vias.iter().filter(|v| v.net == net) {
+            link(node(v.from_layer, v.position), node(v.to_layer, v.position));
+        }
+        g
+    }
+
+    fn connected(g: &HashMap<NodeKey, Vec<NodeKey>>) -> bool {
+        let Some(start) = g.keys().next() else { return true };
+        let mut seen = std::collections::HashSet::from([*start]);
+        let mut stack = vec![*start];
+        while let Some(n) = stack.pop() {
+            for m in &g[&n] {
+                if seen.insert(*m) {
+                    stack.push(*m);
+                }
+            }
+        }
+        seen.len() == g.len()
+    }
+
+    fn approx(a: Point, x: f64, y: f64) -> bool {
+        (a.x - x).abs() < 1e-5 && (a.y - y).abs() < 1e-5
+    }
+
+    #[test]
+    fn closed_connection_keeps_every_phase_a_ring() {
+        let r = InfinityBraidPattern.generate(&fader_ctx(0.0)).unwrap();
+        assert!(r.segments.iter().all(|s| s.is_active));
+        for net in ["A", "B", "C"] {
+            let g = net_graph(&r, net);
+            assert!(connected(&g), "phase {net} is one piece of copper");
+            let ends = g.values().filter(|n| n.len() == 1).count();
+            assert_eq!(ends, 0, "a closed phase {net} has no free ends");
+        }
+    }
+
+    #[test]
+    fn delta_matches_the_fader_example_leads() {
+        // Reference: motor-coils_3s_0-4mm_mod2.dxf. Each phase is opened at
+        // its first-period last peak and both ends run up to
+        // y = 8 + (i + 1)·4/9 and left to x = 0 on both layers.
+        let r = InfinityBraidPattern.generate(&fader_ctx(1.0)).unwrap();
+        let expected = [("A", 4.0 + 1.0 / 3.0, 8.0 + 4.0 / 9.0),
+            ("B", 6.0 + 1.0 / 3.0, 8.0 + 8.0 / 9.0),
+            ("C", 8.0 + 1.0 / 3.0, 8.0 + 12.0 / 9.0)];
+        for (net, break_x, lead_y) in expected {
+            assert!(
+                !r.vias.iter().any(|v| v.net == net && approx(v.position, break_x, 8.0)),
+                "phase {net} break via must be omitted"
+            );
+            let leads: Vec<&RouteSegment> =
+                r.segments.iter().filter(|s| s.net == net && !s.is_active).collect();
+            assert_eq!(leads.len(), 4, "phase {net}: riser + run on each layer");
+            for layer in [0, 1] {
+                assert!(leads.iter().any(|s| s.layer == layer
+                    && approx(s.start, break_x, 8.0)
+                    && approx(s.end, break_x, lead_y)));
+                assert!(leads.iter().any(|s| s.layer == layer
+                    && approx(s.start, break_x, lead_y)
+                    && approx(s.end, 0.0, lead_y)));
+            }
+
+            // The ring is now one open winding whose two ends are the lead
+            // ends at x = 0, one per layer.
+            let g = net_graph(&r, net);
+            assert!(connected(&g), "phase {net} stays one piece of copper");
+            let mut ends: Vec<NodeKey> =
+                g.iter().filter(|(_, n)| n.len() == 1).map(|(k, _)| *k).collect();
+            ends.sort();
+            assert_eq!(ends, vec![
+                node(0, Point::new(0.0, lead_y)),
+                node(1, Point::new(0.0, lead_y)),
+            ]);
+        }
+        // Only the three break vias are removed.
+        let closed = InfinityBraidPattern.generate(&fader_ctx(0.0)).unwrap();
+        assert_eq!(r.vias.len(), closed.vias.len() - 3);
+        assert!(Validator::validate(&r, &fader_ctx(1.0), false).is_ok());
+    }
+
+    #[test]
+    fn star_ties_the_layer_one_ends_into_a_neutral() {
+        let r = InfinityBraidPattern.generate(&fader_ctx(2.0)).unwrap();
+        let bus: Vec<&RouteSegment> = r
+            .segments
+            .iter()
+            .filter(|s| !s.is_active && s.layer == 1 && s.start.x == 0.0 && s.end.x == 0.0)
+            .collect();
+        assert_eq!(bus.len(), 2, "one neutral piece per adjacent phase pair");
+        assert!(approx(bus[0].start, 0.0, 8.0 + 4.0 / 9.0) && approx(bus[0].end, 0.0, 8.0 + 8.0 / 9.0));
+        assert!(approx(bus[1].start, 0.0, 8.0 + 8.0 / 9.0) && approx(bus[1].end, 0.0, 8.0 + 12.0 / 9.0));
+        // Line terminals: the layer-0 lead ends stay free.
+        for (net, lead_y) in [("A", 8.0 + 4.0 / 9.0), ("B", 8.0 + 8.0 / 9.0), ("C", 8.0 + 12.0 / 9.0)] {
+            let g = net_graph(&r, net);
+            assert_eq!(g[&node(0, Point::new(0.0, lead_y))].len(), 1);
+        }
+        assert!(Validator::validate(&r, &fader_ctx(2.0), false).is_ok());
+    }
+
+    #[test]
+    fn leads_never_tighter_than_trace_plus_space() {
+        let mut c = fader_ctx(1.0);
+        c.min_trace_mm = 0.4;
+        c.min_space_mm = 0.4;
+        let r = InfinityBraidPattern.generate(&c).unwrap();
+        let mut ys: Vec<f64> = r
+            .segments
+            .iter()
+            .filter(|s| !s.is_active && s.layer == 0 && s.start.y == s.end.y)
+            .map(|s| s.start.y)
+            .collect();
+        ys.sort_by(f64::total_cmp);
+        assert!((ys[0] - 8.8).abs() < 1e-9);
+        assert!(ys.windows(2).all(|w| (w[1] - w[0] - 0.8).abs() < 1e-9));
+    }
+
+    #[test]
+    fn validator_still_rejects_active_copper_off_the_board() {
+        let mut r = InfinityBraidPattern.generate(&fader_ctx(1.0)).unwrap();
+        let lead = r.segments.iter_mut().find(|s| !s.is_active).unwrap();
+        lead.is_active = true;
+        assert!(Validator::validate(&r, &fader_ctx(1.0), false).is_err());
     }
 
     #[test]

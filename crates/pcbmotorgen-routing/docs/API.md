@@ -539,7 +539,9 @@ never sanitised.** Rules:
 - **Finite** — every coordinate must be finite (`NaN`/`Inf` rejected).
 - **Bounds** — x within `[0, active_area_length_mm]` (the routing domain equals the active area) and y within
   `[0, board_width_mm]` (inclusive, with a `1e-6` epsilon so exact-boundary
-  coordinates pass).
+  coordinates pass). Inactive segments (`is_active: false` — end turns and
+  terminal leads) are exempt from the y bound so leads can leave the board
+  width; they must still be finite and inside the x range.
 - **Layer range** — `layer` / `from_layer` / `to_layer` inside `[0, num_layers)`.
 - **Vias** — `from_layer` must differ from `to_layer`.
 - **Non-degenerate** — segments have non-zero length; arcs have start/mid/end

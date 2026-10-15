@@ -183,6 +183,14 @@ pub async fn routing_pattern_parameters(
             max: p.max,
             step: p.step,
             multiple_of: p.multiple_of,
+            options: p
+                .options
+                .into_iter()
+                .map(|o| ParamOptionIpc {
+                    value: o.value,
+                    label: o.label,
+                })
+                .collect(),
         })
         .collect()
 }
@@ -203,6 +211,16 @@ pub struct ParamDefIpc {
     /// input's step + invalid state; the routing crate remains the
     /// validation authority at generate-time (`validate_routing_params`).
     pub multiple_of: Option<f64>,
+    /// Closed set of allowed values (empty = any value in range). The
+    /// frontend renders a choice when present.
+    pub options: Vec<ParamOptionIpc>,
+}
+
+/// One allowed value of a choice parameter (wire form).
+#[derive(serde::Serialize)]
+pub struct ParamOptionIpc {
+    pub value: f64,
+    pub label: String,
 }
 
 /// One DRC interference violation (wire form).

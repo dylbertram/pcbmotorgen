@@ -33,20 +33,34 @@
                 <HelpTag tip={def.description} />
               {/if}
             </span>
-            <NumberField
-              id={`routing-param-${def.key}`}
-              value={valueFor(def)}
-              step={def.multiple_of ?? def.step ?? (def.param_type === "int" ? 1 : 0.1)}
-              integer={def.param_type === "int"}
-              min={def.min}
-              max={def.max}
-              multipleOf={def.multiple_of ?? undefined}
-              ariaLabel={def.label}
-              class="w-24 shrink-0 bg-slate-900 px-2 py-1 text-xs font-mono text-emerald-200"
-              onCommit={(value) => onParamInput(def, value)}
-            />
+            {#if def.options?.length}
+              <select
+                id={`routing-param-${def.key}`}
+                aria-label={def.label}
+                class="w-32 shrink-0 rounded border border-slate-700 bg-slate-900 px-2 py-1 text-xs text-emerald-200"
+                value={valueFor(def)}
+                onchange={(event) => onParamInput(def, Number(event.currentTarget.value))}
+              >
+                {#each def.options as option (option.value)}
+                  <option value={option.value}>{option.label}</option>
+                {/each}
+              </select>
+            {:else}
+              <NumberField
+                id={`routing-param-${def.key}`}
+                value={valueFor(def)}
+                step={def.multiple_of ?? def.step ?? (def.param_type === "int" ? 1 : 0.1)}
+                integer={def.param_type === "int"}
+                min={def.min}
+                max={def.max}
+                multipleOf={def.multiple_of ?? undefined}
+                ariaLabel={def.label}
+                class="w-24 shrink-0 bg-slate-900 px-2 py-1 text-xs font-mono text-emerald-200"
+                onCommit={(value) => onParamInput(def, value)}
+              />
+            {/if}
           </span>
-          {#if def.min !== undefined || def.max !== undefined || def.multiple_of}
+          {#if !def.options?.length && (def.min !== undefined || def.max !== undefined || def.multiple_of)}
             <span class="mt-0.5 block text-[10px] text-slate-500">
               range {def.min ?? "-"} to {def.max ?? "-"}{def.multiple_of
                 ? ` · multiples of ${def.multiple_of}`

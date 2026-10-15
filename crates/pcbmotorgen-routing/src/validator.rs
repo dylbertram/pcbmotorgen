@@ -13,10 +13,13 @@ use crate::model::{Point, RoutingResult, FORMAT_VERSION};
 pub struct Validator;
 
 /// Routing-domain bounds shared by the geometric checks.
+#[derive(Clone, Copy)]
 struct Bounds {
     x_max: f64,
     board_width: f64,
     eps: f64,
+    /// Skip the board-width (y) check — used for inactive lead conductors.
+    y_unbounded: bool,
 }
 
 impl Validator {
@@ -53,6 +56,7 @@ impl Validator {
             x_max: ctx.active_area_length_mm,
             board_width: ctx.board_width_mm,
             eps: 1e-6,
+            y_unbounded: false,
         };
 
         validate_segments(result, ctx, &bounds)?;
@@ -97,10 +101,18 @@ fn validate_segments(
     ctx: &RoutingContext,
     bounds: &Bounds,
 ) -> Result<(), RoutingError> {
+    // Inactive conductors (end turns, terminal leads) may run past either
+    // board-width edge to reach the winding's terminals; they stay within the
+    // travel extent. Thrust-producing conductors must stay on the board.
+    let lead_bounds = Bounds {
+        y_unbounded: true,
+        ..*bounds
+    };
     for (i, s) in result.segments.iter().enumerate() {
         let idx = i + 1;
-        check_point(&s.start, bounds, &format!("segments[{i}].start"), idx)?;
-        check_point(&s.end, bounds, &format!("segments[{i}].end"), idx)?;
+        let b = if s.is_active { bounds } else { &lead_bounds };
+        check_point(&s.start, b, &format!("segments[{i}].start"), idx)?;
+        check_point(&s.end, b, &format!("segments[{i}].end"), idx)?;
         let len = length(s.start, s.end);
         if !len.is_finite() || len <= bounds.eps {
             return Err(RoutingError::new(
@@ -437,7 +449,7 @@ fn check_point(p: &Point, bounds: &Bounds, field: &str, index: usize) -> Result<
             ),
         ));
     }
-    if p.y < -bounds.eps || p.y > bounds.board_width + bounds.eps {
+    if !bounds.y_unbounded && (p.y < -bounds.eps || p.y > bounds.board_width + bounds.eps) {
         return Err(RoutingError::new(
             index,
             field,

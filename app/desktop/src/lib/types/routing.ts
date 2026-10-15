@@ -41,6 +41,18 @@ export interface RoutingParamDef {
    * re-validates authoritatively at generate time.
    */
   multiple_of?: number | null;
+  /**
+   * Closed set of allowed values declared by the pattern (absent/empty = any
+   * value in range). When present the UI renders a choice; the routing crate
+   * rejects any other value at generate time.
+   */
+  options?: RoutingParamOption[];
+}
+
+/** One allowed value of a choice parameter. */
+export interface RoutingParamOption {
+  value: number;
+  label: string;
 }
 
 /** One installed routing-pattern plugin (from the persistent store). */

@@ -47,6 +47,28 @@ pub struct PatternParameter {
     /// input's step + invalid state. `None` = unconstrained.
     #[serde(default)]
     pub multiple_of: Option<f64>,
+    /// Optional closed set of allowed values, each with a display label. When
+    /// non-empty the UI renders a choice instead of a number input and the
+    /// routing crate rejects any value outside the set
+    /// (`validate_routing_params`). Empty = any value in range.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub options: Vec<ParamOption>,
+}
+
+/// One allowed value of a choice [`PatternParameter`].
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct ParamOption {
+    pub value: f64,
+    pub label: String,
+}
+
+impl ParamOption {
+    pub fn new(value: f64, label: impl Into<String>) -> Self {
+        Self {
+            value,
+            label: label.into(),
+        }
+    }
 }
 
 impl PatternParameter {
@@ -67,6 +89,7 @@ impl PatternParameter {
             max: Some(max),
             step: Some(1.0),
             multiple_of: None,
+            options: Vec::new(),
         }
     }
 
@@ -85,6 +108,7 @@ impl PatternParameter {
             max: None,
             step: None,
             multiple_of: None,
+            options: Vec::new(),
         }
     }
 
@@ -98,6 +122,13 @@ impl PatternParameter {
     /// [`crate::validate_routing_params`] before generation.
     pub fn with_multiple_of(mut self, m: f64) -> Self {
         self.multiple_of = Some(m);
+        self
+    }
+
+    /// Restrict the parameter to a closed set of labelled values. The routing
+    /// crate rejects any other value in [`crate::validate_routing_params`].
+    pub fn with_options(mut self, options: Vec<ParamOption>) -> Self {
+        self.options = options;
         self
     }
 }
