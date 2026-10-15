@@ -74,7 +74,7 @@ pub use model::{
     Layer, LegGrid, Net, PhaseBand, PhaseBandShape, Point, PoleRegion, RouteCurve, RouteSegment,
     RoutingResult, Via,
 };
-pub use pattern::{ParamType, PatternParameter, PluginMetadata, RoutingPattern};
+pub use pattern::{ParamOption, ParamType, PatternParameter, PluginMetadata, RoutingPattern};
 pub use registry::{RoutingErrorKind, RoutingRegistry};
 pub use report::RoutingReport;
 pub use spline::RouteSpline;

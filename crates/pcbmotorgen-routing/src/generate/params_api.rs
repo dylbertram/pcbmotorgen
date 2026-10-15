@@ -82,6 +82,19 @@ pub fn validate_routing_params(
                     }
                 }
             }
+            if !p.options.is_empty() && !p.options.iter().any(|o| (o.value - v).abs() <= 1e-9) {
+                let allowed: Vec<String> = p
+                    .options
+                    .iter()
+                    .map(|o| format!("{} ({})", o.value, o.label))
+                    .collect();
+                return Err(format!(
+                    "{} = {} is not one of the allowed values [{}] for pattern \"{id}\"",
+                    p.label,
+                    v,
+                    allowed.join(", ")
+                ));
+            }
         }
     }
     Ok(())
@@ -214,5 +227,17 @@ mod tests {
         // fires first.
         let err = validate_value(vec![p], "n", 3.5).unwrap_err();
         assert!(err.contains("not an integer"), "unexpected: {err}");
+    }
+
+    #[test]
+    fn options_restrict_values_to_the_declared_set() {
+        use crate::pattern::ParamOption;
+        let p = PatternParameter::int("mode", "Mode", 0.0, 0.0, 4.0).with_options(vec![
+            ParamOption::new(0.0, "Off"),
+            ParamOption::new(2.0, "On"),
+        ]);
+        assert_eq!(validate_value(vec![p.clone()], "mode", 2.0), Ok(()));
+        let err = validate_value(vec![p], "mode", 1.0).unwrap_err();
+        assert!(err.contains("not one of the allowed values"), "unexpected: {err}");
     }
 }
