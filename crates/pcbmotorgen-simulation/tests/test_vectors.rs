@@ -166,15 +166,17 @@ fn test_config_derived_values() {
     let v = load_vectors();
     let cfg = test_config();
 
-    // Exact match for derived values
+    // Legacy oracle records pitch-cell span, including one extra gap.
+    // Preserve the independent fixture while checking physical edge span.
+    let physical_span_mm = v.config.magnet_array_span_mm - v.config.magnet_gap_mm;
     assert!(
-        (cfg.magnet_array_span_m() * 1e3 - v.config.magnet_array_span_mm).abs() < 1e-6,
+        (cfg.magnet_array_span_m() * 1e3 - physical_span_mm).abs() < 1e-6,
         "magnet_array_span: {} vs {}",
         cfg.magnet_array_span_m() * 1e3,
-        v.config.magnet_array_span_mm
+        physical_span_mm
     );
     assert!(
-        (cfg.travel_m() * 1e3 - v.config.travel_mm).abs() < 1e-6,
+        (cfg.travel_m() * 1e3 - (v.config.travel_mm + v.config.magnet_gap_mm)).abs() < 1e-6,
         "travel: {} vs {}",
         cfg.travel_m() * 1e3,
         v.config.travel_mm

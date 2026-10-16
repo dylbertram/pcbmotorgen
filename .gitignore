@@ -9,6 +9,8 @@ node_modules/
 __pycache__/
 *.pyc
 .venv/
+.magpy-venv/
+app/desktop/src-tauri/magpylib-fixture.json
 *.egg-info/
 
 # OS

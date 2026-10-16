@@ -145,7 +145,7 @@ export function mockCoils(c: LinearMotorConfig): CoilPathDto {
   // domain, whose end turns are part of the pattern. The mover must have
   // conductors beneath it for every position along its travel, exactly like
   // the real backend.
-  const moverSpan = c.magnet_count * c.magnet_pitch_m;
+  const moverSpan = (c.magnet_count - 1) * c.magnet_pitch_m + c.magnet_width_m;
   const domain = c.active_area_length_m;
   const width = c.board_width_m;
   const nLayers = Math.max(1, c.num_layers);
@@ -286,8 +286,9 @@ export function mockCoils(c: LinearMotorConfig): CoilPathDto {
 
 export function mockForceSweep(c: LinearMotorConfig): ForceSweepResult {
   const n = c.n_positions;
-  const travel = Math.max(0, c.active_area_length_m - c.magnet_count * c.magnet_pitch_m);
-  const positions = Array.from({ length: n }, (_, i) => (travel * i) / (n - 1));
+  const span = (c.magnet_count - 1) * c.magnet_pitch_m + c.magnet_width_m;
+  const travel = Math.max(0, c.active_area_length_m - span);
+  const positions = Array.from({ length: n }, (_, i) => c.magnet_width_m / 2 + (travel * i) / (n - 1));
   // Sinusoidal-ish force with ripple + a normal-force baseline.
   const br = c.magnet_remanence_t;
   const ipeak = c.max_current_a;
@@ -530,8 +531,12 @@ export function mockDriveAnalysis(
   const pe = 2 * c.magnet_pitch_m;
   const required = (v: number) =>
     Math.sqrt(3) * Math.hypot(i * r + (ke ?? 0) * v, ((2 * Math.PI * v) / pe) * l * i) + i * d.driver.rds_on_ohm;
-  const ripple = vBus / (8 * d.pwm_hz * l);
+  const ripple = r > 1e-12 ? vBus / (2 * r) * Math.tanh(r / (4 * d.pwm_hz * l)) : vBus / (8 * d.pwm_hz * l);
   const rippleLimit = d.ripple_limit_fraction * i;
+  const requiredFL = rippleLimit <= 0 || vBus <= 0 ? Infinity
+    : r <= 1e-12 ? vBus / (8 * rippleLimit)
+    : 2 * r * rippleLimit >= vBus ? 0
+    : r / (4 * Math.atanh(2 * r * rippleLimit / vBus));
   const ampacity = 0.048 * d.allowed_rise_c ** 0.44 * ((c.min_trace_m / 25.4e-6) * (t / 25.4e-6)) ** 0.725;
   const vLimitedI = available / (Math.sqrt(3) * r + d.driver.rds_on_ohm);
   const maxCont = Math.min(d.driver.continuous_rms_a, ampacity, vLimitedI);
@@ -581,8 +586,8 @@ export function mockDriveAnalysis(
     voltage_limited_current_a: vLimitedI,
     max_speed_m_s: ke !== null ? Math.max(0, (available / Math.sqrt(3) - i * r) / Math.max(ke, 1e-9)) : null,
     ripple_pp_a: ripple,
-    min_pwm_hz: vBus / (8 * l * rippleLimit),
-    added_inductance_h: Math.max(0, vBus / (8 * d.pwm_hz * rippleLimit) - l),
+    min_pwm_hz: requiredFL / l,
+    added_inductance_h: Math.max(0, requiredFL / d.pwm_hz - l),
     peak_current_a: i + ripple / 2,
     trace_ampacity_a: ampacity,
     copper_loss_w: 1.5 * i * i * r,
@@ -593,7 +598,7 @@ export function mockDriveAnalysis(
     checks: [
       check("supply", "Bus voltage within driver rating", st(vBus >= d.driver.min_supply_v && vBus <= d.driver.max_supply_v, false), vBus, d.driver.max_supply_v, "V"),
       check("holding_voltage", "Voltage to hold the phase current", st(hold <= available, hold <= vBus), hold, available, "V"),
-      check("ripple", "PWM current ripple", st(ripple <= rippleLimit, ripple <= i), ripple, rippleLimit, "A"),
+      check("ripple", "PWM current ripple estimate (50% duty)", st(ripple <= rippleLimit, ripple <= i), ripple, rippleLimit, "A"),
       check("ampacity", "Trace ampacity", st(i <= ampacity, i <= 1.25 * ampacity), i, ampacity, "A"),
     ],
     speed_curve: Array.from({ length: 41 }, (_, k) => {

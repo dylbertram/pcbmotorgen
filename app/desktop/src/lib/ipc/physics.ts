@@ -8,6 +8,7 @@
  */
 
 import { invoke } from "@tauri-apps/api/core";
+import { driverConnectionError, usesDeltaConnection } from "../driverConnection";
 import type {
   LinearMotorConfig,
   CoilPathDto,
@@ -62,9 +63,10 @@ export async function fetchTravelEnvelope(
 export async function evaluateForceSweep(
   config: LinearMotorConfig,
   cadGeometry: CadGeometry | null = null,
+  drive: DriveSettings | null = null,
 ): Promise<ForceSweepResult> {
   if (!isTauriAvailable()) return mockForceSweep(config);
-  return await invoke<ForceSweepResult>("evaluate_force_sweep", { config, cadGeometry });
+  return await invoke<ForceSweepResult>("evaluate_force_sweep", { config, cadGeometry, drive });
 }
 
 export async function computeHeightStack(
@@ -91,6 +93,8 @@ export async function analyzeDrive(
   kf: number | null,
   cadGeometry: CadGeometry | null = null,
 ): Promise<DriveAnalysis> {
+  const connectionError = driverConnectionError(drive.driver, usesDeltaConnection(config, cadGeometry !== null));
+  if (connectionError) throw new Error(connectionError);
   if (!isTauriAvailable()) return mockDriveAnalysis(config, drive, kf);
   return await invoke<DriveAnalysis>("analyze_drive", {
     config,

@@ -99,8 +99,8 @@ impl Default for CommutationMode {
 ///
 /// `phase_shift` is the dynamic polarity term set by the
 /// [`ForceEvaluator`](crate::magnetic::force_eval::ForceEvaluator)'s 3-point
-/// self-calibration guard (0 or π). It tilts the whole current set by 0° or
-/// 180° — a pure d-axis *sign* (polarity) choice, not a q-axis change.
+/// self-calibration guard. Usually 0 or π; a winding whose reference is
+/// displaced can require a common electrical alignment as well.
 ///
 /// Free function so it can be called from parallel closures without borrowing
 /// `self` (which would require `&self` to be `Sync` — it is, but extracting
@@ -115,9 +115,9 @@ pub(crate) fn commutation_currents(
     let i_pk = config.max_current_a;
 
     if commutation == CommutationMode::PhaseAOnly {
-        let mut currents = vec![0.0; phase_labels.len()];
-        currents[0] = i_pk;
-        return currents;
+        return phase_labels.iter().map(|label| {
+            if Some(label) == phase_labels.first() { i_pk } else { 0.0 }
+        }).collect();
     }
 
     // MaxThrust — FOC, id = 0 (pure q-axis; module docs hold the derivation
@@ -137,7 +137,7 @@ pub(crate) fn commutation_currents(
     let theta_e = 2.0 * std::f64::consts::PI * mover_position_m / (2.0 * config.pole_pitch_m())
         + phase_shift;
     let offsets = declared_phase_offsets(config, phase_labels)
-        .unwrap_or_else(|| analytic_phase_offsets(config, phase_labels.len()));
+        .unwrap_or_else(|| analytic_phase_offsets(config, phase_labels));
 
     (0..phase_labels.len())
         .map(|p| i_pk * (theta_e - offsets[p]).cos())
@@ -178,15 +178,35 @@ fn declared_phase_offsets(config: &SimulationInput, phase_labels: &[&str]) -> Op
 /// Analytic per-coil offsets [rad]: `p·π·τ_band/τ_p` for coils spaced one
 /// (Vernier-adjusted) phase-band pitch apart — the fallback when no phase
 /// bands are declared.
-fn analytic_phase_offsets(config: &SimulationInput, n_phases: usize) -> Vec<f64> {
+fn analytic_phase_offsets(config: &SimulationInput, phase_labels: &[&str]) -> Vec<f64> {
     let phase_offset = std::f64::consts::PI * config.phase_band_pitch_m() / config.pole_pitch_m();
-    (0..n_phases).map(|p| p as f64 * phase_offset).collect()
+    // A coil slot is a (layer, net) pair, not a new electrical phase.
+    // Every layer of the same net must receive the same current.
+    let mut phases = Vec::new();
+    phase_labels.iter().map(|label| {
+        let p = match phases.iter().position(|known| known == label) {
+            Some(p) => p,
+            None => { phases.push(*label); phases.len() - 1 }
+        };
+        p as f64 * phase_offset
+    }).collect()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::params::PhaseBandPosition;
+
+    #[test]
+    fn repeated_phase_layers_share_current() {
+        let cfg = SimulationInput::default();
+        for mode in [CommutationMode::MaxThrust, CommutationMode::PhaseAOnly] {
+            let single = commutation_currents(mode, 0.0, &cfg, 0.003, &["A", "B", "C"]);
+            let layered = commutation_currents(mode, 0.0, &cfg, 0.003, &["A", "B", "C", "A", "B", "C"]);
+            assert_eq!(&layered[..3], &single);
+            assert_eq!(&layered[3..], &single);
+        }
+    }
 
     #[test]
     fn test_phase_a_only_commutation() {
@@ -446,7 +466,7 @@ mod tests {
 
         // Cross-check: the analytic law would give B the 1:1 offset π/3 and
         // C 2π/3, but the declaration asks for π/4 and 3π/4 — distinct laws.
-        let analytic = analytic_phase_offsets(&cfg, 3);
+        let analytic = analytic_phase_offsets(&cfg, &["A", "B", "C"]);
         assert!((analytic[1] - std::f64::consts::PI / 3.0).abs() < 1e-12);
         assert!((analytic[2] - 2.0 * std::f64::consts::PI / 3.0).abs() < 1e-12);
         assert!((std::f64::consts::PI * 0.003 / tau_p - std::f64::consts::PI / 4.0).abs() < 1e-12);

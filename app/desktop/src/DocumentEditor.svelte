@@ -306,7 +306,7 @@
 
     try {
       const results = await Promise.allSettled([
-        evaluateForceSweep(ipc, simulationCad()),
+        evaluateForceSweep(ipc, simulationCad(), $state.snapshot(config.drive)),
         computeFriction(ipc),
         computeHeightStack(ipc),
       ]);
@@ -380,9 +380,14 @@
       config.commutation,
       config.n_positions,
       config.meshing,
+      config.drive.outer_copper_oz,
+      config.drive.inner_copper_oz,
+      config.drive.winding_temp_c,
+      config.drive.via_plating_m,
     ];
     void valid;
 
+    void geometryKey(projects.cadGeometry);
     const generation = ++simulationGeneration;
     if (!active || activeTab !== "simulate") {
       scheduleSimulation.cancel();
@@ -417,12 +422,16 @@
       driveError = null;
     } catch (e) {
       if (generation !== driveGeneration) return;
+      drive = null;
       driveError = e instanceof Error ? e.message : String(e);
     }
   }
 
   $effect(() => {
     void sweep;
+    // Read all IPC inputs synchronously: reads inside the debounced async
+    // run are not effect dependencies. A failed sweep must not block updates.
+    void JSON.stringify(config.toIpc());
     void JSON.stringify(config.drive);
     void geometryKey(projects.cadGeometry);
     void valid;
@@ -631,7 +640,7 @@
             class="h-full p-4 lg:pr-0"
           >
             <div hidden={designType !== "motor"} class="h-full">
-              <DesignTab {config} cadGeometry={projects.cadGeometry} onImportCad={() => (cadImportDialogOpen = true)} onUseGenerated={() => projects.setCadGeometry(null)} />
+              <DesignTab {config} cadGeometry={projects.cadGeometry} onGeometryChange={(geometry) => projects.setCadGeometry(geometry)} onImportCad={() => (cadImportDialogOpen = true)} onUseGenerated={() => projects.setCadGeometry(null)} />
             </div>
             <div hidden={designType !== "sensor"} class="h-full overflow-y-auto">
               <SensorTab store={sensorStore} />
@@ -644,6 +653,7 @@
             class="h-full overflow-y-auto p-4 lg:pr-0"
           >
             <SimulateTab
+              onConfigureWinding={() => selectTab("design")}
               {config}
               active={active && activeTab === "simulate"}
               {sweep}

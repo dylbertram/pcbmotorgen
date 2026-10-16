@@ -3,6 +3,84 @@ use pcbmotorgen_routing::{
     generate_routing_result, Point, RouteSegment, RoutingContext, RoutingResult, Via,
 };
 
+#[test]
+fn signed_branch_currents_obey_kirchhoff_and_power_balance() {
+    use super::geometry::Edge;
+    let net = PhaseNetwork {
+        net: "branched".into(), node_count: 4, node_x: vec![0.0; 4],
+        terminal_key: vec![0, 1, 2, 3], terminal: vec![0], star: vec![2, 3],
+        active_length_m: 0.0,
+        edges: vec![Edge { a: 0, b: 1, kind: EdgeKind::Via },
+                    Edge { a: 1, b: 2, kind: EdgeKind::Via },
+                    Edge { a: 3, b: 1, kind: EdgeKind::Via }],
+    };
+    let resistances = [1.0, 2.0, 2.0];
+    let solved = solve_network(&net, &resistances);
+    assert!(solved.connected);
+    for (current, expected) in solved.current_share.iter().zip([1.0, 0.5, -0.5]) {
+        assert!((current - expected).abs() < 1e-10);
+    }
+    let dissipation: f64 = solved.current_share.iter().zip(resistances).map(|(i, r)| i*i*r).sum();
+    assert!((dissipation - solved.resistance_ohm).abs() < 1e-10);
+    for invalid in [vec![1.0], vec![1.0, -1.0, 2.0], vec![1.0, f64::NAN, 2.0]] {
+        assert!(!solve_network(&net, &invalid).connected);
+    }
+    let mut disconnected = net.clone();
+    disconnected.edges.truncate(1);
+    assert!(!solve_network(&disconnected, &[1.0]).connected);
+    let mut shorted_terminals = net.clone();
+    shorted_terminals.star.push(0);
+    assert!(!solve_network(&shorted_terminals, &resistances).connected);
+}
+
+#[test]
+fn empty_routing_cannot_produce_a_force_result() {
+    use crate::magnetic::force_eval::ForceEvaluator;
+    assert!(ForceEvaluator::default().with_routed_currents(
+        &RoutingResult::default(), &sim(), &DriveSettings::default(), &DriveGeometryHints::default()
+    ).is_err());
+}
+
+#[test]
+fn curved_copper_is_integrated_and_endpoint_order_is_not_current_direction() {
+    use crate::magnetic::force_eval::{ForceEvaluator, CommutationMode};
+    let mut routing = RoutingResult::default();
+    routing.curves.push(pcbmotorgen_routing::RouteCurve {
+        start: Point::new(0.0, 0.0), mid: Point::new(2.928932188, 7.071067812),
+        end: Point::new(10.0, 10.0), layer: 0, net: "A".into(), is_active: true,
+    });
+    let evaluate = |routing: &RoutingResult| {
+        let (mut evaluator, coils) = ForceEvaluator::new(3, 8, CommutationMode::PhaseAOnly, 0.0)
+            .with_routed_currents(routing, &sim(), &DriveSettings::default(), &DriveGeometryHints::default()).unwrap();
+        assert!(!evaluator.routed_conductor_samples().unwrap()[0].is_empty());
+        evaluator.evaluate_at(&sim(), &coils, 0.003).unwrap().0
+    };
+    let first = evaluate(&routing);
+    let curve = &mut routing.curves[0];
+    std::mem::swap(&mut curve.start, &mut curve.end);
+    let reversed = evaluate(&routing);
+    for (a, b) in first.iter().zip(reversed) {
+        assert!((a - b).abs() < 1e-9);
+    }
+    assert!(first.iter().any(|v| v.abs() > 1e-8));
+}
+
+#[test]
+fn routed_force_respects_imported_depths_and_rejects_mismatched_coils() {
+    use crate::magnetic::force_eval::ForceEvaluator;
+    let hints = DriveGeometryHints { layer_z_m: vec![0.0002, -0.003], ..Default::default() };
+    let (mut evaluator, coils) = ForceEvaluator::default().with_routed_currents(
+        &two_strand_fixture(), &sim(), &DriveSettings::default(), &hints,
+    ).unwrap();
+    let samples = evaluator.routed_conductor_samples().unwrap();
+    assert!(samples[0].iter().any(|s| s.midpoint_3d[2] == 0.0002));
+    assert!(samples[0].iter().any(|s| s.midpoint_3d[2] == -0.003));
+    assert!(samples[0].iter().all(|s| s.dl_3d.iter().all(|v| v.is_finite())));
+    assert!(evaluator.evaluate(&sim(), &[]).is_err());
+    assert!(evaluator.evaluate_at(&sim(), &[], 0.0).is_err());
+    assert!(!coils.is_empty());
+}
+
 fn seg(x0: f64, y0: f64, x1: f64, y1: f64, layer: u32, net: &str) -> RouteSegment {
     RouteSegment {
         start: Point::new(x0, y0),
@@ -24,6 +102,57 @@ fn two_strand_fixture() -> RoutingResult {
         r.vias.push(Via { position: Point::new(100.0, y), from_layer: 0, to_layer: 1, net: "A".into() });
     }
     r
+}
+
+#[test]
+fn routed_sweep_limits_follow_copper_not_configured_board_length() {
+    use crate::magnetic::force_eval::ForceEvaluator;
+    let mut cfg = sim();
+    cfg.magnet_count = 2;
+    cfg.magnet_pitch_m = 0.006;
+    cfg.magnet_dims_m[0] = 0.004;
+    for offset_mm in [0.0, 20.0] {
+        let mut routing = two_strand_fixture();
+        for segment in &mut routing.segments {
+            segment.start.x += offset_mm;
+            segment.end.x += offset_mm;
+        }
+        for via in &mut routing.vias { via.position.x += offset_mm; }
+        let (evaluator, _) = ForceEvaluator::default().with_routed_currents(
+            &routing, &cfg, &DriveSettings::default(), &DriveGeometryHints::default(),
+        ).unwrap();
+        let (start, end) = evaluator.sweep_center_limits_m(&cfg).unwrap();
+        assert!((start - cfg.magnet_dims_m[0] / 2.0 - offset_mm * 1e-3).abs() < 1e-12);
+        assert!((end + cfg.magnet_pitch_m + cfg.magnet_dims_m[0] / 2.0
+            - (100.0 + offset_mm) * 1e-3).abs() < 1e-12);
+        let mut oversized = cfg.clone();
+        oversized.magnet_count = 100;
+        assert!(evaluator.sweep_center_limits_m(&oversized).is_err());
+    }
+}
+
+#[test]
+fn solved_force_is_invariant_to_stored_segment_direction() {
+    use crate::magnetic::force_eval::{ForceEvaluator, CommutationMode};
+    let config = sim();
+    let settings = DriveSettings::default();
+    let routing = two_strand_fixture();
+    let mut reversed = routing.clone();
+    for (i, segment) in reversed.segments.iter_mut().enumerate() {
+        if i % 2 == 0 {
+            std::mem::swap(&mut segment.start, &mut segment.end);
+        }
+    }
+    let evaluate = |routing: &RoutingResult| {
+        let (mut evaluator, coils) = ForceEvaluator::new(3, 4, CommutationMode::PhaseAOnly, 0.0)
+            .with_routed_currents(routing, &config, &settings, &DriveGeometryHints::default()).unwrap();
+        evaluator.evaluate_at(&config, &coils, 0.003).unwrap().0
+    };
+    let original = evaluate(&routing);
+    let flipped = evaluate(&reversed);
+    for (a, b) in original.iter().zip(flipped) {
+        assert!((a - b).abs() < 1e-9, "stored direction changed physical force: {a} vs {b}");
+    }
 }
 
 fn sim() -> SimulationInput {
@@ -77,13 +206,69 @@ fn parallel_strands_divide_resistance() {
     let strand = rho * ph.strand_length_m / (0.25e-3 * oz_to_m(1.0)) + a.via_resistance_each_ohm;
     assert!((ph.resistance_hot_ohm - strand / 2.0).abs() < 1e-9);
     assert!(a.via_resistance_each_ohm > 0.5e-3 && a.via_resistance_each_ohm < 3e-3);
+    for phase in &a.phases {
+        assert!(phase.via_resistance_ohm > 0.0);
+        assert!(phase.via_resistance_ohm < phase.resistance_hot_ohm);
+    }
+}
+
+#[test]
+fn floating_closed_copper_does_not_gain_inferred_terminal_buses() {
+    let mut routing = two_strand_fixture();
+    for (a, b) in [((200.0, 0.0), (210.0, 10.0)), ((210.0, 10.0), (220.0, 0.0)),
+        ((220.0, 0.0), (210.0, -10.0)), ((210.0, -10.0), (200.0, 0.0))] {
+        routing.segments.push(seg(a.0, a.1, b.0, b.1, 0, "A"));
+    }
+    let baseline = extract_phase_networks(&two_strand_fixture()).remove(0);
+    let net = extract_phase_networks(&routing).remove(0);
+    assert_eq!(net.terminal.len(), baseline.terminal.len());
+    assert_eq!(net.star.len(), baseline.star.len());
+    let solution = solve_network(&net, &vec![1.0; net.edges.len()]);
+    assert!(solution.connected);
+    for (edge, current) in net.edges.iter().zip(&solution.current_share) {
+        if let EdgeKind::Trace { points, .. } = &edge.kind {
+            if points.iter().all(|p| p[0] >= 0.2) {
+                assert!(current.abs() < 1e-10, "floating copper carries invented current");
+            }
+        }
+    }
+}
+
+#[test]
+fn generated_braid_remains_one_connected_winding_across_repeat_counts() {
+    for strands in [2, 3, 4, 5] {
+        for length in [92.0, 98.0, 110.0, 120.0] {
+            let ctx = pcbmotorgen_routing::RoutingContext {
+                active_area_length_mm: length, board_width_mm: 8.0,
+                num_layers: 2, phases: 3, min_trace_mm: 0.1, min_space_mm: 0.127,
+                expects_continuous: false,
+                params: std::collections::HashMap::from([("num_strands".into(), strands as f64), ("connection".into(), 2.0)]),
+                magnet_pitch_mm: Some(6.0), magnet_array_span_mm: Some(35.0), phase_clearance_mm: None,
+            };
+            let routing = pcbmotorgen_routing::generate_routing_result(&ctx, "infinity-braid").unwrap();
+            for net in extract_phase_networks(&routing) {
+                let mut adj = vec![Vec::new(); net.node_count];
+                for e in &net.edges { adj[e.a].push(e.b); adj[e.b].push(e.a); }
+                let mut seen = vec![false; net.node_count];
+                let mut stack = vec![0];
+                seen[0] = true;
+                while let Some(node) = stack.pop() {
+                    for &next in &adj[node] {
+                        if !seen[next] { seen[next] = true; stack.push(next); }
+                    }
+                }
+                assert!(seen.iter().all(|v| *v), "{} split: strands={strands}, length={length}", net.net);
+            }
+        }
+    }
 }
 
 #[test]
 fn ripple_and_voltage_follow_the_formulas() {
     let settings = DriveSettings::default();
     let a = analyze_drive(&sim(), &two_strand_fixture(), &settings, Some(0.5));
-    let expected_ripple = 12.0 / (8.0 * settings.pwm_hz * a.synchronous_inductance_h);
+    let expected_ripple = 12.0 / (2.0 * a.phase_resistance_ohm)
+        * (a.phase_resistance_ohm / (4.0 * settings.pwm_hz * a.synchronous_inductance_h)).tanh();
     assert!((a.ripple_pp_a - expected_ripple).abs() / expected_ripple < 1e-9);
     let hold = 3f64.sqrt() * 0.8 * a.phase_resistance_ohm + 0.8 * settings.driver.rds_on_ohm;
     assert!((a.holding_voltage_v - hold).abs() < 1e-9);
@@ -92,6 +277,44 @@ fn ripple_and_voltage_follow_the_formulas() {
     assert!(vmax > 0.0);
     assert_eq!(a.thrust_n, Some(0.4));
     assert!(a.checks.iter().all(|c| c.status != CheckStatus::Unknown));
+    assert!(a.checks.iter().find(|c| c.id == "ripple").unwrap().detail.contains("not a switched-waveform simulation"));
+    assert!(a.checks.iter().find(|c| c.id == "thrust").unwrap().detail.contains("not a position-specific"));
+}
+
+#[test]
+fn ripple_estimate_matches_the_assumed_fifty_percent_rl_loop() {
+    let settings = DriveSettings::default();
+    let cfg = sim();
+    let a = analyze_drive(&cfg, &two_strand_fixture(), &settings, Some(0.5));
+    // Independent steady-state RL solution for the assumed alternating
+    // +/- Vbus/2 excitation of a two-phase loop, not a PWM-controller oracle.
+    // Ipp = Vbus/Rloop * tanh(Rloop/(4*f*Lloop)).
+    let r_loop = 2.0 * a.phase_resistance_ohm;
+    let l_loop = 2.0 * a.synchronous_inductance_h;
+    let exact = cfg.supply_voltage_v / r_loop
+        * (r_loop / (4.0 * settings.pwm_hz * l_loop)).tanh();
+    assert!(exact > 0.0);
+    assert!((exact - a.ripple_pp_a).abs() < 1e-10);
+    assert!(a.ripple_pp_a <= cfg.supply_voltage_v / r_loop);
+    // March the two half-cycle RL responses to periodic steady state.
+    // This uses exponential settling, independently of the tanh formula.
+    let decay = (-r_loop / (2.0 * settings.pwm_hz * l_loop)).exp();
+    let target = cfg.supply_voltage_v / (2.0 * r_loop);
+    let mut current = 0.0;
+    let mut high = 0.0;
+    for _ in 0..10_000 {
+        high = target + (current - target) * decay;
+        current = -target + (high + target) * decay;
+    }
+    assert!((high - current - a.ripple_pp_a).abs() < 1e-9);
+    let at_required_pwm = cfg.supply_voltage_v / r_loop
+        * (r_loop / (4.0 * a.min_pwm_hz * l_loop)).tanh();
+    assert!((at_required_pwm - settings.ripple_limit_fraction * cfg.max_current_a).abs() < 1e-9);
+    let mut higher_bus = cfg.clone();
+    higher_bus.supply_voltage_v *= 2.0;
+    let higher = analyze_drive(&higher_bus, &two_strand_fixture(), &settings, Some(0.5));
+    assert!((higher.ripple_pp_a - 2.0 * a.ripple_pp_a).abs() < 1e-10);
+    assert_eq!(higher.thrust_n, a.thrust_n);
 }
 
 #[test]

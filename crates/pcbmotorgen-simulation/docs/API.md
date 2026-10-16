@@ -153,7 +153,7 @@ footprint violation, and the force / mass / accel / capacitor targets.
 
 | Method | Value |
 | --- | --- |
-| `magnet_array_span_m()` | `magnet_count × magnet_pitch` — mover magnet array span [m] |
+| `magnet_array_span_m()` | `(magnet_count − 1) × magnet_pitch + magnet_width` — physical outer-edge span [m] |
 | `travel_m()` | `active_area_length − magnet array span` [m] |
 | `active_length_m()` | `active_area_length_m` [m] |
 | `pole_pitch_m()` | `magnet_pitch_m` [m] |

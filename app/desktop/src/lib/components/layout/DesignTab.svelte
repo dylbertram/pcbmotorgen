@@ -15,11 +15,13 @@
     cadGeometry = null,
     onImportCad,
     onUseGenerated,
+    onGeometryChange,
   }: {
     config: ConfigStore;
     cadGeometry?: CadGeometry | null;
     onImportCad: () => void;
     onUseGenerated: () => void;
+    onGeometryChange?: (geometry: CadGeometry) => void;
   } = $props();
 </script>
 
@@ -174,7 +176,7 @@
               </span>
             </div>
             <p class="mt-2 text-[11px] leading-relaxed text-slate-400">
-              The DXF geometry is active. Generator and winding settings are hidden because they do not describe the imported traces. Choose a generator in Routing source to return to generated geometry.
+              The DXF centerlines are active. Trace width, clearance and via dimensions remain editable below. Generator settings are hidden because they do not describe these paths. Choose a generator in Routing source to return to generated geometry.
             </p>
             <dl class="mt-3 grid grid-cols-3 gap-2 border-t border-slate-700/70 pt-2">
               <div>
@@ -193,9 +195,11 @@
               </div>
             </dl>
           </div>
-        {:else}
-          <TracesBoardPanel {config} />
         {/if}
+        <TracesBoardPanel {config} traceWidthMm={cadGeometry?.trace_width_mm}
+          onTraceWidthChange={cadGeometry && onGeometryChange ? (width) => {
+            if (cadGeometry) onGeometryChange?.({ ...cadGeometry, trace_width_mm: width });
+          } : undefined} />
       </div>
     </section>
 

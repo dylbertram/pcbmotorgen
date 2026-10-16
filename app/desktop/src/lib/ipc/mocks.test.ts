@@ -21,6 +21,18 @@ import {
 import type { LinearMotorConfig } from "../types";
 import { computePreviewGeometry, computeMagnets } from "../previewGeometry";
 
+it("force sweep endpoints keep the physical array inside the active area", () => {
+  for (const width of [0.006, 0.012]) {
+    const c = makeConfig({ magnet_width_m: width, spacing_ratio: 0.8 });
+    const sweep = mockForceSweep(c);
+    const first = sweep.positions_m[0];
+    const last = sweep.positions_m[sweep.positions_m.length - 1];
+    expect(first - width / 2).toBeCloseTo(0, 12);
+    expect(last + (c.magnet_count - 1) * c.magnet_pitch_m + width / 2)
+      .toBeCloseTo(c.active_area_length_m, 12);
+  }
+});
+
 function makeConfig(overrides: Partial<LinearMotorConfig> = {}): LinearMotorConfig {
   return {
     active_area_length_m: 0.195,

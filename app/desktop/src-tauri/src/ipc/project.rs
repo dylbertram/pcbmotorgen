@@ -238,11 +238,11 @@ impl ProjectConfigStateIpc {
     ///
     /// Derived quantities are recomputed exactly as the store derives them:
     /// - pole pitch tau_p = electrical_pitch / 2
-    /// - active-area length = desired travel + mover span (count * tau_p)
+    /// - active-area length = desired travel + physical mover span
     /// - magnet gap = max(0, tau_p - width), spacing ratio pinned to 1.0
     pub fn to_linear_motor_ipc(&self) -> LinearMotorConfigIpc {
         let pole_pitch_mm = self.electrical_pitch_mm / 2.0;
-        let mover_span_mm = self.magnet_count as f64 * pole_pitch_mm;
+        let mover_span_mm = self.magnet_count.saturating_sub(1) as f64 * pole_pitch_mm + self.magnet_width_mm;
         let active_len_mm = self.desired_travel_mm + mover_span_mm;
         let gap_mm = (pole_pitch_mm - self.magnet_width_mm).max(0.0);
         let m = |mm: f64| mm / 1000.0;
@@ -643,9 +643,9 @@ mod tests {
     fn to_linear_motor_ipc_matches_store_derivation() {
         let state = sample_state();
         let ipc = state.config.to_linear_motor_ipc();
-        // pole pitch = electrical/2 = 6mm; span = 16*6 = 96mm;
-        // active length = 60 + 96 = 156mm.
-        assert!((ipc.active_area_length_m - 0.156).abs() < 1e-12);
+        // pole pitch = electrical/2 = 6mm; physical span = 15*6+5 = 95mm;
+        // active length = 60 + 95 = 155mm.
+        assert!((ipc.active_area_length_m - 0.155).abs() < 1e-12);
         assert!((ipc.magnet_pitch_m - 0.006).abs() < 1e-12);
         // gap = max(0, 6 - 5) = 1mm
         assert!((ipc.magnet_gap_m - 0.001).abs() < 1e-12);

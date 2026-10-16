@@ -8,6 +8,7 @@
     CadGeometry,
   } from "../../types";
   import { unmappedCoils } from "../../cadPhases";
+  import { usesDeltaConnection } from "../../driverConnection";
   import CoilPhaseMapping from "../design/CoilPhaseMapping.svelte";
   import FluxDiagram from "../simulate/FluxDiagram.svelte";
   import ForceSweepPlot from "../simulate/ForceSweepPlot.svelte";
@@ -27,6 +28,7 @@
     error,
     cadGeometry = null,
     onCadGeometryChange,
+    onConfigureWinding,
   }: {
     config: ConfigStore;
     active: boolean;
@@ -38,6 +40,7 @@
     error: string | null;
     cadGeometry?: CadGeometry | null;
     onCadGeometryChange?: (geometry: CadGeometry) => void;
+    onConfigureWinding?: () => void;
   } = $props();
 </script>
 
@@ -73,7 +76,7 @@
     {/if}
     <FluxDiagram {config} {active} />
     <ForceSweepPlot result={sweep} />
-    <DriverSuitability analysis={drive} error={driveError} />
+    <DriverSuitability analysis={drive} error={driveError} onConfigureWinding={usesDeltaConnection(config.toIpc(), !!cadGeometry && !unmappedCoils(cadGeometry).length) ? onConfigureWinding : undefined} />
   </section>
 
   <!-- Side column: drive & force targets and the driver settings sit on top

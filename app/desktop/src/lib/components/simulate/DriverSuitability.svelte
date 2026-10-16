@@ -6,7 +6,8 @@
   let {
     analysis,
     error = null,
-  }: { analysis: DriveAnalysis | null; error?: string | null } = $props();
+    onConfigureWinding,
+  }: { analysis: DriveAnalysis | null; error?: string | null; onConfigureWinding?: () => void } = $props();
 
   const STATUS: Record<CheckStatus, { glyph: string; tone: string; label: string }> = {
     pass: { glyph: "✓", tone: "text-emerald-300 border-emerald-500/50 bg-emerald-500/10", label: "Pass" },
@@ -80,9 +81,12 @@
     <p class="mt-3 rounded-md border border-rose-500/60 bg-rose-500/10 px-3 py-2 text-xs text-rose-200" role="alert">
       Driver analysis failed: {error}
     </p>
+    {#if onConfigureWinding}
+      <button type="button" onclick={onConfigureWinding} class="mt-2 rounded border border-slate-600 px-3 py-2 text-xs text-slate-100 hover:bg-slate-700">Change winding connection</button>
+    {/if}
   {/if}
 
-  {#if !analysis}
+  {#if !analysis && !error}
     <p class="mt-3 text-xs text-slate-500">Measuring the routed copper…</p>
   {:else if verdict && budget}
     <p class="mt-3 flex items-start gap-2 text-sm text-slate-100" role="status">

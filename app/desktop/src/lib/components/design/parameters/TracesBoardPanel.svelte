@@ -5,7 +5,11 @@
   import Separator from "../../ui/Separator.svelte";
   import ViaSizingGuide from "../ViaSizingGuide.svelte";
 
-  let { config }: { config: ConfigStore } = $props();
+  let { config, traceWidthMm, onTraceWidthChange }: {
+    config: ConfigStore;
+    traceWidthMm?: number;
+    onTraceWidthChange?: (width: number) => void;
+  } = $props();
 
   const sizingFields = [
     { key: "min_trace_mm", id: "motor-trace-width", label: "Minimum trace width (mm)", min: 0.01 },
@@ -36,19 +40,22 @@
             </span>
             <NumberField
               id={field.id}
-              value={config[field.key]}
+              value={field.key === "min_trace_mm" ? traceWidthMm ?? config.min_trace_mm : config[field.key]}
               min={field.min}
               step={0.01}
               ariaLabel={field.label}
               class="w-24 shrink-0 px-2 py-1 text-xs font-mono text-emerald-200"
-              onCommit={(value) => (config[field.key] = value)}
+              onCommit={(value) => {
+                if (field.key === "min_trace_mm" && onTraceWidthChange) onTraceWidthChange(value);
+                else config[field.key] = value;
+              }}
             />
           </span>
         </label>
       {/each}
     </div>
     <p class="mt-2 text-[11px] text-slate-500">
-      Trace width and gap set the generator's manufacturing limits.
+      Trace width sizes the copper around each centerline. Gap is the minimum manufacturing clearance. Via dimensions apply to generated and imported paths.
     </p>
     <ViaSizingGuide holeMm={config.min_via_drill_mm} ringMm={config.min_via_annular_ring_mm}>
       {#each viaFields as field (field.key)}

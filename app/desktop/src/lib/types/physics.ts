@@ -7,6 +7,7 @@ import type { CommutationMode } from "./enums";
 
 /** Force-vs-position sweep (evaluate_force_sweep). */
 export interface ForceSweepResult {
+  /** Absolute first-magnet-center coordinates; sweep limits align array edges. */
   positions_m: number[];
   force_x_n: number[];
   force_y_n: number[];

@@ -52,6 +52,24 @@ async function openTerminalTool(page: Page, { layered = false } = {}) {
   return { command, tools };
 }
 
+test("imported centerlines retain editable trace and via dimensions", async ({ page }) => {
+  const dialog = await openImport(page);
+  await dialog.getByRole("button", { name: "Open with this geometry" }).click();
+  for (const [id, value] of [
+    ["motor-trace-width", "0.6"],
+    ["motor-via-drill", "0.3"],
+    ["motor-via-annular-ring", "0.15"],
+  ]) {
+    const field = page.locator(`#${id}`);
+    await expect(field).toBeVisible();
+    await expect(field).toBeEnabled();
+    await field.fill(value);
+    await field.press("Tab");
+    await expect(field).toHaveValue(value);
+  }
+  await expect(page.getByText("DXF centerlines are active", { exact: false })).toBeVisible();
+});
+
 test("terminal defaults are selected automatically, overrides infer the other end, and labels survive simplify", async ({ page }, testInfo) => {
   const { command, tools } = await openTerminalTool(page);
   await expect(command.getByRole("status")).toContainText("Review A");

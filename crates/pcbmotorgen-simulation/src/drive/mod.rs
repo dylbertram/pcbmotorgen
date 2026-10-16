@@ -50,6 +50,9 @@ const RHO_REF_C: f64 = 20.0;
 pub struct DriverSpec {
     /// Display name, e.g. `DRV8311`.
     pub name: String,
+    /// Confirmed built-in delta handling by the driver/controller. Unconfirmed
+    /// legacy specs require star/wye for evaluation, not a hardware prohibition.
+    pub supports_delta: bool,
     /// Minimum motor supply voltage [V].
     pub min_supply_v: f64,
     /// Maximum motor supply voltage [V].
@@ -69,6 +72,7 @@ impl Default for DriverSpec {
         // TI DRV8311 (integrated FET, 3-phase).
         Self {
             name: "DRV8311".to_string(),
+            supports_delta: false,
             min_supply_v: 3.0,
             max_supply_v: 20.0,
             peak_current_a: 5.0,
@@ -76,6 +80,47 @@ impl Default for DriverSpec {
             rds_on_ohm: 0.21,
             max_pwm_hz: 200e3,
         }
+    }
+}
+
+/// Keep hardware compatibility separate from model availability. The present
+/// voltage/current/ripple equations assume star/wye and cannot evaluate delta.
+pub fn driver_connection_error(driver: &DriverSpec, delta: bool) -> Option<String> {
+    if !delta {
+        return None;
+    }
+    let hint = "Go to Design > Topology & Board > Winding connection and select Star (wye).";
+    Some(if driver.supports_delta {
+        format!("Delta handling is declared for {}, but delta electrical analysis is not yet available. {hint}", driver.name)
+    } else {
+        format!("{} has no declared built-in delta handling. Star (wye) configuration is required. {hint}", driver.name)
+    })
+}
+
+#[cfg(test)]
+mod connection_tests {
+    use super::*;
+
+    #[test]
+    fn unconfirmed_delta_requires_star_wye() {
+        let driver = DriverSpec::default();
+        assert!(driver_connection_error(&driver, false).is_none());
+        let error = driver_connection_error(&driver, true).unwrap();
+        assert!(error.contains("Star (wye) configuration is required"));
+        assert!(error.contains("Design > Topology & Board > Winding connection"));
+    }
+
+    #[test]
+    fn declared_delta_support_does_not_enable_star_equations_for_delta() {
+        let driver = DriverSpec { supports_delta: true, ..DriverSpec::default() };
+        let error = driver_connection_error(&driver, true).unwrap();
+        assert!(error.contains("delta electrical analysis is not yet available"));
+    }
+
+    #[test]
+    fn legacy_driver_specs_default_to_unconfirmed_delta_support() {
+        let driver: DriverSpec = serde_json::from_str(r#"{"name":"Legacy"}"#).unwrap();
+        assert!(!driver.supports_delta);
     }
 }
 
@@ -231,7 +276,7 @@ pub struct DriveAnalysis {
     pub voltage_limited_current_a: f64,
     /// Highest speed at the target current within the usable voltage [m/s].
     pub max_speed_m_s: Option<f64>,
-    /// Peak-to-peak PWM current ripple (center-aligned, 50 % duty) [A].
+    /// Peak-to-peak ripple of the assumed 50%-duty two-phase RL loop [A].
     pub ripple_pp_a: f64,
     /// PWM frequency needed to meet the ripple limit [Hz].
     pub min_pwm_hz: f64,
@@ -245,7 +290,8 @@ pub struct DriveAnalysis {
     pub trace_ampacity_a: f64,
     /// Copper loss at the operating current (`1.5·I²·R`) [W].
     pub copper_loss_w: f64,
-    /// Holding thrust at the target current [N].
+    /// Thrust at the target current using the supplied force constant [N].
+    /// The desktop supplies the mean sweep constant, not a holding-position value.
     pub thrust_n: Option<f64>,
     /// Highest continuous phase current: min of driver, ampacity, voltage [A].
     pub max_continuous_current_a: f64,
@@ -369,7 +415,13 @@ pub fn analyze_drive_with(
         .iter()
         .zip(solutions.iter())
         .map(|(net, sol)| {
-            let no_via = solve_network(net, &edge_resistances(net, 0.0));
+            // At unit phase current, each edge's I²R is its contribution
+            // to equivalent resistance. Avoid an ill-conditioned second
+            // solve with ideal-short vias, whose failure could attribute
+            // the entire phase resistance to the vias.
+            let via_resistance: f64 = net.edges.iter().zip(&sol.current_share)
+                .filter(|(edge, _)| matches!(edge.kind, EdgeKind::Via))
+                .map(|(_, share)| share * share * r_via_hot).sum();
             let strands = net.strands().max(1);
             let total_len = net.trace_length_m();
             let vias = net.via_count();
@@ -408,7 +460,7 @@ pub fn analyze_drive_with(
                 vias_total: vias,
                 resistance_20c_ohm: sol.resistance_ohm * rho_20 / rho_hot,
                 resistance_hot_ohm: sol.resistance_ohm,
-                via_resistance_ohm: (sol.resistance_ohm - no_via.resistance_ohm).max(0.0),
+                via_resistance_ohm: via_resistance,
                 self_inductance_h: 0.0,
                 max_trace_share: max_share,
                 connected: sol.connected,
@@ -508,20 +560,35 @@ pub fn analyze_drive_with(
     });
 
     // --- Ripple ---------------------------------------------------------
+    // Steady-state RL response to +/- Vbus/2 across Rloop=2R, Lloop=2Ls.
+    // The inductive V/(8fLs) approximation is valid only when R/(4fLs)<<1.
     let ripple = if settings.pwm_hz > 0.0 && l_s > 0.0 {
-        v_bus / (8.0 * settings.pwm_hz * l_s)
+        if r_phase > 1e-12 {
+            v_bus / (2.0 * r_phase) * (r_phase / (4.0 * settings.pwm_hz * l_s)).tanh()
+        } else {
+            v_bus / (8.0 * settings.pwm_hz * l_s)
+        }
     } else {
         f64::INFINITY
     };
     let ripple_limit = settings.ripple_limit_fraction * i;
-    let min_pwm = if l_s > 0.0 && ripple_limit > 0.0 {
-        v_bus / (8.0 * l_s * ripple_limit)
+    let required_fl = if ripple_limit <= 0.0 || v_bus <= 0.0 {
+        f64::INFINITY
+    } else if r_phase <= 1e-12 {
+        v_bus / (8.0 * ripple_limit)
+    } else if 2.0 * r_phase * ripple_limit >= v_bus {
+        0.0
+    } else {
+        r_phase / (4.0 * (2.0 * r_phase * ripple_limit / v_bus).atanh())
+    };
+    let min_pwm = if l_s > 0.0 {
+        required_fl / l_s
     } else {
         f64::INFINITY
     };
     let peak_current = i + ripple / 2.0;
     let added_inductance = if settings.pwm_hz > 0.0 && ripple_limit > 0.0 {
-        (v_bus / (8.0 * settings.pwm_hz * ripple_limit) - l_s).max(0.0)
+        (required_fl / settings.pwm_hz - l_s).max(0.0)
     } else {
         0.0
     };
@@ -614,14 +681,14 @@ pub fn analyze_drive_with(
     });
     checks.push(DriveCheck {
         id: "ripple".into(),
-        label: "PWM current ripple".into(),
+        label: "PWM current ripple estimate (50% duty)".into(),
         status: status(ripple <= ripple_limit, ripple <= i),
         value: ripple,
         limit: ripple_limit,
         unit: "A".into(),
         detail: if added_inductance > 0.0 {
             format!(
-                "V_bus / (8·f_sw·L_s) with L_s = {:.2} µH. Meeting {:.0} % of the phase current needs f_sw ≥ {:.0} kHz, or {:.1} µH added in series per phase at {:.0} kHz.",
+                "50%-duty RL estimate, not a switched-waveform simulation: V_bus/(2R)·tanh(R/(4·f_sw·L_s)), L_s = {:.2} µH. Meeting {:.0} % of the phase current needs f_sw ≥ {:.0} kHz, or {:.1} µH added in series per phase at {:.0} kHz.",
                 l_s * 1e6,
                 settings.ripple_limit_fraction * 100.0,
                 min_pwm / 1e3,
@@ -630,7 +697,7 @@ pub fn analyze_drive_with(
             )
         } else {
             format!(
-                "V_bus / (8·f_sw·L_s) with L_s = {:.2} µH. The limit holds down to f_sw = {:.0} kHz.",
+                "50%-duty RL estimate, not a switched-waveform simulation: V_bus/(2R)·tanh(R/(4·f_sw·L_s)), L_s = {:.2} µH. The limit holds down to f_sw = {:.0} kHz.",
                 l_s * 1e6,
                 min_pwm / 1e3
             )
@@ -668,13 +735,13 @@ pub fn analyze_drive_with(
             let f = k * i;
             checks.push(DriveCheck {
                 id: "thrust".into(),
-                label: "Holding thrust vs continuous target".into(),
+                label: "Mean sweep thrust vs continuous target".into(),
                 status: status(f >= sim.target_force_n, f > sim.friction_n),
                 value: f,
                 limit: sim.target_force_n,
                 unit: "N".into(),
                 detail: format!(
-                    "K_f = {k:.3} N/A. Friction is {:.3} N; at the {limiting} limit ({max_cont:.2} A) thrust reaches {:.3} N.",
+                    "Mean sweep K_f = {k:.3} N/A, not a position-specific holding-force result. Friction is {:.3} N; at the {limiting} limit ({max_cont:.2} A) mean thrust reaches {:.3} N.",
                     sim.friction_n,
                     k * max_cont
                 ),
@@ -682,7 +749,7 @@ pub fn analyze_drive_with(
         }
         None => checks.push(DriveCheck {
             id: "thrust".into(),
-            label: "Holding thrust vs continuous target".into(),
+            label: "Mean sweep thrust vs continuous target".into(),
             status: CheckStatus::Unknown,
             value: 0.0,
             limit: sim.target_force_n,

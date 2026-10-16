@@ -5,43 +5,41 @@
   import NumberField from "../ui/NumberField.svelte";
   import Separator from "../ui/Separator.svelte";
   import SettingRow from "./SettingRow.svelte";
+  import AddDriverModal from "./AddDriverModal.svelte";
+  import { readCustomDrivers, saveCustomDrivers } from "../../driverLibrary";
 
   let { config }: { config: ConfigStore } = $props();
 
   const COPPER_WEIGHTS = [0.5, 1, 2, 3];
 
-  // A preset is "selected" only while every limit still matches it.
-  let presetName = $derived.by(() => {
-    const d = config.drive.driver;
-    const match = DRIVER_PRESETS.find(
-      (p) =>
-        p.name === d.name &&
-        p.min_supply_v === d.min_supply_v &&
-        p.max_supply_v === d.max_supply_v &&
-        p.peak_current_a === d.peak_current_a &&
-        p.continuous_rms_a === d.continuous_rms_a &&
-        p.rds_on_ohm === d.rds_on_ohm &&
-        p.max_pwm_hz === d.max_pwm_hz,
-    );
-    return match ? match.name : "custom";
-  });
+  let customDrivers = $state<DriverSpec[]>(readCustomDrivers());
+  let addingDriver = $state(false);
+  let storageWarning = $state(false);
+  // Keep the project's exact parameters, even when another installation has
+  // a library entry with the same name and different limits.
+  let drivers = $derived([
+    config.drive.driver,
+    ...[...DRIVER_PRESETS, ...customDrivers].filter((driver) => driver.name !== config.drive.driver.name),
+  ]);
 
   function update(patch: Partial<DriveSettings>): void {
     config.drive = { ...config.drive, ...patch };
   }
 
-  function updateDriver(patch: Partial<DriverSpec>): void {
-    const driver = { ...config.drive.driver, ...patch };
-    // Editing a preset's limits makes it a custom part.
-    if (presetName !== "custom" && !("name" in patch)) {
-      driver.name = `${config.drive.driver.name} (custom)`;
+  function choosePreset(name: string): void {
+    const preset = drivers.find((p) => p.name === name);
+    const current = config.drive.driver;
+    if (![...DRIVER_PRESETS, ...customDrivers].some((driver) => driver.name === current.name)) {
+      customDrivers = [...customDrivers, { ...current }];
     }
-    update({ driver });
+    if (preset) update({ driver: { ...preset } });
   }
 
-  function choosePreset(name: string): void {
-    const preset = DRIVER_PRESETS.find((p) => p.name === name);
-    if (preset) update({ driver: { ...preset } });
+  function addDriver(driver: DriverSpec): void {
+    customDrivers = [...customDrivers, driver];
+    storageWarning = !saveCustomDrivers(customDrivers);
+    update({ driver });
+    addingDriver = false;
   }
 
   const field = "w-24 shrink-0 px-2 py-1 text-xs font-mono text-emerald-200";
@@ -53,36 +51,29 @@
 <section aria-labelledby="driver-settings-heading" class="overflow-hidden rounded-md border border-slate-700 bg-slate-800/30">
   <div class="flex items-center justify-between gap-3 px-3 py-2">
     <h3 id="driver-settings-heading" class="text-xs font-semibold uppercase tracking-wider text-slate-200">Driver</h3>
+    <button type="button" onclick={() => (addingDriver = true)} class="rounded border border-slate-600 px-2 py-1 text-xs text-slate-200 hover:bg-slate-700">Add driver…</button>
+  </div>
+  <div class="px-3 pb-3">
+    <label for="evaluation-driver" class="mb-1 block text-[11px] text-slate-400">Evaluate against</label>
     <select
-      aria-label="Driver preset"
-      value={presetName}
+      id="evaluation-driver"
+      aria-label="Driver to evaluate"
+      value={config.drive.driver.name}
       onchange={(e) => choosePreset(e.currentTarget.value)}
       class="rounded border border-slate-700 bg-slate-900 px-2 py-1 text-xs text-slate-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-400"
     >
-      {#each DRIVER_PRESETS as preset (preset.name)}
+      {#each drivers as preset (preset.name)}
         <option value={preset.name}>{preset.name}</option>
       {/each}
-      <option value="custom" disabled={presetName !== "custom"}>Custom</option>
     </select>
+    <p class="mt-2 text-[11px] text-slate-400">{config.drive.driver.min_supply_v}–{config.drive.driver.max_supply_v} V · {config.drive.driver.continuous_rms_a} A RMS · {config.drive.driver.peak_current_a} A peak</p>
+    <p class="mt-1 text-[11px] text-slate-400">{config.drive.driver.supports_delta ? "Delta handling declared" : "Requires Star (wye) for evaluation"}</p>
+    {#if storageWarning}<p role="status" class="mt-2 text-xs text-amber-200">Driver selected. Library storage is unavailable, so save this project to keep its parameters.</p>{/if}
   </div>
 
   <Separator />
 
   <div class="space-y-3 px-3 pb-3 pt-2.5">
-    <fieldset class="space-y-2">
-      <legend class="mb-1.5 text-[11px] text-slate-400">Datasheet limits of {config.drive.driver.name}</legend>
-      <div class="grid gap-y-2">
-        <SettingRow label="Min supply (V)"><NumberField value={config.drive.driver.min_supply_v} min={0} step={0.5} ariaLabel="Driver minimum supply (V)" class={field} onCommit={(v) => updateDriver({ min_supply_v: v })} /></SettingRow>
-        <SettingRow label="Max supply (V)"><NumberField value={config.drive.driver.max_supply_v} min={0.1} step={1} ariaLabel="Driver maximum supply (V)" class={field} onCommit={(v) => updateDriver({ max_supply_v: v })} /></SettingRow>
-        <SettingRow label="Peak / OCP (A)" help="Overcurrent trip or peak output rating. Phase current plus half the PWM ripple must stay below it."><NumberField value={config.drive.driver.peak_current_a} min={0.01} step={0.1} ariaLabel="Driver peak current (A)" class={field} onCommit={(v) => updateDriver({ peak_current_a: v })} /></SettingRow>
-        <SettingRow label="Continuous (A RMS)"><NumberField value={config.drive.driver.continuous_rms_a} min={0.01} step={0.1} ariaLabel="Driver continuous current (A RMS)" class={field} onCommit={(v) => updateDriver({ continuous_rms_a: v })} /></SettingRow>
-        <SettingRow label="R_DS(on) HS+LS (mΩ)" help="Total on-resistance in the current path: one high-side plus one low-side FET."><NumberField value={Math.round(config.drive.driver.rds_on_ohm * 1e4) / 10} min={0} step={10} ariaLabel="Driver on-resistance, high plus low side (mΩ)" class={field} onCommit={(v) => updateDriver({ rds_on_ohm: v / 1e3 })} /></SettingRow>
-        <SettingRow label="Max PWM (kHz)"><NumberField value={config.drive.driver.max_pwm_hz / 1e3} min={1} step={10} ariaLabel="Driver maximum PWM frequency (kHz)" class={field} onCommit={(v) => updateDriver({ max_pwm_hz: v * 1e3 })} /></SettingRow>
-      </div>
-    </fieldset>
-
-    <Separator />
-
     <fieldset class="space-y-2">
       <legend class="mb-1.5 text-[11px] text-slate-400">Operating point</legend>
       <div class="grid gap-y-2">
@@ -116,3 +107,7 @@
     </fieldset>
   </div>
 </section>
+
+{#if addingDriver}
+  <AddDriverModal existingNames={drivers.map((driver) => driver.name)} onAdd={addDriver} onClose={() => (addingDriver = false)} />
+{/if}
