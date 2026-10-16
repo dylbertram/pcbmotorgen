@@ -1,5 +1,15 @@
 import type { DriverSpec } from "./types/drive";
+import { DRIVER_PRESETS } from "./types/drive";
 
+/**
+ * Persisted driver library. Bundled drivers and user-added ones live together;
+ * bundled entries are ordinary, DELETABLE entries rather than a separate list.
+ *
+ * Storage keeps the original `v1` key. The store used to hold only custom
+ * drivers, so an old-only store is simply REPLACED by the bundled library
+ * rather than transitioned. Once the bundled drivers are present, the stored
+ * library is used as-is, so edits and deletions persist.
+ */
 const STORAGE_KEY = "pcbmotorgen.drivers.v1";
 
 export function driverValidationError(driver: DriverSpec): string | null {
@@ -17,20 +27,46 @@ export function driverValidationError(driver: DriverSpec): string | null {
   return null;
 }
 
-export function readCustomDrivers(): DriverSpec[] {
+/** Parse a stored array, dropping malformed entries. Null/garbage -> empty. */
+function parseStored(raw: string | null): DriverSpec[] {
   try {
-    const saved: unknown = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "[]");
+    const saved: unknown = JSON.parse(raw ?? "null");
     if (!Array.isArray(saved)) return [];
     return saved.filter((driver): driver is DriverSpec =>
       driver !== null && typeof driver === "object" &&
-      typeof driver.name === "string" && !driverValidationError(driver));
+      typeof (driver as { name?: unknown }).name === "string" && !driverValidationError(driver));
   } catch {
     return [];
   }
 }
 
+function bundled(): DriverSpec[] {
+  return DRIVER_PRESETS.map((driver) => ({ ...driver }));
+}
+
+/**
+ * The saved driver library. An absent or pre-bundled store is replaced by the
+ * bundled drivers; a store that already holds them is used as-is.
+ */
+export function readDrivers(): DriverSpec[] {
+  if (typeof localStorage === "undefined") return bundled();
+  try {
+    const stored = parseStored(localStorage.getItem(STORAGE_KEY));
+    const hasBundled = stored.some((driver) =>
+      DRIVER_PRESETS.some((preset) => preset.name.toLowerCase() === driver.name.toLowerCase()));
+    if (!hasBundled) {
+      const seeded = bundled();
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(seeded));
+      return seeded;
+    }
+    return stored;
+  } catch {
+    return bundled();
+  }
+}
+
 /** Return false when browser storage is unavailable; the project still keeps the selected driver. */
-export function saveCustomDrivers(drivers: DriverSpec[]): boolean {
+export function saveDrivers(drivers: DriverSpec[]): boolean {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(drivers));
     return true;

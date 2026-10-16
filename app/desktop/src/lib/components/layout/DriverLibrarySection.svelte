@@ -1,10 +1,14 @@
 <script lang="ts">
   import type { DriverSpec } from "../../types";
+  import { DRIVER_PRESETS } from "../../types";
   import { driverValidationError } from "../../driverLibrary";
   import { driverLibrary } from "../../stores/driverLibrary.svelte";
   import AddDriverModal from "../simulate/AddDriverModal.svelte";
 
   let { disabled = false }: { disabled?: boolean } = $props();
+
+  /** Names of the drivers shipped with the app (still ordinary library rows). */
+  const bundledNames = new Set(DRIVER_PRESETS.map((driver) => driver.name));
 
   /** Editable form values: datasheet-friendly units (mΩ, kHz) like the Add dialog. */
   interface DriverDraft {
@@ -102,7 +106,7 @@
     </button>
   </div>
   <p class="mb-3 mt-1 text-xs leading-relaxed text-slate-400">
-    Edit the datasheet limits here; pick a driver in the Simulation tab to evaluate against it.
+    Bundled drivers ship with the app but can be edited or removed like any other. Pick a driver in the Simulation tab to evaluate against it.
   </p>
 
   {#if driverLibrary.drivers.length === 0}
@@ -150,7 +154,10 @@
         {:else}
           <div class="flex items-start justify-between gap-3">
             <div class="min-w-0">
-              <p class="truncate text-xs font-medium text-slate-100" title={driver.name}>{driver.name}</p>
+              <p class="flex items-center gap-1.5 text-xs font-medium text-slate-100">
+                <span class="truncate" title={driver.name}>{driver.name}</span>
+                {#if bundledNames.has(driver.name)}<span class="shrink-0 rounded-full border border-slate-600 px-1.5 py-0.5 text-[9px] uppercase tracking-wide text-slate-400">Bundled</span>{/if}
+              </p>
               <p class="mt-0.5 text-[11px] text-slate-400">
                 {driver.min_supply_v}–{driver.max_supply_v} V · {driver.continuous_rms_a} A RMS · {driver.peak_current_a} A peak · {driver.supports_delta ? "delta declared" : "star only"}
               </p>
