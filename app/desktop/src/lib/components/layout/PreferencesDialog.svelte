@@ -5,6 +5,8 @@
   import { DEFAULT_RULES, RULE_FIELDS, readPreferences, writePreferences, validRules, type Appearance, type DrcRules } from "../../preferences";
   import { attachBackdropScrollGuard, lockPageScroll } from "../../utils/pageScrollLock";
   import { importKicadDrc } from "../../kicadDrc";
+  import DriverLibrarySection from "./DriverLibrarySection.svelte";
+  import CoilPatternLibrarySection from "./CoilPatternLibrarySection.svelte";
 
   let { config, disabled = false, onClose }: { config: ConfigStore; disabled?: boolean; onClose: () => void } = $props();
   let open = $state(true);
@@ -114,6 +116,9 @@
             <button type="button" onclick={() => { rules = { ...DEFAULT_RULES }; importName = null; importWarnings = []; error = null; }} class="mt-4 text-xs text-slate-400 underline decoration-slate-600 underline-offset-4 hover:text-slate-200">Restore default rules</button>
             {#if !valid}<p class="mt-3 text-xs text-rose-300" role="alert">Enter a positive number for every rule.</p>{/if}
           </fieldset>
+
+          <DriverLibrarySection {disabled} />
+          <CoilPatternLibrarySection {config} {disabled} />
           {#if error}<p role="alert" class="text-xs text-rose-300">{error}</p>{/if}
         </div>
         <footer class="flex shrink-0 justify-end gap-2 border-t border-slate-700 px-5 py-3">
