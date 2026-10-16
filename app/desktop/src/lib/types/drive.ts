@@ -31,6 +31,8 @@ export interface DriveSettings {
   allowed_rise_c: number;
   ripple_limit_fraction: number;
   voltage_headroom: number;
+  /** External series inductance per phase at the driver terminals [H]. */
+  series_inductance_h: number;
 }
 
 export interface PhaseElectrical {
@@ -79,6 +81,10 @@ export interface DriveAnalysis {
   mutual_inductance_h: number;
   line_inductance_h: number;
   synchronous_inductance_h: number;
+  /** External series inductance per phase defined at the terminals [H]. */
+  series_inductance_h: number;
+  /** Copper + external per-phase inductance the checks use [H]. */
+  effective_inductance_h: number;
   line_resistance_ohm: number;
   time_constant_s: number;
   bus_voltage_v: number;
@@ -155,4 +161,5 @@ export const DEFAULT_DRIVE_SETTINGS: DriveSettings = {
   allowed_rise_c: 20,
   ripple_limit_fraction: 0.3,
   voltage_headroom: 0.85,
+  series_inductance_h: 0,
 };

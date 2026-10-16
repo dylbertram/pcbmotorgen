@@ -178,6 +178,9 @@
           <div>
             <dt class="text-slate-400">PWM for the ripple limit</dt>
             <dd class="font-mono text-slate-100">≥ {formatSi(analysis.min_pwm_hz, "Hz")}</dd>
+            {#if analysis.series_inductance_h > 0}
+              <dd class="text-[11px] text-slate-500">with {formatSi(analysis.series_inductance_h, "H")} series per phase</dd>
+            {/if}
             {#if analysis.added_inductance_h > 0}
               <dd class="text-[11px] text-slate-500">or add {formatSi(analysis.added_inductance_h, "H")} per phase</dd>
             {/if}

@@ -1,6 +1,19 @@
 import { test, expect } from "@playwright/test";
 import { gotoDesignApp } from "./helpers";
 
+test("a defined series inductor tames the PWM ripple estimate", async ({ page }) => {
+  await gotoDesignApp(page);
+  await page.getByRole("combobox", { name: "Winding connection", exact: true }).selectOption("2");
+  await page.getByRole("tab", { name: /^Simulate/i }).click();
+  const results = page.locator('section[aria-labelledby="driver-suitability-heading"]');
+  await expect(results).not.toContainText("series per phase");
+  const inductor = page.getByRole("spinbutton", { name: "Series inductor per phase (µH)", exact: true });
+  await inductor.fill("100");
+  await inductor.press("Enter");
+  // The configured inductor feeds the ripple floor and the analysis notes.
+  await expect(results).toContainText("with 100 µH series per phase");
+});
+
 test("voltage updates driver results even when the force sweep fails", async ({ page }) => {
   await page.route(/\/src\/lib\/ipc\/physics\.ts(?:\?t=\d+)?$/, (route) => route.fulfill({
     contentType: "application/javascript",

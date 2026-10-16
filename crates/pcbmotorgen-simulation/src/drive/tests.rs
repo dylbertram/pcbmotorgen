@@ -318,6 +318,30 @@ fn ripple_estimate_matches_the_assumed_fifty_percent_rl_loop() {
 }
 
 #[test]
+fn external_series_inductance_tames_ripple_and_raises_voltage() {
+    let base = analyze_drive(&sim(), &two_strand_fixture(), &DriveSettings::default(), Some(0.5));
+    let extra = 1e-3; // 1 mH per phase at the driver terminals
+    let settings = DriveSettings { series_inductance_h: extra, ..DriveSettings::default() };
+    let a = analyze_drive(&sim(), &two_strand_fixture(), &settings, Some(0.5));
+
+    assert!((a.series_inductance_h - extra).abs() < 1e-15);
+    assert!((a.effective_inductance_h - (a.synchronous_inductance_h + extra)).abs() < 1e-15);
+    // More series inductance: less ripple, a longer time constant, a lower
+    // PWM floor, and less extra inductance still needed.
+    assert!(a.ripple_pp_a < base.ripple_pp_a);
+    assert!(a.min_pwm_hz < base.min_pwm_hz);
+    assert!(a.time_constant_s > base.time_constant_s);
+    assert!(a.added_inductance_h <= base.added_inductance_h);
+    // Standstill holding voltage is resistive, so it is unchanged; the
+    // at-speed voltage grows by ω·ΔL·I.
+    assert!((a.holding_voltage_v - base.holding_voltage_v).abs() < 1e-12);
+    assert!(a.speed_voltage_v.unwrap() > base.speed_voltage_v.unwrap());
+    assert!(a.notes.iter().any(|note| note.contains("external series inductance")));
+    // The copper-only value is untouched, so the UI can still show it.
+    assert!((a.synchronous_inductance_h - base.synchronous_inductance_h).abs() < 1e-15);
+}
+
+#[test]
 fn braid_fixture_produces_plausible_values() {
     let ctx = RoutingContext {
         active_area_length_mm: 147.0,

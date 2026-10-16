@@ -149,6 +149,13 @@ pub struct DriveSettings {
     pub ripple_limit_fraction: f64,
     /// Fraction of the bus a current loop may use (control headroom).
     pub voltage_headroom: f64,
+    /// External series inductance added at the driver terminals, per phase [H].
+    ///
+    /// Coreless coils have very low phase inductance, so a physical inductor
+    /// is often fitted near the driver to tame PWM ripple. It adds directly to
+    /// the per-phase (synchronous) inductance used for the ripple, time
+    /// constant, and ω·L voltage terms; zero means none.
+    pub series_inductance_h: f64,
 }
 
 impl Default for DriveSettings {
@@ -164,6 +171,7 @@ impl Default for DriveSettings {
             allowed_rise_c: 20.0,
             ripple_limit_fraction: 0.3,
             voltage_headroom: 0.85,
+            series_inductance_h: 0.0,
         }
     }
 }
@@ -253,6 +261,11 @@ pub struct DriveAnalysis {
     pub line_inductance_h: f64,
     /// Effective per-phase (synchronous) inductance `L_LL / 2` [H].
     pub synchronous_inductance_h: f64,
+    /// External series inductance per phase defined at the driver terminals [H].
+    pub series_inductance_h: f64,
+    /// Per-phase inductance the checks use: copper `synchronous_inductance_h`
+    /// plus `series_inductance_h` [H].
+    pub effective_inductance_h: f64,
     /// Line-to-line resistance a 4-wire measurement reads (`2·R_phase`) [Ω].
     pub line_resistance_ohm: f64,
     /// Electrical time constant `L_s / R` [s].
@@ -509,6 +522,10 @@ pub fn analyze_drive_with(
         l_ll = 2.0 * l_self;
     }
     let l_s = l_ll / 2.0;
+    // External inductors fitted at the driver terminals add in series with
+    // each phase, so one per-phase value raises the effective synchronous
+    // inductance that the ripple, time-constant, and ω·L terms see.
+    let l_total = l_s + settings.series_inductance_h.max(0.0);
 
     let r_phase = phases.iter().map(|p| p.resistance_hot_ohm).fold(0.0, f64::max);
     let i = sim.max_current_a.max(0.0);
@@ -535,7 +552,7 @@ pub fn analyze_drive_with(
         } else {
             0.0
         };
-        let v_ph = ((i * r_phase + e).powi(2) + (omega * l_s * i).powi(2)).sqrt();
+        let v_ph = ((i * r_phase + e).powi(2) + (omega * l_total * i).powi(2)).sqrt();
         sqrt3 * v_ph + i * d.rds_on_ohm
     };
     let speed_v = ke.map(|_| required_v(settings.target_speed_m_s));
@@ -562,11 +579,11 @@ pub fn analyze_drive_with(
     // --- Ripple ---------------------------------------------------------
     // Steady-state RL response to +/- Vbus/2 across Rloop=2R, Lloop=2Ls.
     // The inductive V/(8fLs) approximation is valid only when R/(4fLs)<<1.
-    let ripple = if settings.pwm_hz > 0.0 && l_s > 0.0 {
+    let ripple = if settings.pwm_hz > 0.0 && l_total > 0.0 {
         if r_phase > 1e-12 {
-            v_bus / (2.0 * r_phase) * (r_phase / (4.0 * settings.pwm_hz * l_s)).tanh()
+            v_bus / (2.0 * r_phase) * (r_phase / (4.0 * settings.pwm_hz * l_total)).tanh()
         } else {
-            v_bus / (8.0 * settings.pwm_hz * l_s)
+            v_bus / (8.0 * settings.pwm_hz * l_total)
         }
     } else {
         f64::INFINITY
@@ -581,14 +598,14 @@ pub fn analyze_drive_with(
     } else {
         r_phase / (4.0 * (2.0 * r_phase * ripple_limit / v_bus).atanh())
     };
-    let min_pwm = if l_s > 0.0 {
-        required_fl / l_s
+    let min_pwm = if l_total > 0.0 {
+        required_fl / l_total
     } else {
         f64::INFINITY
     };
     let peak_current = i + ripple / 2.0;
     let added_inductance = if settings.pwm_hz > 0.0 && ripple_limit > 0.0 {
-        (required_fl / settings.pwm_hz - l_s).max(0.0)
+        (required_fl / settings.pwm_hz - l_total).max(0.0)
     } else {
         0.0
     };
@@ -689,7 +706,7 @@ pub fn analyze_drive_with(
         detail: if added_inductance > 0.0 {
             format!(
                 "50%-duty RL estimate, not a switched-waveform simulation: V_bus/(2R)·tanh(R/(4·f_sw·L_s)), L_s = {:.2} µH. Meeting {:.0} % of the phase current needs f_sw ≥ {:.0} kHz, or {:.1} µH added in series per phase at {:.0} kHz.",
-                l_s * 1e6,
+                l_total * 1e6,
                 settings.ripple_limit_fraction * 100.0,
                 min_pwm / 1e3,
                 added_inductance * 1e6,
@@ -698,7 +715,7 @@ pub fn analyze_drive_with(
         } else {
             format!(
                 "50%-duty RL estimate, not a switched-waveform simulation: V_bus/(2R)·tanh(R/(4·f_sw·L_s)), L_s = {:.2} µH. The limit holds down to f_sw = {:.0} kHz.",
-                l_s * 1e6,
+                l_total * 1e6,
                 min_pwm / 1e3
             )
         },
@@ -783,6 +800,12 @@ pub fn analyze_drive_with(
         "Inductance is integrated over the routed copper only; terminal fan-out and the star point add a little. Confirm with an LCR meter at 100 kHz (L_LL = 2·L_s)."
             .to_string(),
     );
+    if settings.series_inductance_h > 0.0 {
+        notes.push(format!(
+            "Includes {:.1} µH external series inductance per phase at the driver terminals in the ripple, time-constant, and voltage terms.",
+            settings.series_inductance_h * 1e6
+        ));
+    }
 
     DriveAnalysis {
         driver_name: d.name.clone(),
@@ -796,8 +819,10 @@ pub fn analyze_drive_with(
         mutual_inductance_h: m_mut,
         line_inductance_h: l_ll,
         synchronous_inductance_h: l_s,
+        series_inductance_h: settings.series_inductance_h.max(0.0),
+        effective_inductance_h: l_total,
         line_resistance_ohm: 2.0 * r_phase,
-        time_constant_s: if r_phase > 0.0 { l_s / r_phase } else { 0.0 },
+        time_constant_s: if r_phase > 0.0 { l_total / r_phase } else { 0.0 },
         bus_voltage_v: v_bus,
         phase_current_a: i,
         pwm_hz: settings.pwm_hz,
