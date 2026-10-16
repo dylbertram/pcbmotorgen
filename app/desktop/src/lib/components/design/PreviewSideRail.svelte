@@ -26,7 +26,7 @@
     phases = [], showMotorControls = false, hasPolePitchData = false,
     hasBandWidthData = false, hasPoleRegionData = false, poleRegionPhases = [],
     geometry, selection, assignmentDisabled = false, terminalTool, onStartTerminals,
-    terminalsDisabled = false, dismissOnOutsideClick = true }: {
+    terminalsDisabled = false, dismissOnOutsideClick = true, showViewMode = false }: {
     view: CoilPreviewViewState;
     layers: { idx: number }[];
     coils?: { name: string; colorIdx: number }[];
@@ -54,6 +54,8 @@
      * so an outside click never surprises the user (kata qfdz).
      */
     dismissOnOutsideClick?: boolean;
+    /** Offer the Top-down / 3D switch in the Display panel (coil preview). */
+    showViewMode?: boolean;
   } = $props();
 
   type PanelId = "layers" | "display" | "terminals";
@@ -156,7 +158,7 @@
         </button>
       </header>
       <div class="min-h-0 overflow-y-auto overscroll-contain p-3">
-        <CoilPreviewDisplayPanel {view} uniqueLayers={layers} />
+        <CoilPreviewDisplayPanel {view} uniqueLayers={layers} {showViewMode} />
       </div>
     </div>
   {/if}

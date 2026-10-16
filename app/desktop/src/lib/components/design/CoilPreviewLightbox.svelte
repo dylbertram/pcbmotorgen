@@ -31,6 +31,7 @@
   import PreviewFrame from "./PreviewFrame.svelte";
   import PreviewMeasureOverlay from "./PreviewMeasureOverlay.svelte";
   import PreviewSideRail from "./PreviewSideRail.svelte";
+  import CoilPreviewIsoView from "./CoilPreviewIsoView.svelte";
   import MoverPositionControls from "./MoverPositionControls.svelte";
   import { PREVIEW_H, PREVIEW_W } from "./coilPreviewCanvas";
   import type { CoilPreviewViewState } from "./coilPreviewViewState.svelte";
@@ -183,6 +184,9 @@
         <div class="absolute inset-0">
           <PreviewFrame bind:frame={modalFrameRef} {gestures} {measure} interactive={terminalTool?.active ?? false}
             label="Coil preview — expanded">
+            {#if view.viewMode === "iso"}
+              <CoilPreviewIsoView geometry={terminalGeometry ?? importedGeometry} {view} />
+            {:else}
             <canvas bind:this={modalCanvasRef} class="block h-full w-full"
             ></canvas>
             {#if importedGeometry}
@@ -192,6 +196,7 @@
               <CoilTerminalOverlay geometry={terminalGeometry} tool={terminalTool} transform={worldTransform} panX={gestures.panX} panY={gestures.panY} width={W} height={H} worldScale={1e-3} isVisible={isTerminalVisible} showMarkers={view.showTerminals} rightInset={terminalPanelOpen ? 284 : 44} />
             {/if}
             <PreviewMeasureOverlay {measure} transform={worldTransform} panX={gestures.panX} panY={gestures.panY} width={W} height={H} />
+            {/if}
           </PreviewFrame>
         </div>
 
@@ -212,7 +217,7 @@
           coils={importedGeometry ? uniquePhases.map((phase) => ({ name: phase.name, colorIdx: phase.colorIdx })) : []}
           isCoilVisible={(name) => view.isPhaseVisible(uniquePhases.find((phase) => phase.name === name)?.idx ?? -1)}
           onToggleCoil={(name) => { const phase = uniquePhases.find((phase) => phase.name === name); if (phase) view.phaseVisibility[phase.idx] = !view.isPhaseVisible(phase.idx); }} showMotorControls={true}
-            label="Coil preview layers" displayLabel="Coil preview display" {hasPolePitchData} {hasBandWidthData} {hasPoleRegionData} {poleRegionPhases} dismissOnOutsideClick={false} />
+            label="Coil preview layers" displayLabel="Coil preview display" {hasPolePitchData} {hasBandWidthData} {hasPoleRegionData} {poleRegionPhases} dismissOnOutsideClick={false} showViewMode={true} />
         </div>
 
         <!-- Bare zoom buttons: no background, with the same 12px gap on the

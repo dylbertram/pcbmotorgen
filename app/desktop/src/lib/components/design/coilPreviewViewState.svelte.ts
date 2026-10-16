@@ -15,6 +15,8 @@
  */
 
 export class CoilPreviewViewState {
+  /** Top-down canvas or the layer-aware isometric view (kata zje4). */
+  viewMode = $state<"top" | "iso">("top");
   /** Copper uses physical widths; centerlines use a thin screen-width stroke. */
   traceMode = $state<"traces" | "centerlines">("traces");
   /** Phase waveform below the mover slider in the expanded preview. */

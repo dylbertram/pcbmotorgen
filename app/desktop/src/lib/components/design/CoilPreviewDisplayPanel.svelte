@@ -7,14 +7,26 @@
    */
   import type { CoilPreviewViewState } from "./coilPreviewViewState.svelte";
 
-  let { view, uniqueLayers }: {
+  let { view, uniqueLayers, showViewMode = false }: {
     view: CoilPreviewViewState;
     uniqueLayers: { idx: number }[];
+    /** Show the Top-down / 3D switch (coil preview only). */
+    showViewMode?: boolean;
   } = $props();
   const displayGroup = $props.id();
 </script>
 
 <div class="display-controls">
+  {#if showViewMode}
+    <fieldset>
+      <legend>View</legend>
+      <div class="mode-options">
+        <label><input type="radio" name={"view-" + displayGroup} value="top" bind:group={view.viewMode} />Top-down</label>
+        <label><input type="radio" name={"view-" + displayGroup} value="iso" bind:group={view.viewMode} />3D</label>
+      </div>
+    </fieldset>
+  {/if}
+
   <fieldset>
     <legend>Traces</legend>
     <div class="mode-options">
