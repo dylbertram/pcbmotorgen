@@ -79,4 +79,8 @@ export interface CadGeometry {
 export interface CadImportResult {
   geometry: CadGeometry;
   warnings: string[];
+  /** Millimetres per drawing unit actually applied. Absent in older results. */
+  units_to_mm?: number;
+  /** Millimetres per unit declared by the DXF `$INSUNITS` header, when present. */
+  source_units_mm?: number;
 }

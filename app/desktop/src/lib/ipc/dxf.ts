@@ -57,6 +57,7 @@ export async function importCadDxf(
   legacyLayerCount: number,
   legacyPcbThicknessMm: number,
   sourceLayerCoils: Record<string, string> = {},
+  preferDetectedUnits = false,
 ): Promise<CadImportResult> {
   if (!isTauriAvailable()) throw new Error("CAD import requires the desktop app");
   return await invoke<CadImportResult>("import_cad_dxf", {
@@ -67,6 +68,7 @@ export async function importCadDxf(
     legacyLayerCount,
     legacyPcbThicknessMm,
     sourceLayerCoils,
+    preferDetectedUnits,
   });
 }
 

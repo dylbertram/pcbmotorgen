@@ -19,10 +19,10 @@ test.beforeEach(async ({ page }) => {
     const response = await route.fetch();
     let body = await response.text();
     body = body.replace(/export async function pickCadDxfPath\(\) \{[\s\S]*?\n\}/, `export async function pickCadDxfPath() { return '/fixture/coil-leads.dxf'; }`);
-    body = body.replace(/export async function importCadDxf\([\s\S]*?\n\}/, `export async function importCadDxf(path, units, tolerance, width, count, thickness, assignments = {}) {
+    body = body.replace(/export async function importCadDxf\([\s\S]*?\n\}/, `export async function importCadDxf(path, units, tolerance, width, count, thickness, assignments = {}, preferDetected = false) {
       const source = { L0_A: 'A', L0_B: 'B', holes: 'holes' };
       const source_layer_coils = Object.fromEntries(Object.entries(source).map(([name, coil]) => [name, (assignments[name] ?? coil).trim()]));
-      return { warnings: [], geometry: { layer_z_mm: [-1.6, 0], trace_width_mm: width, source_layer_coils,
+      return { warnings: [], units_to_mm: units, source_units_mm: preferDetected ? 25.4 : undefined, geometry: { layer_z_mm: [-1.6, 0], trace_width_mm: width, source_layer_coils,
         routing: { format_version: 2, curves: [], splines: [],
           segments: ['A', 'B'].flatMap((coil, row) => [0, 1].map(x => ({
             start: { x, y: row * 2 }, end: { x: x + 1, y: row * 2 },
@@ -68,6 +68,17 @@ test("imported centerlines retain editable trace and via dimensions", async ({ p
     await expect(field).toHaveValue(value);
   }
   await expect(page.getByText("DXF centerlines are active", { exact: false })).toBeVisible();
+});
+
+test("DXF units auto-detect from the file and can be overridden", async ({ page }) => {
+  const dialog = await openImport(page);
+  const units = dialog.getByLabel("DXF units");
+  await expect(units).toHaveValue("auto");
+  // Auto reports the header unit the backend detected.
+  await expect(dialog.getByTestId("cad-detected-units")).toContainText("detected 25.4 mm/unit");
+  // An explicit choice overrides the header and drops the detection note.
+  await units.selectOption("1");
+  await expect(dialog.getByTestId("cad-detected-units")).toHaveCount(0);
 });
 
 test("terminal defaults are selected automatically, overrides infer the other end, and labels survive simplify", async ({ page }, testInfo) => {
