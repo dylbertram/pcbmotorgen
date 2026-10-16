@@ -149,6 +149,23 @@ export class CoilTerminalTool {
     this.#base = null;
   };
 
+  /**
+   * Re-anchor to a regenerated design (e.g. after a routing-parameter change)
+   * and reselect its AUTOMATIC ends for the current coil. `CoilPreview`'s
+   * generated terminal geometry is derived fresh on every parameter edit, so
+   * without this the applied draft would silently stop updating.
+   *
+   * A geometry that keeps the same `routing` reference is one of this tool's
+   * own edits (a connection-convention change), so the live draft is kept.
+   */
+  rebind = (geometry: CadGeometry | null): void => {
+    if (this.step === null || !this.#base || !geometry) return;
+    if (this.#base.routing === geometry.routing) return;
+    const coil = this.coil;
+    this.#base = geometry;
+    this.begin(coil);
+  };
+
   #apply(next: boolean) {
     if (!this.canApply || !this.#base || !this.input || !this.output) return;
     const nextCoil = next ? this.nextCoil : undefined;

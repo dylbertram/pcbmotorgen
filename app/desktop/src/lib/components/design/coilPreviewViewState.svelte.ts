@@ -38,6 +38,17 @@ export class CoilPreviewViewState {
   showTerminals = $state(true);
   terminalPanelOpen = $state(false);
 
+  // --- outside requests -----------------------------------------------------
+  /** Incremented by an outside prompt (the Simulation tab's ends alert) to
+   *  open the coil-ends panel in the expanded preview. CoilPreview watches
+   *  the counter, so repeated requests always fire. */
+  terminalRequest = $state(0);
+
+  requestTerminals(): void {
+    this.terminalPanelOpen = true;
+    this.terminalRequest += 1;
+  }
+
   // --- per-phase + per-layer trace visibility -------------------------------
   // `coils.phases` is one entry per (phase, layer) pair, so phase toggles
   // index against `phase_idx`. Out-of-bounds indices default to visible.

@@ -54,6 +54,11 @@
   const triggers: Record<PanelId, HTMLButtonElement | null> = { layers: null, display: null, terminals: null };
   const panelClass = "absolute bottom-0 right-full top-0 z-30 flex w-60 max-w-[calc(100vw-4rem)] flex-col overflow-hidden border-l border-slate-700 bg-slate-900 text-slate-200 shadow-xl shadow-black/40";
   onDestroy(() => { terminalTool?.cancel(); view.terminalPanelOpen = false; });
+  // An outside request (the Simulation tab's ends alert) sets
+  // `view.terminalPanelOpen`; mirror it into the local panel state.
+  $effect(() => {
+    if (view.terminalPanelOpen && open !== "terminals") open = "terminals";
+  });
 
   function toggle(panel: PanelId) {
     if (open === "terminals") terminalTool?.cancel();

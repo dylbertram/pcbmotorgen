@@ -147,6 +147,19 @@
     expanded = true;
     terminalTool.begin(coil);
   }
+  // An ends request from elsewhere (the Simulation tab's alert) opens the
+  // expanded viewer with the coil-ends panel ready.
+  $effect(() => {
+    const request = view.terminalRequest;
+    if (!request) return;
+    untrack(() => startTerminalTool());
+  });
+  // A generated pattern is re-derived on every parameter edit. Re-anchor the
+  // open terminal tool so its automatic ends reselect instead of going stale.
+  $effect(() => {
+    const geometry = terminalGeometry;
+    untrack(() => terminalTool.rebind(geometry));
+  });
   function isTerminalVisible(coil: string, layer: number): boolean {
     const phase = coils?.phases.find((p) => p.phase_name === coil);
     return Boolean(phase && view.isPhaseVisible(phase.phase_idx) && view.isLayerVisible(layer) && view.isCoilLayerVisible(coil, layer));

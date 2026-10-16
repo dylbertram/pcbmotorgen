@@ -30,6 +30,7 @@
   import { cadGeometryToPreview } from "./lib/cadPreview";
   import { saveTextToFile } from "./lib/files";
   import { geometryKey, unmappedCoils } from "./lib/cadPhases";
+  import { coilsMissingEnds } from "./lib/cadTerminals";
 
   import TabNav from "./lib/components/layout/TabNav.svelte";
   import DrcStatus from "./lib/components/layout/DrcStatus.svelte";
@@ -288,6 +289,12 @@
     drive = null;
   }
 
+  /** Opening the coil-ends panel lives in the design reflection preview. */
+  function selectCoilEnds(): void {
+    selectTab("design");
+    session.previewView.requestTerminals();
+  }
+
   async function runSimulation(generation: number): Promise<void> {
     if (!isCurrentSimulation(generation)) return;
 
@@ -295,6 +302,17 @@
     // valid results while editing, but do not run any simulation IPC call.
     if (!valid) {
       clearSimulationResults();
+      error = null;
+      loading = false;
+      return;
+    }
+
+    // Imported copper without confirmed ends has no valid electrical model.
+    // Reset rather than present numbers derived from the inferred defaults;
+    // the Simulation tab shows the ends prompt in their place.
+    if (projects.cadGeometry && coilsMissingEnds(projects.cadGeometry).length) {
+      clearSimulationResults();
+      driveError = null;
       error = null;
       loading = false;
       return;
@@ -386,8 +404,8 @@
       config.drive.via_plating_m,
     ];
     void valid;
-
     void geometryKey(projects.cadGeometry);
+
     const generation = ++simulationGeneration;
     if (!active || activeTab !== "simulate") {
       scheduleSimulation.cancel();
@@ -412,6 +430,11 @@
   async function runDrive(generation: number): Promise<void> {
     if (!valid) {
       drive = null;
+      return;
+    }
+    if (projects.cadGeometry && coilsMissingEnds(projects.cadGeometry).length) {
+      drive = null;
+      driveError = null;
       return;
     }
     const kf = sweep && sweep.current_a > 0 ? Math.abs(sweep.mean_thrust_n) / sweep.current_a : null;
@@ -663,7 +686,7 @@
               {driveError}
               {error}
               cadGeometry={projects.cadGeometry}
-              onCadGeometryChange={(g) => projects.setCadGeometry(g)}
+              onSelectEnds={selectCoilEnds}
             />
           </Tabs.Content>
         </div>
