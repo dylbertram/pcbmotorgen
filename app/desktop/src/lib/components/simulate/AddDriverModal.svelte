@@ -3,10 +3,12 @@
   import type { DriverSpec } from "../../types";
   import { driverValidationError } from "../../driverLibrary";
 
-  let { existingNames, onAdd, onClose }: {
+  let { existingNames, onAdd, onClose, zIndex = 50 }: {
     existingNames: string[];
     onAdd: (driver: DriverSpec) => void;
     onClose: () => void;
+    /** Stacking order; the Settings dialog raises it so the modal sits above. */
+    zIndex?: number;
   } = $props();
 
   let open = $state(true);
@@ -37,8 +39,8 @@
 
 <Dialog.Root bind:open onOpenChange={(value) => { if (!value) onClose(); }}>
   <Dialog.Portal>
-    <Dialog.Overlay class="fixed inset-0 z-50 bg-black/70" />
-    <Dialog.Content class="fixed left-1/2 top-1/2 z-50 max-h-[85vh] w-[calc(100%_-_2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-lg border border-slate-700 bg-slate-800 p-5 shadow-xl">
+    <Dialog.Overlay class="fixed inset-0 z-50 bg-black/70" style={`z-index: ${zIndex}`} />
+    <Dialog.Content class="fixed left-1/2 top-1/2 z-50 max-h-[85vh] w-[calc(100%_-_2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-lg border border-slate-700 bg-slate-800 p-5 shadow-xl" style={`z-index: ${zIndex}`}>
       <Dialog.Title class="text-sm font-semibold text-slate-100">Add driver</Dialog.Title>
       <Dialog.Description class="mt-1 text-xs text-slate-400">Enter the datasheet limits. The new driver will be selected for evaluation.</Dialog.Description>
       <form onsubmit={submit} class="mt-4 space-y-4">

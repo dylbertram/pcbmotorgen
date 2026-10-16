@@ -6,20 +6,18 @@
   import Separator from "../ui/Separator.svelte";
   import SettingRow from "./SettingRow.svelte";
   import AddDriverModal from "./AddDriverModal.svelte";
-  import { readCustomDrivers, saveCustomDrivers } from "../../driverLibrary";
+  import { driverLibrary } from "../../stores/driverLibrary.svelte";
 
   let { config }: { config: ConfigStore } = $props();
 
   const COPPER_WEIGHTS = [0.5, 1, 2, 3];
 
-  let customDrivers = $state<DriverSpec[]>(readCustomDrivers());
   let addingDriver = $state(false);
-  let storageWarning = $state(false);
   // Keep the project's exact parameters, even when another installation has
   // a library entry with the same name and different limits.
   let drivers = $derived([
     config.drive.driver,
-    ...[...DRIVER_PRESETS, ...customDrivers].filter((driver) => driver.name !== config.drive.driver.name),
+    ...[...DRIVER_PRESETS, ...driverLibrary.drivers].filter((driver) => driver.name !== config.drive.driver.name),
   ]);
 
   function update(patch: Partial<DriveSettings>): void {
@@ -29,15 +27,14 @@
   function choosePreset(name: string): void {
     const preset = drivers.find((p) => p.name === name);
     const current = config.drive.driver;
-    if (![...DRIVER_PRESETS, ...customDrivers].some((driver) => driver.name === current.name)) {
-      customDrivers = [...customDrivers, { ...current }];
+    if (![...DRIVER_PRESETS, ...driverLibrary.drivers].some((driver) => driver.name === current.name)) {
+      driverLibrary.add(current);
     }
     if (preset) update({ driver: { ...preset } });
   }
 
   function addDriver(driver: DriverSpec): void {
-    customDrivers = [...customDrivers, driver];
-    storageWarning = !saveCustomDrivers(customDrivers);
+    driverLibrary.add(driver);
     update({ driver });
     addingDriver = false;
   }
@@ -68,7 +65,7 @@
     </select>
     <p class="mt-2 text-[11px] text-slate-400">{config.drive.driver.min_supply_v}–{config.drive.driver.max_supply_v} V · {config.drive.driver.continuous_rms_a} A RMS · {config.drive.driver.peak_current_a} A peak</p>
     <p class="mt-1 text-[11px] text-slate-400">{config.drive.driver.supports_delta ? "Delta handling declared" : "Requires Star (wye) for evaluation"}</p>
-    {#if storageWarning}<p role="status" class="mt-2 text-xs text-amber-200">Driver selected. Library storage is unavailable, so save this project to keep its parameters.</p>{/if}
+    {#if !driverLibrary.storageAvailable}<p role="status" class="mt-2 text-xs text-amber-200">Driver selected. Library storage is unavailable, so save this project to keep its parameters.</p>{/if}
   </div>
 
   <Separator />

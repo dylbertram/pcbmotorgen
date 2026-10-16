@@ -23,6 +23,62 @@ async function settings(page: Page) {
   return dialog;
 }
 
+test("driver library edits persist and feed the Simulation selector", async ({ page }) => {
+  await gotoDesignApp(page);
+  let dialog = await settings(page);
+
+  await dialog.getByRole("button", { name: "Add driver…", exact: true }).click();
+  const modal = page.getByRole("dialog", { name: "Add driver", exact: true });
+  await modal.getByLabel("Driver name").fill("Settings driver");
+  await modal.getByLabel("Min supply (V)", { exact: true }).fill("3");
+  await modal.getByLabel("Max supply (V)", { exact: true }).fill("30");
+  await modal.getByLabel("Peak / OCP (A)").fill("6");
+  await modal.getByLabel("Continuous (A RMS)").fill("2");
+  await modal.getByLabel("R_DS(on) HS+LS (mΩ)").fill("150");
+  await modal.getByLabel("Max PWM (kHz)").fill("200");
+  await modal.getByRole("button", { name: "Add driver", exact: true }).click();
+  await expect(modal).toBeHidden();
+  await expect(dialog.getByText("Settings driver", { exact: true })).toBeVisible();
+
+  await dialog.getByRole("button", { name: "Edit Settings driver", exact: true }).click();
+  await dialog.getByLabel("Driver name").fill("Settings driver v2");
+  await dialog.getByLabel("Driver maximum supply (V)").fill("48");
+  await dialog.getByRole("button", { name: "Save driver", exact: true }).click();
+  await expect(dialog.getByText("Settings driver v2", { exact: true })).toBeVisible();
+  await expect(dialog.getByText("3–48 V", { exact: false })).toBeVisible();
+
+  // A malformed edit is rejected and leaves the saved value untouched.
+  await dialog.getByRole("button", { name: "Edit Settings driver v2", exact: true }).click();
+  await dialog.getByLabel("Driver maximum supply (V)").fill("1");
+  await dialog.getByRole("button", { name: "Save driver", exact: true }).click();
+  await expect(dialog.getByRole("alert")).toContainText("Maximum supply must be greater");
+  await dialog.getByRole("button", { name: "Cancel driver edit", exact: true }).click();
+  await expect(dialog.getByText("3–48 V", { exact: false })).toBeVisible();
+
+  // Persists across reload without saving the project.
+  await page.reload();
+  await page.getByRole("button", { name: "New coil file", exact: true }).first().click();
+  await page.getByRole("dialog", { name: "New coil file", exact: true }).getByRole("button", { name: /^Motor coil/ }).click();
+  dialog = await settings(page);
+  await expect(dialog.getByText("Settings driver v2", { exact: true })).toBeVisible();
+
+  // The Simulation tab selects from the same library.
+  await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
+  await page.getByRole("tab", { name: /^Simulate/i }).click();
+  await page.getByRole("combobox", { name: "Driver to evaluate" }).selectOption("Settings driver v2");
+  await expect(page.locator('section[aria-labelledby="driver-suitability-heading"]')).toContainText("Settings driver v2");
+});
+
+test("coil pattern library lists bundled generators and the installed set", async ({ page }) => {
+  await gotoDesignApp(page);
+  const dialog = await settings(page);
+  const library = dialog.locator("fieldset", { hasText: "Coil pattern library" });
+  await expect(library).toContainText("Infinity Braid (pcbBraid)");
+  await expect(library).toContainText("Built-in");
+  await expect(library).toContainText("No user-installed generators.");
+  await expect(library.getByRole("button", { name: /^Remove / })).toHaveCount(0);
+});
+
 test("KiCad rules import previews supported limits and only applies on save", async ({ page }) => {
   await gotoDesignApp(page);
   let dialog = await settings(page);

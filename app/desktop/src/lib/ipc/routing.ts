@@ -13,6 +13,7 @@ import type {
   LinearMotorConfig,
   RoutingPatternInfo,
   RoutingParamDef,
+  InstalledPlugin,
   InterferenceViolation,
 } from "../types";
 import { isTauriAvailable } from "./core";
@@ -108,6 +109,27 @@ export async function registerRoutingPlugin(
 export async function loadInstalledPlugins(): Promise<string[]> {
   if (!isTauriAvailable()) return [];
   return await invoke<string[]>("load_installed_plugins");
+}
+
+/**
+ * List the routing-pattern generators in the app's persistent store. Browser
+ * mode has no store, so it reports none.
+ */
+export async function listInstalledPlugins(): Promise<InstalledPlugin[]> {
+  if (!isTauriAvailable()) return [];
+  return await invoke<InstalledPlugin[]>("list_installed_plugins");
+}
+
+/**
+ * Remove an installed routing-pattern generator from the persistent store and
+ * the runtime registry. Unlike the read paths this changes state, so there is
+ * no mock fallback: browser mode rejects explicitly.
+ */
+export async function removeRoutingPlugin(id: string): Promise<void> {
+  if (!isTauriAvailable()) {
+    throw new Error("Tauri backend unavailable");
+  }
+  await invoke("remove_routing_plugin", { id });
 }
 
 /**
