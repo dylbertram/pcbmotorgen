@@ -81,6 +81,21 @@ test("DXF units auto-detect from the file and can be overridden", async ({ page 
   await expect(dialog.getByTestId("cad-detected-units")).toHaveCount(0);
 });
 
+test("imported geometry renders in the isometric view", async ({ page }) => {
+  const dialog = await openImport(page);
+  await dialog.getByRole("button", { name: "Open with this geometry" }).click();
+  await page.getByRole("button", { name: "Expand coil preview" }).click();
+  const modal = page.getByRole("dialog", { name: "Coil Preview", exact: true });
+  await modal.getByRole("button", { name: "Display", exact: true }).click();
+  const display = page.getByRole("dialog", { name: "Coil preview display", exact: true });
+  await display.getByRole("radio", { name: "3D", exact: true }).check();
+  const iso = modal.getByTestId("coil-iso");
+  await expect(iso).toBeVisible();
+  await expect(iso).toHaveAttribute("data-layers", /[1-9]/);
+  await expect(iso).toHaveAttribute("data-segments", /[1-9]/);
+  await expect(iso).toHaveAttribute("data-vias", /[1-9]/);
+});
+
 test("terminal defaults are selected automatically, overrides infer the other end, and labels survive simplify", async ({ page }, testInfo) => {
   const { command, tools } = await openTerminalTool(page);
   await expect(command.getByRole("status")).toContainText("Review A");

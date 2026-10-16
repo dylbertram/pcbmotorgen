@@ -69,6 +69,7 @@
   import { CoilPreviewGestures } from "../../utils/coilPreviewGestures.svelte";
   import { CoilPreviewMeasure } from "../../utils/coilPreviewMeasure.svelte";
   import CoilPreviewLightbox from "./CoilPreviewLightbox.svelte";
+  import CoilPreviewIsoView from "./CoilPreviewIsoView.svelte";
   import PreviewFrame from "./PreviewFrame.svelte";
   import {
     PREVIEW_H,
@@ -556,9 +557,13 @@
          data-pole-regions / data-revision are written imperatively by the
          renderer (canvas.dataset in coilPreviewCanvas.ts), NOT bound
          reactively — see the counter comment there. -->
-    <canvas bind:this={canvasRef} class="block h-full w-full"></canvas>
-    {#if terminalGeometry}
-      <CoilTerminalOverlay geometry={terminalGeometry} transform={worldTransform} panX={gestures.panX} panY={gestures.panY} width={W} height={H} isVisible={isTerminalVisible} showMarkers={view.showTerminals} />
+    {#if view.viewMode === "iso"}
+      <CoilPreviewIsoView geometry={terminalGeometry} {view} />
+    {:else}
+      <canvas bind:this={canvasRef} class="block h-full w-full"></canvas>
+      {#if terminalGeometry}
+        <CoilTerminalOverlay geometry={terminalGeometry} transform={worldTransform} panX={gestures.panX} panY={gestures.panY} width={W} height={H} isVisible={isTerminalVisible} showMarkers={view.showTerminals} />
+      {/if}
     {/if}
   </PreviewFrame>
 

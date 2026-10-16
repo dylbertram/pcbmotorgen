@@ -145,6 +145,30 @@ test("an outside click keeps the coil preview panel open; toolbar toggles close 
   await expect(display).toHaveCount(0);
 });
 
+test("the isometric view draws copper planes and via spans", async ({ page }, testInfo) => {
+  await gotoDesignApp(page);
+  await page.getByRole("button", { name: "Expand coil preview" }).click();
+  const dialog = page.getByRole("dialog", { name: "Coil Preview", exact: true });
+  await dialog.getByRole("button", { name: "Display", exact: true }).click();
+  const display = page.getByRole("dialog", { name: "Coil preview display", exact: true });
+  await expect(display.getByRole("radio", { name: "Top-down", exact: true })).toBeChecked();
+  await display.getByRole("radio", { name: "3D", exact: true }).check();
+
+  const iso = dialog.getByTestId("coil-iso");
+  await expect(iso).toBeVisible();
+  await expect(iso).toHaveAttribute("data-layers", /[1-9]/);
+  await expect(iso).toHaveAttribute("data-segments", /[1-9]/);
+  // Generated geometry carries via spans between its copper planes.
+  await expect(iso).toHaveAttribute("data-vias", /[1-9]/);
+  await page.screenshot({ path: testInfo.outputPath("coil-iso.png") });
+  await expect(dialog.locator("canvas")).toHaveCount(0);
+
+  // Returning to top-down restores the canvas renderer.
+  await display.getByRole("radio", { name: "Top-down", exact: true }).check();
+  await expect(dialog.getByTestId("coil-iso")).toHaveCount(0);
+  await expect(dialog.locator("canvas")).toBeVisible();
+});
+
 test("overlay visibility and phase selection do not change the camera", async ({ page }) => {
   await page.addInitScript(() => {
     const original = CanvasRenderingContext2D.prototype.scale;
