@@ -7,16 +7,16 @@
  * `lib/driverLibrary.ts` (pure functions, unit-tested); this store only holds
  * the in-memory list and reports whether a write reached browser storage.
  */
-import { driverValidationError, readCustomDrivers, saveCustomDrivers } from "../driverLibrary";
+import { driverValidationError, readDrivers, saveDrivers } from "../driverLibrary";
 import type { DriverSpec } from "../types/drive";
 
 export class DriverLibrary {
-  drivers = $state<DriverSpec[]>(readCustomDrivers());
+  drivers = $state<DriverSpec[]>(readDrivers());
   /** False once a write fails; the current project still keeps its driver. */
   storageAvailable = $state(true);
 
   #persist(): void {
-    this.storageAvailable = saveCustomDrivers($state.snapshot(this.drivers));
+    this.storageAvailable = saveDrivers($state.snapshot(this.drivers));
   }
 
   /**

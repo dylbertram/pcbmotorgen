@@ -1,7 +1,6 @@
 <script lang="ts">
   import type { ConfigStore } from "../../stores/config.svelte";
   import type { DriveSettings, DriverSpec } from "../../types";
-  import { DRIVER_PRESETS } from "../../types";
   import NumberField from "../ui/NumberField.svelte";
   import Separator from "../ui/Separator.svelte";
   import SettingRow from "./SettingRow.svelte";
@@ -13,11 +12,12 @@
   const COPPER_WEIGHTS = [0.5, 1, 2, 3];
 
   let addingDriver = $state(false);
-  // Keep the project's exact parameters, even when another installation has
-  // a library entry with the same name and different limits.
+  // The driver library is the single source of selectable drivers. The
+  // project's own driver stays first even when the library no longer holds it
+  // (an older project, or a library entry that was removed).
   let drivers = $derived([
     config.drive.driver,
-    ...[...DRIVER_PRESETS, ...driverLibrary.drivers].filter((driver) => driver.name !== config.drive.driver.name),
+    ...driverLibrary.drivers.filter((driver) => driver.name !== config.drive.driver.name),
   ]);
 
   function update(patch: Partial<DriveSettings>): void {
@@ -27,7 +27,7 @@
   function choosePreset(name: string): void {
     const preset = drivers.find((p) => p.name === name);
     const current = config.drive.driver;
-    if (![...DRIVER_PRESETS, ...driverLibrary.drivers].some((driver) => driver.name === current.name)) {
+    if (!driverLibrary.drivers.some((driver) => driver.name === current.name)) {
       driverLibrary.add(current);
     }
     if (preset) update({ driver: { ...preset } });

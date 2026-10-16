@@ -69,6 +69,33 @@ test("driver library edits persist and feed the Simulation selector", async ({ p
   await expect(page.locator('section[aria-labelledby="driver-suitability-heading"]')).toContainText("Settings driver v2");
 });
 
+test("bundled drivers live in the library, are deletable, and leave the selectors", async ({ page }) => {
+  await gotoDesignApp(page);
+  let dialog = await settings(page);
+  const library = dialog.locator("fieldset", { hasText: "Driver library" });
+  for (const name of ["DRV8311", "DRV8316", "DRV8313"]) {
+    await expect(library.getByText(name, { exact: true })).toBeVisible();
+  }
+  await expect(library.getByText("Bundled", { exact: true })).toHaveCount(3);
+
+  await library.getByRole("button", { name: "Remove DRV8313", exact: true }).click();
+  await expect(library.getByText("DRV8313", { exact: true })).toHaveCount(0);
+
+  // The Simulation tab reads the same library, so the removed driver is gone.
+  await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
+  await page.getByRole("tab", { name: /^Simulate/i }).click();
+  const selector = page.getByRole("combobox", { name: "Driver to evaluate" });
+  await expect(selector.locator("option", { hasText: "DRV8313" })).toHaveCount(0);
+  await expect(selector.locator("option", { hasText: "DRV8316" })).toHaveCount(1);
+
+  // The deletion persists; bundled drivers are not re-seeded on the next load.
+  await page.reload();
+  await page.getByRole("button", { name: "New coil file", exact: true }).first().click();
+  await page.getByRole("dialog", { name: "New coil file", exact: true }).getByRole("button", { name: /^Motor coil/ }).click();
+  dialog = await settings(page);
+  await expect(dialog.locator("fieldset", { hasText: "Driver library" }).getByText("DRV8313", { exact: true })).toHaveCount(0);
+});
+
 test("coil pattern library lists bundled generators and the installed set", async ({ page }) => {
   await gotoDesignApp(page);
   const dialog = await settings(page);
