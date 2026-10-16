@@ -87,8 +87,8 @@ test("capture the mover at the min and max travel endpoints", async ({
   };
 
   // Frontend defaults with the placeholder envelope (36 → 111 mm), span
-  // 72 mm → strip 0 → 72 mm at min, 75 → 147 mm at max — array edges
-  // EXACTLY on the copper bounds, sweep = configured travel.
-  await shoot("min", "0.0 - 72.0 mm");
-  await shoot("max", "75.0 - 147.0 mm");
+  // 70.5 mm (physical outer-edge span) → strip 0.8 → 71.3 mm at min,
+  // 75.8 → 146.3 mm at max — readout = array centre ± span / 2.
+  await shoot("min", "0.8 - 71.3 mm");
+  await shoot("max", "75.8 - 146.3 mm");
 });
