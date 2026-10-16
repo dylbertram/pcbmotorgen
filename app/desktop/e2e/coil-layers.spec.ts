@@ -118,6 +118,33 @@ test("the side rail docks the Layers and Display panels without resizing the vie
   expect((await dialog.boundingBox())!.width).toBeLessThan(390);
 });
 
+test("an outside click keeps the coil preview panel open; toolbar toggles close it", async ({ page }) => {
+  await gotoDesignApp(page);
+  await page.getByRole("button", { name: "Expand coil preview" }).click();
+  const dialog = page.getByRole("dialog", { name: "Coil Preview", exact: true });
+  const layers = page.getByRole("dialog", { name: "Coil preview layers", exact: true });
+  const display = page.getByRole("dialog", { name: "Coil preview display", exact: true });
+  const frame = dialog.getByRole("img", { name: "Coil preview — expanded", exact: true });
+
+  await dialog.getByRole("button", { name: "Layers", exact: true }).click();
+  await expect(layers).toBeVisible();
+  // A click on the drawing is outside the rail and must not dismiss the panel.
+  const box = (await frame.boundingBox())!;
+  await page.mouse.click(box.x + box.width * 0.25, box.y + box.height * 0.5);
+  await expect(layers).toBeVisible();
+
+  // Another rail item swaps panels; the previous one no longer dismisses either.
+  await dialog.getByRole("button", { name: "Display", exact: true }).click();
+  await expect(display).toBeVisible();
+  await expect(layers).toHaveCount(0);
+  await page.mouse.click(box.x + box.width * 0.25, box.y + box.height * 0.5);
+  await expect(display).toBeVisible();
+
+  // Toggling the same rail item, or its close button, still closes it.
+  await dialog.getByRole("button", { name: "Display", exact: true }).click();
+  await expect(display).toHaveCount(0);
+});
+
 test("overlay visibility and phase selection do not change the camera", async ({ page }) => {
   await page.addInitScript(() => {
     const original = CanvasRenderingContext2D.prototype.scale;

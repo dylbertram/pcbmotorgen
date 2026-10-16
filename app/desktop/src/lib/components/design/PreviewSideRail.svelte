@@ -8,6 +8,8 @@
    * Panels overlay the drawing, so opening one never resizes the viewer, and
     * only one is open at a time. Terminal picking keeps the panel open for
     * clicks in the drawing; Escape or its close button cancels the draft.
+    * Outside clicks dismiss by default (the CAD import viewer) but the coil
+    * preview passes `dismissOnOutsideClick={false}` (kata qfdz).
    */
   import { fly } from "svelte/transition";
   import { onDestroy } from "svelte";
@@ -24,7 +26,7 @@
     phases = [], showMotorControls = false, hasPolePitchData = false,
     hasBandWidthData = false, hasPoleRegionData = false, poleRegionPhases = [],
     geometry, selection, assignmentDisabled = false, terminalTool, onStartTerminals,
-    terminalsDisabled = false }: {
+    terminalsDisabled = false, dismissOnOutsideClick = true }: {
     view: CoilPreviewViewState;
     layers: { idx: number }[];
     coils?: { name: string; colorIdx: number }[];
@@ -46,6 +48,12 @@
     terminalTool?: CoilTerminalTool;
     onStartTerminals?: (coil?: string) => void;
     terminalsDisabled?: boolean;
+    /**
+     * Close the open panel when a pointer lands outside the rail. The CAD
+     * import viewer dismisses this way; the coil preview keeps its panel open
+     * so an outside click never surprises the user (kata qfdz).
+     */
+    dismissOnOutsideClick?: boolean;
   } = $props();
 
   type PanelId = "layers" | "display" | "terminals";
@@ -79,7 +87,7 @@
     close();
   }
   function handlePointerDown(event: PointerEvent) {
-    if (!open || open === "terminals") return;
+    if (!open || open === "terminals" || !dismissOnOutsideClick) return;
     // Menus and popovers opened from the panel are portaled to the body, so they
     // are outside the rail. bits-ui tags those floating layers, and clicks in
     // them must not dismiss the panel.
