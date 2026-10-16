@@ -40,6 +40,20 @@ This reruns all 50 positions at mesh densities 10, 20 and 40, compares their
 pointwise forces, prints phase contributions and electrical checks, and
 asserts the design still misses its thrust target and ripple allowance.
 
+The five-to-six magnet transition also has a normal backend regression:
+
+```sh
+RAYON_NUM_THREADS=4 cargo test -p pcbmotorgen closed_infinity_six_magnets_simulates --bin pcbmotorgen
+```
+
+Changing magnet count also changes configured winding length. A braid repeat
+count sharing a divisor with the strand count splits each phase into several
+closed rings. Magnet-aware generation now selects the largest fitting repeat
+count coprime to the strand count. Pole pitch is unchanged; the usable copper
+span can be shorter than the requested routing domain. Sweeps continue to use
+that actual copper span. Connectivity tests cover multiple strand counts and
+lengths, and floating closed copper must not acquire invented terminal buses.
+
 ## Normal regression suite
 
 ```sh

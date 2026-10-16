@@ -17,6 +17,8 @@
 //! centre-to-centre pole pitch. The phase/strand via pitch is
 //! `pole_pitch / (phases × strands)` on both layer copies; the period count is
 //! reduced when necessary to keep that uniform grid inside the routable length.
+//! The selected repeat count is coprime to the strand count so the braid
+//! forms one connected ring per phase before its lead cut, not several rings.
 //! Contexts built without a magnet layout fall back to the packaged `n_periods`
 //! default (kept for backward compatibility with plugin probes and unit tests).
 //!
@@ -299,7 +301,17 @@ fn resolve_braid_layout(
             // the last strand of one period and the first strand of the
             // next period.
             let interleave_step = pitch / (num_strands * phases) as f64;
-            let n_periods = ((d_tot + interleave_step) / pitch).floor() as i64 - 1;
+            let mut n_periods = ((d_tot + interleave_step) / pitch).floor() as i64 - 1;
+            // The braid's end joins permute its strands by the repeat
+            // count. A shared divisor creates separate closed rings rather
+            // than the single winding that the lead cut is meant to open.
+            let gcd = |mut a: i64, mut b: i64| {
+                while b != 0 { (a, b) = (b, a % b); }
+                a
+            };
+            while n_periods > 0 && gcd(n_periods, num_strands) != 1 {
+                n_periods -= 1;
+            }
             if n_periods < 1 {
                 return Err(RoutingError::new(
                     0,
@@ -629,8 +641,8 @@ mod tests {
 
     #[test]
     fn one_period_per_pole_pitch_when_magnet_layout_present() {
-        // 800 mm routing domain contains 65 complete 12 mm periods after the
-        // uniform phase/strand interleave grid is reserved. The period is
+        // 800 mm fits 65 periods, but 65 and five strands form separate
+        // rings. Select 64 connected 12 mm periods instead. The period is
         // exact and every adjacent left/right via-grid point uses the same
         // pole_pitch / (phases × strands) x spacing.
         let pat = InfinityBraidPattern;
@@ -648,13 +660,13 @@ mod tests {
         let period_length: f64 = 12.0;
         assert!((period_length - 12.0).abs() < 1e-9, "period {period_length} mm");
         assert_eq!(n_expected as usize, 65);
-        assert_eq!(base.pole_regions.len(), 65 * magnet_ctx().phases as usize);
+        assert_eq!(base.pole_regions.len(), 64 * magnet_ctx().phases as usize);
         assert_eq!(
             base.pole_regions
                 .iter()
                 .filter(|region| region.phase == "A")
                 .count(),
-            65
+            64
         );
         for region in base.pole_regions.iter().filter(|region| region.phase == "A") {
             assert!(region.end.x > region.start.x);
@@ -765,17 +777,17 @@ mod tests {
     fn declares_its_leg_grid_for_the_host_slot_metrics() {
         // The braid's declared leg grid is its uniform interleave grid:
         // periods × phases × strands slots. With the magnet layout the braid
-        // emits 65 complete pole-pitched periods.
+        // emits 64 complete pole-pitched periods, coprime to five strands.
         let report = crate::generate_routing_report(&magnet_ctx(), "infinity-braid")
             .expect("reference braid report");
         let grid = report.result.leg_grid.as_ref().expect("declared leg grid");
-        assert_eq!(grid.slot_count, 65 * 3 * 5);
+        assert_eq!(grid.slot_count, 64 * 3 * 5);
         assert_eq!(grid.strands_per_leg, Some(5));
         // Host-derived slot metrics from the declaration. Slot pitch spans
         // the active copper length (the routing domain equals the active
-        // area since kata hrd8): fixture active 800 mm / 975 slots.
-        assert_eq!(report.dimensions.slot_count, Some(975));
-        assert_eq!(report.dimensions.slot_pitch_mm, Some(800.0 / 975.0));
+        // area since kata hrd8): fixture active 800 mm / 960 slots.
+        assert_eq!(report.dimensions.slot_count, Some(960));
+        assert_eq!(report.dimensions.slot_pitch_mm, Some(800.0 / 960.0));
         assert_eq!(report.dimensions.interleave_step_mm, Some(0.8));
 
         // Fallback braid (no magnet layout): 4 periods × 3 phases × 5

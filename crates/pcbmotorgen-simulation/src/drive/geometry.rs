@@ -502,6 +502,7 @@ fn find_terminals(b: &Builder, pos: impl Fn(usize) -> (f64, f64)) -> (Vec<usize>
     // Each connected piece of copper is split on its own, oriented so the
     // bus holding its lowest end is the terminal.
     let (mut terminal, mut star) = (Vec::new(), Vec::new());
+    let has_dangling_terminals = ends.iter().filter(|e| dirs[*e].len() == 1).count() >= 2;
     let mut remaining: Vec<(i64, i64)> = ends.clone();
     while !remaining.is_empty() {
         let lowest = *remaining.iter().min_by(|a, b| by_pos(a, b)).unwrap();
@@ -512,6 +513,10 @@ fn find_terminals(b: &Builder, pos: impl Fn(usize) -> (f64, f64)) -> (Vec<usize>
         // Truly dangling ends win over two-layer turn points when present.
         if component.iter().filter(|e| dirs[*e].len() == 1).count() >= 2 {
             component.retain(|e| dirs[e].len() == 1);
+        } else if has_dangling_terminals {
+            // A disconnected closed loop is floating copper, not another
+            // externally driven winding. Do not invent buses at its turns.
+            continue;
         }
         let lowest = *component.iter().min_by(|a, b| by_pos(a, b)).unwrap();
         if component.len() < 2 {

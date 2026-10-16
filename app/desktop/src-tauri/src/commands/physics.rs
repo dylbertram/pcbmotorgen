@@ -509,6 +509,26 @@ mod analyze_drive_tests {
     }
 
     #[test]
+    fn closed_infinity_six_magnets_simulates() {
+        let mut state: crate::ipc::ProjectConfigStateIpc = serde_json::from_str(include_str!("fixtures/closed_infinity_pattern.config.json")).unwrap();
+        let five_ipc = state.to_linear_motor_ipc();
+        let five = tauri::async_runtime::block_on(evaluate_force_sweep(five_ipc, None, Some(state.drive.clone()))).unwrap();
+        state.magnet_count = 6;
+        let ipc = state.to_linear_motor_ipc();
+        let sweep = tauri::async_runtime::block_on(evaluate_force_sweep(ipc.clone(), None, Some(state.drive.clone()))).expect("six-magnet user configuration must simulate");
+        assert!(sweep.force_x_n.iter().all(|f| f.is_finite()));
+        eprintln!("six magnets mean={} min={} max={}", sweep.mean_thrust_n, sweep.min_thrust_n, sweep.peak_thrust_n);
+        assert!(sweep.min_thrust_n > 0.0);
+        assert!(sweep.mean_thrust_n > five.mean_thrust_n, "adding a magnet must not collapse thrust for this fixture");
+        let analysis = tauri::async_runtime::block_on(analyze_drive(ipc.clone(), state.drive, Some(sweep.mean_thrust_n / sweep.current_a), None)).expect("six-magnet driver analysis");
+        assert!(!serde_json::to_string(&analysis).unwrap().contains(":null"));
+        tauri::async_runtime::block_on(compute_friction(ipc.clone())).expect("six-magnet friction");
+        tauri::async_runtime::block_on(compute_height_stack(ipc.clone())).expect("six-magnet height stack");
+        tauri::async_runtime::block_on(generate_coils(ipc.clone())).expect("six-magnet coil preview");
+        tauri::async_runtime::block_on(travel_envelope(ipc)).expect("six-magnet travel envelope");
+    }
+
+    #[test]
     #[ignore = "User project force convergence and driver diagnostics"]
     fn closed_infinity_user_project_diagnostics() {
         let state: crate::ipc::ProjectConfigStateIpc = serde_json::from_str(include_str!("fixtures/closed_infinity_pattern.config.json")).unwrap();

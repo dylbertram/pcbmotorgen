@@ -213,6 +213,57 @@ fn parallel_strands_divide_resistance() {
 }
 
 #[test]
+fn floating_closed_copper_does_not_gain_inferred_terminal_buses() {
+    let mut routing = two_strand_fixture();
+    for (a, b) in [((200.0, 0.0), (210.0, 10.0)), ((210.0, 10.0), (220.0, 0.0)),
+        ((220.0, 0.0), (210.0, -10.0)), ((210.0, -10.0), (200.0, 0.0))] {
+        routing.segments.push(seg(a.0, a.1, b.0, b.1, 0, "A"));
+    }
+    let baseline = extract_phase_networks(&two_strand_fixture()).remove(0);
+    let net = extract_phase_networks(&routing).remove(0);
+    assert_eq!(net.terminal.len(), baseline.terminal.len());
+    assert_eq!(net.star.len(), baseline.star.len());
+    let solution = solve_network(&net, &vec![1.0; net.edges.len()]);
+    assert!(solution.connected);
+    for (edge, current) in net.edges.iter().zip(&solution.current_share) {
+        if let EdgeKind::Trace { points, .. } = &edge.kind {
+            if points.iter().all(|p| p[0] >= 0.2) {
+                assert!(current.abs() < 1e-10, "floating copper carries invented current");
+            }
+        }
+    }
+}
+
+#[test]
+fn generated_braid_remains_one_connected_winding_across_repeat_counts() {
+    for strands in [2, 3, 4, 5] {
+        for length in [92.0, 98.0, 110.0, 120.0] {
+            let ctx = pcbmotorgen_routing::RoutingContext {
+                active_area_length_mm: length, board_width_mm: 8.0,
+                num_layers: 2, phases: 3, min_trace_mm: 0.1, min_space_mm: 0.127,
+                expects_continuous: false,
+                params: std::collections::HashMap::from([("num_strands".into(), strands as f64), ("connection".into(), 2.0)]),
+                magnet_pitch_mm: Some(6.0), magnet_array_span_mm: Some(35.0), phase_clearance_mm: None,
+            };
+            let routing = pcbmotorgen_routing::generate_routing_result(&ctx, "infinity-braid").unwrap();
+            for net in extract_phase_networks(&routing) {
+                let mut adj = vec![Vec::new(); net.node_count];
+                for e in &net.edges { adj[e.a].push(e.b); adj[e.b].push(e.a); }
+                let mut seen = vec![false; net.node_count];
+                let mut stack = vec![0];
+                seen[0] = true;
+                while let Some(node) = stack.pop() {
+                    for &next in &adj[node] {
+                        if !seen[next] { seen[next] = true; stack.push(next); }
+                    }
+                }
+                assert!(seen.iter().all(|v| *v), "{} split: strands={strands}, length={length}", net.net);
+            }
+        }
+    }
+}
+
+#[test]
 fn ripple_and_voltage_follow_the_formulas() {
     let settings = DriveSettings::default();
     let a = analyze_drive(&sim(), &two_strand_fixture(), &settings, Some(0.5));
