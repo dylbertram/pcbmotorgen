@@ -40,6 +40,7 @@ export interface LinearMotorConfig {
 
   num_layers: number;
   min_trace_m: number;
+  trace_width_m: number;
   min_space_m: number;
   min_via_drill_m: number;
   min_via_annular_ring_m: number;

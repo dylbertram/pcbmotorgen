@@ -45,7 +45,7 @@ pub async fn editable_coil_geometry(config: LinearMotorConfigIpc) -> Result<CadG
             &coils,
             core.num_layers,
             core.pcb_thickness_m * 1e3,
-            core.design_rules().min_trace_mm,
+            core.design_rules().trace_width_mm,
         )
     })
     .await
@@ -69,7 +69,7 @@ pub async fn export_coils_dxf(config: LinearMotorConfigIpc) -> Result<DxfExportR
             &coils,
             num_layers,
             core.pcb_thickness_m * 1e3,
-            rules.min_trace_mm,
+            rules.trace_width_mm,
         )?;
         // Keep x=0 at the trace start so import, preview and mover travel use
         // the same frame without a hidden half-length translation.

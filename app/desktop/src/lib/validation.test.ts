@@ -18,6 +18,7 @@ function validConfig(overrides: Partial<DesignConfigInput> = {}): DesignConfigIn
     routing_pattern: "infinity-braid",
     strands_per_phase: 2,
     min_trace_mm: 0.127,
+    trace_width_mm: 0.127,
     peak_force_n: 1.0,
     target_force_n: 0.5,
     ...overrides,
@@ -29,6 +30,12 @@ const ids = (config: DesignConfigInput) => validateDesign(config).map((f) => f.i
 describe("validateDesign", () => {
   it("returns no findings for a valid config", () => {
     expect(validateDesign(validConfig())).toEqual([]);
+  });
+
+  it("flags a nominal trace width below the minimum", () => {
+    expect(ids(validConfig({ trace_width_mm: 0.1 }))).toContain("trace-width");
+    expect(ids(validConfig({ trace_width_mm: 0 }))).toContain("trace-width");
+    expect(ids(validConfig({ trace_width_mm: 0.2 }))).not.toContain("trace-width");
   });
 
   it("flags non-positive travel as an error", () => {

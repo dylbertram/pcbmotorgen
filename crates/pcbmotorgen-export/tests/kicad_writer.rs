@@ -41,6 +41,7 @@ fn mils_to_mm(v: f64) -> f64 {
 fn braid_rules() -> DesignRules {
     DesignRules {
         min_trace_mm: mils_to_mm(5.0),
+        trace_width_mm: mils_to_mm(5.0),
         min_space_mm: mils_to_mm(5.0),
         min_via_drill_mm: mm(0.2),
         min_via_annular_ring_mm: mm(0.1),
@@ -68,6 +69,7 @@ fn braid_coils(num_layers: u32) -> Vec<PhaseCoil> {
         num_layers,
         phases: 3,
         min_trace_mm: 0.1,
+        trace_width_mm: 0.1,
         min_space_mm: 0.1,
         expects_continuous: false,
         params,
@@ -844,6 +846,7 @@ use pcbmotorgen_export::io_elements_to_board_items;
 fn io_rules() -> DesignRules {
     DesignRules {
         min_trace_mm: mm(0.1),
+        trace_width_mm: mm(0.1),
         min_space_mm: mm(0.1),
         min_via_drill_mm: mm(0.2),
         min_via_annular_ring_mm: mm(0.1),

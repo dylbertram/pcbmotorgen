@@ -124,8 +124,10 @@ pub struct LinearMotorConfig {
     pub supply_voltage_v: f64,
 
     // --- DFM rules ---
-    /// Minimum manufacturable trace width [m].
+    /// Minimum manufacturable trace width [m] (design-rule floor).
     pub min_trace_m: f64,
+    /// Nominal (actual) copper trace width [m] written to the board.
+    pub trace_width_m: f64,
     /// Minimum trace-to-trace clearance [m].
     pub min_space_m: f64,
     /// Minimum via drill diameter [m].
@@ -205,6 +207,7 @@ impl Default for LinearMotorConfig {
             max_current_a: 1.0,
             supply_voltage_v: 5.0,
             min_trace_m: mils_to_m(5.0),
+            trace_width_m: mils_to_m(5.0),
             min_space_m: mils_to_m(5.0),
             min_via_drill_m: mm(0.2),
             min_via_annular_ring_m: mm(0.1),

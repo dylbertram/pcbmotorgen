@@ -38,6 +38,8 @@ export interface DesignConfigInput {
   routing_pattern: string;
   strands_per_phase: number;
   min_trace_mm: number;
+  /** Nominal (actual) trace width (mm); must clear `min_trace_mm`. */
+  trace_width_mm: number;
   peak_force_n: number;
   target_force_n: number;
 }
@@ -136,7 +138,7 @@ export function validateDesign(config: DesignConfigInput): Finding[] {
   }
 
   const strandHeight = config.active_area_width_mm / Math.max(config.strands_per_phase, 1);
-  const minimumStrandHeight = config.min_trace_mm + config.min_space_mm;
+  const minimumStrandHeight = config.trace_width_mm + config.min_space_mm;
   if (config.strands_per_phase > 1 && strandHeight < minimumStrandHeight) {
     next.push({
       id: "strand-clearance",
@@ -145,6 +147,16 @@ export function validateDesign(config: DesignConfigInput): Finding[] {
         `The active width gives each strand ${strandHeight.toFixed(2)} mm, ` +
         `but trace plus clearance requires ${minimumStrandHeight.toFixed(2)} mm. ` +
         "Reduce strands or increase active width.",
+    });
+  }
+
+  if (!(config.trace_width_mm > 0) || config.trace_width_mm < config.min_trace_mm) {
+    next.push({
+      id: "trace-width",
+      level: "error",
+      message:
+        `Trace width must be positive and at least the minimum trace width ` +
+        `(${config.min_trace_mm} mm); got ${config.trace_width_mm} mm.`,
     });
   }
 

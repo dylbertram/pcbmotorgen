@@ -466,7 +466,7 @@ fn phase_band_records(
             })?;
         let band_width_mm = phase_band_width_from_trace_geometry_mm(
             trace_count,
-            ctx.min_trace_mm,
+            ctx.trace_width(),
             ctx.min_space_mm,
             angle_rad,
         )
@@ -476,7 +476,7 @@ fn phase_band_records(
         // whose legs bundle `k` parallel strands use
         // `slot_width_from_leg_geometry_mm(k, ...)` directly.
         let slot_width_mm =
-            slot_width_from_leg_geometry_mm(1, ctx.min_trace_mm, ctx.min_space_mm, angle_rad)
+            slot_width_from_leg_geometry_mm(1, ctx.trace_width(), ctx.min_space_mm, angle_rad)
                 .map_err(|message| {
                     dimension_error("dimensions.phase_band_widths.slot_width_mm", message)
                 })?;
@@ -485,7 +485,7 @@ fn phase_band_records(
             layer,
             net,
             trace_count,
-            trace_width_mm: ctx.min_trace_mm,
+            trace_width_mm: ctx.trace_width(),
             trace_spacing_mm: ctx.min_space_mm,
             angle_rad,
             band_width_mm,

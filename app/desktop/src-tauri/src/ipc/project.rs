@@ -171,6 +171,11 @@ pub struct ProjectConfigStateIpc {
 
     // --- PCB manufacturing defaults (mm) ---
     pub min_trace_mm: f64,
+    /// Nominal (actual) trace width [mm]. `None` in files saved before it
+    /// existed; callers fall back to `min_trace_mm` so older projects keep
+    /// their copper width.
+    #[serde(default)]
+    pub trace_width_mm: Option<f64>,
     pub min_space_mm: f64,
     pub min_via_drill_mm: f64,
     pub min_via_annular_ring_mm: f64,
@@ -217,6 +222,7 @@ impl Default for ProjectConfigStateIpc {
             n_positions: 50,
             meshing: 20,
             min_trace_mm: 0.127,
+            trace_width_mm: None,
             min_space_mm: 0.127,
             min_via_drill_mm: 0.2,
             min_via_annular_ring_mm: 0.1,
@@ -269,6 +275,7 @@ impl ProjectConfigStateIpc {
             supply_voltage_v: self.supply_voltage_v,
             num_layers: self.num_layers,
             min_trace_m: m(self.min_trace_mm),
+            trace_width_m: m(self.trace_width_mm.unwrap_or(self.min_trace_mm)),
             min_space_m: m(self.min_space_mm),
             min_via_drill_m: m(self.min_via_drill_mm),
             min_via_annular_ring_m: m(self.min_via_annular_ring_mm),
@@ -600,6 +607,31 @@ mod tests {
         assert_eq!(state.config.capacitor_bank_uf, 1000.0);
         assert!(state.config.routing_params.is_empty());
         assert!(state.cad_geometry.is_none());
+    }
+
+    #[test]
+    fn legacy_project_without_nominal_width_uses_the_minimum() {
+        // Files written before the nominal trace width existed must keep
+        // their copper width: the converter seeds it from min_trace_mm.
+        let json = r#"{
+            "format_version": 2,
+            "app_version": "0.5.0",
+            "saved_at_unix_ms": 123,
+            "next_version_id": 2,
+            "versions": [{
+                "id": 1,
+                "description": "",
+                "created_at_unix_ms": 123,
+                "last_edited_at_unix_ms": 123,
+                "project": {
+                    "config": { "desired_travel_mm": 30.0, "min_trace_mm": 0.25 },
+                    "mover_position_mm": 10.0
+                }
+            }]
+        }"#;
+        let (state, _) = parse_project_file(json).expect("parse");
+        assert_eq!(state.config.trace_width_mm, None);
+        assert!((state.config.to_linear_motor_ipc().trace_width_m - 0.25e-3).abs() < 1e-12);
     }
 
     #[test]

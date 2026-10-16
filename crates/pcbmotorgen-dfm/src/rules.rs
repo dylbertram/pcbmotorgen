@@ -19,12 +19,20 @@ use serde::{Deserialize, Serialize};
 
 /// Minimum manufacturable trace width [mm].
 const DEFAULT_MIN_TRACE_MM: f64 = 0.127; // 5 mil
+/// Nominal (actual) copper trace width [mm].
+const DEFAULT_TRACE_WIDTH_MM: f64 = 0.127; // 5 mil
 /// Minimum trace-to-trace clearance [mm].
 const DEFAULT_MIN_SPACE_MM: f64 = 0.127; // 5 mil
 /// Minimum via drill diameter [mm].
 const DEFAULT_MIN_VIA_DRILL_MM: f64 = 0.2;
 /// Minimum via annular ring width [mm].
 const DEFAULT_MIN_VIA_ANNULAR_RING_MM: f64 = 0.1;
+
+/// Serde default for [`DesignRules::trace_width_mm`] on payloads written before
+/// the nominal width existed: fall back to the minimum trace width.
+fn default_trace_width_mm() -> f64 {
+    DEFAULT_MIN_TRACE_MM
+}
 
 /// A snapshot of the DFM rules applied to generated routing geometry.
 ///
@@ -36,8 +44,13 @@ const DEFAULT_MIN_VIA_ANNULAR_RING_MM: f64 = 0.1;
 /// never decide them.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct DesignRules {
-    /// Minimum manufacturable trace width [mm].
+    /// Minimum manufacturable trace width [mm] — the design-rule floor.
     pub min_trace_mm: f64,
+    /// Nominal (actual) copper trace width [mm] written to the board and DXF.
+    /// Independent of the `min_trace_mm` floor so a design can use wider
+    /// copper than the process minimum.
+    #[serde(default = "default_trace_width_mm")]
+    pub trace_width_mm: f64,
     /// Minimum trace-to-trace clearance [mm].
     pub min_space_mm: f64,
     /// Minimum via drill diameter [mm].
@@ -50,6 +63,7 @@ impl Default for DesignRules {
     fn default() -> Self {
         Self {
             min_trace_mm: DEFAULT_MIN_TRACE_MM,
+            trace_width_mm: DEFAULT_TRACE_WIDTH_MM,
             min_space_mm: DEFAULT_MIN_SPACE_MM,
             min_via_drill_mm: DEFAULT_MIN_VIA_DRILL_MM,
             min_via_annular_ring_mm: DEFAULT_MIN_VIA_ANNULAR_RING_MM,
@@ -100,6 +114,7 @@ mod tests {
     fn defaults_are_millimetres() {
         let rules = DesignRules::default();
         assert_eq!(rules.min_trace_mm, 0.127);
+        assert_eq!(rules.trace_width_mm, 0.127);
         assert_eq!(rules.min_space_mm, 0.127);
         assert_eq!(rules.min_via_drill_mm, 0.2);
         assert_eq!(rules.min_via_annular_ring_mm, 0.1);
@@ -127,10 +142,17 @@ mod tests {
         let json = serde_json::to_string(&rules).unwrap();
         assert_eq!(
             json,
-            r#"{"min_trace_mm":0.127,"min_space_mm":0.127,"min_via_drill_mm":0.2,"min_via_annular_ring_mm":0.1}"#
+            r#"{"min_trace_mm":0.127,"trace_width_mm":0.127,"min_space_mm":0.127,"min_via_drill_mm":0.2,"min_via_annular_ring_mm":0.1}"#
         );
         let back: DesignRules = serde_json::from_str(&json).unwrap();
         assert_eq!(back, rules);
+        // A payload from before the nominal width existed defaults to the floor.
+        let legacy: DesignRules = serde_json::from_str(
+            r#"{"min_trace_mm":0.2,"min_space_mm":0.15,"min_via_drill_mm":0.3,"min_via_annular_ring_mm":0.1}"#,
+        )
+        .unwrap();
+        assert_eq!(legacy.trace_width_mm, 0.127);
+        assert_eq!(legacy.min_trace_mm, 0.2);
     }
 
     #[test]

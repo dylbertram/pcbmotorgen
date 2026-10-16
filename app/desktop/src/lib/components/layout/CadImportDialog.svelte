@@ -60,10 +60,14 @@
   let zTolerance = $derived(zToleranceParsed ?? 0.05);
   let zToleranceValid = $derived(zToleranceParsed !== null && zToleranceParsed >= 0);
   let traceWidthDraft = $state<string | null>(null);
-  let traceWidthText = $derived(traceWidthDraft ?? String(config.min_trace_mm));
+  // Blank means "keep each DXF's own width"; a typed value overrides it for
+  // all imported traces (kata ej6m). The nominal config width is the fallback
+  // for files that carry no width metadata.
+  let traceWidthText = $derived(traceWidthDraft ?? "");
   let traceWidthParsed = $derived(parseNumberDraft(traceWidthText));
-  let traceWidth = $derived(traceWidthParsed ?? config.min_trace_mm);
-  let traceWidthValid = $derived(traceWidthParsed !== null && traceWidthParsed > 0);
+  let traceWidthOverride = $derived(traceWidthText.trim() === "" ? null : traceWidthParsed);
+  let traceWidth = $derived(traceWidthOverride ?? config.trace_width_mm);
+  let traceWidthValid = $derived(traceWidthText.trim() === "" || (traceWidthParsed !== null && traceWidthParsed > 0));
   let viaDrillDraft = $state<string | null>(null);
   let viaDrillText = $derived(viaDrillDraft ?? String(config.min_via_drill_mm));
   let viaDrillParsed = $derived(parseNumberDraft(viaDrillText));
@@ -118,7 +122,7 @@
   let previewRefreshTimer: ReturnType<typeof setTimeout> | undefined;
 
   let optionsKey = $derived(
-    [unitsToMm, zTolerance, traceWidth, selectedLayers, config.pcb_thickness_mm, simplifyLines, JSON.stringify(sourceLayerCoils)].join("|"),
+    [unitsToMm, zTolerance, traceWidthText, selectedLayers, config.pcb_thickness_mm, simplifyLines, JSON.stringify(sourceLayerCoils)].join("|"),
   );
   let importSettingsValid = $derived(zToleranceValid && traceWidthValid && Object.values(sourceLayerCoils).every((coil) => coil.trim() !== ""));
   let previewIsCurrent = $derived(
@@ -145,7 +149,7 @@
       minY = Math.min(minY, y);
       maxY = Math.max(maxY, y);
     }
-    const effectiveTraceWidth = traceWidthValid ? traceWidth : geometry.trace_width_mm;
+    const effectiveTraceWidth = traceWidthOverride ?? geometry.trace_width_mm;
     const span = Math.max(maxX - minX, maxY - minY, effectiveTraceWidth * 4, 1);
     const padding = Math.max(span * 0.05, effectiveTraceWidth * 2, viaPadRadius * 1.5);
     return {
@@ -156,8 +160,7 @@
     };
   });
   let previewStrokeWidth = $derived.by(() => {
-    if (traceWidthValid) return traceWidth;
-    return imported?.geometry.trace_width_mm ?? config.min_trace_mm;
+    return traceWidthOverride ?? imported?.geometry.trace_width_mm ?? config.trace_width_mm;
   });
   let joinedPreview = $derived.by(() =>
     imported
@@ -253,7 +256,7 @@
 
   async function readPreview(path: string): Promise<void> {
     const requestedOptions = optionsKey;
-    const requestedTraceWidth = traceWidth;
+    const requestedTraceWidth = traceWidthOverride;
     error = null;
     importFailed = false;
     try {
@@ -272,7 +275,7 @@
           ...result,
           geometry: {
             ...(simplifyLines ? simplifyCadLines(result.geometry) : result.geometry),
-            trace_width_mm: requestedTraceWidth,
+            trace_width_mm: requestedTraceWidth ?? result.geometry.trace_width_mm,
             source_file_name: baseName(path),
           },
         };
@@ -445,8 +448,8 @@
             <input id="cad-z-tolerance" aria-label="Z tolerance (mm)" type="text" inputmode="decimal" value={zToleranceDraft} oninput={updateZTolerance} disabled={busy} class="mt-1.5 w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 disabled:opacity-50" />
           </label>
           <label class="text-xs font-medium text-slate-300" for="cad-trace-width">
-            <span class="inline-flex items-center">Trace width (mm)<HelpTag label="About trace width" tip="Sets the width of all imported traces in previews and exports. Overrides the DXF trace-width metadata." /></span>
-            <input id="cad-trace-width" aria-label="Trace width (mm)" type="text" inputmode="decimal" value={traceWidthText} oninput={updateTraceWidth} disabled={busy} class="mt-1.5 w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 disabled:opacity-50" />
+            <span class="inline-flex items-center">Trace width (mm)<HelpTag label="About trace width" tip="Leave blank to keep each DXF's own trace width; enter a value to override it for all imported traces." /></span>
+            <input id="cad-trace-width" aria-label="Trace width (mm)" type="text" inputmode="decimal" placeholder="Auto (file)" value={traceWidthText} oninput={updateTraceWidth} disabled={busy} class="mt-1.5 w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 disabled:opacity-50" />
           </label>
         </div>
         <details class="mt-3 text-xs text-slate-300">

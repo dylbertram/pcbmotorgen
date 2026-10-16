@@ -97,6 +97,7 @@ mod tests {
     fn braid_rules() -> DesignRules {
         DesignRules {
             min_trace_mm: 0.1,
+            trace_width_mm: 0.1,
             min_space_mm: 0.1,
             min_via_drill_mm: mm(0.2),
             min_via_annular_ring_mm: mm(0.1),
@@ -117,6 +118,7 @@ mod tests {
             num_layers,
             phases: 3,
             min_trace_mm: 0.1,
+            trace_width_mm: 0.1,
             min_space_mm: 0.1,
             expects_continuous: false,
             params,
@@ -148,9 +150,23 @@ mod tests {
     fn test_track_width_matches_config() {
         let (coils, layers, rules, active) = braid_scene(2);
         let items = coils_to_board_items(&coils, layers, &rules, active);
-        let expected = (rules.min_trace_mm * 1e6).round() as i64;
+        let expected = (rules.trace_width_mm * 1e6).round() as i64;
         let track: Track = Track::decode(items[0].value.as_slice()).expect("decode Track");
         assert_eq!(track.width.unwrap().value_nm, expected);
+    }
+
+    #[test]
+    fn nominal_trace_width_drives_written_tracks_not_the_floor() {
+        // The floor and the written width are independent: raising the
+        // minimum must not widen the copper, and the nominal width (not the
+        // floor) is what lands on the board.
+        let (coils, layers, mut rules, active) = braid_scene(2);
+        rules.min_trace_mm = 0.1;
+        rules.trace_width_mm = 0.3;
+        let items = coils_to_board_items(&coils, layers, &rules, active);
+        let track: Track = Track::decode(items[0].value.as_slice()).expect("decode Track");
+        assert_eq!(track.width.unwrap().value_nm, 300_000);
+        assert_ne!(track.width.unwrap().value_nm, 100_000);
     }
 
     #[test]

@@ -164,6 +164,7 @@ export class ProjectStore {
         n_positions: this.config.n_positions,
         meshing: this.config.meshing,
         min_trace_mm: this.config.min_trace_mm,
+        trace_width_mm: this.config.trace_width_mm,
         min_space_mm: this.config.min_space_mm,
         min_via_drill_mm: this.config.min_via_drill_mm,
         min_via_annular_ring_mm: this.config.min_via_annular_ring_mm,
@@ -219,6 +220,9 @@ export class ProjectStore {
     this.config.n_positions = c.n_positions;
     this.config.meshing = c.meshing;
     this.config.min_trace_mm = c.min_trace_mm;
+    // Older files have no nominal width: keep their copper width by seeding
+    // it from the minimum trace width they were drawn with.
+    this.config.trace_width_mm = c.trace_width_mm ?? c.min_trace_mm;
     this.config.min_space_mm = c.min_space_mm;
     this.config.min_via_drill_mm = c.min_via_drill_mm;
     this.config.min_via_annular_ring_mm = c.min_via_annular_ring_mm;

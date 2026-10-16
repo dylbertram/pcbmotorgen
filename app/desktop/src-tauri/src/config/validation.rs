@@ -89,6 +89,18 @@ impl LinearMotorConfig {
                 self.min_trace_m
             )));
         }
+        if self.trace_width_m <= 0.0 {
+            return Err(ConfigError(format!(
+                "trace_width_m must be positive, got {}",
+                self.trace_width_m
+            )));
+        }
+        if self.trace_width_m < self.min_trace_m {
+            return Err(ConfigError(format!(
+                "trace_width_m ({}) must be at least the minimum trace width ({})",
+                self.trace_width_m, self.min_trace_m
+            )));
+        }
         if self.min_space_m <= 0.0 {
             return Err(ConfigError(format!(
                 "min_space_m must be positive, got {}",
@@ -246,6 +258,12 @@ impl LinearMotorConfig {
 mod tests {
     use super::*;
     use pcbmotorgen_simulation::units::mm;
+
+    #[test]
+    fn test_nominal_trace_width_below_minimum_raises() {
+        let cfg = LinearMotorConfig { trace_width_m: mm(0.05), min_trace_m: mm(0.127), ..LinearMotorConfig::default() };
+        assert!(cfg.validate().is_err());
+    }
 
     #[test]
     fn test_zero_active_area_raises() {

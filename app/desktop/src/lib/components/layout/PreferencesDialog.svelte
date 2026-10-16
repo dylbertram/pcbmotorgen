@@ -14,6 +14,7 @@
   let appearance = $state<Appearance>(untrack(() => readPreferences().appearance));
   let rules = $state<DrcRules>(untrack(() => ({
     min_trace_mm: config.min_trace_mm,
+    trace_width_mm: config.trace_width_mm,
     min_space_mm: config.min_space_mm,
     min_via_drill_mm: config.min_via_drill_mm,
     min_via_annular_ring_mm: config.min_via_annular_ring_mm,
@@ -25,7 +26,7 @@
   let rulesetName = $state("");
   let selectedRuleset = $state("");
   let rulesetError = $state<string | null>(null);
-  let valid = $derived(validRules(rules));
+  let valid = $derived(validRules(rules) && rules.trace_width_mm >= rules.min_trace_mm);
   let backdropRef = $state<HTMLDivElement | null>(null);
   let panelRef = $state<HTMLDivElement | null>(null);
   const appearances = [{ value: "light", label: "Light" }, { value: "dark", label: "Dark" }, { value: "auto", label: "Auto" }] as const;
@@ -147,7 +148,7 @@
               {/each}
             </div>
             <button type="button" onclick={() => { rules = { ...DEFAULT_RULES }; importName = null; importWarnings = []; error = null; }} class="mt-4 text-xs text-slate-400 underline decoration-slate-600 underline-offset-4 hover:text-slate-200">Restore default rules</button>
-            {#if !valid}<p class="mt-3 text-xs text-rose-300" role="alert">Enter a positive number for every rule.</p>{/if}
+            {#if !valid}<p class="mt-3 text-xs text-rose-300" role="alert">Enter a positive number for every rule, with a nominal trace width at least the minimum.</p>{/if}
 
             <div class="mt-4 space-y-2 border-t border-slate-800 pt-4">
               <p class="text-xs font-medium text-slate-300">Saved rulesets</p>

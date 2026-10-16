@@ -88,7 +88,7 @@ pub fn check_interference(
 ) -> Vec<InterferenceViolation> {
     let mut violations = Vec::new();
 
-    let trace_width = rules.min_trace_mm;
+    let trace_width = rules.trace_width_mm;
     let min_space = rules.min_space_mm;
     let via_pad_radius = rules.via_pad_radius_mm();
 
@@ -253,7 +253,7 @@ fn check_io_pad_clearance(
     runs_by_layer: &BTreeMap<u32, Vec<CopperRun>>,
     violations: &mut Vec<InterferenceViolation>,
 ) {
-    let trace_width = rules.min_trace_mm;
+    let trace_width = rules.trace_width_mm;
     let min_space = rules.min_space_mm;
 
     // Pad ↔ copper: pad centre to a different-net trace on a declared layer.
@@ -381,6 +381,7 @@ mod tests {
     fn rules() -> DesignRules {
         DesignRules {
             min_trace_mm: 0.1,
+            trace_width_mm: 0.1,
             min_space_mm: 0.1,
             min_via_drill_mm: 0.2,
             min_via_annular_ring_mm: 0.1,

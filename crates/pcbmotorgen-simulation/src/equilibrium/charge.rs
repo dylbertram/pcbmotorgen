@@ -909,6 +909,7 @@ mod tests {
             num_layers: 4,
             phases: 3,
             min_trace_mm: 0.127,
+            trace_width_mm: 0.127,
             min_space_mm: 0.127,
             expects_continuous: false,
             params: Default::default(),

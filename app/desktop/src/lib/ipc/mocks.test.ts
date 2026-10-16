@@ -56,6 +56,7 @@ function makeConfig(overrides: Partial<LinearMotorConfig> = {}): LinearMotorConf
     supply_voltage_v: 5.0,
     num_layers: 4,
     min_trace_m: 0.000127,
+    trace_width_m: 0.000127,
     min_space_m: 0.000127,
     min_via_drill_m: 0.0002,
     min_via_annular_ring_m: 0.0001,

@@ -74,6 +74,8 @@ export interface ProjectConfigState {
 
   // --- PCB manufacturing defaults (mm) ---
   min_trace_mm: number;
+  /** Nominal (actual) copper width. Absent in files saved before it existed. */
+  trace_width_mm?: number | null;
   min_space_mm: number;
   min_via_drill_mm: number;
   min_via_annular_ring_mm: number;

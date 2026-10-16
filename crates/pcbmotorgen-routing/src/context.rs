@@ -29,8 +29,14 @@ pub struct RoutingContext {
     pub num_layers: u32,
     /// Number of electrical phases.
     pub phases: u32,
-    /// Minimum manufacturable trace width [mm].
+    /// Minimum manufacturable trace width [mm] — the design-rule floor.
     pub min_trace_mm: f64,
+    /// Nominal (actual) copper trace width [mm]. Patterns lay out conductor
+    /// geometry from this; `min_trace_mm` stays the floor. Zero means unset —
+    /// [`RoutingContext::trace_width`] then falls back to `min_trace_mm`, so
+    /// contexts serialized before this field existed keep their behaviour.
+    #[serde(default)]
+    pub trace_width_mm: f64,
     /// Minimum trace-to-trace clearance [mm].
     ///
     /// Also the default inter-phase clearance: when
@@ -74,6 +80,16 @@ impl RoutingContext {
     /// Convenience: read a numeric parameter or fall back to `default`.
     pub fn param(&self, key: &str, default: f64) -> f64 {
         self.params.get(key).copied().unwrap_or(default)
+    }
+
+    /// Copper trace width to lay out geometry with: the nominal width when
+    /// set, otherwise the minimum (older contexts and unitless callers).
+    pub fn trace_width(&self) -> f64 {
+        if self.trace_width_mm.is_finite() && self.trace_width_mm > 0.0 {
+            self.trace_width_mm
+        } else {
+            self.min_trace_mm
+        }
     }
 
     /// Resolved pole pitch [mm] when the magnet layout was provided.

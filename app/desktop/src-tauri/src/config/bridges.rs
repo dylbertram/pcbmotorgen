@@ -31,6 +31,7 @@ impl LinearMotorConfig {
             num_layers: self.num_layers.max(1),
             phases: self.phases.max(1),
             min_trace_mm: self.min_trace_m * 1e3,
+            trace_width_mm: self.trace_width_m * 1e3,
             min_space_mm: self.min_space_m * 1e3,
             expects_continuous: false,
             params: self.routing_params.clone(),
@@ -51,6 +52,7 @@ impl LinearMotorConfig {
     pub fn design_rules(&self) -> pcbmotorgen_dfm::DesignRules {
         pcbmotorgen_dfm::DesignRules {
             min_trace_mm: self.min_trace_m * 1e3,
+            trace_width_mm: self.trace_width_m * 1e3,
             min_space_mm: self.min_space_m * 1e3,
             min_via_drill_mm: self.min_via_drill_m * 1e3,
             min_via_annular_ring_mm: self.min_via_annular_ring_m * 1e3,
@@ -74,7 +76,10 @@ impl LinearMotorConfig {
             spacing_ratio: self.spacing_ratio,
             max_current_a: self.max_current_a,
             supply_voltage_v: self.supply_voltage_v,
-            min_trace_m: self.min_trace_m,
+            // The simulation treats `min_trace_m` as the conductor width for
+            // resistance and ampacity, so hand it the nominal (actual) width;
+            // the design-rule floor lives in `DesignRules.min_trace_mm`.
+            min_trace_m: self.trace_width_m,
             min_space_m: self.min_space_m,
             min_via_drill_m: self.min_via_drill_m,
             min_via_annular_ring_m: self.min_via_annular_ring_m,

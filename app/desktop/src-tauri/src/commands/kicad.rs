@@ -213,6 +213,7 @@ pub async fn write_sensor_to_board(
         let geometry = generate_sensor(&config)?;
         let rules = DesignRules {
             min_trace_mm: config.trace_width_mm,
+            trace_width_mm: config.trace_width_mm,
             min_space_mm: config.min_clearance_mm,
             min_via_drill_mm: 0.2,
             min_via_annular_ring_mm: 0.2,
