@@ -387,6 +387,7 @@
     ];
     void valid;
 
+    void geometryKey(projects.cadGeometry);
     const generation = ++simulationGeneration;
     if (!active || activeTab !== "simulate") {
       scheduleSimulation.cancel();
@@ -639,7 +640,7 @@
             class="h-full p-4 lg:pr-0"
           >
             <div hidden={designType !== "motor"} class="h-full">
-              <DesignTab {config} cadGeometry={projects.cadGeometry} onImportCad={() => (cadImportDialogOpen = true)} onUseGenerated={() => projects.setCadGeometry(null)} />
+              <DesignTab {config} cadGeometry={projects.cadGeometry} onGeometryChange={(geometry) => projects.setCadGeometry(geometry)} onImportCad={() => (cadImportDialogOpen = true)} onUseGenerated={() => projects.setCadGeometry(null)} />
             </div>
             <div hidden={designType !== "sensor"} class="h-full overflow-y-auto">
               <SensorTab store={sensorStore} />

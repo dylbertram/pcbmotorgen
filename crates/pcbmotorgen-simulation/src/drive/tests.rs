@@ -105,6 +105,33 @@ fn two_strand_fixture() -> RoutingResult {
 }
 
 #[test]
+fn routed_sweep_limits_follow_copper_not_configured_board_length() {
+    use crate::magnetic::force_eval::ForceEvaluator;
+    let mut cfg = sim();
+    cfg.magnet_count = 2;
+    cfg.magnet_pitch_m = 0.006;
+    cfg.magnet_dims_m[0] = 0.004;
+    for offset_mm in [0.0, 20.0] {
+        let mut routing = two_strand_fixture();
+        for segment in &mut routing.segments {
+            segment.start.x += offset_mm;
+            segment.end.x += offset_mm;
+        }
+        for via in &mut routing.vias { via.position.x += offset_mm; }
+        let (evaluator, _) = ForceEvaluator::default().with_routed_currents(
+            &routing, &cfg, &DriveSettings::default(), &DriveGeometryHints::default(),
+        ).unwrap();
+        let (start, end) = evaluator.sweep_center_limits_m(&cfg).unwrap();
+        assert!((start - cfg.magnet_dims_m[0] / 2.0 - offset_mm * 1e-3).abs() < 1e-12);
+        assert!((end + cfg.magnet_pitch_m + cfg.magnet_dims_m[0] / 2.0
+            - (100.0 + offset_mm) * 1e-3).abs() < 1e-12);
+        let mut oversized = cfg.clone();
+        oversized.magnet_count = 100;
+        assert!(evaluator.sweep_center_limits_m(&oversized).is_err());
+    }
+}
+
+#[test]
 fn solved_force_is_invariant_to_stored_segment_direction() {
     use crate::magnetic::force_eval::{ForceEvaluator, CommutationMode};
     let config = sim();
@@ -179,13 +206,18 @@ fn parallel_strands_divide_resistance() {
     let strand = rho * ph.strand_length_m / (0.25e-3 * oz_to_m(1.0)) + a.via_resistance_each_ohm;
     assert!((ph.resistance_hot_ohm - strand / 2.0).abs() < 1e-9);
     assert!(a.via_resistance_each_ohm > 0.5e-3 && a.via_resistance_each_ohm < 3e-3);
+    for phase in &a.phases {
+        assert!(phase.via_resistance_ohm > 0.0);
+        assert!(phase.via_resistance_ohm < phase.resistance_hot_ohm);
+    }
 }
 
 #[test]
 fn ripple_and_voltage_follow_the_formulas() {
     let settings = DriveSettings::default();
     let a = analyze_drive(&sim(), &two_strand_fixture(), &settings, Some(0.5));
-    let expected_ripple = 12.0 / (8.0 * settings.pwm_hz * a.synchronous_inductance_h);
+    let expected_ripple = 12.0 / (2.0 * a.phase_resistance_ohm)
+        * (a.phase_resistance_ohm / (4.0 * settings.pwm_hz * a.synchronous_inductance_h)).tanh();
     assert!((a.ripple_pp_a - expected_ripple).abs() / expected_ripple < 1e-9);
     let hold = 3f64.sqrt() * 0.8 * a.phase_resistance_ohm + 0.8 * settings.driver.rds_on_ohm;
     assert!((a.holding_voltage_v - hold).abs() < 1e-9);
@@ -194,6 +226,44 @@ fn ripple_and_voltage_follow_the_formulas() {
     assert!(vmax > 0.0);
     assert_eq!(a.thrust_n, Some(0.4));
     assert!(a.checks.iter().all(|c| c.status != CheckStatus::Unknown));
+    assert!(a.checks.iter().find(|c| c.id == "ripple").unwrap().detail.contains("not a switched-waveform simulation"));
+    assert!(a.checks.iter().find(|c| c.id == "thrust").unwrap().detail.contains("not a position-specific"));
+}
+
+#[test]
+fn ripple_estimate_matches_the_assumed_fifty_percent_rl_loop() {
+    let settings = DriveSettings::default();
+    let cfg = sim();
+    let a = analyze_drive(&cfg, &two_strand_fixture(), &settings, Some(0.5));
+    // Independent steady-state RL solution for the assumed alternating
+    // +/- Vbus/2 excitation of a two-phase loop, not a PWM-controller oracle.
+    // Ipp = Vbus/Rloop * tanh(Rloop/(4*f*Lloop)).
+    let r_loop = 2.0 * a.phase_resistance_ohm;
+    let l_loop = 2.0 * a.synchronous_inductance_h;
+    let exact = cfg.supply_voltage_v / r_loop
+        * (r_loop / (4.0 * settings.pwm_hz * l_loop)).tanh();
+    assert!(exact > 0.0);
+    assert!((exact - a.ripple_pp_a).abs() < 1e-10);
+    assert!(a.ripple_pp_a <= cfg.supply_voltage_v / r_loop);
+    // March the two half-cycle RL responses to periodic steady state.
+    // This uses exponential settling, independently of the tanh formula.
+    let decay = (-r_loop / (2.0 * settings.pwm_hz * l_loop)).exp();
+    let target = cfg.supply_voltage_v / (2.0 * r_loop);
+    let mut current = 0.0;
+    let mut high = 0.0;
+    for _ in 0..10_000 {
+        high = target + (current - target) * decay;
+        current = -target + (high + target) * decay;
+    }
+    assert!((high - current - a.ripple_pp_a).abs() < 1e-9);
+    let at_required_pwm = cfg.supply_voltage_v / r_loop
+        * (r_loop / (4.0 * a.min_pwm_hz * l_loop)).tanh();
+    assert!((at_required_pwm - settings.ripple_limit_fraction * cfg.max_current_a).abs() < 1e-9);
+    let mut higher_bus = cfg.clone();
+    higher_bus.supply_voltage_v *= 2.0;
+    let higher = analyze_drive(&higher_bus, &two_strand_fixture(), &settings, Some(0.5));
+    assert!((higher.ripple_pp_a - 2.0 * a.ripple_pp_a).abs() < 1e-10);
+    assert_eq!(higher.thrust_n, a.thrust_n);
 }
 
 #[test]

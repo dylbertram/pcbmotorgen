@@ -509,6 +509,35 @@ mod analyze_drive_tests {
     }
 
     #[test]
+    #[ignore = "User project force convergence and driver diagnostics"]
+    fn closed_infinity_user_project_diagnostics() {
+        let state: crate::ipc::ProjectConfigStateIpc = serde_json::from_str(include_str!("fixtures/closed_infinity_pattern.config.json")).unwrap();
+        let mut ipc = state.to_linear_motor_ipc();
+        assert!((ipc.active_area_length_m - 0.092).abs() < 1e-12);
+        let mut previous: Option<Vec<f64>> = None;
+        for mesh in [10, 20, 40] {
+            ipc.meshing = mesh;
+            let sweep = tauri::async_runtime::block_on(evaluate_force_sweep(ipc.clone(), None, Some(state.drive.clone()))).unwrap();
+            let kf = sweep.mean_thrust_n / sweep.current_a;
+            eprintln!("USER mesh={mesh} x=[{},{}] mean={} min={} max={} ripple_pct={} first={} last={}", sweep.positions_m[0], sweep.positions_m.last().unwrap(), sweep.mean_thrust_n, sweep.min_thrust_n, sweep.peak_thrust_n, sweep.ripple_pct, sweep.force_x_n[0], sweep.force_x_n.last().unwrap());
+            if mesh == 20 {
+                let a = tauri::async_runtime::block_on(analyze_drive(ipc.clone(), state.drive.clone(), Some(kf), None)).unwrap();
+                eprintln!("USER driver={}", serde_json::to_string(&a).unwrap());
+                eprintln!("USER force_x={:?}", sweep.force_x_n);
+                eprintln!("USER phase means={:?}", (0..3).map(|p| sweep.per_phase_force_x.iter().map(|row| row[p]).sum::<f64>() / sweep.per_phase_force_x.len() as f64).collect::<Vec<_>>());
+                assert!(a.ripple_pp_a < 12.0 / (2.0 * a.phase_resistance_ohm));
+                assert!(a.ripple_pp_a > state.drive.ripple_limit_fraction * ipc.max_current_a);
+                assert!(a.thrust_n.unwrap() < ipc.target_force_n);
+            }
+            if let Some(old) = previous.as_ref() {
+                let max_diff = old.iter().zip(&sweep.force_x_n).map(|(a,b)| (a-b).abs()).fold(0.0, f64::max);
+                assert!(max_diff / sweep.mean_thrust_n.abs() < 0.002, "mesh {mesh} has not converged: {max_diff}");
+            }
+            previous = Some(sweep.force_x_n);
+        }
+    }
+
+    #[test]
     #[ignore = "Exploratory 5 V versus 12 V geometry comparison"]
     fn drv8311_compare_five_and_twelve_volts() {
         for strands in [7.0, 9.0] {

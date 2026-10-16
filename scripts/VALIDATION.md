@@ -3,12 +3,42 @@
 Run from the repository root.
 
 Force sweeps use physical outer-edge travel limits. The reported position
-is the absolute center of the first magnet, so it runs from `width / 2` to
-`active_length - (count - 1) * pitch - width / 2`. The field model and
+is the absolute center of the first magnet. Routed sweeps run from
+`copper_start + width / 2` to
+`copper_end - (count - 1) * pitch - width / 2`, using the solved
+current-carrying copper extent, not the configured board length. A winding
+shorter than the magnet group has no full-overlap sweep and returns an error.
+Analytic fixtures without routing use the configured active area. The field model and
 commutation receive that same coordinate. Vernier phase offsets must not
 translate mechanical travel limits. Array span is `(count - 1) * pitch + width`,
 not `count * pitch`. Do not crop low-force samples to suppress real fringe
 effects. Reference values recorded before this correction need rerunning.
+
+Driver ripple is a 50%-duty RL estimate, not a switched-controller
+simulation. The driver thrust check uses mean sweep Kf, not a position-specific
+holding force. Neither check independently validates the imported terminal
+polarity, FOC phase mapping, or actual PWM modulation scheme.
+
+The ripple estimate now includes winding resistance in that assumed loop:
+`Ipp = Vbus/(2Rphase) * tanh(Rphase/(4*f*Ls))`. The old `Vbus/(8*f*Ls)`
+limit ignores resistance and can wildly overestimate ripple when `L/R` is
+short relative to a PWM period. Tests compare the RL result to independently
+marched exponential half-cycles and verify the required-frequency inversion.
+
+## Reported closed-infinity project
+
+`app/desktop/src-tauri/src/commands/fixtures/closed_infinity_pattern.config.json`
+preserves the supplied project's config. It contains generated Star/wye
+copper, not imported CAD: five magnets, three strands, 0.1 mm traces, 1 oz,
+12 V, 1 A, 100 kHz. Do not substitute earlier feasibility-search settings.
+
+```sh
+RAYON_NUM_THREADS=4 cargo test -p pcbmotorgen closed_infinity_user_project_diagnostics --bin pcbmotorgen -- --ignored --nocapture
+```
+
+This reruns all 50 positions at mesh densities 10, 20 and 40, compares their
+pointwise forces, prints phase contributions and electrical checks, and
+asserts the design still misses its thrust target and ripple allowance.
 
 ## Normal regression suite
 

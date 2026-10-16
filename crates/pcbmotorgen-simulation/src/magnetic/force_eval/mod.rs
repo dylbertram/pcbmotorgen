@@ -80,6 +80,7 @@ pub struct ForceEvaluator {
     /// Whether self-calibration has been performed.
     calibrated: bool,
     routed_samples: Option<Vec<Vec<ConductorSample>>>,
+    routed_x_bounds_m: Option<(f64, f64)>,
 }
 
 impl Default for ForceEvaluator {
@@ -92,6 +93,7 @@ impl Default for ForceEvaluator {
             phase_shift: 0.0,
             calibrated: false,
             routed_samples: None,
+            routed_x_bounds_m: None,
         }
     }
 }
@@ -120,6 +122,7 @@ impl ForceEvaluator {
         let via_r = crate::drive::via_resistance_ohm(config.min_via_drill_m, settings.via_plating_m, config.pcb_thickness_m, rho);
         let mut coils = Vec::new();
         let mut all_samples = Vec::new();
+        let mut x_bounds = (f64::INFINITY, f64::NEG_INFINITY);
         for net in extract_phase_networks_with_terminals(routing, &hints.terminals) {
             let resistances: Vec<f64> = net.edges.iter().map(|edge| match &edge.kind {
                 EdgeKind::Via => via_r,
@@ -136,6 +139,12 @@ impl ForceEvaluator {
             let mut samples = Vec::new();
             for (edge, share) in net.edges.iter().zip(&solution.current_share) {
                 if let EdgeKind::Trace { layer, points, .. } = &edge.kind {
+                    if share.abs() > 1e-9 {
+                        for point in points {
+                            x_bounds.0 = x_bounds.0.min(point[0]);
+                            x_bounds.1 = x_bounds.1.max(point[0]);
+                        }
+                    }
                     let z = hints.layer_z_m.get(*layer as usize).copied().unwrap_or_else(|| {
                         -(*layer as f64) * config.pcb_thickness_m / config.num_layers.saturating_sub(1).max(1) as f64
                     });
@@ -159,6 +168,7 @@ impl ForceEvaluator {
             return Err(SimulationError("No conductor networks available for force evaluation".into()));
         }
         self.routed_samples = Some(all_samples);
+        self.routed_x_bounds_m = Some(x_bounds);
         self.calibrated = false;
         Ok((self, coils))
     }
@@ -183,6 +193,7 @@ impl ForceEvaluator {
             phase_shift: 0.0,
             calibrated: false,
             routed_samples: None,
+            routed_x_bounds_m: None,
         }
     }
 
@@ -190,8 +201,20 @@ impl ForceEvaluator {
     // Public API
     // ------------------------------------------------------------------
 
+    /// Physical center limits over actual current-carrying routed copper.
+    /// Analytic fixtures without routing use the configured active area.
+    pub fn sweep_center_limits_m(&self, config: &SimulationInput) -> Result<(f64, f64), SimulationError> {
+        let (left, right) = self.routed_x_bounds_m.unwrap_or((0.0, config.active_area_length_m));
+        let start = left + config.magnet_dims_m[0] / 2.0;
+        let end = right - config.magnet_array_span_m() + config.magnet_dims_m[0] / 2.0;
+        if !start.is_finite() || !end.is_finite() || end < start {
+            return Err(SimulationError("Current-carrying copper is shorter than the physical magnet array; no full-overlap thrust sweep is available".into()));
+        }
+        Ok((start, end))
+    }
+
     /// Sweep first-magnet-center positions between physical edge-aligned
-    /// travel limits and compute force. Positions use the same absolute
+    /// travel limits of the actual routed copper and compute force. Positions use the same absolute
     /// center coordinate as `evaluate_at` and commutation.
     ///
     /// For generated or imported routed copper, first use
@@ -214,13 +237,13 @@ impl ForceEvaluator {
         if coils.is_empty() || self.routed_samples.as_ref().is_some_and(|s| s.len() != coils.len()) {
             return Err(SimulationError("Force coils do not match the solved conductor networks".into()));
         }
+        let (start, end) = self.sweep_center_limits_m(config)?;
         // Self-calibration guard (FOC spec §4.3): 3-point polarity + alignment
         // check, including a common winding-reference alignment if needed.
         if !self.calibrated {
             self.self_calibrate(config, coils)?;
         }
 
-        let (start, end) = config.sweep_center_limits_m();
         let positions = linspace(start, end, self.n_positions);
         let n_phases = coils.len();
         let magnet_array = MagnetArray::new(config);
