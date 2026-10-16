@@ -79,6 +79,7 @@
         <SettingRow label="Top speed (m/s)" help="Fastest move at full current. Back-EMF grows with speed and eats into the bus voltage."><NumberField value={config.drive.target_speed_m_s} min={0} step={0.05} ariaLabel="Target speed (m/s)" class={field} onCommit={(v) => update({ target_speed_m_s: v })} /></SettingRow>
         <SettingRow label="Ripple limit (%)" help="Allowed peak-to-peak PWM ripple as a share of the phase current."><NumberField value={Math.round(config.drive.ripple_limit_fraction * 100)} min={1} max={200} step={5} ariaLabel="Ripple limit (% of phase current)" class={field} onCommit={(v) => update({ ripple_limit_fraction: v / 100 })} /></SettingRow>
         <SettingRow label="Usable bus (%)" help="Share of the bus the current loop may use, leaving control headroom."><NumberField value={Math.round(config.drive.voltage_headroom * 100)} min={10} max={100} step={5} ariaLabel="Usable bus share (%)" class={field} onCommit={(v) => update({ voltage_headroom: v / 100 })} /></SettingRow>
+        <SettingRow label="Series inductor (µH)" help="External inductor added in series with each phase at the driver terminals. Coreless coils have little inductance, so this tames PWM ripple and raises the ω·L voltage."><NumberField value={config.drive.series_inductance_h * 1e6} min={0} step={1} ariaLabel="Series inductor per phase (µH)" class={field} onCommit={(v) => update({ series_inductance_h: v * 1e-6 })} /></SettingRow>
       </div>
     </fieldset>
 

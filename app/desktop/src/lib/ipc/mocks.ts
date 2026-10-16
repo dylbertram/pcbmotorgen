@@ -524,14 +524,15 @@ export function mockDriveAnalysis(
   const t = d.outer_copper_oz * 35e-6;
   const r = (rho * length) / (c.min_trace_m * t);
   const l = 2e-6;
+  const lEff = l + Math.max(0, d.series_inductance_h);
   const i = c.max_current_a;
   const vBus = c.supply_voltage_v;
   const available = d.voltage_headroom * vBus;
   const ke = kf !== null ? (2 / 3) * kf : null;
   const pe = 2 * c.magnet_pitch_m;
   const required = (v: number) =>
-    Math.sqrt(3) * Math.hypot(i * r + (ke ?? 0) * v, ((2 * Math.PI * v) / pe) * l * i) + i * d.driver.rds_on_ohm;
-  const ripple = r > 1e-12 ? vBus / (2 * r) * Math.tanh(r / (4 * d.pwm_hz * l)) : vBus / (8 * d.pwm_hz * l);
+    Math.sqrt(3) * Math.hypot(i * r + (ke ?? 0) * v, ((2 * Math.PI * v) / pe) * lEff * i) + i * d.driver.rds_on_ohm;
+  const ripple = r > 1e-12 ? vBus / (2 * r) * Math.tanh(r / (4 * d.pwm_hz * lEff)) : vBus / (8 * d.pwm_hz * lEff);
   const rippleLimit = d.ripple_limit_fraction * i;
   const requiredFL = rippleLimit <= 0 || vBus <= 0 ? Infinity
     : r <= 1e-12 ? vBus / (8 * rippleLimit)
@@ -572,8 +573,10 @@ export function mockDriveAnalysis(
     mutual_inductance_h: 0,
     line_inductance_h: 2 * l,
     synchronous_inductance_h: l,
+    series_inductance_h: Math.max(0, d.series_inductance_h),
+    effective_inductance_h: lEff,
     line_resistance_ohm: 2 * r,
-    time_constant_s: l / r,
+    time_constant_s: lEff / r,
     bus_voltage_v: vBus,
     phase_current_a: i,
     pwm_hz: d.pwm_hz,
@@ -586,8 +589,8 @@ export function mockDriveAnalysis(
     voltage_limited_current_a: vLimitedI,
     max_speed_m_s: ke !== null ? Math.max(0, (available / Math.sqrt(3) - i * r) / Math.max(ke, 1e-9)) : null,
     ripple_pp_a: ripple,
-    min_pwm_hz: requiredFL / l,
-    added_inductance_h: Math.max(0, requiredFL / d.pwm_hz - l),
+    min_pwm_hz: requiredFL / lEff,
+    added_inductance_h: Math.max(0, requiredFL / d.pwm_hz - lEff),
     peak_current_a: i + ripple / 2,
     trace_ampacity_a: ampacity,
     copper_loss_w: 1.5 * i * i * r,
