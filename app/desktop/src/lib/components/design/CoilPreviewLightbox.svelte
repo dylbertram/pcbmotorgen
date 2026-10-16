@@ -212,7 +212,7 @@
           coils={importedGeometry ? uniquePhases.map((phase) => ({ name: phase.name, colorIdx: phase.colorIdx })) : []}
           isCoilVisible={(name) => view.isPhaseVisible(uniquePhases.find((phase) => phase.name === name)?.idx ?? -1)}
           onToggleCoil={(name) => { const phase = uniquePhases.find((phase) => phase.name === name); if (phase) view.phaseVisibility[phase.idx] = !view.isPhaseVisible(phase.idx); }} showMotorControls={true}
-            label="Coil preview layers" displayLabel="Coil preview display" {hasPolePitchData} {hasBandWidthData} {hasPoleRegionData} {poleRegionPhases} />
+            label="Coil preview layers" displayLabel="Coil preview display" {hasPolePitchData} {hasBandWidthData} {hasPoleRegionData} {poleRegionPhases} dismissOnOutsideClick={false} />
         </div>
 
         <!-- Bare zoom buttons: no background, with the same 12px gap on the
