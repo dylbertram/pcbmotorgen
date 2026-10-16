@@ -148,7 +148,8 @@ pub fn coils_to_board_items(
 
 Pure converter, no socket I/O:
 
-- each `CoilSegment` → `Track` (width from `min_trace_mm`, layer via
+- each `CoilSegment` → `Track` (width from `rules.trace_width_mm`; the
+  `min_trace_mm` floor is a separate DRC input; layer via
   `layer_idx_to_board_layer`, net `/<phaseName>`);
 - each `corner_arc` → `Arc`;
 - each `center_via_position` → through `Via` (drill + pad from design rules,
@@ -183,7 +184,7 @@ pub fn io_elements_to_board_items(
   mapped onto the board, or the kind's default set when empty: all copper
   layers for THT, `F_Cu` for surface pads);
 - one `Track` per `io_traces[]` entry — IO fanout traces emit as normal
-  tracks, sized from `rules.min_trace_mm`;
+  tracks, sized from `rules.trace_width_mm`;
 - a result without IO elements produces an empty item list.
 
 **Sizing authority:** the writer reads pad sizes from the declared elements

@@ -161,6 +161,19 @@ pub fn validate_write_preconditions(
         ));
     }
 
+    // (6) The nominal trace width must clear the manufacturing floor.
+    if rules.trace_width_mm <= 0.0 || rules.trace_width_mm < rules.min_trace_mm {
+        out.push(PreconditionWarning::warn(
+            Some("trace_width_mm"),
+            format!(
+                "Nominal trace width ({:.4} mm) is below the minimum trace width \
+                 ({:.4} mm); using the minimum. Increase the trace width or lower \
+                 the minimum rule.",
+                rules.trace_width_mm, rules.min_trace_mm
+            ),
+        ));
+    }
+
     out
 }
 
@@ -182,6 +195,7 @@ fn mm(v: f64) -> f64 {
 fn braid_rules() -> DesignRules {
     DesignRules {
         min_trace_mm: 0.127,
+        trace_width_mm: 0.127,
         min_space_mm: 0.127,
         min_via_drill_mm: 0.2,
         min_via_annular_ring_mm: 0.1,

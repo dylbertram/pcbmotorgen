@@ -127,7 +127,7 @@
   // views. The toggles live in the lightbox UI; the draw effect below
   // reads the same instance, so a flip there repaints the schematic.
   // -------------------------------------------------------------------
-  let terminalGeometry = $derived(importedGeometry ? withAutomaticCadTerminals(importedGeometry) : coils ? generatedTerminalGeometry(coils, config.num_layers, config.pcb_thickness_mm, config.min_trace_mm, config.routing_pattern === "infinity-braid" ? config.routing_params.connection : undefined) : null);
+  let terminalGeometry = $derived(importedGeometry ? withAutomaticCadTerminals(importedGeometry) : coils ? generatedTerminalGeometry(coils, config.num_layers, config.pcb_thickness_mm, config.trace_width_mm, config.routing_pattern === "infinity-braid" ? config.routing_params.connection : undefined) : null);
   const terminalTool = new CoilTerminalTool({
     getGeometry: () => terminalGeometry,
     onChange: (geometry) => onGeometryChange?.(geometry),
@@ -504,7 +504,7 @@
       isCoilLayerVisible: (coil, layer) => view.isCoilLayerVisible(coil, layer),
       showVias: view.showVias,
       traceMode: view.traceMode,
-      traceWidthMm: config.min_trace_mm,
+      traceWidthMm: config.trace_width_mm,
       viaDrillMm: config.min_via_drill_mm,
       viaAnnularRingMm: config.min_via_annular_ring_mm,
       poleRuler,

@@ -565,6 +565,7 @@ mod analyze_drive_tests {
             ipc.routing_params.insert("connection".into(), 2.0);
             ipc.routing_params.insert("num_strands".into(), strands);
             ipc.min_trace_m = 0.0005;
+            ipc.trace_width_m = 0.0005;
             ipc.n_positions = 25;
             ipc.meshing = 20;
             let mut settings = pcbmotorgen_simulation::drive::DriveSettings::default();
@@ -595,6 +596,7 @@ mod analyze_drive_tests {
             let mut ipc = crate::ipc::ProjectConfigStateIpc::default().to_linear_motor_ipc();
             ipc.routing_params.insert("connection".into(), 2.0);
             ipc.min_trace_m = width_mm * 1e-3;
+            ipc.trace_width_m = width_mm * 1e-3;
             ipc.n_positions = 25;
             ipc.meshing = 20;
             let mut force_settings = pcbmotorgen_simulation::drive::DriveSettings::default();

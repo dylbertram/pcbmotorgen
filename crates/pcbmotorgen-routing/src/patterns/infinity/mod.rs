@@ -359,7 +359,7 @@ fn resolve_braid_layout(
 fn lead_pitch_mm(layout: BraidLayout, amplitude_mm: f64, ctx: &RoutingContext) -> f64 {
     let period_length = layout.d_phase / layout.n_periods as f64;
     let crossing_depth = layout.o.abs() * amplitude_mm / period_length;
-    crossing_depth.max(ctx.min_trace_mm + ctx.min_space_mm)
+    crossing_depth.max(ctx.trace_width() + ctx.min_space_mm)
 }
 
 /// Generated braid geometry across all phases.

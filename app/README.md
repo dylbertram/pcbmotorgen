@@ -4,11 +4,14 @@ Open **pcbmotorgen > Settings…** with the menu bar or **Cmd/Ctrl+,**.
 Choose Light, Dark, or Auto appearance. Auto follows system appearance changes.
 Settings persist on this device, separately from project versions.
 
-DRC rules set minimum motor trace width, clearance, via drill, and annular ring
-in millimetres. Saving settings applies these values to the current motor
-design and uses them for new designs. Opened projects retain their saved rules.
-Rule changes update routing, DRC, and export together, and mark a saved design
-as edited. Cancel leaves appearance and rules unchanged.
+DRC rules set the minimum motor trace width, clearance, via drill, and annular
+ring in millimetres, plus the nominal (actual) trace width written to the board
+and DXF. The nominal width must be at least the minimum, which stays the
+design-rule floor. Saving settings applies these values to the current motor
+design and uses them for new designs. Opened projects retain their saved rules,
+and a project saved before the nominal width existed keeps its original copper
+width. Rule changes update routing, DRC, and export together, and mark a saved
+design as edited. Cancel leaves appearance and rules unchanged.
 
 Use **Import KiCad DRC rules** in Settings to upload a `.kicad_dru` file.
 Review the imported values and limitations, then save to apply them. The importer

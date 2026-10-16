@@ -39,7 +39,9 @@ impl CadBoard {
             x[0] + x[1]
         };
         let mut rules = core.design_rules();
-        rules.min_trace_mm = cad.trace_width_mm;
+        // The imported DXF width is the actual copper width; the config's
+        // minimum trace width stays the DRC floor.
+        rules.trace_width_mm = cad.trace_width_mm;
         Ok(Self {
             routing,
             coils,

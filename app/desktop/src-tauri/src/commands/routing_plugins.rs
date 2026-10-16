@@ -250,7 +250,9 @@ pub async fn check_coil_interference(
             // phase, coils keep their own nets so DRC still runs.
             Some(cad) => {
                 let mut rules = core.design_rules();
-                rules.min_trace_mm = cad.trace_width_mm;
+                // Imported copper is checked at its drawn width; the config's
+                // minimum trace width is the floor for the clearance check.
+                rules.trace_width_mm = cad.trace_width_mm;
                 (cad.routing_by_phase().unwrap_or_else(|_| cad.routing.clone()), rules)
             }
             None => {

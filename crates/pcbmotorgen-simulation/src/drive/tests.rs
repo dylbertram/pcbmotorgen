@@ -240,7 +240,7 @@ fn generated_braid_remains_one_connected_winding_across_repeat_counts() {
         for length in [92.0, 98.0, 110.0, 120.0] {
             let ctx = pcbmotorgen_routing::RoutingContext {
                 active_area_length_mm: length, board_width_mm: 8.0,
-                num_layers: 2, phases: 3, min_trace_mm: 0.1, min_space_mm: 0.127,
+                num_layers: 2, phases: 3, min_trace_mm: 0.1, trace_width_mm: 0.1, min_space_mm: 0.127,
                 expects_continuous: false,
                 params: std::collections::HashMap::from([("num_strands".into(), strands as f64), ("connection".into(), 2.0)]),
                 magnet_pitch_mm: Some(6.0), magnet_array_span_mm: Some(35.0), phase_clearance_mm: None,
@@ -349,6 +349,7 @@ fn braid_fixture_produces_plausible_values() {
         num_layers: 4,
         phases: 3,
         min_trace_mm: 0.127,
+        trace_width_mm: 0.127,
         min_space_mm: 0.127,
         expects_continuous: false,
         params: Default::default(),

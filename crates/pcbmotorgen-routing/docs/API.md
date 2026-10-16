@@ -126,6 +126,7 @@ boundary.
   "num_layers": 4,
   "phases": 3,
   "min_trace_mm": 0.127,
+  "trace_width_mm": 0.127,
   "min_space_mm": 0.127,
   "expects_continuous": false,
   "params": { "num_strands": 5 },
@@ -140,7 +141,8 @@ boundary.
 | `board_width_mm` | `f64` | PCB dimension perpendicular to travel [mm]. |
 | `num_layers` | `u32` | Copper layers in the stack. |
 | `phases` | `u32` | Electrical phase count. |
-| `min_trace_mm` | `f64` | Minimum manufacturable trace width [mm]. |
+| `min_trace_mm` | `f64` | Minimum manufacturable trace width [mm] (design-rule floor). |
+| `trace_width_mm` | `f64` | Nominal copper width patterns lay geometry out with [mm]; 0 falls back to `min_trace_mm`. |
 | `min_space_mm` | `f64` | Minimum trace-to-trace clearance [mm]. |
 | `expects_continuous` | `bool` | Whether the pattern declares end→start continuity per (layer, net), driving the validator continuity check. |
 | `params` | `{string → number}` | Pattern-specific user-editable parameters. |
@@ -587,7 +589,8 @@ The signature is unchanged and the routing crate re-exports nothing.
 It reports design-rule violations against the configured widths:
 
 - **Segments** — same-layer, different-net traces closer than
-  `min_trace_mm + min_space_mm` (edge-to-edge clearance).
+  `trace_width_mm + min_space_mm` (edge-to-edge clearance at the nominal
+  copper width).
 - **IO fanout traces** (kata xa0f) — join the same clearance rule, against
   segments and other IO traces; they are ordinary copper for DRC purposes.
 - **Via pads** — via pad (`drill + 2 × annular ring`) on its from/to layers
@@ -725,7 +728,8 @@ w_s = (N * w_t + (N - 1) * s) / sin(theta)
   (`turns`, `windings_per_phase`) are deliberately **not** consulted: they
   count coil windings, not parallel strands in one bundle, and previously fed
   this equation with silently wrong numbers.
-- `w_t` = `trace_width_mm` = `min_trace_mm` from the context.
+- `w_t` = `trace_width_mm` = the context's nominal `trace_width_mm` (falling
+  back to `min_trace_mm` when unset).
 - `s` = `trace_spacing_mm` = `min_space_mm` from the context.
 - `theta` = `angle_rad`, measured from the x/travel axis. An angle parallel to
   the travel axis is rejected because the projection is undefined; geometry is

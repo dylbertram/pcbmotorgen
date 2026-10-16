@@ -46,7 +46,7 @@ pub(crate) fn emit_io_elements(
     x_offset_nm: i64,
 ) {
     // --- IO fanout traces: one Track each (normal tracks, rule-sized) ------
-    let trace_width_nm = mm_to_nm(rules.min_trace_mm);
+    let trace_width_nm = mm_to_nm(rules.trace_width_mm);
     for trace in &result.io_traces {
         items.push(pack_any(
             "kiapi.board.types.Track",
@@ -288,6 +288,7 @@ mod tests {
     fn rules() -> DesignRules {
         DesignRules {
             min_trace_mm: 0.1,
+            trace_width_mm: 0.1,
             min_space_mm: 0.1,
             min_via_drill_mm: 0.2,
             min_via_annular_ring_mm: 0.1,

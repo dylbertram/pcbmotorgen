@@ -17,6 +17,13 @@ fn default_routing_pattern() -> String {
     "infinity-braid".to_string()
 }
 
+/// Default nominal trace width [m] = 5 mil, matching the core default. Used
+/// only for payloads that pre-date the field; the migration seeds it from the
+/// project's own minimum trace width.
+fn default_trace_width_m() -> f64 {
+    0.127e-3
+}
+
 // ===========================================================================
 // LinearMotorConfig (IPC wire format — SI units, snake_case)
 // ===========================================================================
@@ -77,6 +84,9 @@ pub struct LinearMotorConfigIpc {
     /// Current copper layer count selection (UI-controlled).
     pub num_layers: u32,
     pub min_trace_m: f64,
+    /// Nominal (actual) trace width [m]. Absent in older payloads.
+    #[serde(default = "default_trace_width_m")]
+    pub trace_width_m: f64,
     pub min_space_m: f64,
     pub min_via_drill_m: f64,
     pub min_via_annular_ring_m: f64,
@@ -133,6 +143,7 @@ impl LinearMotorConfigIpc {
             max_current_a: self.max_current_a,
             supply_voltage_v: self.supply_voltage_v,
             min_trace_m: self.min_trace_m,
+            trace_width_m: self.trace_width_m,
             min_space_m: self.min_space_m,
             min_via_drill_m: self.min_via_drill_m,
             min_via_annular_ring_m: self.min_via_annular_ring_m,
@@ -180,6 +191,7 @@ impl From<&CoreConfig> for LinearMotorConfigIpc {
             // The core has no "current layer count" field — default to max.
             num_layers: c.max_layers,
             min_trace_m: c.min_trace_m,
+            trace_width_m: c.trace_width_m,
             min_space_m: c.min_space_m,
             min_via_drill_m: c.min_via_drill_m,
             min_via_annular_ring_m: c.min_via_annular_ring_m,

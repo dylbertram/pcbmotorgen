@@ -169,7 +169,7 @@ export function mockCoils(c: LinearMotorConfig): CoilPathDto {
     Math.round(c.routing_params.num_strands ?? c.strands_per_phase ?? 1),
   );
   const band_width_m =
-    trace_count * c.min_trace_m + (trace_count - 1) * c.min_space_m;
+    trace_count * c.trace_width_m + (trace_count - 1) * c.min_space_m;
   const phase_band_widths: PhaseBandWidthDto[] = [];
   // Pattern-owned pole-region bands (the routing sidecar's authoritative
   // phase/pole boundaries). The mock mirrors the infinity braid: one region
@@ -234,7 +234,7 @@ export function mockCoils(c: LinearMotorConfig): CoilPathDto {
         layer,
         net,
         trace_count,
-        trace_width_m: c.min_trace_m,
+        trace_width_m: c.trace_width_m,
         trace_spacing_m: c.min_space_m,
         angle_rad: Math.PI / 2,
         band_width_m,
@@ -522,7 +522,7 @@ export function mockDriveAnalysis(
   const rho = RHO * (1 + 0.00393 * (d.winding_temp_c - 20));
   const length = c.active_area_length_m * (c.board_width_m / (c.magnet_pitch_m / 2)) * 2;
   const t = d.outer_copper_oz * 35e-6;
-  const r = (rho * length) / (c.min_trace_m * t);
+  const r = (rho * length) / (c.trace_width_m * t);
   const l = 2e-6;
   const lEff = l + Math.max(0, d.series_inductance_h);
   const i = c.max_current_a;
@@ -538,7 +538,7 @@ export function mockDriveAnalysis(
     : r <= 1e-12 ? vBus / (8 * rippleLimit)
     : 2 * r * rippleLimit >= vBus ? 0
     : r / (4 * Math.atanh(2 * r * rippleLimit / vBus));
-  const ampacity = 0.048 * d.allowed_rise_c ** 0.44 * ((c.min_trace_m / 25.4e-6) * (t / 25.4e-6)) ** 0.725;
+  const ampacity = 0.048 * d.allowed_rise_c ** 0.44 * ((c.trace_width_m / 25.4e-6) * (t / 25.4e-6)) ** 0.725;
   const vLimitedI = available / (Math.sqrt(3) * r + d.driver.rds_on_ohm);
   const maxCont = Math.min(d.driver.continuous_rms_a, ampacity, vLimitedI);
   const st = (ok: boolean, warn: boolean): CheckStatus => (ok ? "pass" : warn ? "warn" : "fail");
@@ -564,7 +564,7 @@ export function mockDriveAnalysis(
       max_trace_share: 1,
       connected: true,
     })),
-    trace_width_m: c.min_trace_m,
+    trace_width_m: c.trace_width_m,
     outer_copper_m: t,
     inner_copper_m: d.inner_copper_oz * 35e-6,
     via_resistance_each_ohm: 0.0015,

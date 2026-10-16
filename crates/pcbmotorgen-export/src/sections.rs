@@ -67,6 +67,7 @@ mod tests {
     fn sample_rules() -> DesignRules {
         DesignRules {
             min_trace_mm: 0.1,
+            trace_width_mm: 0.1,
             min_space_mm: 0.1,
             min_via_drill_mm: 0.2,
             min_via_annular_ring_mm: 0.1,

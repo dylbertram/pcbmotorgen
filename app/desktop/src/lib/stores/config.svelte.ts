@@ -111,6 +111,7 @@ export class ConfigStore {
 
   // --- PCB manufacturing defaults (mm) ---------------------------------
   min_trace_mm = $state(0.127);
+  trace_width_mm = $state(0.127);
   min_space_mm = $state(0.127);
   min_via_drill_mm = $state(0.2);
   min_via_annular_ring_mm = $state(0.1);
@@ -353,6 +354,7 @@ export class ConfigStore {
 
       num_layers: this.num_layers,
       min_trace_m: mm(this.min_trace_mm),
+      trace_width_m: mm(this.trace_width_mm),
       min_space_m: mm(this.min_space_mm),
       min_via_drill_m: mm(this.min_via_drill_mm),
       min_via_annular_ring_m: mm(this.min_via_annular_ring_mm),

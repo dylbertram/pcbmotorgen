@@ -62,7 +62,7 @@ pub fn coils_to_board_items(
     rules: &DesignRules,
     active_area_length_mm: f64,
 ) -> Vec<Any> {
-    let trace_width_nm = mm_to_nm(rules.min_trace_mm);
+    let trace_width_nm = mm_to_nm(rules.trace_width_mm);
     let drill_nm = mm_to_nm(rules.min_via_drill_mm);
     let pad_diameter_nm =
         via_pad_diameter_nm(rules.min_via_drill_mm, rules.min_via_annular_ring_mm);
@@ -162,7 +162,8 @@ pub fn sensor_geometry_to_board_items(
             tracks.extend(spline.tessellate(net.arc_step_mm)?);
         }
         let net_rules = DesignRules {
-            min_trace_mm: net.trace_width_mm,
+            min_trace_mm: rules.min_trace_mm,
+            trace_width_mm: net.trace_width_mm,
             min_space_mm: rules.min_space_mm,
             min_via_drill_mm: rules.min_via_drill_mm.min(net.via_size_mm / 2.0),
             min_via_annular_ring_mm: (net.via_size_mm
@@ -243,6 +244,7 @@ mod tests {
     fn braid_rules() -> DesignRules {
         DesignRules {
             min_trace_mm: 0.1,
+            trace_width_mm: 0.1,
             min_space_mm: 0.1,
             min_via_drill_mm: mm(0.2),
             min_via_annular_ring_mm: mm(0.1),
@@ -254,6 +256,7 @@ mod tests {
     fn test_rules() -> DesignRules {
         DesignRules {
             min_trace_mm: mils_to_mm(5.0),
+            trace_width_mm: mils_to_mm(5.0),
             min_space_mm: mils_to_mm(5.0),
             min_via_drill_mm: mm(0.2),
             min_via_annular_ring_mm: mm(0.1),
@@ -280,6 +283,7 @@ mod tests {
             num_layers,
             phases: 3,
             min_trace_mm: 0.1,
+            trace_width_mm: 0.1,
             min_space_mm: 0.1,
             expects_continuous: false,
             params,

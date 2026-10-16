@@ -1,6 +1,8 @@
 export type Appearance = "light" | "dark" | "auto";
 export interface DrcRules {
   min_trace_mm: number;
+  /** Nominal (actual) copper width; must clear `min_trace_mm`. */
+  trace_width_mm: number;
   min_space_mm: number;
   min_via_drill_mm: number;
   min_via_annular_ring_mm: number;
@@ -13,12 +15,14 @@ export interface Preferences {
 export const PREFERENCES_KEY = "pcbmotorgen.preferences.v1";
 export const DEFAULT_RULES: DrcRules = {
   min_trace_mm: 0.127,
+  trace_width_mm: 0.127,
   min_space_mm: 0.127,
   min_via_drill_mm: 0.2,
   min_via_annular_ring_mm: 0.1,
 };
 export const RULE_FIELDS = [
   { key: "min_trace_mm", label: "Minimum trace width" },
+  { key: "trace_width_mm", label: "Nominal trace width" },
   { key: "min_space_mm", label: "Minimum clearance" },
   { key: "min_via_drill_mm", label: "Minimum via drill" },
   { key: "min_via_annular_ring_mm", label: "Minimum via annular ring" },
@@ -35,8 +39,13 @@ export function readPreferences(): Preferences {
     const stored = JSON.parse(localStorage.getItem(PREFERENCES_KEY) ?? "null");
     if (!stored || typeof stored !== "object") return defaults;
     if (["light", "dark", "auto"].includes(stored.appearance)) defaults.appearance = stored.appearance;
-    if (stored.rules && validRules(stored.rules)) {
-      for (const { key } of RULE_FIELDS) defaults.rules[key] = stored.rules[key];
+    // Copy each rule individually so a value saved before a field existed
+    // (e.g. the nominal trace width) does not reset the others to defaults.
+    if (stored.rules && typeof stored.rules === "object") {
+      for (const { key } of RULE_FIELDS) {
+        const value = stored.rules[key];
+        if (Number.isFinite(value) && value > 0) defaults.rules[key] = value;
+      }
     }
   } catch {
     // Missing, corrupt, or unavailable storage must not prevent startup.

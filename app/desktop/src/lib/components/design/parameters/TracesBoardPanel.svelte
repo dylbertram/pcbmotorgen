@@ -12,7 +12,8 @@
   } = $props();
 
   const sizingFields = [
-    { key: "min_trace_mm", id: "motor-trace-width", label: "Minimum trace width (mm)", min: 0.01 },
+    { key: "trace_width_mm", id: "motor-trace-width", label: "Trace width (mm)", min: 0.01 },
+    { key: "min_trace_mm", id: "motor-min-trace-width", label: "Minimum trace width (mm)", min: 0.01 },
     { key: "min_space_mm", id: "motor-trace-gap", label: "Minimum trace gap (mm)", min: 0.01 },
   ] as const;
   const viaFields = [
@@ -40,13 +41,13 @@
             </span>
             <NumberField
               id={field.id}
-              value={field.key === "min_trace_mm" ? traceWidthMm ?? config.min_trace_mm : config[field.key]}
+              value={field.key === "trace_width_mm" ? traceWidthMm ?? config.trace_width_mm : config[field.key]}
               min={field.min}
               step={0.01}
               ariaLabel={field.label}
               class="w-24 shrink-0 px-2 py-1 text-xs font-mono text-emerald-200"
               onCommit={(value) => {
-                if (field.key === "min_trace_mm" && onTraceWidthChange) onTraceWidthChange(value);
+                if (field.key === "trace_width_mm" && onTraceWidthChange) onTraceWidthChange(value);
                 else config[field.key] = value;
               }}
             />
@@ -55,7 +56,7 @@
       {/each}
     </div>
     <p class="mt-2 text-[11px] text-slate-500">
-      Trace width sizes the copper around each centerline. Gap is the minimum manufacturing clearance. Via dimensions apply to generated and imported paths.
+      Trace width is the nominal copper width written to the board and DXF; it must be at least the minimum. Minimum trace width is the manufacturing floor. Gap is the minimum manufacturing clearance. Via dimensions apply to generated and imported paths.
     </p>
     <ViaSizingGuide holeMm={config.min_via_drill_mm} ringMm={config.min_via_annular_ring_mm}>
       {#each viaFields as field (field.key)}
