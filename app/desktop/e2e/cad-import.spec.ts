@@ -223,6 +223,37 @@ test("changing a terminal keeps the inspection zoom and offers keyboard-accessib
   expect(tips.every((tip) => tip.length <= 140)).toBe(true);
 });
 
+test("simulation blocks on unselected coil ends and replaces the imported-coil-phases box", async ({ page }) => {
+  await page.addInitScript(() => { (window as any).__cadNoVias = true; });
+  const dialog = await openImport(page);
+  await dialog.getByRole("button", { name: "Open with this geometry" }).click();
+  await expect(dialog).toBeHidden();
+
+  await page.getByRole("tab", { name: /^Simulate/i }).click();
+  const panel = page.locator("#panel-simulate");
+  // The phase-mapping box no longer lives in Simulation.
+  await expect(panel.getByRole("heading", { name: "Imported coil phases" })).toHaveCount(0);
+  // Imported copper with no confirmed ends blocks the simulation and prompts.
+  const alert = panel.getByRole("alert").filter({ hasText: "Select the coil ends before simulating" });
+  await expect(alert).toBeVisible();
+  await expect(panel.getByText("Thrust and driver results use the imported copper.")).toHaveCount(0);
+
+  await alert.getByRole("button", { name: "Select coil ends" }).click();
+  const modal = page.getByRole("dialog", { name: "Coil Preview", exact: true });
+  await expect(modal).toBeVisible();
+  const command = page.getByRole("region", { name: "Set coil terminals", exact: true });
+  await expect(command.getByRole("status")).toContainText("Review A");
+  await command.getByRole("button", { name: "Apply terminals", exact: true }).click();
+  await command.getByRole("button", { name: "Select driver end for coil B", exact: true }).click();
+  await command.getByRole("button", { name: "Keep current points", exact: true }).click();
+  await command.getByRole("button", { name: "Apply terminals", exact: true }).click();
+  await page.getByRole("button", { name: "Close coil preview" }).click();
+
+  await page.getByRole("tab", { name: /^Simulate/i }).click();
+  await expect(alert).toHaveCount(0);
+  await expect(panel.getByText("Thrust and driver results use the imported copper.")).toBeVisible();
+});
+
 async function openImport(page: Page) {
   await gotoDesignApp(page);
   await page.evaluate(() => window.dispatchEvent(new CustomEvent("test-file-action", { detail: "importCad" })));

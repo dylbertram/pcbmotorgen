@@ -8,8 +8,8 @@
     CadGeometry,
   } from "../../types";
   import { unmappedCoils } from "../../cadPhases";
+  import { coilsMissingEnds } from "../../cadTerminals";
   import { usesDeltaConnection } from "../../driverConnection";
-  import CoilPhaseMapping from "../design/CoilPhaseMapping.svelte";
   import FluxDiagram from "../simulate/FluxDiagram.svelte";
   import ForceSweepPlot from "../simulate/ForceSweepPlot.svelte";
   import MetricsPanel from "../simulate/MetricsPanel.svelte";
@@ -27,8 +27,8 @@
     driveError = null,
     error,
     cadGeometry = null,
-    onCadGeometryChange,
     onConfigureWinding,
+    onSelectEnds,
   }: {
     config: ConfigStore;
     active: boolean;
@@ -39,8 +39,9 @@
     driveError?: string | null;
     error: string | null;
     cadGeometry?: CadGeometry | null;
-    onCadGeometryChange?: (geometry: CadGeometry) => void;
     onConfigureWinding?: () => void;
+    /** Open the coil-ends panel for the active copper. */
+    onSelectEnds?: () => void;
   } = $props();
 </script>
 
@@ -54,15 +55,23 @@
       </p>
     </div>
     {#if cadGeometry}
-      {#if unmappedCoils(cadGeometry).length}
+      {@const missingEnds = coilsMissingEnds(cadGeometry)}
+      {#if missingEnds.length}
+        <div class="rounded-md border border-rose-500/60 bg-rose-500/10 px-3 py-2.5 text-xs text-rose-100" role="alert">
+          <p class="font-semibold text-rose-200">Select the coil ends before simulating</p>
+          <p class="mt-1 text-rose-100/90">
+            {missingEnds.length} coil{missingEnds.length === 1 ? "" : "s"} still need a driver end and its opposite end. Resistance, inductance and thrust are not valid until every coil has its ends.
+          </p>
+          {#if onSelectEnds}
+            <button type="button" onclick={onSelectEnds} class="mt-2 rounded border border-rose-400/60 px-2 py-1 font-medium text-rose-100 hover:bg-rose-500/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-rose-300">Select coil ends</button>
+          {/if}
+        </div>
+      {:else if unmappedCoils(cadGeometry).length}
         <div class="rounded-md border border-amber-500/50 bg-amber-500/10 px-3 py-2 text-xs text-amber-100" role="status">
           Simulation uses the generated coils until every imported coil has a phase.
         </div>
       {:else}
         <p class="text-xs text-slate-400" role="status">Thrust and driver results use the imported copper.</p>
-      {/if}
-      {#if onCadGeometryChange}
-        <CoilPhaseMapping geometry={cadGeometry} phases={config.phases} onChange={onCadGeometryChange} />
       {/if}
     {/if}
     {#if error}

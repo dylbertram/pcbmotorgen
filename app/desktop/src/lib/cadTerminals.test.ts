@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { assignCadTerminals, cadTerminalCandidates, defaultCadTerminals } from "./cadTerminals";
+import { assignCadTerminals, cadTerminalCandidates, coilsMissingEnds, defaultCadTerminals } from "./cadTerminals";
 import { cadGeometryToPreview } from "./cadPreview";
 import { simplifyCadLines } from "./cadSimplify";
 import type { CadGeometry, CadTerminal } from "./types";
@@ -110,5 +110,20 @@ describe("CAD terminals", () => {
     otherLayer.routing.segments.push({ start: { x: 2, y: 0 }, end: { x: 3, y: 0 }, layer: 1, net: "B", is_active: true });
     expect(defaultCadTerminals(otherLayer, "A")).not.toBeNull();
     expect(defaultCadTerminals(otherLayer, "missing")).toBeNull();
+  });
+  it("treats inferred defaults as unconfirmed and reports every coil missing ends", () => {
+    const geometry = terminalFixture();
+    expect(coilsMissingEnds(geometry)).toEqual(["A", "B"]);
+    const applied = assignCadTerminals(geometry, "A", { input: terminal(2), output: terminal(0, 1) });
+    expect(coilsMissingEnds(applied)).toEqual(["B"]);
+    const complete = assignCadTerminals(applied, "B", { input: terminal(0, 0, 2), output: terminal(1, 0, 2) });
+    expect(coilsMissingEnds(complete)).toEqual([]);
+    // A stored pair that no longer matches the copper is unconfirmed again.
+    const stale = { ...complete, coil_terminals: { ...complete.coil_terminals!, A: { input: terminal(9), output: terminal(9) } } };
+    expect(coilsMissingEnds(stale)).toEqual(["A"]);
+    // Nets with fewer than two trace endpoints cannot take ends and never block.
+    const endpointless = terminalFixture();
+    endpointless.routing.vias.push({ position: { x: 5, y: 5 }, from_layer: 0, to_layer: 1, net: "D" });
+    expect(coilsMissingEnds(endpointless)).toEqual(["A", "B"]);
   });
 });

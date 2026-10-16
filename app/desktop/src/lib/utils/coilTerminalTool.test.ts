@@ -129,4 +129,48 @@ describe("CoilTerminalTool", () => {
     expect(tool.step).toBe("review"); expect(tool.output).toEqual(point(2, 1));
     expect(onReveal).toHaveBeenCalledWith("A", 0); expect(onReveal).toHaveBeenCalledWith("A", 1);
   });
+  it("re-anchors to a regenerated design and reselects its automatic ends", () => {
+    const coil = (endX: number): CadGeometry => ({
+      layer_z_mm: [0], trace_width_mm: 0.4,
+      routing: { format_version: 2, curves: [], vias: [], segments: [
+        { start: { x: 0, y: 0 }, end: { x: 1, y: 0 }, layer: 0, net: "A", is_active: true },
+        { start: { x: 1, y: 0 }, end: { x: endX, y: 0 }, layer: 0, net: "A", is_active: true },
+      ] },
+    });
+    let geometry = coil(2);
+    const onChange = vi.fn();
+    const tool = new CoilTerminalTool({ getGeometry: () => geometry, onChange, onReveal: vi.fn() });
+    tool.begin();
+    expect(tool.input).toEqual(point(0)); expect(tool.output).toEqual(point(2));
+    // The generated pattern is rebuilt with a new routing reference.
+    geometry = coil(3);
+    expect(tool.active).toBe(false);
+    tool.rebind(geometry);
+    expect(tool.active).toBe(true);
+    expect(tool.coil).toBe("A");
+    expect(tool.input).toEqual(point(0)); expect(tool.output).toEqual(point(3));
+    expect(onChange).not.toHaveBeenCalled();
+  });
+  it("keeps a live draft when only the connection convention changes", () => {
+    const base: CadGeometry = {
+      layer_z_mm: [0], trace_width_mm: 0.4,
+      routing: { format_version: 2, curves: [], vias: [], segments: [
+        { start: { x: 0, y: 0 }, end: { x: 1, y: 0 }, layer: 0, net: "A", is_active: true },
+        { start: { x: 1, y: 0 }, end: { x: 2, y: 0 }, layer: 0, net: "A", is_active: true },
+      ] },
+    };
+    let geometry = base;
+    const tool = new CoilTerminalTool({ getGeometry: () => geometry, onChange: vi.fn(), onReveal: vi.fn() });
+    tool.begin(); tool.change("input"); tool.pick(point(2));
+    expect(tool.input).toEqual(point(2)); expect(tool.output).toEqual(point(0));
+    // A connection change spreads the same routing reference; the draft stays.
+    geometry = { ...base, terminal_connection: "delta" };
+    tool.rebind(geometry);
+    expect(tool.input).toEqual(point(2)); expect(tool.output).toEqual(point(0));
+    // A closed tool never revives.
+    tool.cancel();
+    tool.rebind(base);
+    expect(tool.active).toBe(false);
+    expect(tool.input).toBeNull();
+  });
 });

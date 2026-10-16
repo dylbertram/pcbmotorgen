@@ -1,5 +1,6 @@
 import type { CadCoilTerminals, CadGeometry, CadTerminal } from "./types";
 import { splinePointAt } from "./curvePaths";
+import { cadCoilNames } from "./cadPreview";
 
 export function sameTerminal(a: CadTerminal, b: CadTerminal): boolean {
   return a.layer === b.layer && Math.hypot(a.position.x - b.position.x, a.position.y - b.position.y) <= 1e-9;
@@ -143,6 +144,23 @@ export function withAutomaticCadTerminals(geometry: CadGeometry): CadGeometry {
     if (inferred) { terminals[coil] = inferred; changed = true; }
   }
   return changed ? { ...geometry, coil_terminals: terminals } : geometry;
+}
+
+/**
+ * Coils that carry at least two trace endpoints but have no confirmed IN/OUT
+ * end selection. The inferred defaults from {@link withAutomaticCadTerminals}
+ * are presentation only; the Simulation tab treats imported copper as
+ * electrically invalid until every such coil has an applied pair.
+ */
+export function coilsMissingEnds(geometry: CadGeometry): string[] {
+  return cadCoilNames(geometry).filter((coil) => {
+    const candidates = cadTerminalCandidates(geometry, coil);
+    if (candidates.length < 2) return false;
+    const saved = geometry.coil_terminals?.[coil];
+    if (!saved) return true;
+    return sameTerminal(saved.input, saved.output)
+      || [saved.input, saved.output].some((point) => !candidates.some((candidate) => sameTerminal(candidate, point)));
+  });
 }
 
 export function assignCadTerminals(geometry: CadGeometry, coil: string, terminals: CadCoilTerminals): CadGeometry {
