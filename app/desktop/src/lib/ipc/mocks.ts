@@ -145,7 +145,7 @@ export function mockCoils(c: LinearMotorConfig): CoilPathDto {
   // domain, whose end turns are part of the pattern. The mover must have
   // conductors beneath it for every position along its travel, exactly like
   // the real backend.
-  const moverSpan = c.magnet_count * c.magnet_pitch_m;
+  const moverSpan = (c.magnet_count - 1) * c.magnet_pitch_m + c.magnet_width_m;
   const domain = c.active_area_length_m;
   const width = c.board_width_m;
   const nLayers = Math.max(1, c.num_layers);
@@ -286,8 +286,9 @@ export function mockCoils(c: LinearMotorConfig): CoilPathDto {
 
 export function mockForceSweep(c: LinearMotorConfig): ForceSweepResult {
   const n = c.n_positions;
-  const travel = Math.max(0, c.active_area_length_m - c.magnet_count * c.magnet_pitch_m);
-  const positions = Array.from({ length: n }, (_, i) => (travel * i) / (n - 1));
+  const span = (c.magnet_count - 1) * c.magnet_pitch_m + c.magnet_width_m;
+  const travel = Math.max(0, c.active_area_length_m - span);
+  const positions = Array.from({ length: n }, (_, i) => c.magnet_width_m / 2 + (travel * i) / (n - 1));
   // Sinusoidal-ish force with ripple + a normal-force baseline.
   const br = c.magnet_remanence_t;
   const ipeak = c.max_current_a;

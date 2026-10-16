@@ -9,7 +9,8 @@ use super::CommutationMode;
 /// All force values are **mover** forces (Newton's Third Law corrected).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ForceResult {
-    /// Mover positions at which force was evaluated [m].
+    /// Absolute first-magnet-center positions at which force was evaluated [m].
+    /// Physical array edges, not magnet centers, define the sweep limits.
     pub positions_m: Vec<f64>,
     /// Total X (thrust) force at each position [N].
     pub force_x_n: Vec<f64>,

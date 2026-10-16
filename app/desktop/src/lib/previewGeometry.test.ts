@@ -728,7 +728,7 @@ describe("measureTrace", () => {
     const config = new ConfigStore();
     const m = measureTrace(mockCoils(config.toIpc()), config);
     expect(m).not.toBeNull();
-    expect(m!.traceLengthMm).toBeCloseTo(147, 3);
+    expect(m!.traceLengthMm).toBeCloseTo(145.5, 3);
     expect(m!.traceStartMm).toBeCloseTo(0, 6);
   });
 

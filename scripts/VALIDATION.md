@@ -2,6 +2,14 @@
 
 Run from the repository root.
 
+Force sweeps use physical outer-edge travel limits. The reported position
+is the absolute center of the first magnet, so it runs from `width / 2` to
+`active_length - (count - 1) * pitch - width / 2`. The field model and
+commutation receive that same coordinate. Vernier phase offsets must not
+translate mechanical travel limits. Array span is `(count - 1) * pitch + width`,
+not `count * pitch`. Do not crop low-force samples to suppress real fringe
+effects. Reference values recorded before this correction need rerunning.
+
 ## Normal regression suite
 
 ```sh

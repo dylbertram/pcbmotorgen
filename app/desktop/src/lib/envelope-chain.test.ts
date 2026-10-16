@@ -44,18 +44,16 @@ describe("envelope consumption chain", () => {
     expect(motion.restPhaseMm).toBeCloseTo(10, 3);
     expect(motion.electricalPeriodMm).toBeCloseTo(12, 3);
 
-    // MIN endpoint: strip edges at centre ± span/2 = 0 … 72 mm — leading
-    // edge EXACTLY on the copper start (the pin equals the authority's
-    // output for this reference build).
+    // The fixed legacy placeholder uses pitch-cell limits. Physical bars
+    // exclude the extra inter-magnet gap, so it is not a flush envelope.
     motion.commit(motion.moverMinMm);
-    expect(motion.stripStartMm).toBeCloseTo(0, 6);
-    expect(motion.stripEndMm).toBeCloseTo(72, 6);
+    expect(motion.stripStartMm).toBeCloseTo(0.75, 6);
+    expect(motion.stripEndMm).toBeCloseTo(71.25, 6);
 
-    // MAX endpoint: strip edges at 75 … 147 mm — trailing edge EXACTLY on
-    // the copper end.
+    // Keep the placeholder warning: these limits are not configuration-derived.
     motion.commit(motion.moverMaxMm);
-    expect(motion.stripStartMm).toBeCloseTo(75, 6);
-    expect(motion.stripEndMm).toBeCloseTo(147, 6);
+    expect(motion.stripStartMm).toBeCloseTo(75.75, 6);
+    expect(motion.stripEndMm).toBeCloseTo(146.25, 6);
   });
 
   it("rejects implausible envelopes (mm reported as metres) and keeps the flagged placeholder", async () => {
@@ -118,8 +116,8 @@ describe("envelope consumption chain", () => {
     // The refined max is NOT a stable rest (off the φ = 10 mm, P_e = 12 mm
     // lattice) — the mover may hold between rests; endpoints are limits.
     motion.commit(motion.moverMaxMm);
-    expect(motion.stripStartMm).toBeCloseTo(71.973, 3);
-    expect(motion.stripEndMm).toBeCloseTo(143.973, 3);
+    expect(motion.stripStartMm).toBeCloseTo(72.723, 3);
+    expect(motion.stripEndMm).toBeCloseTo(143.223, 3);
     expect(motion.offsetFromRestMm).toBeCloseTo(71.973, 3);
 
     // HoldingForceChart domain spans [min, max]; zeros stay on the lattice.

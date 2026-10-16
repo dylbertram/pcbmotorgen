@@ -190,7 +190,9 @@ impl ForceEvaluator {
     // Public API
     // ------------------------------------------------------------------
 
-    /// Sweep mover position from 0 to `config.travel_m` and compute force.
+    /// Sweep first-magnet-center positions between physical edge-aligned
+    /// travel limits and compute force. Positions use the same absolute
+    /// center coordinate as `evaluate_at` and commutation.
     ///
     /// For generated or imported routed copper, first use
     /// [`Self::with_routed_currents`]. Bare `PhaseCoil` inputs do not describe
@@ -218,8 +220,8 @@ impl ForceEvaluator {
             self.self_calibrate(config, coils)?;
         }
 
-        let rest = config.rest_offset_m();
-        let positions = linspace(rest, config.travel_m() + rest, self.n_positions);
+        let (start, end) = config.sweep_center_limits_m();
+        let positions = linspace(start, end, self.n_positions);
         let n_phases = coils.len();
         let magnet_array = MagnetArray::new(config);
 
@@ -719,6 +721,18 @@ mod tests {
         assert_eq!(result.n_positions(), 5);
         assert_eq!(result.force_x_n.len(), 5);
         assert_eq!(result.n_phases, 3);
+        let first = result.positions_m[0];
+        let last = *result.positions_m.last().unwrap();
+        let half_width = cfg.magnet_dims_m[0] / 2.0;
+        assert!((first - half_width).abs() < 1e-12);
+        assert!((last + (cfg.magnet_count - 1) as f64 * cfg.magnet_pitch_m
+            + half_width - cfg.active_area_length_m).abs() < 1e-12);
+        // The sweep must use exactly the same physical position for both
+        // field placement and commutation as the single-position evaluator.
+        for index in [0, result.n_positions() - 1] {
+            let (force, _) = ev.evaluate_at(&cfg, &coils, result.positions_m[index]).unwrap();
+            assert!((force[0] - result.force_x_n[index]).abs() < 1e-12);
+        }
         for f in &result.force_x_n {
             assert!(f.is_finite(), "force_x not finite: {f}");
         }

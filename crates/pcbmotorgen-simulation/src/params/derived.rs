@@ -5,16 +5,22 @@ use super::{SAFETY_MARGIN, SimulationInput};
 impl SimulationInput {
     // --- Derived geometry ---
 
-    /// Span of the mover magnet array [m]: `magnet_count × magnet_pitch`
-    /// (center-of-first-magnet to one pitch beyond the last; the physical
-    /// end-to-end span is one inter-magnet gap shorter).
+    /// Physical outer-edge span of the mover magnet array [m].
     pub fn magnet_array_span_m(&self) -> f64 {
-        self.magnet_count as f64 * self.magnet_pitch_m
+        self.magnet_count.saturating_sub(1) as f64 * self.magnet_pitch_m
+            + self.magnet_dims_m[0]
     }
 
-    /// Derived center-to-center travel [m]: `active_area_length − magnet array span`.
+    /// Edge-aligned translation distance [m]: `active_area_length − physical array span`.
     pub fn travel_m(&self) -> f64 {
         self.active_area_length_m - self.magnet_array_span_m()
+    }
+
+    /// First-magnet-center limits that keep both physical array edges inside
+    /// the active area. Vernier phase offsets do not move mechanical limits.
+    pub fn sweep_center_limits_m(&self) -> (f64, f64) {
+        let start = self.magnet_dims_m[0] / 2.0;
+        (start, start + self.travel_m())
     }
 
     /// Minimum PCB length required [m] (= active_area_length_m).
@@ -73,10 +79,29 @@ mod tests {
     }
 
     #[test]
+    fn sweep_limits_contain_physical_array_for_gaps_and_vernier_ratios() {
+        for count in [1, 2, 10] {
+            for width in [0.006, 0.012] {
+                for ratio in [0.8, 1.0, 1.2] {
+                    let mut cfg = default_config();
+                    cfg.magnet_count = count;
+                    cfg.magnet_dims_m[0] = width;
+                    cfg.spacing_ratio = ratio;
+                    let (start, end) = cfg.sweep_center_limits_m();
+                    let last_center_offset = count.saturating_sub(1) as f64 * cfg.magnet_pitch_m;
+                    assert!((start - width / 2.0).abs() < 1e-12);
+                    assert!((end + last_center_offset + width / 2.0 - cfg.active_area_length_m).abs() < 1e-12);
+                    assert!((end - start - cfg.travel_m()).abs() < 1e-12);
+                }
+            }
+        }
+    }
+
+    #[test]
     fn test_derived_values() {
         let cfg = default_config();
-        assert!((cfg.magnet_array_span_m() - 120e-3).abs() < 1e-12);
-        assert!((cfg.travel_m() - 75e-3).abs() < 1e-12);
+        assert!((cfg.magnet_array_span_m() - 118e-3).abs() < 1e-12);
+        assert!((cfg.travel_m() - 77e-3).abs() < 1e-12);
         assert!((cfg.phase_band_pitch_m() - 4e-3).abs() < 1e-12);
         assert_eq!(cfg.rest_offset_m(), 0.0);
         assert!((cfg.magnet_gap_m() - 2e-3).abs() < 1e-12);

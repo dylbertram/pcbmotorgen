@@ -176,7 +176,7 @@ export function computePreviewGeometry(
   const magnetWidth = config.magnet_width_mm / 1000;
   const magnetGap = Math.max(config.magnet_gap_mm, 0) / 1000;
   const magnetSpan = Math.max(
-    config.magnet_count * (magnetWidth + magnetGap),
+    (config.magnet_count - 1) * (magnetWidth + magnetGap) + magnetWidth,
     0.001,
   );
   // Fit the painted solids themselves. Do not include synthetic half-gap

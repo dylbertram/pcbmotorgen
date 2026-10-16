@@ -142,8 +142,8 @@ export class ConfigStore {
   magnet_gap_mm = $derived(
     Math.max(0, this.pole_pitch_mm - this.magnet_width_mm),
   );
-  /** Mover magnet-array span: magnet_count × pole pitch. */
-  mover_span_mm = $derived(this.magnet_count * this.pole_pitch_mm);
+  /** Physical outer-edge span, excluding the extra trailing pitch-cell gap. */
+  mover_span_mm = $derived((this.magnet_count - 1) * this.pole_pitch_mm + this.magnet_width_mm);
   /** Active-area length along the travel axis: mover span + desired travel. */
   active_area_length_mm = $derived(this.mover_span_mm + this.desired_travel_mm);
   /**
