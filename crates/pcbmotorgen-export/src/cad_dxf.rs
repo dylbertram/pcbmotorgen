@@ -146,17 +146,61 @@ pub struct CadCoilTerminals {
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct CadImportOptions {
     /// Multiply drawing coordinates by this value to convert them to mm.
+    /// Also the fallback when `prefer_detected_units` is set but the file has
+    /// no recognisable `$INSUNITS`.
     pub units_to_mm: f64,
     pub z_tolerance_mm: f64,
     pub default_trace_width_mm: f64,
     pub legacy_layer_count: u32,
     pub legacy_pcb_thickness_mm: f64,
+    /// Use the DXF `$INSUNITS` header unit when present and recognised,
+    /// overriding `units_to_mm` (the user can still override by disabling it).
+    pub prefer_detected_units: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CadImportResult {
     pub geometry: CadGeometry,
     pub warnings: Vec<String>,
+    /// Millimetres per drawing unit actually applied to the import.
+    #[serde(default = "one_mm")]
+    pub units_to_mm: f64,
+    /// Millimetres per unit read from the DXF `$INSUNITS` header. `None` when
+    /// the file declares no units or an unrecognised code.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_units_mm: Option<f64>,
+}
+
+fn one_mm() -> f64 {
+    1.0
+}
+
+/// Millimetres per drawing unit for a DXF `$INSUNITS` code (kata chgg).
+///
+/// Covers the units a mechanical-CAD export plausibly uses. Unitless (0) and
+/// codes outside this set return `None`, so the caller keeps the user's
+/// explicit choice rather than guessing. Values follow the DXF reference.
+pub fn dxf_insunits_to_mm(code: i32) -> Option<f64> {
+    Some(match code {
+        1 => 25.4,      // inches
+        2 => 304.8,     // feet
+        4 => 1.0,       // millimetres
+        5 => 10.0,      // centimetres
+        6 => 1000.0,    // metres
+        8 => 2.54e-5,   // microinches
+        9 => 0.0254,    // mils
+        13 => 1e-3,     // micrometres
+        _ => return None,
+    })
+}
+
+/// Read the `$INSUNITS` header value from the parsed pair stream.
+fn detect_source_units_mm(pairs: &[(i32, String)]) -> Option<f64> {
+    pairs
+        .windows(2)
+        .find(|window| window[0].0 == 9 && window[0].1.trim() == "$INSUNITS")
+        .and_then(|window| window[1].1.trim().parse::<i32>().ok())
+        .and_then(dxf_insunits_to_mm)
 }
 
 #[derive(Debug, Clone)]
@@ -463,6 +507,15 @@ pub fn import_3d_dxf_with_coils(
         return Err("Legacy PCB thickness must be non-negative and finite".into());
     }
     let pairs = parse_pairs(text)?;
+    // (kata chgg) Honour the drawing's declared units when asked, keeping the
+    // caller's value as the fallback for unitless or unknown files.
+    let source_units_mm = detect_source_units_mm(&pairs);
+    let mut options = options;
+    if options.prefer_detected_units {
+        if let Some(scale) = source_units_mm {
+            options.units_to_mm = scale;
+        }
+    }
     let embedded_width = pairs
         .iter()
         .find_map(|(code, value)| {
@@ -921,7 +974,7 @@ pub fn import_3d_dxf_with_coils(
         coil_phases: BTreeMap::new(),
     };
     validate_geometry(&geometry)?;
-    Ok(CadImportResult { geometry, warnings })
+    Ok(CadImportResult { geometry, warnings, units_to_mm: options.units_to_mm, source_units_mm })
 }
 
 fn validate_geometry(geometry: &CadGeometry) -> Result<(), String> {
@@ -1315,6 +1368,7 @@ mod tests {
                 default_trace_width_mm: 0.15,
                 legacy_layer_count: 2,
                 legacy_pcb_thickness_mm: 1.6,
+                prefer_detected_units: false,
             },
         )
         .unwrap();
@@ -1383,6 +1437,7 @@ mod tests {
                 default_trace_width_mm: 0.15,
                 legacy_layer_count: 1,
                 legacy_pcb_thickness_mm: 1.6,
+                prefer_detected_units: false,
             },
         )
         .unwrap();
@@ -1391,6 +1446,39 @@ mod tests {
         assert_eq!(curve.knots, spline.knots);
         assert_eq!(curve.weights, spline.weights);
         assert!((curve.point_at(0.5).x - 25.4 * 0.5_f64.sqrt()).abs() < 1e-9);
+    }
+
+    #[test]
+    fn insunits_detection_scales_and_preserves_an_explicit_override() {
+        let dxf = "0\nSECTION\n2\nHEADER\n9\n$INSUNITS\n70\n1\n0\nENDSEC\n\
+0\nSECTION\n2\nENTITIES\n0\nLINE\n8\nL0_A\n10\n0\n20\n0\n30\n0\n11\n1\n21\n0\n31\n0\n0\nENDSEC\n0\nEOF\n";
+        let options = |units_to_mm, prefer_detected_units| CadImportOptions {
+            units_to_mm,
+            z_tolerance_mm: 0.01,
+            default_trace_width_mm: 0.15,
+            legacy_layer_count: 2,
+            legacy_pcb_thickness_mm: 1.6,
+            prefer_detected_units,
+        };
+        // Auto uses the declared inches; the numbers are preserved in mm.
+        let auto = import_3d_dxf(dxf, options(1.0, true)).unwrap();
+        assert_eq!(auto.source_units_mm, Some(25.4));
+        assert_eq!(auto.units_to_mm, 25.4);
+        assert!((auto.geometry.routing.segments[0].end.x - 25.4).abs() < 1e-9);
+        // An explicit choice overrides the header value.
+        let forced = import_3d_dxf(dxf, options(1.0, false)).unwrap();
+        assert_eq!(forced.units_to_mm, 1.0);
+        assert!((forced.geometry.routing.segments[0].end.x - 1.0).abs() < 1e-9);
+        // Unitless and unknown codes are reported as no detection.
+        for code in ["0", "999"] {
+            let unitless = dxf.replace("\n70\n1\n", &format!("\n70\n{code}\n"));
+            let imported = import_3d_dxf(&unitless, options(2.0, true)).unwrap();
+            assert_eq!(imported.source_units_mm, None);
+            assert_eq!(imported.units_to_mm, 2.0);
+        }
+        assert_eq!(dxf_insunits_to_mm(4), Some(1.0));
+        assert_eq!(dxf_insunits_to_mm(9), Some(0.0254));
+        assert_eq!(dxf_insunits_to_mm(0), None);
     }
 
     fn sample() -> CadGeometry {
@@ -1449,6 +1537,7 @@ mod tests {
                 default_trace_width_mm: 0.2,
                 legacy_layer_count: 2,
                 legacy_pcb_thickness_mm: 1.6,
+                prefer_detected_units: false,
             },
         )
         .unwrap();
@@ -1560,6 +1649,7 @@ mod tests {
                 default_trace_width_mm: 0.15,
                 legacy_layer_count: 4,
                 legacy_pcb_thickness_mm: 1.6,
+                prefer_detected_units: false,
             },
         )
         .unwrap();
@@ -1578,6 +1668,7 @@ mod tests {
                 default_trace_width_mm: 0.15,
                 legacy_layer_count: 4,
                 legacy_pcb_thickness_mm: 1.6,
+                prefer_detected_units: false,
             },
         )
         .unwrap();
@@ -1603,6 +1694,7 @@ mod tests {
                 default_trace_width_mm: 0.15,
                 legacy_layer_count: 2,
                 legacy_pcb_thickness_mm: 1.6,
+                prefer_detected_units: false,
             },
         )
         .unwrap();
@@ -1623,6 +1715,7 @@ mod tests {
                 default_trace_width_mm: 0.4,
                 legacy_layer_count: 2,
                 legacy_pcb_thickness_mm: 1.6,
+                prefer_detected_units: false,
             },
         )
         .unwrap()
@@ -1695,6 +1788,7 @@ mod tests {
             default_trace_width_mm: 0.4,
             legacy_layer_count: 2,
             legacy_pcb_thickness_mm: 1.6,
+            prefer_detected_units: false,
         };
         let imported = import_3d_dxf_with_coils(&text, options, &assignments).unwrap();
         assert!(imported.warnings.is_empty());

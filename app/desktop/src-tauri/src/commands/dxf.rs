@@ -175,6 +175,7 @@ mod sensor_tests {
                 default_trace_width_mm: config.trace_width_mm,
                 legacy_layer_count: 2,
                 legacy_pcb_thickness_mm: 1.6,
+                prefer_detected_units: false,
             },
         )
         .unwrap();
@@ -195,6 +196,7 @@ pub async fn import_cad_dxf(
     default_trace_width_mm: f64,
     legacy_layer_count: u32,
     legacy_pcb_thickness_mm: f64,
+    prefer_detected_units: bool,
     source_layer_coils: Option<std::collections::BTreeMap<String, String>>,
 ) -> Result<pcbmotorgen_export::cad_dxf::CadImportResult, String> {
     tauri::async_runtime::spawn_blocking(move || {
@@ -208,6 +210,7 @@ pub async fn import_cad_dxf(
                 default_trace_width_mm,
                 legacy_layer_count,
                 legacy_pcb_thickness_mm,
+                prefer_detected_units,
             },
             &source_layer_coils.unwrap_or_default(),
         )

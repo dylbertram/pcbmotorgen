@@ -50,7 +50,11 @@
 
   const coilType = untrack(() => initialCoilType);
   let existingGeometry = $derived(coilType === "sensor" ? sensor.cadGeometry : projects.cadGeometry);
-  let unitsToMm = $state("1");
+  let unitsToMm = $state("auto");
+  // (kata chgg) "auto" reads the DXF $INSUNITS header, falling back to mm; the
+  // explicit Millimetres/Inches entries override it.
+  let preferDetectedUnits = $derived(unitsToMm === "auto");
+  let unitsFallbackMm = $derived(unitsToMm === "auto" ? 1 : Number(unitsToMm));
   let zToleranceDraft = $state("0.05");
   let zToleranceParsed = $derived(parseNumberDraft(zToleranceDraft));
   let zTolerance = $derived(zToleranceParsed ?? 0.05);
@@ -255,12 +259,13 @@
     try {
       const result = await importCadDxf(
         path,
-        Number(unitsToMm),
+        unitsFallbackMm,
         zTolerance,
         traceWidth,
         selectedLayers,
         config.pcb_thickness_mm,
         sourceLayerCoils,
+        preferDetectedUnits,
       );
       if (path === selectedPath && requestedOptions === optionsKey) {
         imported = {
@@ -600,10 +605,11 @@
 
     <div class="flex shrink-0 flex-wrap items-center gap-3 border-t border-slate-700 px-4 py-2 text-xs text-slate-400">
       <label class="flex items-center gap-2">DXF units
-        <select id="cad-units" aria-label="DXF units" bind:value={unitsToMm} onchange={schedulePreviewRefresh} disabled={busy} title="Choose the units used in the source DXF. Imported geometry is stored in millimetres." class="rounded border border-slate-700 bg-slate-950 px-2 py-1 text-xs text-slate-200">
-          <option value="1">Millimetres</option><option value="25.4">Inches</option>
+        <select id="cad-units" aria-label="DXF units" bind:value={unitsToMm} onchange={schedulePreviewRefresh} disabled={busy} title="Auto reads the drawing's declared units and falls back to millimetres. Imported geometry is stored in millimetres." class="rounded border border-slate-700 bg-slate-950 px-2 py-1 text-xs text-slate-200">
+          <option value="auto">Auto (detect)</option><option value="1">Millimetres</option><option value="25.4">Inches</option>
         </select>
       </label>
+      {#if imported?.source_units_mm != null}<span data-testid="cad-detected-units" title="Units read from the DXF $INSUNITS header.">detected {imported.source_units_mm} mm/unit</span>{/if}
       {#if imported}<span>{imported.geometry.routing.segments.length} lines, {imported.geometry.routing.curves.length} arcs, {imported.geometry.routing.splines?.length ?? 0} splines, {imported.geometry.routing.vias.length} vias</span><span>{imported.geometry.layer_z_mm.length} copper layers</span>{/if}
     </div>
     <footer class="flex shrink-0 flex-wrap items-center justify-between gap-2 border-t border-slate-800 px-5 py-3 md:px-7">
