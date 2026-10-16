@@ -306,7 +306,7 @@
 
     try {
       const results = await Promise.allSettled([
-        evaluateForceSweep(ipc, simulationCad()),
+        evaluateForceSweep(ipc, simulationCad(), $state.snapshot(config.drive)),
         computeFriction(ipc),
         computeHeightStack(ipc),
       ]);
@@ -380,6 +380,10 @@
       config.commutation,
       config.n_positions,
       config.meshing,
+      config.drive.outer_copper_oz,
+      config.drive.inner_copper_oz,
+      config.drive.winding_temp_c,
+      config.drive.via_plating_m,
     ];
     void valid;
 

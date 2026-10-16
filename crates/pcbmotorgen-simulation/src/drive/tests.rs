@@ -3,6 +3,84 @@ use pcbmotorgen_routing::{
     generate_routing_result, Point, RouteSegment, RoutingContext, RoutingResult, Via,
 };
 
+#[test]
+fn signed_branch_currents_obey_kirchhoff_and_power_balance() {
+    use super::geometry::Edge;
+    let net = PhaseNetwork {
+        net: "branched".into(), node_count: 4, node_x: vec![0.0; 4],
+        terminal_key: vec![0, 1, 2, 3], terminal: vec![0], star: vec![2, 3],
+        active_length_m: 0.0,
+        edges: vec![Edge { a: 0, b: 1, kind: EdgeKind::Via },
+                    Edge { a: 1, b: 2, kind: EdgeKind::Via },
+                    Edge { a: 3, b: 1, kind: EdgeKind::Via }],
+    };
+    let resistances = [1.0, 2.0, 2.0];
+    let solved = solve_network(&net, &resistances);
+    assert!(solved.connected);
+    for (current, expected) in solved.current_share.iter().zip([1.0, 0.5, -0.5]) {
+        assert!((current - expected).abs() < 1e-10);
+    }
+    let dissipation: f64 = solved.current_share.iter().zip(resistances).map(|(i, r)| i*i*r).sum();
+    assert!((dissipation - solved.resistance_ohm).abs() < 1e-10);
+    for invalid in [vec![1.0], vec![1.0, -1.0, 2.0], vec![1.0, f64::NAN, 2.0]] {
+        assert!(!solve_network(&net, &invalid).connected);
+    }
+    let mut disconnected = net.clone();
+    disconnected.edges.truncate(1);
+    assert!(!solve_network(&disconnected, &[1.0]).connected);
+    let mut shorted_terminals = net.clone();
+    shorted_terminals.star.push(0);
+    assert!(!solve_network(&shorted_terminals, &resistances).connected);
+}
+
+#[test]
+fn empty_routing_cannot_produce_a_force_result() {
+    use crate::magnetic::force_eval::ForceEvaluator;
+    assert!(ForceEvaluator::default().with_routed_currents(
+        &RoutingResult::default(), &sim(), &DriveSettings::default(), &DriveGeometryHints::default()
+    ).is_err());
+}
+
+#[test]
+fn curved_copper_is_integrated_and_endpoint_order_is_not_current_direction() {
+    use crate::magnetic::force_eval::{ForceEvaluator, CommutationMode};
+    let mut routing = RoutingResult::default();
+    routing.curves.push(pcbmotorgen_routing::RouteCurve {
+        start: Point::new(0.0, 0.0), mid: Point::new(2.928932188, 7.071067812),
+        end: Point::new(10.0, 10.0), layer: 0, net: "A".into(), is_active: true,
+    });
+    let evaluate = |routing: &RoutingResult| {
+        let (mut evaluator, coils) = ForceEvaluator::new(3, 8, CommutationMode::PhaseAOnly, 0.0)
+            .with_routed_currents(routing, &sim(), &DriveSettings::default(), &DriveGeometryHints::default()).unwrap();
+        assert!(!evaluator.routed_conductor_samples().unwrap()[0].is_empty());
+        evaluator.evaluate_at(&sim(), &coils, 0.003).unwrap().0
+    };
+    let first = evaluate(&routing);
+    let curve = &mut routing.curves[0];
+    std::mem::swap(&mut curve.start, &mut curve.end);
+    let reversed = evaluate(&routing);
+    for (a, b) in first.iter().zip(reversed) {
+        assert!((a - b).abs() < 1e-9);
+    }
+    assert!(first.iter().any(|v| v.abs() > 1e-8));
+}
+
+#[test]
+fn routed_force_respects_imported_depths_and_rejects_mismatched_coils() {
+    use crate::magnetic::force_eval::ForceEvaluator;
+    let hints = DriveGeometryHints { layer_z_m: vec![0.0002, -0.003], ..Default::default() };
+    let (mut evaluator, coils) = ForceEvaluator::default().with_routed_currents(
+        &two_strand_fixture(), &sim(), &DriveSettings::default(), &hints,
+    ).unwrap();
+    let samples = evaluator.routed_conductor_samples().unwrap();
+    assert!(samples[0].iter().any(|s| s.midpoint_3d[2] == 0.0002));
+    assert!(samples[0].iter().any(|s| s.midpoint_3d[2] == -0.003));
+    assert!(samples[0].iter().all(|s| s.dl_3d.iter().all(|v| v.is_finite())));
+    assert!(evaluator.evaluate(&sim(), &[]).is_err());
+    assert!(evaluator.evaluate_at(&sim(), &[], 0.0).is_err());
+    assert!(!coils.is_empty());
+}
+
 fn seg(x0: f64, y0: f64, x1: f64, y1: f64, layer: u32, net: &str) -> RouteSegment {
     RouteSegment {
         start: Point::new(x0, y0),
@@ -24,6 +102,30 @@ fn two_strand_fixture() -> RoutingResult {
         r.vias.push(Via { position: Point::new(100.0, y), from_layer: 0, to_layer: 1, net: "A".into() });
     }
     r
+}
+
+#[test]
+fn solved_force_is_invariant_to_stored_segment_direction() {
+    use crate::magnetic::force_eval::{ForceEvaluator, CommutationMode};
+    let config = sim();
+    let settings = DriveSettings::default();
+    let routing = two_strand_fixture();
+    let mut reversed = routing.clone();
+    for (i, segment) in reversed.segments.iter_mut().enumerate() {
+        if i % 2 == 0 {
+            std::mem::swap(&mut segment.start, &mut segment.end);
+        }
+    }
+    let evaluate = |routing: &RoutingResult| {
+        let (mut evaluator, coils) = ForceEvaluator::new(3, 4, CommutationMode::PhaseAOnly, 0.0)
+            .with_routed_currents(routing, &config, &settings, &DriveGeometryHints::default()).unwrap();
+        evaluator.evaluate_at(&config, &coils, 0.003).unwrap().0
+    };
+    let original = evaluate(&routing);
+    let flipped = evaluate(&reversed);
+    for (a, b) in original.iter().zip(flipped) {
+        assert!((a - b).abs() < 1e-9, "stored direction changed physical force: {a} vs {b}");
+    }
 }
 
 fn sim() -> SimulationInput {

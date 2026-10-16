@@ -79,6 +79,7 @@ pub struct ForceEvaluator {
     phase_shift: f64,
     /// Whether self-calibration has been performed.
     calibrated: bool,
+    routed_samples: Option<Vec<Vec<ConductorSample>>>,
 }
 
 impl Default for ForceEvaluator {
@@ -90,11 +91,78 @@ impl Default for ForceEvaluator {
             layer_z_m: 0.0,
             phase_shift: 0.0,
             calibrated: false,
+            routed_samples: None,
         }
     }
 }
 
 impl ForceEvaluator {
+    /// Read-only SI samples for independent field/force cross-validation.
+    pub fn routed_conductor_samples(&self) -> Option<&[Vec<ConductorSample>]> {
+        self.routed_samples.as_deref()
+    }
+    /// Integrate signed branch currents solved from the physical resistor network.
+    pub fn with_routed_currents(
+        mut self,
+        routing: &pcbmotorgen_routing::RoutingResult,
+        config: &SimulationInput,
+        settings: &crate::drive::DriveSettings,
+        hints: &crate::drive::DriveGeometryHints,
+    ) -> Result<(Self, Vec<PhaseCoil>), SimulationError> {
+        use crate::drive::{extract_phase_networks_with_terminals, solve_network, EdgeKind};
+        if !config.min_trace_m.is_finite() || config.min_trace_m <= 0.0
+            || !settings.outer_copper_oz.is_finite() || settings.outer_copper_oz <= 0.0
+            || !settings.inner_copper_oz.is_finite() || settings.inner_copper_oz <= 0.0
+            || hints.layer_z_m.iter().any(|z| !z.is_finite()) {
+            return Err(SimulationError("Invalid copper dimensions or layer depths for force current solve".into()));
+        }
+        let rho = crate::drive::rho_cu_at(settings.winding_temp_c);
+        let via_r = crate::drive::via_resistance_ohm(config.min_via_drill_m, settings.via_plating_m, config.pcb_thickness_m, rho);
+        let mut coils = Vec::new();
+        let mut all_samples = Vec::new();
+        for net in extract_phase_networks_with_terminals(routing, &hints.terminals) {
+            let resistances: Vec<f64> = net.edges.iter().map(|edge| match &edge.kind {
+                EdgeKind::Via => via_r,
+                EdgeKind::Trace { layer, length_m, .. } => {
+                    let inner = config.num_layers > 2 && *layer != 0 && *layer + 1 != config.num_layers;
+                    let oz = if inner { settings.inner_copper_oz } else { settings.outer_copper_oz };
+                    rho * length_m / (config.min_trace_m * crate::units::oz_to_m(oz))
+                }
+            }).collect();
+            let solution = solve_network(&net, &resistances);
+            if !solution.connected {
+                return Err(SimulationError(format!("Phase {} has no solved terminal-to-neutral current path", net.net)));
+            }
+            let mut samples = Vec::new();
+            for (edge, share) in net.edges.iter().zip(&solution.current_share) {
+                if let EdgeKind::Trace { layer, points, .. } = &edge.kind {
+                    let z = hints.layer_z_m.get(*layer as usize).copied().unwrap_or_else(|| {
+                        -(*layer as f64) * config.pcb_thickness_m / config.num_layers.saturating_sub(1).max(1) as f64
+                    });
+                    for pair in points.windows(2) {
+                        let dx = pair[1][0] - pair[0][0];
+                        let dy = pair[1][1] - pair[0][1];
+                        for j in 0..self.meshing {
+                            let t = (j as f64 + 0.5) / self.meshing as f64;
+                            samples.push(ConductorSample {
+                                midpoint_3d: [pair[0][0] + t * dx, pair[0][1] + t * dy, z],
+                                dl_3d: [dx * share / self.meshing as f64, dy * share / self.meshing as f64, 0.0],
+                            });
+                        }
+                    }
+                }
+            }
+            coils.push(PhaseCoil { phase_name: net.net, phase_idx: coils.len() as u32, ..PhaseCoil::default() });
+            all_samples.push(samples);
+        }
+        if coils.is_empty() {
+            return Err(SimulationError("No conductor networks available for force evaluation".into()));
+        }
+        self.routed_samples = Some(all_samples);
+        self.calibrated = false;
+        Ok((self, coils))
+    }
+
     /// Create a new `ForceEvaluator`.
     ///
     /// # Panics
@@ -114,6 +182,7 @@ impl ForceEvaluator {
             layer_z_m,
             phase_shift: 0.0,
             calibrated: false,
+            routed_samples: None,
         }
     }
 
@@ -122,6 +191,12 @@ impl ForceEvaluator {
     // ------------------------------------------------------------------
 
     /// Sweep mover position from 0 to `config.travel_m` and compute force.
+    ///
+    /// For generated or imported routed copper, first use
+    /// [`Self::with_routed_currents`]. Bare `PhaseCoil` inputs do not describe
+    /// branching connectivity and retain the uniform-current convention only
+    /// for analytic conductor fixtures. Drawing endpoint order is not a
+    /// physical current-direction specification.
     ///
     /// All returned forces are **mover** forces (Newton's Third Law corrected).
     ///
@@ -134,6 +209,9 @@ impl ForceEvaluator {
         config: &SimulationInput,
         coils: &[PhaseCoil],
     ) -> Result<ForceResult, SimulationError> {
+        if coils.is_empty() || self.routed_samples.as_ref().is_some_and(|s| s.len() != coils.len()) {
+            return Err(SimulationError("Force coils do not match the solved conductor networks".into()));
+        }
         // Self-calibration guard (FOC spec §4.3): 3-point polarity + alignment
         // check, including a common winding-reference alignment if needed.
         if !self.calibrated {
@@ -150,7 +228,7 @@ impl ForceEvaluator {
         let phase_geom: Vec<(usize, Vec<ConductorSample>)> = coils
             .iter()
             .enumerate()
-            .map(|(i, coil)| (i, coil_model.build_phase_samples(coil)))
+            .map(|(i, coil)| (i, self.routed_samples.as_ref().map(|s| s[i].clone()).unwrap_or_else(|| coil_model.build_phase_samples(coil))))
             .collect();
         // Phase labels drive the declared phase-band offset matching
         // (kata hzs2); coil order defines the current slot order.
@@ -262,6 +340,9 @@ impl ForceEvaluator {
         coils: &[PhaseCoil],
         mover_position_m: f64,
     ) -> Result<([f64; 3], [f64; 3]), SimulationError> {
+        if coils.is_empty() || self.routed_samples.as_ref().is_some_and(|s| s.len() != coils.len()) {
+            return Err(SimulationError("Force coils do not match the solved conductor networks".into()));
+        }
         if !self.calibrated {
             self.self_calibrate(config, coils)?;
         }
@@ -373,7 +454,7 @@ impl ForceEvaluator {
         let mut torque = Vector3::zeros();
 
         for (phase_i, coil) in coils.iter().enumerate() {
-            let samples = coil_model.build_phase_samples(coil);
+            let samples = self.routed_samples.as_ref().map(|s| s[phase_i].clone()).unwrap_or_else(|| coil_model.build_phase_samples(coil));
             let i_current = currents[phase_i];
 
             let points: Vec<nalgebra::Point3<f64>> = samples

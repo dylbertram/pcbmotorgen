@@ -119,7 +119,10 @@ pub struct NetworkSolution {
 pub fn solve_network(net: &PhaseNetwork, edge_r: &[f64]) -> NetworkSolution {
     let n = net.node_count;
     let fail = NetworkSolution { resistance_ohm: 0.0, current_share: vec![0.0; net.edges.len()], connected: false };
-    if n == 0 || net.terminal.is_empty() || net.star.is_empty() {
+    if n == 0 || net.terminal.is_empty() || net.star.is_empty()
+        || edge_r.len() != net.edges.len()
+        || edge_r.iter().any(|r| !r.is_finite() || *r < 0.0)
+        || net.terminal.iter().any(|t| net.star.contains(t)) {
         return fail;
     }
     let mut fixed: Vec<Option<f64>> = vec![None; n];
@@ -227,6 +230,18 @@ pub fn solve_network(net: &PhaseNetwork, edge_r: &[f64]) -> NetworkSolution {
         }
     }
     if !(i_total > 1e-15) {
+        return fail;
+    }
+    // A finite terminal current alone does not establish CG convergence.
+    // Reject unbalanced internal branches rather than integrating phantom
+    // current into force, inductance, and thermal estimates.
+    let mut balance = vec![0.0; n];
+    for (edge, current) in net.edges.iter().zip(&currents) {
+        balance[edge.a] += current;
+        balance[edge.b] -= current;
+    }
+    if !i_total.is_finite() || currents.iter().any(|i| !i.is_finite())
+        || balance.iter().enumerate().any(|(i, value)| fixed[i].is_none() && value.abs() > 1e-7 * i_total) {
         return fail;
     }
     NetworkSolution {

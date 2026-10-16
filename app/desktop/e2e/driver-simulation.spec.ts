@@ -8,6 +8,7 @@ test("voltage updates driver results even when the force sweep fails", async ({ 
       export async function evaluateForceSweep() { throw new Error('Test sweep failure'); }`,
   }));
   await gotoDesignApp(page);
+  await page.getByRole("combobox", { name: "Winding connection", exact: true }).selectOption("2");
   await page.getByRole("tab", { name: /^Simulate/i }).click();
   const results = page.locator('section[aria-labelledby="driver-suitability-heading"]');
   await expect(page.getByText("Computation error: Test sweep failure")).toBeVisible();

@@ -63,9 +63,10 @@ export async function fetchTravelEnvelope(
 export async function evaluateForceSweep(
   config: LinearMotorConfig,
   cadGeometry: CadGeometry | null = null,
+  drive: DriveSettings | null = null,
 ): Promise<ForceSweepResult> {
   if (!isTauriAvailable()) return mockForceSweep(config);
-  return await invoke<ForceSweepResult>("evaluate_force_sweep", { config, cadGeometry });
+  return await invoke<ForceSweepResult>("evaluate_force_sweep", { config, cadGeometry, drive });
 }
 
 export async function computeHeightStack(

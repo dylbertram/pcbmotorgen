@@ -373,7 +373,9 @@ pub fn phase_coils_to_cad_geometry(
         vec![0.0]
     } else {
         (0..num_layers)
-            .map(|i| pcb_thickness_mm * (i as f64 / (num_layers - 1) as f64 - 1.0))
+            // Generated layer 0 is top copper, as in the force and preview
+            // models. Preserve that physical position when exporting CAD.
+            .map(|i| -pcb_thickness_mm * i as f64 / (num_layers - 1) as f64)
             .collect()
     };
     let mut routing = RoutingResult::default();
@@ -1844,9 +1846,9 @@ mod tests {
             ..Default::default()
         };
         let geometry = phase_coils_to_cad_geometry(&[coil], 4, 1.6, 0.2).unwrap();
-        assert!((geometry.layer_z_mm[0] + 1.6).abs() < 1e-12);
-        assert!((geometry.layer_z_mm[1] + 1.6 / 3.0 * 2.0).abs() < 1e-12);
-        assert_eq!(geometry.layer_z_mm[3], 0.0);
+        assert_eq!(geometry.layer_z_mm[0], 0.0);
+        assert!((geometry.layer_z_mm[1] + 1.6 / 3.0).abs() < 1e-12);
+        assert!((geometry.layer_z_mm[3] + 1.6).abs() < 1e-12);
         let via = &geometry.routing.vias[0];
         assert_eq!((via.from_layer, via.to_layer), (0, 1));
         assert_eq!(geometry.routing.segments[0].start.x, 0.0);

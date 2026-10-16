@@ -106,6 +106,7 @@ pub async fn generate_coils(config: LinearMotorConfigIpc) -> Result<CoilPathIpc,
 pub async fn evaluate_force_sweep(
     config: LinearMotorConfigIpc,
     cad_geometry: Option<pcbmotorgen_export::cad_dxf::CadGeometry>,
+    drive: Option<pcbmotorgen_simulation::drive::DriveSettings>,
 ) -> Result<ForceSweepResultIpc, String> {
     let core = config.to_core();
     let n_positions = config.n_positions.max(2) as usize;
@@ -115,11 +116,11 @@ pub async fn evaluate_force_sweep(
         CommutationModeIpc::PhaseAOnly => CoreCommutationMode::PhaseAOnly,
     };
     tauri::async_runtime::spawn_blocking(move || {
-        let (coils, sim) = match cad_geometry.as_ref() {
+        let (routing, sim) = match cad_geometry.as_ref() {
             Some(cad) => {
                 let board = super::cad_source::CadBoard::new(cad, &core)?;
                 let sim = board.simulation_input(cad, &core);
-                (board.coils, sim)
+                (board.routing, sim)
             }
             None => {
                 let ctx = core.routing_context();
@@ -128,15 +129,14 @@ pub async fn evaluate_force_sweep(
                     &core.routing_pattern_id(),
                 )
                 .map_err(|e| format!("routing pattern failed: {e}"))?;
-                let coils = pcbmotorgen_routing::routing_result_to_phase_coils(
-                    &routing_result,
-                    &core.routing_pattern_id(),
-                );
-                (coils, core.to_simulation())
+                (routing_result, core.to_simulation())
             }
         };
 
-        let mut evaluator = ForceEvaluator::new(n_positions, meshing, commutation, 0.0);
+        let hints = cad_geometry.as_ref().map(super::cad_source::CadBoard::drive_hints).unwrap_or_default();
+        let (mut evaluator, coils) = ForceEvaluator::new(n_positions, meshing, commutation, 0.0)
+            .with_routed_currents(&routing, &sim, &drive.unwrap_or_default(), &hints)
+            .map_err(|e| format!("force current solve failed: {e}"))?;
         let result = evaluator
             .evaluate(&sim, &coils)
             .map_err(|e| format!("force_sweep self-calibration failed: {e}"))?;
@@ -488,6 +488,121 @@ mod analyze_drive_tests {
     use super::*;
 
     #[test]
+    #[ignore = "Exports real winding geometry for independent Magpylib validation"]
+    fn export_magpylib_validation_fixture() {
+        let mut ipc = crate::ipc::ProjectConfigStateIpc::default().to_linear_motor_ipc();
+        ipc.routing_params.insert("connection".into(), 2.0);
+        let core = ipc.to_core();
+        let routing = pcbmotorgen_routing::generate_routing_result(&core.routing_context(), &core.routing_pattern_id()).unwrap();
+        let sim = core.to_simulation();
+        let points = vec![0.0, 0.001, 0.003, 0.006, 0.012, 0.036, 0.06];
+        let array = pcbmotorgen_simulation::magnetic::magnet_model::MagnetArray::new(&sim);
+        let b = array.bfield_at_pcb_surface(&points, 0.0, 0.0);
+        let (mut evaluator, coils) = ForceEvaluator::new(9, 10, CoreCommutationMode::PhaseAOnly, 0.0)
+            .with_routed_currents(&routing, &sim, &pcbmotorgen_simulation::drive::DriveSettings::default(), &Default::default()).unwrap();
+        let force = evaluator.evaluate(&sim, &coils).unwrap();
+        let samples: Vec<_> = evaluator.routed_conductor_samples().unwrap()[0].iter()
+            .map(|s| serde_json::json!({"point": s.midpoint_3d, "dl": s.dl_3d})).collect();
+        let out = serde_json::json!({"routing": routing, "sim": sim, "field_x_m": points, "rust_b_t": b,
+            "phase_a_samples": samples, "force_positions_m": force.positions_m, "rust_force_x_n": force.force_x_n});
+        std::fs::write("magpylib-fixture.json", serde_json::to_vec(&out).unwrap()).unwrap();
+    }
+
+    #[test]
+    #[ignore = "Exploratory 5 V versus 12 V geometry comparison"]
+    fn drv8311_compare_five_and_twelve_volts() {
+        for strands in [7.0, 9.0] {
+            let mut ipc = crate::ipc::ProjectConfigStateIpc::default().to_linear_motor_ipc();
+            ipc.routing_params.insert("connection".into(), 2.0);
+            ipc.routing_params.insert("num_strands".into(), strands);
+            ipc.min_trace_m = 0.0005;
+            ipc.n_positions = 25;
+            ipc.meshing = 20;
+            let mut settings = pcbmotorgen_simulation::drive::DriveSettings::default();
+            settings.outer_copper_oz = 3.0;
+            settings.inner_copper_oz = 3.0;
+            settings.pwm_hz = 200e3;
+            settings.ripple_limit_fraction = 0.35;
+            settings.voltage_headroom = 0.95;
+            let sweep = tauri::async_runtime::block_on(evaluate_force_sweep(ipc.clone(), None, Some(settings.clone()))).unwrap();
+            let kf = sweep.mean_thrust_n.abs() / sweep.current_a;
+            ipc.max_current_a = 1.1;
+            for voltage in [5.0, 12.0] {
+                ipc.supply_voltage_v = voltage;
+                let a = tauri::async_runtime::block_on(analyze_drive(ipc.clone(), settings.clone(), Some(kf), None)).unwrap();
+                let pass = a.checks.iter().all(|c| c.status == pcbmotorgen_simulation::drive::CheckStatus::Pass);
+                if strands == 9.0 {
+                    assert_eq!(pass, voltage == 12.0, "nine-strand 5 V / 12 V feasibility regression: {:?}", a.checks);
+                }
+                eprintln!("DRV8311 strands={strands} V={voltage} ALL_PASS={pass} R={} L_uH={} thrust={:?} holding={} speed={:?} available={} ripple={} ripple_limit={}", a.phase_resistance_ohm, a.synchronous_inductance_h*1e6, a.thrust_n, a.holding_voltage_v, a.speed_voltage_v, a.available_voltage_v, a.ripple_pp_a, 0.35*1.1);
+                eprintln!("checks={:?}", a.checks.iter().map(|c| (&c.id, c.status, c.value, c.limit)).collect::<Vec<_>>());
+            }
+        }
+    }
+
+    #[test]
+    fn drv8311_star_reference_passes_all_checks() {
+        for width_mm in [0.5] {
+            let mut ipc = crate::ipc::ProjectConfigStateIpc::default().to_linear_motor_ipc();
+            ipc.routing_params.insert("connection".into(), 2.0);
+            ipc.min_trace_m = width_mm * 1e-3;
+            ipc.n_positions = 25;
+            ipc.meshing = 20;
+            let mut force_settings = pcbmotorgen_simulation::drive::DriveSettings::default();
+            force_settings.outer_copper_oz = 3.0;
+            force_settings.inner_copper_oz = 3.0;
+            let sweep = tauri::async_runtime::block_on(evaluate_force_sweep(ipc.clone(), None, Some(force_settings))).unwrap();
+            let kf = sweep.mean_thrust_n.abs() / sweep.current_a;
+            eprintln!("width={width_mm} computed Kf={kf} N/A");
+            for copper in [3.0] {
+                for voltage in [5.0] {
+                    for current in [1.1] {
+                        ipc.supply_voltage_v = voltage;
+                        ipc.max_current_a = current;
+                        let mut settings = pcbmotorgen_simulation::drive::DriveSettings::default();
+                        settings.outer_copper_oz = copper;
+                        settings.inner_copper_oz = copper;
+                        settings.pwm_hz = 200e3;
+                        settings.ripple_limit_fraction = 0.35;
+                        settings.voltage_headroom = 0.95;
+                        let a = tauri::async_runtime::block_on(analyze_drive(ipc.clone(), settings, Some(kf), None)).unwrap();
+                        let electrical_pass = a.checks.iter().filter(|c| c.id != "thrust").all(|c| c.status == pcbmotorgen_simulation::drive::CheckStatus::Pass);
+                        assert!(a.checks.iter().all(|c| c.status == pcbmotorgen_simulation::drive::CheckStatus::Pass), "reference driver checks: {:?}", a.checks);
+                        eprintln!("trial width={width_mm} V={voltage} I={current} checks={:?}", a.checks.iter().map(|c| (&c.id, c.status, c.value, c.limit)).collect::<Vec<_>>());
+                        if electrical_pass {
+                            eprintln!("ELECTRICAL PASS DRV8311 width={width_mm} copper={copper}oz V={voltage} I={current} thrust={:?} N checks={:?}", a.thrust_n, a.checks.iter().map(|c| (&c.id, c.status)).collect::<Vec<_>>());
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn generated_star_driver_analysis_tracks_voltage_and_current() {
+        let mut ipc = crate::ipc::ProjectConfigStateIpc::default().to_linear_motor_ipc();
+        ipc.routing_params.insert("connection".into(), 2.0);
+        let drive = pcbmotorgen_simulation::drive::DriveSettings::default();
+        let run = |ipc| tauri::async_runtime::block_on(analyze_drive(ipc, drive.clone(), Some(0.4), None)).unwrap();
+        let baseline = run(ipc.clone());
+        eprintln!("STAR baseline R={} ohm L={} H", baseline.phase_resistance_ohm, baseline.synchronous_inductance_h);
+        for check in &baseline.checks {
+            eprintln!("{}: {:?} value={} limit={} {}", check.id, check.status, check.value, check.limit, check.unit);
+        }
+        assert_eq!(baseline.phases.len(), 3);
+        assert!(baseline.phases.iter().all(|phase| phase.connected));
+        assert!(baseline.phase_resistance_ohm.is_finite() && baseline.phase_resistance_ohm > 0.0);
+        assert!(baseline.phase_inductance_h.is_finite() && baseline.phase_inductance_h > 0.0);
+        ipc.supply_voltage_v *= 2.0;
+        let higher_voltage = run(ipc.clone());
+        assert!((higher_voltage.available_voltage_v / baseline.available_voltage_v - 2.0).abs() < 1e-9);
+        assert!((higher_voltage.ripple_pp_a / baseline.ripple_pp_a - 2.0).abs() < 1e-9);
+        ipc.max_current_a *= 2.0;
+        let higher_current = run(ipc);
+        assert!((higher_current.copper_loss_w / higher_voltage.copper_loss_w - 4.0).abs() < 1e-9);
+    }
+
+    #[test]
     fn command_rejects_delta_before_running_star_analysis() {
         let mut ipc = crate::ipc::ProjectConfigStateIpc::default().to_linear_motor_ipc();
         ipc.routing_params.insert("connection".into(), 1.0);
@@ -547,19 +662,21 @@ mod cad_source_tests {
     #[test]
     fn unmapped_coils_are_reported() {
         let (ipc, cad) = exported_default();
-        let err = tauri::async_runtime::block_on(evaluate_force_sweep(ipc, Some(cad)))
+        let err = tauri::async_runtime::block_on(evaluate_force_sweep(ipc, Some(cad), None))
             .expect_err("unmapped");
         assert!(err.contains("coil A"), "{err}");
     }
 
     #[test]
     fn mapped_import_matches_the_generated_copper() {
-        let (ipc, mut cad) = exported_default();
+        let (mut ipc, mut cad) = exported_default();
+        ipc.n_positions = 9;
+        ipc.meshing = 5;
         for p in ["A", "B", "C"] {
             cad.coil_phases.insert(format!("coil {p}"), p.to_string());
         }
-        let gen = tauri::async_runtime::block_on(evaluate_force_sweep(ipc.clone(), None)).unwrap();
-        let imp = tauri::async_runtime::block_on(evaluate_force_sweep(ipc.clone(), Some(cad.clone()))).unwrap();
+        let gen = tauri::async_runtime::block_on(evaluate_force_sweep(ipc.clone(), None, None)).unwrap();
+        let imp = tauri::async_runtime::block_on(evaluate_force_sweep(ipc.clone(), Some(cad.clone()), None)).unwrap();
         assert!(
             (gen.mean_thrust_n - imp.mean_thrust_n).abs() <= 1e-6 * gen.mean_thrust_n.abs().max(1.0),
             "generated {} vs imported {}",
