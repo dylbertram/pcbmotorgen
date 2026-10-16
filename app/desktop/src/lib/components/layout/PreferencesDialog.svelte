@@ -5,6 +5,7 @@
   import { DEFAULT_RULES, RULE_FIELDS, readPreferences, writePreferences, validRules, type Appearance, type DrcRules } from "../../preferences";
   import { attachBackdropScrollGuard, lockPageScroll } from "../../utils/pageScrollLock";
   import { importKicadDrc } from "../../kicadDrc";
+  import { drcRulesets } from "../../stores/drcRulesets.svelte";
   import DriverLibrarySection from "./DriverLibrarySection.svelte";
   import CoilPatternLibrarySection from "./CoilPatternLibrarySection.svelte";
 
@@ -21,6 +22,9 @@
   let importing = $state(false);
   let importName = $state<string | null>(null);
   let importWarnings = $state<string[]>([]);
+  let rulesetName = $state("");
+  let selectedRuleset = $state("");
+  let rulesetError = $state<string | null>(null);
   let valid = $derived(validRules(rules));
   let backdropRef = $state<HTMLDivElement | null>(null);
   let panelRef = $state<HTMLDivElement | null>(null);
@@ -54,6 +58,35 @@
       importing = false;
       input.value = "";
     }
+  }
+
+  function saveRuleset(): void {
+    const problem = drcRulesets.add(rulesetName, rules);
+    if (problem) {
+      rulesetError = problem;
+      return;
+    }
+    selectedRuleset = rulesetName.trim();
+    rulesetName = "";
+    rulesetError = null;
+  }
+
+  function loadRuleset(): void {
+    const saved = drcRulesets.rulesets.find((entry) => entry.name === selectedRuleset);
+    if (!saved) return;
+    rules = { ...saved.rules };
+    importName = null;
+    importWarnings = [];
+    error = null;
+    rulesetError = null;
+  }
+
+  function deleteRuleset(): void {
+    const index = drcRulesets.rulesets.findIndex((entry) => entry.name === selectedRuleset);
+    if (index < 0) return;
+    drcRulesets.remove(index);
+    selectedRuleset = "";
+    rulesetError = null;
   }
 
   function save(event: SubmitEvent): void {
@@ -115,6 +148,29 @@
             </div>
             <button type="button" onclick={() => { rules = { ...DEFAULT_RULES }; importName = null; importWarnings = []; error = null; }} class="mt-4 text-xs text-slate-400 underline decoration-slate-600 underline-offset-4 hover:text-slate-200">Restore default rules</button>
             {#if !valid}<p class="mt-3 text-xs text-rose-300" role="alert">Enter a positive number for every rule.</p>{/if}
+
+            <div class="mt-4 space-y-2 border-t border-slate-800 pt-4">
+              <p class="text-xs font-medium text-slate-300">Saved rulesets</p>
+              <p class="text-xs leading-relaxed text-slate-400">Save the limits above under a name to reload them later. Saved rulesets persist on this device, separately from projects.</p>
+              <div class="flex gap-2">
+                <input aria-label="Ruleset name" bind:value={rulesetName} placeholder="e.g. PCBWay 1 oz" class="min-w-0 flex-1 rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-xs text-slate-100 placeholder:text-slate-500 focus:border-emerald-500 focus:outline-none" />
+                <button type="button" disabled={!rulesetName.trim() || !valid} onclick={saveRuleset} class="shrink-0 rounded-md border border-slate-700 px-3 py-2 text-xs text-slate-200 hover:bg-slate-800 disabled:opacity-50">Save ruleset</button>
+              </div>
+              {#if drcRulesets.rulesets.length > 0}
+                <div class="flex gap-2">
+                  <select aria-label="Saved rulesets" bind:value={selectedRuleset} class="min-w-0 flex-1 rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-xs text-slate-100 focus:border-emerald-500 focus:outline-none">
+                    <option value="">Select a saved ruleset</option>
+                    {#each drcRulesets.rulesets as saved (saved.name)}
+                      <option value={saved.name}>{saved.name}</option>
+                    {/each}
+                  </select>
+                  <button type="button" disabled={!selectedRuleset} onclick={loadRuleset} class="shrink-0 rounded-md border border-slate-700 px-3 py-2 text-xs text-slate-200 hover:bg-slate-800 disabled:opacity-50">Load</button>
+                  <button type="button" disabled={!selectedRuleset} onclick={deleteRuleset} class="shrink-0 rounded-md border border-slate-700 px-3 py-2 text-xs text-slate-200 hover:bg-slate-800 disabled:opacity-50">Delete</button>
+                </div>
+              {/if}
+              {#if rulesetError}<p role="alert" class="text-xs text-rose-300">{rulesetError}</p>{/if}
+              {#if !drcRulesets.storageAvailable}<p class="text-xs text-amber-300">Saved rulesets cannot be stored in this browser; they last for this session only.</p>{/if}
+            </div>
           </fieldset>
 
           <DriverLibrarySection {disabled} />
