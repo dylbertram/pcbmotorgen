@@ -128,6 +128,37 @@ test("KiCad rules import previews supported limits and only applies on save", as
   await expect(dialog.getByLabel("Minimum via drill (mm)")).toHaveValue("0.3");
 });
 
+test("saved DRC rulesets store, load, and persist across reloads", async ({ page }) => {
+  await gotoDesignApp(page);
+  let dialog = await settings(page);
+  const example = fileURLToPath(new URL("./fixtures/pcbway.kicad_dru", import.meta.url));
+  await dialog.getByLabel("Import KiCad DRC rules (.kicad_dru)").setInputFiles(example);
+  await dialog.getByLabel("Ruleset name").fill("PCBWay");
+  await dialog.getByRole("button", { name: "Save ruleset", exact: true }).click();
+  await expect(dialog.getByLabel("Saved rulesets").locator("option", { hasText: "PCBWay" })).toHaveCount(1);
+
+  // Editing a limit and then loading the ruleset restores the saved values.
+  await dialog.getByLabel("Minimum via drill (mm)").fill("0.2");
+  await dialog.getByLabel("Saved rulesets").selectOption("PCBWay");
+  await dialog.getByRole("button", { name: "Load", exact: true }).click();
+  await expect(dialog.getByLabel("Minimum via drill (mm)")).toHaveValue("0.3");
+  await dialog.getByRole("button", { name: "Save settings" }).click();
+
+  // The saved ruleset persists on this device, independent of the project.
+  await page.reload();
+  await page.getByRole("button", { name: "New coil file", exact: true }).first().click();
+  await page.getByRole("dialog", { name: "New coil file", exact: true }).getByRole("button", { name: /^Motor coil/ }).click();
+  dialog = await settings(page);
+  await dialog.getByLabel("Saved rulesets").selectOption("PCBWay");
+  await dialog.getByRole("button", { name: "Load", exact: true }).click();
+  await expect(dialog.getByLabel("Minimum via drill (mm)")).toHaveValue("0.3");
+
+  // Deleting clears it from the list and storage.
+  await dialog.getByRole("button", { name: "Delete", exact: true }).click();
+  await expect(dialog.getByLabel("Saved rulesets")).toHaveCount(0);
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem("pcbmotorgen.drc_rulesets.v1")!))).toEqual([]);
+});
+
 test("invalid rules leave draft limits intact and can be retried", async ({ page }) => {
   await gotoDesignApp(page);
   const dialog = await settings(page);

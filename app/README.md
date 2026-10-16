@@ -22,6 +22,11 @@ are imported. Other conditions, unsupported checks, and maximum or preferred
 values are reported but not applied. This does not run KiCad's full DRC engine.
 Fields absent from the file keep their current values.
 
+Name the limits under **Saved rulesets** to keep them for later. Enter a name and
+choose **Save ruleset**; the saved set appears in the list and can be **Load**ed
+into the draft or **Delete**d. Saved rulesets persist on this device, separately
+from projects, and only affect a design when you save settings.
+
 ## Files and projects
 
 Motor coils use `.pmmotor` files. Sensor coils use `.pmsensor` files. These are
