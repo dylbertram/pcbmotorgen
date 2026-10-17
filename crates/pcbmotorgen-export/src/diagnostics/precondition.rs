@@ -150,7 +150,8 @@ pub fn validate_write_preconditions(
     }
 
     // (5) Invalid design rules → no valid geometry is possible.
-    if rules.min_trace_mm <= 0.0 || rules.min_space_mm <= 0.0 {
+    if !rules.min_trace_mm.is_finite() || !rules.min_space_mm.is_finite()
+        || rules.min_trace_mm <= 0.0 || rules.min_space_mm <= 0.0 {
         out.push(PreconditionWarning::error(
             Some("design_rules"),
             format!(
@@ -162,12 +163,12 @@ pub fn validate_write_preconditions(
     }
 
     // (6) The nominal trace width must clear the manufacturing floor.
-    if rules.trace_width_mm <= 0.0 || rules.trace_width_mm < rules.min_trace_mm {
-        out.push(PreconditionWarning::warn(
+    if !rules.trace_width_mm.is_finite() || rules.trace_width_mm <= 0.0 || rules.trace_width_mm < rules.min_trace_mm {
+        out.push(PreconditionWarning::error(
             Some("trace_width_mm"),
             format!(
                 "Nominal trace width ({:.4} mm) is below the minimum trace width \
-                 ({:.4} mm); using the minimum. Increase the trace width or lower \
+                  ({:.4} mm). Increase the trace width or lower \
                  the minimum rule.",
                 rules.trace_width_mm, rules.min_trace_mm
             ),
@@ -199,6 +200,16 @@ fn braid_rules() -> DesignRules {
         min_space_mm: 0.127,
         min_via_drill_mm: 0.2,
         min_via_annular_ring_mm: 0.1,
+    }
+}
+
+#[test]
+fn invalid_nominal_width_blocks_writing_without_silent_resizing() {
+    for width in [0.05, 0.0, f64::NAN, f64::INFINITY] {
+        let rules = DesignRules { trace_width_mm: width, ..braid_rules() };
+        let warnings = validate_write_preconditions(&rules, 4, ACTIVE_AREA_M, BOARD_WIDTH_M, &empty_diagnostics());
+        assert!(warnings.iter().any(|w| w.field.as_deref() == Some("trace_width_mm") && w.level == PreconditionLevel::Error));
+        assert!(!warnings.iter().any(|w| w.message.contains("using the minimum")));
     }
 }
 

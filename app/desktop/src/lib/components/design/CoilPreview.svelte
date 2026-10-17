@@ -558,7 +558,7 @@
          renderer (canvas.dataset in coilPreviewCanvas.ts), NOT bound
          reactively — see the counter comment there. -->
     {#if view.viewMode === "iso"}
-      <CoilPreviewIsoView geometry={terminalGeometry} {view} />
+      <CoilPreviewIsoView geometry={terminalGeometry} {view} isVisible={isTerminalVisible} />
     {:else}
       <canvas bind:this={canvasRef} class="block h-full w-full"></canvas>
       {#if terminalGeometry}

@@ -83,13 +83,13 @@ impl LinearMotorConfig {
                 self.supply_voltage_v
             )));
         }
-        if self.min_trace_m <= 0.0 {
+        if !self.min_trace_m.is_finite() || self.min_trace_m <= 0.0 {
             return Err(ConfigError(format!(
                 "min_trace_m must be positive, got {}",
                 self.min_trace_m
             )));
         }
-        if self.trace_width_m <= 0.0 {
+        if !self.trace_width_m.is_finite() || self.trace_width_m <= 0.0 {
             return Err(ConfigError(format!(
                 "trace_width_m must be positive, got {}",
                 self.trace_width_m

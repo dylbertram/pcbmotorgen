@@ -160,6 +160,11 @@ test("the isometric view draws copper planes and via spans", async ({ page }, te
   await expect(iso).toHaveAttribute("data-segments", /[1-9]/);
   // Generated geometry carries via spans between its copper planes.
   await expect(iso).toHaveAttribute("data-vias", /[1-9]/);
+  const allSegments = Number(await iso.getAttribute("data-segments"));
+  await display.getByRole("checkbox", { name: "Show layer 0", exact: true }).uncheck();
+  await expect.poll(async () => Number(await iso.getAttribute("data-segments"))).toBeLessThan(allSegments);
+  await display.getByRole("checkbox", { name: "Show layer 0", exact: true }).check();
+  await expect(iso).toHaveAttribute("data-segments", String(allSegments));
   await page.screenshot({ path: testInfo.outputPath("coil-iso.png") });
   await expect(dialog.locator("canvas")).toHaveCount(0);
 

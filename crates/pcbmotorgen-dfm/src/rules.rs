@@ -28,12 +28,6 @@ const DEFAULT_MIN_VIA_DRILL_MM: f64 = 0.2;
 /// Minimum via annular ring width [mm].
 const DEFAULT_MIN_VIA_ANNULAR_RING_MM: f64 = 0.1;
 
-/// Serde default for [`DesignRules::trace_width_mm`] on payloads written before
-/// the nominal width existed: fall back to the minimum trace width.
-fn default_trace_width_mm() -> f64 {
-    DEFAULT_MIN_TRACE_MM
-}
-
 /// A snapshot of the DFM rules applied to generated routing geometry.
 ///
 /// Patterns receive the board + phase dimensions via
@@ -43,13 +37,13 @@ fn default_trace_width_mm() -> f64 {
 /// consumers (e.g. the KiCad writer) read the sizes from this spec — they
 /// never decide them.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[serde(from = "StoredDesignRules")]
 pub struct DesignRules {
     /// Minimum manufacturable trace width [mm] — the design-rule floor.
     pub min_trace_mm: f64,
     /// Nominal (actual) copper trace width [mm] written to the board and DXF.
     /// Independent of the `min_trace_mm` floor so a design can use wider
     /// copper than the process minimum.
-    #[serde(default = "default_trace_width_mm")]
     pub trace_width_mm: f64,
     /// Minimum trace-to-trace clearance [mm].
     pub min_space_mm: f64,
@@ -57,6 +51,27 @@ pub struct DesignRules {
     pub min_via_drill_mm: f64,
     /// Minimum via annular ring width [mm].
     pub min_via_annular_ring_mm: f64,
+}
+
+#[derive(Deserialize)]
+struct StoredDesignRules {
+    min_trace_mm: f64,
+    trace_width_mm: Option<f64>,
+    min_space_mm: f64,
+    min_via_drill_mm: f64,
+    min_via_annular_ring_mm: f64,
+}
+
+impl From<StoredDesignRules> for DesignRules {
+    fn from(saved: StoredDesignRules) -> Self {
+        Self {
+            min_trace_mm: saved.min_trace_mm,
+            trace_width_mm: saved.trace_width_mm.unwrap_or(saved.min_trace_mm),
+            min_space_mm: saved.min_space_mm,
+            min_via_drill_mm: saved.min_via_drill_mm,
+            min_via_annular_ring_mm: saved.min_via_annular_ring_mm,
+        }
+    }
 }
 
 impl Default for DesignRules {
@@ -151,7 +166,7 @@ mod tests {
             r#"{"min_trace_mm":0.2,"min_space_mm":0.15,"min_via_drill_mm":0.3,"min_via_annular_ring_mm":0.1}"#,
         )
         .unwrap();
-        assert_eq!(legacy.trace_width_mm, 0.127);
+        assert_eq!(legacy.trace_width_mm, 0.2);
         assert_eq!(legacy.min_trace_mm, 0.2);
     }
 

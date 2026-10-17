@@ -15,11 +15,15 @@
    */
   import type { CadGeometry, CadPoint } from "../../types";
   import { ISO_Z_EXAG, isoProject } from "../../geometry";
-  import { sampleSpline } from "../../curvePaths";
+  import { arcSvgPath, sampleSpline } from "../../curvePaths";
   import type { CoilPreviewViewState } from "./coilPreviewViewState.svelte";
   import { PHASE_COLORS, PREVIEW_H, PREVIEW_W } from "./coilPreviewCanvas";
 
-  let { geometry, view }: { geometry: CadGeometry | null; view: CoilPreviewViewState } = $props();
+  let { geometry, view, isVisible = () => true }: {
+    geometry: CadGeometry | null;
+    view: CoilPreviewViewState;
+    isVisible?: (coil: string, layer: number) => boolean;
+  } = $props();
 
   const W = PREVIEW_W;
   const H = PREVIEW_H;
@@ -85,21 +89,20 @@
 
     const layers = zs.map((z, idx) => ({ idx, z, visible: view.isLayerVisible(idx) }))
       .sort((a, b) => a.z - b.z); // painter's order: bottom first
-    const traceWidth = Math.max(0.9, (g.trace_width_mm || 0.1) * sxy);
+    const traceWidth = view.traceMode === "centerlines" ? 1 : Math.max(0.9, (g.trace_width_mm || 0.1) * sxy);
 
     const traces = layers.filter((l) => l.visible).map((l) => {
       const z = zs[l.idx];
-      const segments = g.routing.segments.filter((s) => s.layer === l.idx).map((s) => {
+      const segments = g.routing.segments.filter((s) => s.layer === l.idx && isVisible(s.net, s.layer)).map((s, i) => {
         const a = at(s.start, z), b = at(s.end, z);
-        return { key: `${l.idx}-${s.net}-${s.start.x},${s.start.y}`, net: s.net, x1: a[0], y1: a[1], x2: b[0], y2: b[1] };
+        return { key: `${l.idx}-${i}`, net: s.net, x1: a[0], y1: a[1], x2: b[0], y2: b[1] };
       });
-      const curves = g.routing.curves.filter((c) => c.layer === l.idx).map((c, i) => {
-        const a = at(c.start, z), m = at(c.mid, z), b = at(c.end, z);
-        const ctrlX = 2 * m[0] - (a[0] + b[0]) / 2;
-        const ctrlY = 2 * m[1] - (a[1] + b[1]) / 2;
-        return { key: `${l.idx}-${i}-${c.net}`, net: c.net, d: `M ${a[0].toFixed(1)} ${a[1].toFixed(1)} Q ${ctrlX.toFixed(1)} ${ctrlY.toFixed(1)} ${b[0].toFixed(1)} ${b[1].toFixed(1)}` };
+      const curves = g.routing.curves.filter((c) => c.layer === l.idx && isVisible(c.net, c.layer)).map((c, i) => {
+        // Affine projection of the original circular arc produces the exact
+        // ellipse. A quadratic fitted through its midpoint changes its shape.
+        return { key: `${l.idx}-${i}`, net: c.net, d: arcSvgPath(c), transform: `matrix(${sxy} 0 ${0.45 * sxy} ${0.45 * sxy} ${cx} ${cy - z * sz})` };
       });
-      const splines = (g.routing.splines ?? []).filter((s) => s.layer === l.idx).map((s, i) => {
+      const splines = (g.routing.splines ?? []).filter((s) => s.layer === l.idx && isVisible(s.net, s.layer)).map((s, i) => {
         const pts = sampleSpline(s, 12).map((p) => at(p, z));
         return { key: `${l.idx}-${i}-${s.net}`, net: s.net, points: pts.map((p) => `${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(" ") };
       });
@@ -107,7 +110,7 @@
     });
 
     const vias = view.showVias ? g.routing.vias
-      .filter((v) => view.isLayerVisible(v.from_layer) || view.isLayerVisible(v.to_layer))
+      .filter((v) => (view.isLayerVisible(v.from_layer) && isVisible(v.net, v.from_layer)) || (view.isLayerVisible(v.to_layer) && isVisible(v.net, v.to_layer)))
       .map((v, i) => {
         const z0 = zs[v.from_layer] ?? 0;
         const z1 = zs[v.to_layer] ?? z0;
@@ -119,7 +122,10 @@
       const z = zs[t.input.layer] ?? 0;
       const zi = zs[t.output.layer] ?? 0;
       const a = at(t.input.position, z), b = at(t.output.position, zi);
-      return [{ key: `${coil}-in`, x: a[0], y: a[1] }, { key: `${coil}-out`, x: b[0], y: b[1] }];
+      return [
+        ...(view.isLayerVisible(t.input.layer) && isVisible(coil, t.input.layer) ? [{ key: `${coil}-in`, x: a[0], y: a[1] }] : []),
+        ...(view.isLayerVisible(t.output.layer) && isVisible(coil, t.output.layer) ? [{ key: `${coil}-out`, x: b[0], y: b[1] }] : []),
+      ];
     }) : [];
 
     return { layers: traces, vias, terminals, traceWidth, netCount: coilNames.length };
@@ -154,7 +160,7 @@
           <line x1={seg.x1} y1={seg.y1} x2={seg.x2} y2={seg.y2} stroke={colorFor(seg.net)} stroke-width={scene.traceWidth.toFixed(2)} stroke-linecap="round" />
         {/each}
         {#each layer.curves as curve (curve.key)}
-          <path d={curve.d} fill="none" stroke={colorFor(curve.net)} stroke-width={scene.traceWidth.toFixed(2)} stroke-linecap="round" />
+          <path d={curve.d} transform={curve.transform} vector-effect="non-scaling-stroke" fill="none" stroke={colorFor(curve.net)} stroke-width={scene.traceWidth.toFixed(2)} stroke-linecap="round" />
         {/each}
         {#each layer.splines as spline (spline.key)}
           <polyline points={spline.points} fill="none" stroke={colorFor(spline.net)} stroke-width={scene.traceWidth.toFixed(2)} stroke-linecap="round" stroke-linejoin="round" />
