@@ -320,6 +320,11 @@ export function mockForceSweep(c: LinearMotorConfig): ForceSweepResult {
 }
 
 export function mockHeightStack(c: LinearMotorConfig): HeightStackResultDto {
+  // Backplane heights mirror `BackplaneStack`. The mock skips the image-method
+  // analysis, so `backplane_analysis` is always null here.
+  const backplane_m = c.backplane?.layers.reduce((sum, l) => sum + l.thickness_m, 0) ?? 0;
+  const housing_gap_m = c.backplane?.housing?.gap_m ?? 0;
+  const housing_m = c.backplane?.housing?.thickness_m ?? 0;
   return {
     pcb_thickness_m: c.pcb_thickness_m,
     cu_protrusion_m: COPPER_PROTRUSION_1OZ_M * (c.num_layers >= 6 ? 2 : 1),
@@ -327,8 +332,13 @@ export function mockHeightStack(c: LinearMotorConfig): HeightStackResultDto {
     air_gap_m: c.air_gap_m,
     magnet_height_m: c.magnet_height_m,
     tolerance_m: TOLERANCE_M,
+    backplane_m,
+    housing_gap_m,
+    housing_m,
     total_height_m:
-      c.pcb_thickness_m + COPPER_PROTRUSION_1OZ_M + SOLDER_MASK_M + c.air_gap_m + c.magnet_height_m + TOLERANCE_M,
+      c.pcb_thickness_m + COPPER_PROTRUSION_1OZ_M + SOLDER_MASK_M + c.air_gap_m + c.magnet_height_m + TOLERANCE_M +
+      backplane_m + housing_gap_m + housing_m,
+    backplane_analysis: null,
   };
 }
 

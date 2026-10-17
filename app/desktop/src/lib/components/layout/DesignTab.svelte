@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { ConfigStore } from "../../stores/config.svelte";
-  import type { CadGeometry } from "../../types";
+  import type { BackplaneAnalysis, CadGeometry } from "../../types";
+  import BackplanePanel from "../design/BackplanePanel.svelte";
   import TopologySelector from "../design/TopologySelector.svelte";
   import TracesBoardPanel from "../design/parameters/TracesBoardPanel.svelte";
   import MagnetsPanel from "../design/parameters/MagnetsPanel.svelte";
@@ -16,12 +17,15 @@
     onImportCad,
     onUseGenerated,
     onGeometryChange,
+    backplaneAnalysis = null,
   }: {
     config: ConfigStore;
     cadGeometry?: CadGeometry | null;
     onImportCad: () => void;
     onUseGenerated: () => void;
     onGeometryChange?: (geometry: CadGeometry) => void;
+    /** Backplane results from the last simulation run, if any. */
+    backplaneAnalysis?: BackplaneAnalysis | null;
   } = $props();
 </script>
 
@@ -142,6 +146,8 @@
         </label>
       </div>
     </section>
+
+    <BackplanePanel {config} {backplaneAnalysis} />
 
     <!-- Topology (routing pattern + parameters + generator load) and the
          board/winding fields share one panel so winding geometry can be

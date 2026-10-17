@@ -21,6 +21,7 @@
 //! - [`stackup`] — height stack, friction budget.
 //! - [`drive`] — driver suitability from routed copper.
 
+pub mod backplane;
 pub mod drive;
 pub mod magnet_grades;
 pub mod magnetic;

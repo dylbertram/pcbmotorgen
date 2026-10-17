@@ -14,6 +14,7 @@ import type {
   RoutingParamDef,
   MagnetGrade,
   DriveSettings,
+  BackplaneStack,
 } from "../types";
 import { getRemanence, MAGNET_GRADES, extractBaseGrade, DEFAULT_DRIVE_SETTINGS } from "../types";
 import {
@@ -124,6 +125,11 @@ export class ConfigStore {
   /** Driver limits and operating assumptions for `analyze_drive`. Replace
    *  the whole object to edit it, so dependents see one change. */
   drive = $state<DriveSettings>(structuredClone(DEFAULT_DRIVE_SETTINGS));
+
+  // --- Backplane and housing (t707) ------------------------------------
+  /** Layers below the PCB and an optional housing. `null` = none, which
+   *  leaves the field model unchanged. */
+  backplane = $state<BackplaneStack | null>(null);
 
   // ---------------------------------------------------------------------
   // Derived geometry (mm, for the UI)
@@ -372,6 +378,8 @@ export class ConfigStore {
       commutation: this.commutation,
       n_positions: this.n_positions,
       meshing: this.meshing,
+
+      backplane: $state.snapshot(this.backplane),
 
       name: null,
     };

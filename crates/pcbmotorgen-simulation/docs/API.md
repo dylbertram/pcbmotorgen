@@ -581,10 +581,14 @@ pub struct HeightStackResult {
     pub air_gap_m: f64,
     pub magnet_height_m: f64,
     pub tolerance_m: f64,
+    pub backplane_m: f64,        // serde default 0; backplane layers below the PCB
+    pub housing_gap_m: f64,      // serde default 0; air gap below the backplane
+    pub housing_m: f64,          // serde default 0; housing wall below the gap
+    pub backplane_analysis: Option<BackplaneAnalysis>, // serde default None; set only when a backplane is configured
 }
 
 impl HeightStackResult {
-    pub fn total_height_m(&self) -> f64;               // sum of all layers
+    pub fn total_height_m(&self) -> f64;               // sum of all layers, including backplane and housing
     pub fn fits_in_budget(&self, budget_m: f64) -> bool;
     pub fn headroom_m(&self, budget_m: f64) -> f64;    // negative = over budget
     pub fn summary(&self) -> String;

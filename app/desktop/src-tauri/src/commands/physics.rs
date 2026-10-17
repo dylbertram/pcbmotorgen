@@ -45,6 +45,10 @@ pub async fn compute_height_stack(
             magnet_height_m: hs.magnet_height_m,
             tolerance_m: hs.tolerance_m,
             total_height_m: hs.total_height_m(),
+            backplane_m: hs.backplane_m,
+            housing_gap_m: hs.housing_gap_m,
+            housing_m: hs.housing_m,
+            backplane_analysis: hs.backplane_analysis,
         })
     })
     .await

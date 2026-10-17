@@ -521,7 +521,24 @@ pub fn analyze_drive_with(
     if !(l_ll > 0.0) {
         l_ll = 2.0 * l_self;
     }
-    let l_s = l_ll / 2.0;
+    // A backplane or housing adds image currents that raise the copper
+    // inductance (t707). With no backplane the factor is 1 and nothing changes.
+    let backplane = sim.backplane.as_ref().map(|b| b.analyze(sim));
+    let l_s = l_ll / 2.0 * backplane.as_ref().map_or(1.0, |b| b.inductance_factor);
+    if let Some(stack) = sim.backplane.as_ref() {
+        if stack.has_silicon_steel()
+            && settings.pwm_hz > crate::backplane::SILICON_STEEL_PWM_LIMIT_HZ
+        {
+            notes.push(format!(
+                "Silicon steel backplane at {:.0} kHz PWM: expect severe eddy-current heating. Use ferrite or SMC above {:.0} kHz.",
+                settings.pwm_hz / 1e3,
+                crate::backplane::SILICON_STEEL_PWM_LIMIT_HZ / 1e3
+            ));
+        }
+    }
+    if let Some(analysis) = &backplane {
+        notes.extend(analysis.warnings.iter().cloned());
+    }
     // External inductors fitted at the driver terminals add in series with
     // each phase, so one per-phase value raises the effective synchronous
     // inductance that the ripple, time-constant, and ω·L terms see.

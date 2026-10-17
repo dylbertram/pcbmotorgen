@@ -2,6 +2,7 @@
  * Config (IPC wire format — SI units) and the derived-value contract.
  */
 
+import type { BackplaneStack } from "./backplane";
 import type { CommutationMode } from "./enums";
 
 /** The full design configuration sent to the Tauri backend on every call. */
@@ -58,6 +59,10 @@ export interface LinearMotorConfig {
   commutation: CommutationMode;
   n_positions: number;
   meshing: number;
+
+  /** Backplane and housing below the PCB (t707). `null` = none, which
+   *  leaves the field model unchanged. */
+  backplane: BackplaneStack | null;
 
   name: string | null;
 }
