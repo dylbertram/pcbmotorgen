@@ -795,9 +795,9 @@ checksum = "9e5e8f6c15a24b9a3ee5efec809ccd006d3b30e8b3bb63c39af737c7f87daa1d"
 
 [[package]]
 name = "ellip"
-version = "1.1.1"
+version = "1.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ddf8add35b2174706baf49bac13fd472a423b62829c0a1878e4e57926a8c8c89"
+checksum = "5028f7214cfbc86fba8df7f65785e183c7406270817fb1d2f6df7c4684a753e7"
 dependencies = [
  "num-lazy",
  "num-traits",
@@ -2115,9 +2115,9 @@ dependencies = [
 
 [[package]]
 name = "magba"
-version = "0.6.2"
+version = "0.7.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3a2ac7a3eb398d5b4701117711faf3d9493f0b39c603450e1cac3bddec0f1c48"
+checksum = "9e056d62c3f1526600798ee86342b03511b3aa610ef633336cf3e91a1721f71e"
 dependencies = [
  "concat-idents",
  "delegate",
@@ -2128,6 +2128,7 @@ dependencies = [
  "getset",
  "itertools",
  "nalgebra",
+ "num-lazy",
  "num-traits",
  "numeric_literals",
  "openmesh",
@@ -2638,9 +2639,9 @@ checksum = "9f7c3e4beb33f85d45ae3e3a1792185706c8e16d043238c593331cc7cd313b50"
 
 [[package]]
 name = "openmesh"
-version = "0.2.3"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "338581d9410de745119664f581e6f50ad75d376c3fa62025b5090a362241c0fd"
+checksum = "a9a3ea57ccd2acc76e0282f8059bda347d58e841d4f8153ce06406973dcc6d84"
 dependencies = [
  "hashbrown 0.16.1",
  "nalgebra",
@@ -4181,7 +4182,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "32497e9a4c7b38532efcdebeef879707aa9f794296a4f0244f6f69e9bc8574bd"
 dependencies = [
  "fastrand",
- "getrandom 0.3.4",
+ "getrandom 0.4.3",
  "once_cell",
  "rustix",
  "windows-sys 0.61.2",

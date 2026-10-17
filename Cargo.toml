@@ -36,7 +36,7 @@ pcbmotorgen-simulation = { path = "crates/pcbmotorgen-simulation" }
 pcbmotorgen-dfm = { path = "crates/pcbmotorgen-dfm" }
 pcbmotorgen-export = { path = "crates/pcbmotorgen-export" }
 # Physics / math
-magba = "=0.6.2"
+magba = "=0.7.2"
 nalgebra = "0.34"
 rayon = "1.10"
 # Serialization (shared across crates)
