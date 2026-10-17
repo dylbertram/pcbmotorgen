@@ -37,10 +37,6 @@ pub struct CadGeometry {
     /// already named after a phase maps to it without an entry.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub coil_phases: BTreeMap<String, String>,
-    /// User confirmed conductor roles, layer heights, and via connectivity.
-    /// Imports and older files require review before motor workflows run.
-    #[serde(default)]
-    pub motor_mapping_reviewed: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
@@ -56,9 +52,6 @@ impl CadGeometry {
     pub fn validate_motor_mapping(&self, phases: u32, min_width_mm: f64) -> Result<(), String> {
         validate_geometry(self)?;
         let mut problems = Vec::new();
-        if !self.motor_mapping_reviewed {
-            problems.push("Review imported conductor roles, layer heights, and via connections".to_string());
-        }
         if self.trace_width_mm < min_width_mm {
             problems.push(format!("Imported trace width {} mm is below the minimum {} mm", self.trace_width_mm, min_width_mm));
         }
@@ -331,7 +324,6 @@ pub fn sensor_geometry_to_cad_geometry(sensor: &SensorGeometry) -> CadGeometry {
         coil_terminals: BTreeMap::new(),
         terminal_connection: None,
         coil_phases: BTreeMap::new(),
-        motor_mapping_reviewed: false,
     }
 }
 
@@ -521,7 +513,6 @@ pub fn phase_coils_to_cad_geometry(
         coil_terminals: BTreeMap::new(),
         terminal_connection: None,
         coil_phases: BTreeMap::new(),
-        motor_mapping_reviewed: true,
     };
     validate_geometry(&geometry)?;
     Ok(geometry)
@@ -1024,7 +1015,6 @@ pub fn import_3d_dxf_with_coils(
         coil_terminals: BTreeMap::new(),
         terminal_connection: None,
         coil_phases: BTreeMap::new(),
-        motor_mapping_reviewed: false,
     };
     validate_geometry(&geometry)?;
     Ok(CadImportResult { geometry, warnings, units_to_mm: options.units_to_mm, source_units_mm })
@@ -1480,7 +1470,6 @@ mod tests {
             coil_terminals: BTreeMap::new(),
             terminal_connection: None,
             coil_phases: BTreeMap::new(),
-            motor_mapping_reviewed: false,
         };
         let text = cad_geometry_to_3d_dxf(&geometry).unwrap();
         let imported = import_3d_dxf(
@@ -1536,7 +1525,7 @@ mod tests {
     }
 
     #[test]
-    fn motor_mapping_requires_review_phase_ends_and_landed_vias() {
+    fn motor_mapping_requires_phase_ends_and_landed_vias_not_a_review_checkbox() {
         let mut geometry: CadGeometry = serde_json::from_value(serde_json::json!({
             "layer_z_mm": [-1.6, 0.0], "trace_width_mm": 0.2,
             "routing": { "format_version": 2, "segments": [
@@ -1548,11 +1537,8 @@ mod tests {
                 "output":{"position":{"x":2.0,"y":0.0},"layer":1}
             }}
         })).unwrap();
-        assert!(geometry.validate_motor_mapping(1, 0.127).unwrap_err().contains("Review"));
-        geometry.motor_mapping_reviewed = true;
         geometry.validate_motor_mapping(1, 0.127).unwrap();
         let saved: CadGeometry = serde_json::from_str(&serde_json::to_string(&geometry).unwrap()).unwrap();
-        assert!(saved.motor_mapping_reviewed);
         assert!(!saved.routing.segments[1].is_active);
         saved.validate_motor_mapping(1, 0.127).unwrap();
         assert!(geometry.validate_motor_mapping(2, 0.127).unwrap_err().contains("phase B"));
@@ -1603,7 +1589,6 @@ mod tests {
             coil_terminals: BTreeMap::new(),
             terminal_connection: None,
             coil_phases: BTreeMap::new(),
-            motor_mapping_reviewed: false,
         }
     }
 

@@ -23,7 +23,7 @@ test.beforeEach(async ({ page }) => {
       if (window.__mappingFixture) {
         const segments = ['A', 'B', 'C'].map((net, i) => ({ start: {x:0,y:i*2}, end:{x:2,y:i*2}, layer:0, net, is_active:true }));
         return {warnings:[],geometry:{layer_z_mm:[-1.6,0],trace_width_mm:width,
-          source_layer_coils:{L0_A:'A'}, coil_terminals:Object.fromEntries(segments.map(s => [s.net,{input:{position:s.start,layer:0},output:{position:s.end,layer:0}}])),
+          source_layer_coils:{L0_A:'A'},
           routing:{format_version:2,segments,curves:[],splines:[],vias:[]}}};
       }
       const source = { L0_A: 'A', L0_B: 'B', holes: 'holes' };
@@ -76,7 +76,7 @@ test("imported centerlines retain editable trace and via dimensions", async ({ p
   await expect(page.getByText("DXF centerlines are active", { exact: false })).toBeVisible();
 });
 
-test("import mapping blocks simulation until reviewed and never substitutes generated copper", async ({ page }) => {
+test("inferred ends require one acceptance and never substitute generated copper", async ({ page }) => {
   await page.addInitScript(() => { (window as any).__mappingFixture = true; });
   await page.route(/\/src\/lib\/ipc\/physics\.ts(?:\?t=\d+)?$/, async route => {
     const response = await route.fetch();
@@ -88,13 +88,31 @@ test("import mapping blocks simulation until reviewed and never substitutes gene
   const dialog = await openImport(page);
   await dialog.getByRole("button", { name: "Open with this geometry" }).click();
   await page.getByRole("tab", { name: /^Simulate/i }).click();
-  await expect(page.getByText("Complete the imported motor mapping in Design before simulating.")).toBeVisible();
+  const notice = page.getByRole("status", { name: "Inferred coil ends" });
+  await expect(notice).toBeVisible();
   expect(await page.evaluate(() => (window as any).__mappingSweepCalls ?? [])).toEqual([]);
-  await page.getByRole("tab", { name: /^Design/i }).click();
-  await page.getByRole("checkbox", { name: "Imported motor mapping reviewed" }).check();
-  await page.getByRole("tab", { name: /^Simulate/i }).click();
+  await notice.getByRole("button", { name: "Use inferred ends" }).click();
+  await expect(notice).toHaveCount(0);
   await expect.poll(async () => page.evaluate(() => (window as any).__mappingSweepCalls?.length ?? 0)).toBeGreaterThan(0);
-  expect(await page.evaluate(() => (window as any).__mappingSweepCalls.every((g: any) => g?.motor_mapping_reviewed && g.routing.segments.length === 3))).toBe(true);
+  expect(await page.evaluate(() => (window as any).__mappingSweepCalls.every((g: any) => Object.keys(g?.coil_terminals ?? {}).length === 3 && g.routing.segments.length === 3))).toBe(true);
+  await page.getByRole("tab", { name: /^Design/i }).click();
+  await expect(page.getByRole("heading", { name: "Imported coil phases" })).toHaveCount(0);
+  await page.getByRole("tab", { name: /^Simulate/i }).click();
+  await expect(notice).toHaveCount(0);
+});
+
+test("review opens coil ends and dismisses the inferred notice without requiring an edit", async ({ page }) => {
+  await page.addInitScript(() => { (window as any).__mappingFixture = true; });
+  const dialog = await openImport(page);
+  await dialog.getByRole("button", { name: "Open with this geometry" }).click();
+  await page.getByRole("tab", { name: /^Simulate/i }).click();
+  await page.getByRole("status", { name: "Inferred coil ends" }).getByRole("button", { name: "Review", exact: true }).click();
+  const modal = page.getByRole("dialog", { name: "Coil Preview", exact: true });
+  await expect(modal).toBeVisible();
+  await expect(modal.getByRole("region", { name: "Set coil terminals", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Close coil preview" }).click();
+  await page.getByRole("tab", { name: /^Simulate/i }).click();
+  await expect(page.getByRole("status", { name: "Inferred coil ends" })).toHaveCount(0);
 });
 
 test("DXF units auto-detect from the file and can be overridden", async ({ page }) => {
@@ -108,17 +126,16 @@ test("DXF units auto-detect from the file and can be overridden", async ({ page 
   await expect(dialog.getByTestId("cad-detected-units")).toHaveCount(0);
 });
 
-test("conductor roles can be assigned and undone without changing geometry", async ({ page }) => {
+test("phase assignment stays in import without conductor-role controls or review checkbox", async ({ page }) => {
   const dialog = await openImport(page);
-  await clickTrace(page, 0.5, 0);
-  const tools = dialog.getByRole("group", { name: "Segment selection tools" });
-  await expect(tools).toContainText("1 selected");
-  await tools.getByRole("button", { name: "Mark end-turn", exact: true }).click();
-  await tools.getByRole("button", { name: "Undo assignment", exact: true }).click();
-  await tools.getByRole("button", { name: "Mark end-turn", exact: true }).click();
+  await expect(dialog.getByRole("button", { name: /^Mark (active|end-turn)$/ })).toHaveCount(0);
+  await dialog.getByRole("combobox", { name: "Phase for coil A" }).selectOption("B");
+  await expect(dialog.getByRole("combobox", { name: "Phase for coil A" })).toHaveValue("B");
   await dialog.getByRole("button", { name: "Open with this geometry" }).click();
-  await expect(page.getByText("3 active conductors · 1 end-turns.", { exact: false })).toBeVisible();
-  await expect(page.getByRole("checkbox", { name: "Imported motor mapping reviewed" })).not.toBeChecked();
+  await expect(page.getByRole("checkbox", { name: "Imported motor mapping reviewed" })).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Imported coil phases" })).toHaveCount(0);
+  await page.getByRole("button", { name: "Expand coil preview" }).click();
+  await expect(page.getByRole("button", { name: /^Mark (active|end-turn)$/ })).toHaveCount(0);
 });
 
 test("imported geometry renders in the isometric view", async ({ page }) => {
@@ -289,8 +306,8 @@ test("changing a terminal keeps the inspection zoom and offers keyboard-accessib
   expect(tips.every((tip) => tip.length <= 140)).toBe(true);
 });
 
-test("simulation prompts for coil ends then reports remaining import mapping blockers", async ({ page }) => {
-  await page.addInitScript(() => { (window as any).__cadNoVias = true; });
+test("ends that cannot be inferred require manual picks and the notice clears after selection", async ({ page }) => {
+  await page.addInitScript(() => { (window as any).__cadNoVias = true; (window as any).__cadAmbiguous = true; });
   const dialog = await openImport(page);
   await dialog.getByRole("button", { name: "Open with this geometry" }).click();
   await expect(dialog).toBeHidden();
@@ -300,7 +317,7 @@ test("simulation prompts for coil ends then reports remaining import mapping blo
   // The phase-mapping box no longer lives in Simulation.
   await expect(panel.getByRole("heading", { name: "Imported coil phases" })).toHaveCount(0);
   // Imported copper with no confirmed ends blocks the simulation and prompts.
-  const alert = panel.getByRole("alert").filter({ hasText: "Select the coil ends before simulating" });
+  const alert = panel.getByRole("alert").filter({ hasText: "Coil ends could not be inferred" });
   await expect(alert).toBeVisible();
   await expect(panel.getByText("Thrust and driver results use the imported copper.")).toHaveCount(0);
 
@@ -308,16 +325,16 @@ test("simulation prompts for coil ends then reports remaining import mapping blo
   const modal = page.getByRole("dialog", { name: "Coil Preview", exact: true });
   await expect(modal).toBeVisible();
   const command = page.getByRole("region", { name: "Set coil terminals", exact: true });
-  await expect(command.getByRole("status")).toContainText("Review A");
-  await command.getByRole("button", { name: "Apply terminals", exact: true }).click();
-  await command.getByRole("button", { name: "Select driver end for coil B", exact: true }).click();
-  await command.getByRole("button", { name: "Keep current points", exact: true }).click();
+  await expect(command.getByRole("button", { name: "Apply terminals", exact: true })).toBeDisabled();
+  await page.getByRole("button", { name: "Endpoint coil A, L0, X 0 mm, Y 0 mm", exact: true }).click();
+  await page.getByRole("button", { name: "Endpoint coil A, L0, X 2 mm, Y 0 mm", exact: true }).click();
   await command.getByRole("button", { name: "Apply terminals", exact: true }).click();
   await page.getByRole("button", { name: "Close coil preview" }).click();
 
   await page.getByRole("tab", { name: /^Simulate/i }).click();
   await expect(alert).toHaveCount(0);
-  await expect(panel.getByText("Complete the imported motor mapping in Design before simulating.")).toBeVisible();
+  await expect(panel.getByRole("status", { name: "Inferred coil ends" })).toHaveCount(0);
+  await expect(panel.getByText("Update the imported geometry before simulating.")).toBeVisible();
   await expect(panel.getByText("No imported coil is assigned to phase C.")).toBeVisible();
   await expect(panel.getByText("Thrust and driver results use the imported copper.")).toHaveCount(0);
 });

@@ -6,7 +6,6 @@ import { coilsMissingEnds } from "./cadTerminals";
 /** Early UI checks. The backend repeats these before every motor workflow. */
 export function cadMappingProblems(g: CadGeometry, phases: number, minimumWidth: number): string[] {
   const problems: string[] = [];
-  if (!g.motor_mapping_reviewed) problems.push("Review conductor roles, layer heights, and via connections.");
   if (!Number.isFinite(g.trace_width_mm) || g.trace_width_mm < minimumWidth || g.trace_width_mm <= 0)
     problems.push(`Imported trace width must be at least ${minimumWidth} mm.`);
   if (!g.layer_z_mm.length || !g.layer_z_mm.every(Number.isFinite)) problems.push("Set finite copper layer heights.");

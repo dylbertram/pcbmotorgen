@@ -9,7 +9,7 @@
   } from "../../types";
   import { unmappedCoils } from "../../cadPhases";
   import { cadMappingProblems } from "../../cadMapping";
-  import { coilsMissingEnds } from "../../cadTerminals";
+  import { inferMissingCoilEnds } from "../../cadTerminals";
   import { usesDeltaConnection } from "../../driverConnection";
   import FluxDiagram from "../simulate/FluxDiagram.svelte";
   import ForceSweepPlot from "../simulate/ForceSweepPlot.svelte";
@@ -30,6 +30,7 @@
     cadGeometry = null,
     onConfigureWinding,
     onSelectEnds,
+    onUseInferredEnds,
   }: {
     config: ConfigStore;
     active: boolean;
@@ -43,7 +44,10 @@
     onConfigureWinding?: () => void;
     /** Open the coil-ends panel for the active copper. */
     onSelectEnds?: () => void;
+    onUseInferredEnds?: () => void;
   } = $props();
+
+  let coilEnds = $derived(cadGeometry ? inferMissingCoilEnds(cadGeometry) : null);
 </script>
 
 <div class="grid gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
@@ -56,20 +60,28 @@
       </p>
     </div>
     {#if cadGeometry}
-      {@const missingEnds = coilsMissingEnds(cadGeometry)}
-      {#if missingEnds.length}
+      {#if coilEnds && coilEnds.unresolved.length}
         <div class="rounded-md border border-rose-500/60 bg-rose-500/10 px-3 py-2.5 text-xs text-rose-100" role="alert">
-          <p class="font-semibold text-rose-200">Select the coil ends before simulating</p>
+          <p class="font-semibold text-rose-200">Coil ends could not be inferred</p>
           <p class="mt-1 text-rose-100/90">
-            {missingEnds.length} coil{missingEnds.length === 1 ? "" : "s"} still need a driver end and its opposite end. Resistance, inductance and thrust are not valid until every coil has its ends.
+            Select the driver end and opposite end for {coilEnds.unresolved.join(", ")} in the coil preview to continue.
           </p>
           {#if onSelectEnds}
             <button type="button" onclick={onSelectEnds} class="mt-2 rounded border border-rose-400/60 px-2 py-1 font-medium text-rose-100 hover:bg-rose-500/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-rose-300">Select coil ends</button>
           {/if}
         </div>
+      {:else if coilEnds && coilEnds.pending.length}
+        <div class="rounded-md border border-amber-500/50 bg-amber-500/10 px-3 py-2.5 text-xs text-amber-100" role="status" aria-label="Inferred coil ends">
+          <p class="font-semibold">Coil ends inferred</p>
+          <p class="mt-1">Use these ends, or review which end connects to the driver in the coil preview.</p>
+          <div class="mt-2 flex gap-2">
+            {#if onUseInferredEnds}<button type="button" onclick={onUseInferredEnds} class="rounded border border-amber-400/60 px-2 py-1 hover:bg-amber-500/20">Use inferred ends</button>{/if}
+            {#if onSelectEnds}<button type="button" onclick={onSelectEnds} class="rounded border border-slate-600 px-2 py-1 hover:bg-slate-800">Review</button>{/if}
+          </div>
+        </div>
       {:else if cadMappingProblems(cadGeometry, config.phases, config.min_trace_mm).length}
         <div class="rounded-md border border-amber-500/50 bg-amber-500/10 px-3 py-2 text-xs text-amber-100" role="alert">
-          <p>Complete the imported motor mapping in Design before simulating.</p>
+          <p>Update the imported geometry before simulating.</p>
           <ul>{#each cadMappingProblems(cadGeometry, config.phases, config.min_trace_mm) as problem (problem)}<li>{problem}</li>{/each}</ul>
         </div>
       {:else}

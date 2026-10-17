@@ -7,6 +7,7 @@
   import type { SensorStore } from "../../stores/sensor.svelte";
   import type { CadGeometry, CadImportResult } from "../../types";
   import { cadCoilNames, joinCadPreviewEndpoints } from "../../cadPreview";
+  import { PHASE_LABELS, phaseOf, withCoilPhase } from "../../cadPhases";
   import { simplifyCadLines } from "../../cadSimplify";
   import { PHASE_COLORS } from "../design/coilPreviewCanvas";
   import { arcSvgPath, splineSvgPath } from "../../curvePaths";
@@ -502,6 +503,25 @@
             <p role="alert" class="mt-2 text-xs text-rose-200">Enter a coil name for every source layer assignment.</p>
           {/if}
         </section>
+        {#if coilType === "motor"}
+          <section class="border-t border-slate-700 pt-3" aria-label="Motor phase assignments">
+            <h3 class="text-xs font-medium text-slate-100">Motor phases</h3>
+            <p class="mt-2 text-xs text-slate-400">Choose the motor phase for each coil. Coils on the same phase are driven in parallel.</p>
+            <div class="mt-3 grid gap-2">
+              {#each previewCoils as coil (coil)}
+                <label class="flex items-center justify-between gap-3 text-xs text-slate-300">
+                  <span class="min-w-0 truncate">{coil}</span>
+                  <select aria-label={`Phase for coil ${coil}`} value={phaseOf(imported.geometry, coil) ?? ""} disabled={busy}
+                    onchange={(event) => { if (imported) updateImportedGeometry(withCoilPhase(imported.geometry, coil, event.currentTarget.value || null)); }}
+                    class="w-28 shrink-0 rounded-md border border-slate-700 bg-slate-900 px-2 py-1 text-xs text-slate-100">
+                    <option value="">Choose phase</option>
+                    {#each PHASE_LABELS.slice(0, config.phases) as phase (phase)}<option value={phase}>Phase {phase}</option>{/each}
+                  </select>
+                </label>
+              {/each}
+            </div>
+          </section>
+        {/if}
       {/if}
       </aside>
       <main class="flex min-h-0 min-w-0 flex-col overflow-hidden p-3">

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { assignCadTerminals, cadTerminalCandidates, coilsMissingEnds, defaultCadTerminals } from "./cadTerminals";
+import { assignCadTerminals, cadTerminalCandidates, coilsMissingEnds, defaultCadTerminals, inferMissingCoilEnds } from "./cadTerminals";
 import { cadGeometryToPreview } from "./cadPreview";
 import { simplifyCadLines } from "./cadSimplify";
 import type { CadGeometry, CadTerminal } from "./types";
@@ -19,6 +19,26 @@ const terminalFixture = (): CadGeometry => ({
 const terminal = (x: number, layer = 0, y = 0): CadTerminal => ({ position: { x, y }, layer });
 
 describe("CAD terminals", () => {
+  it("proposes inferred ends without mutating the project, then persists acceptance", () => {
+    const original = terminalFixture();
+    const proposal = inferMissingCoilEnds(original);
+    expect(proposal.pending).toEqual(["A", "B"]);
+    expect(proposal.unresolved).toEqual([]);
+    expect(original.coil_terminals).toBeUndefined();
+    expect(coilsMissingEnds(proposal.geometry)).toEqual([]);
+    const restored = JSON.parse(JSON.stringify(proposal.geometry));
+    expect(inferMissingCoilEnds(restored).pending).toEqual([]);
+  });
+
+  it("preserves chosen ends while identifying coils that need manual selection", () => {
+    const original = assignCadTerminals(terminalFixture(), "B", { input: terminal(1, 0, 2), output: terminal(0, 0, 2) });
+    original.routing.segments.push({ start: { x: 1, y: 0 }, end: { x: 1, y: 1 }, net: "A", layer: 0, is_active: true });
+    const proposal = inferMissingCoilEnds(original);
+    expect(proposal.pending).toEqual(["A"]);
+    expect(proposal.unresolved).toEqual(["A"]);
+    expect(proposal.geometry.coil_terminals?.B).toEqual(original.coil_terminals?.B);
+    expect(proposal.geometry.coil_terminals?.A).toBeUndefined();
+  });
   it("deduplicates shared endpoints without combining copper layers or coils", () => {
     const candidates = cadTerminalCandidates(terminalFixture(), "A");
     expect(candidates).toHaveLength(5);

@@ -163,6 +163,21 @@ export function coilsMissingEnds(geometry: CadGeometry): string[] {
   });
 }
 
+/** Propose only safe inferred pairs; accepting them is an explicit UI action. */
+export function inferMissingCoilEnds(geometry: CadGeometry): {
+  geometry: CadGeometry; pending: string[]; unresolved: string[];
+} {
+  const pending = coilsMissingEnds(geometry);
+  const unresolved: string[] = [];
+  let inferred = geometry;
+  for (const coil of pending) {
+    const pair = defaultCadTerminals(geometry, coil);
+    if (pair) inferred = assignCadTerminals(inferred, coil, pair);
+    else unresolved.push(coil);
+  }
+  return { geometry: inferred, pending, unresolved };
+}
+
 export function assignCadTerminals(geometry: CadGeometry, coil: string, terminals: CadCoilTerminals): CadGeometry {
   const candidates = cadTerminalCandidates(geometry, coil);
   if (!candidates.some((p) => sameTerminal(p, terminals.input)) || !candidates.some((p) => sameTerminal(p, terminals.output))) {
