@@ -12,8 +12,11 @@ bottom face (top of the backplane stack), the PCB spans 0..1.6, the magnets
 sit 0.5 mm above it.
 
 The model check uses the model's own assumptions:
-  * inductance: a sinusoidal current sheet (wavenumber pi/tau) at the PCB
-    midplane; factor = (A.J with stack) / (A.J without);
+  * inductance: equal sinusoidal current sheets (wavenumber pi/tau), one per
+    copper layer, spread evenly from the PCB bottom to the PCB top. Each sheet
+    is solved alone and factor = sum(A.J with stack) / sum(A.J without), which
+    is the model's equal-weight average. A second run drives all sheets at
+    once, so it includes the coupling between sheets that the model leaves out;
   * attraction / field: the alternating magnet row, linear materials.
 The benchmark slice cuts the benchmark winding (DXF) at the middle of the board and
 reports the line-to-line inductance factor of that copper layout.
@@ -142,17 +145,42 @@ def stack_bands(stack, freq):
     return bands, list(mats.values())
 
 
-def sheet_rects(n=48, y=T_PCB / 2, t=0.02, j0=1.0):
-    """Sinusoidal current sheet, wavenumber pi/tau, as n strips."""
+SHEET_T = 0.02  # current sheet thickness [mm]
+
+
+def sheet_ys(layers):
+    """Sheet centres for `layers` copper layers, evenly from the PCB bottom face
+    to the top face (the model's d_i = i*T/(N-1)), kept inside the PCB."""
+    return [SHEET_T / 2 + i * (T_PCB - SHEET_T) / (layers - 1) for i in range(layers)]
+
+
+def sheet_rects(ys, n=48, t=SHEET_T, j0=1.0):
+    """Equal sinusoidal current sheets at heights `ys`, wavenumber pi/tau, as
+    n strips each."""
     mats, rects = [], []
     w = PERIOD / n
-    for i in range(n):
-        xc = -PERIOD / 2 + (i + 0.5) * w
-        name = f"src{i}"
-        mats.append(dict(name=name, mu=1.0, j=j0 * math.cos(math.pi * xc / TAU)))
-        rects.append(dict(x0=xc - 0.4 * w, x1=xc + 0.4 * w, y0=y - t / 2, y1=y + t / 2,
-                          mat=name, mesh=t, group=1))
+    for s, y in enumerate(ys):
+        for i in range(n):
+            xc = -PERIOD / 2 + (i + 0.5) * w
+            name = f"src{s}_{i}"
+            mats.append(dict(name=name, mu=1.0, j=j0 * math.cos(math.pi * xc / TAU)))
+            rects.append(dict(x0=xc - 0.4 * w, x1=xc + 0.4 * w, y0=y - t / 2, y1=y + t / 2,
+                              mat=name, mesh=t, group=1))
     return rects, mats
+
+
+def sheet_factors(name, stack, work, layers=2, freq=0.0, base=None):
+    """(sum of A.J over sheets solved alone, A.J with all sheets driven).
+    Divided by the same pair for `base` when given."""
+    tag = f"{name}.sheet{layers}" + (".ac" if freq else "")
+    ys = sheet_ys(layers)
+    alone = sum(run_femm(build_case(f"{tag}.{s}", stack, sheet_rects([y]), freq=freq),
+                         work)["AJ_sources_re"] for s, y in enumerate(ys))
+    together = run_femm(build_case(f"{tag}.all", stack, sheet_rects(ys), freq=freq),
+                        work)["AJ_sources_re"]
+    if base:
+        return alone / base[0], together / base[1]
+    return alone, together
 
 
 def magnet_rects():
@@ -184,9 +212,7 @@ def upper_bands(top_extra=None):
 def build_case(name, stack, source, freq=0.0, upper=None, extra_mats=()):
     lower, mats = stack_bands(stack, freq)
     labels = []
-    if source == "sheet":
-        rects, smats = sheet_rects()
-    elif source == "magnets":
+    if source == "magnets":
         rects, smats, labels = magnet_rects()
     else:
         rects, smats = source
@@ -223,16 +249,18 @@ def run_femm(case, work):
 # Rust model
 # --------------------------------------------------------------------------
 
-def rust_model(cases):
-    payload = json.dumps({"geometry": G, "cases": [{"name": n, "stack": s} for n, _, s in cases]})
+def rust_model(cases, layers=2):
+    geometry = dict(G, copper_layers=layers)
+    payload = json.dumps({"geometry": geometry, "cases": [{"name": n, "stack": s} for n, _, s in cases]})
     r = subprocess.run(["cargo", "run", "-q", "-p", "pcbmotorgen-simulation", "--example",
                         "backplane_dump"], input=payload, capture_output=True, text=True,
                        cwd=REPO, check=True)
     return {d["name"]: d for d in map(json.loads, r.stdout.splitlines())}
 
 
-def exact_sheet_factor(stack):
-    """1-D transfer solution for a sin current sheet over one linear slab."""
+def exact_sheet_factor(stack, ys):
+    """1-D transfer solution for sin current sheets at heights `ys` over one
+    linear slab: (sheets alone, all sheets driven), or None."""
     if stack["housing"] or len(stack["layers"]) != 1:
         return None
     lay = stack["layers"][0]
@@ -241,7 +269,10 @@ def exact_sheet_factor(stack):
     x = math.exp(-2 * k * lay["thickness_m"] * 1e3)
     r = (mu - 1) / (mu + 1)
     refl = r * (1 - x) / (1 - r * r * x)
-    return 1 + refl * math.exp(-2 * k * T_PCB / 2)
+    alone = 1 + refl * sum(math.exp(-2 * k * y) for y in ys) / len(ys)
+    image = sum(math.exp(-k * (a + b)) for a in ys for b in ys)
+    free = sum(math.exp(-k * abs(a - b)) for a in ys for b in ys)
+    return alone, 1 + refl * image / free
 
 
 # --------------------------------------------------------------------------
@@ -352,17 +383,29 @@ def winding_slice(dxf, y_cut, x_centre, trace_w):
     return win
 
 
-def slice_case(name, win, stack, cu_t=0.035, mode="ll", yoke=None):
+def copper_y0(layers, cu_t=0.035):
+    """Bottom face of each copper sheet for the DXF layers. Two layers: L1 on
+    the PCB bottom, L0 on the top. Four layers (sheets at 0, T/3, 2T/3, T):
+    the L1 pattern on the lower two sheets and the L0 pattern on the upper two,
+    each conductor carrying its 2-layer current."""
+    if layers == 2:
+        return {"L1": [0.0], "L0": [T_PCB - cu_t]}
+    assert layers == 4
+    return {"L1": [0.0, T_PCB / 3 - cu_t / 2], "L0": [2 * T_PCB / 3 - cu_t / 2, T_PCB - cu_t]}
+
+
+def slice_case(name, win, stack, cu_t=0.035, mode="ll", yoke=None, layers=2):
     rects, mats = [], []
+    ys = copper_y0(layers, cu_t)
     for k, c in enumerate(win):
         cur = c["i"] * (c["sign"] if mode == "ll" else (1.0 if c["phase"] == "A" else 0.0))
         area = c["w"] * cu_t  # mm^2
         mname = f"cu{k}"
         mats.append(dict(name=mname, mu=1.0, j=cur / area))  # A/mm^2 = MA/m^2
-        y0 = T_PCB - cu_t if c["layer"] == "L0" else 0.0
         assert -PERIOD / 2 + 0.02 < c["x"] - c["w"] / 2 and c["x"] + c["w"] / 2 < PERIOD / 2 - 0.02
-        rects.append(dict(x0=c["x"] - c["w"] / 2, x1=c["x"] + c["w"] / 2, y0=y0, y1=y0 + cu_t,
-                          mat=mname, mesh=cu_t / 2, group=1))
+        for y0 in ys[c["layer"]]:
+            rects.append(dict(x0=c["x"] - c["w"] / 2, x1=c["x"] + c["w"] / 2, y0=y0, y1=y0 + cu_t,
+                              mat=mname, mesh=cu_t / 2, group=1))
     extra, top = [], None
     if yoke:
         y_bot, t, mu = yoke
@@ -387,13 +430,15 @@ def main():
 
     model = rust_model(CASES)
     femm = {}
+    base_sheet = sheet_factors("none", CASES[0][2], args.work)
+    base_ac = sheet_factors("none", CASES[0][2], args.work, freq=PWM_HZ)
     for name, _, stack in CASES:
         femm[name] = {
-            "sheet": run_femm(build_case(f"{name}.sheet", stack, "sheet"), args.work),
+            "sheet": sheet_factors(name, stack, args.work, base=base_sheet),
             "mag": run_femm(build_case(f"{name}.mag", stack, "magnets"), args.work),
         }
         if name in AC_CASES:
-            femm[name]["ac"] = run_femm(build_case(f"{name}.ac", stack, "sheet", freq=PWM_HZ), args.work)
+            femm[name]["ac"] = sheet_factors(name, stack, args.work, freq=PWM_HZ, base=base_ac)
         print(f"done {name}", file=sys.stderr)
 
     base = femm["none"]
@@ -402,14 +447,13 @@ def main():
     for name, label, stack in CASES:
         m, f = model[name], femm[name]
         a = m["analysis"]
-        lf_femm = f["sheet"]["AJ_sources_re"] / base["sheet"]["AJ_sources_re"]
-        exact = exact_sheet_factor(stack)
-        ac = ""
-        if "ac" in f:
-            ac = f"{f['ac']['AJ_sources_re'] / base['ac']['AJ_sources_re']:.3f}"
-        err = (a["inductance_factor"] - lf_femm) / lf_femm * 100
+        alone, together = f["sheet"]
+        exact = exact_sheet_factor(stack, sheet_ys(2))
+        ac = f"{f['ac'][0]:.3f}" if "ac" in f else ""
+        err = (a["inductance_factor"] - alone) / alone * 100
         rows_l.append(f"| {label} | {a['image_strength']:.3f} | {a['inductance_factor']:.3f} | "
-                      f"{lf_femm:.3f} | {'' if exact is None else f'{exact:.3f}'} | {err:+.1f} % | {ac} |")
+                      f"{alone:.3f} | {'' if exact is None else f'{exact[0]:.3f}'} | {err:+.1f} % | "
+                      f"{together:.3f} | {'' if exact is None else f'{exact[1]:.3f}'} | {ac} |")
         # Attraction as mean pressure over the magnet footprint [kPa].
         p_model = a["attraction_n"] / m["magnet_area_m2"] / 1e3
         p_femm = f["mag"].get("Fy_stack", 0.0) / (2 * w * 1.0) / 1e3
@@ -420,10 +464,23 @@ def main():
                       f"{m['field_ratio_2d']:.3f} | {fr_femm:.3f} | {fr_err:+.1f} % | "
                       f"{-(f['mag']['Fy_magnets'] - base['mag']['Fy_magnets']) / (2 * w) / 1e3:.1f} |")
 
-    print("\n### Inductance factor (sin current sheet at the PCB midplane)\n")
-    print("| Stack | model K | model factor | FEMM factor | exact 1-D | model error | FEMM 100 kHz |")
-    print("|---|---|---|---|---|---|---|")
+    print("\n### Inductance factor (2 sin current sheets, PCB bottom and top)\n")
+    print("| Stack | model K | model factor | FEMM, sheets alone | exact 1-D | model error | "
+          "FEMM, sheets together | exact 1-D | FEMM 100 kHz, alone |")
+    print("|---|---|---|---|---|---|---|---|---|")
     print("\n".join(rows_l))
+
+    # 4 copper layers, MnZn 2 mm: sheets at 0, T/3, 2T/3, T.
+    mnzn = next(c for c in CASES if c[0] == "mnzn_2")
+    m4 = rust_model([mnzn], layers=4)["mnzn_2"]["analysis"]
+    alone, together = sheet_factors("mnzn_2", mnzn[2], args.work, layers=4,
+                                    base=sheet_factors("none", CASES[0][2], args.work, layers=4))
+    exact = exact_sheet_factor(mnzn[2], sheet_ys(4))
+    print("\n### Inductance factor, 4 sheets (0, T/3, 2T/3, T), MnZn 2 mm\n")
+    print("| model factor | FEMM, sheets alone | exact 1-D | model error | FEMM, sheets together | exact 1-D |")
+    print("|---|---|---|---|---|---|")
+    print(f"| {m4['inductance_factor']:.3f} | {alone:.3f} | {exact[0]:.3f} | "
+          f"{(m4['inductance_factor'] - alone) / alone * 100:+.1f} % | {together:.3f} | {exact[1]:.3f} |")
     print("\n### Attraction and field (alternating magnet row)\n")
     print("| Stack | model p [kPa] | FEMM p [kPa] | p error | model B ratio | FEMM B ratio | B error | FEMM p, magnet-side check [kPa] |")
     print("|---|---|---|---|---|---|---|---|")
@@ -453,16 +510,30 @@ def main():
         ("MnZn 2 mm + mu_r 1e5 yoke 0.5 mm above the PCB", mnzn2, {"yoke": (T_PCB + 0.5, 2.0, 1e5)}),
         ("MnZn 2 mm + mu_r 1e5 yoke 0.3 mm above the PCB", mnzn2, {"yoke": (T_PCB + 0.3, 2.0, 1e5)}),
     ]
-    print("| Slice | FEMM L-L factor | FEMM phase-A factor |")
-    print("|---|---|---|")
-    ref = {mode: run_femm(slice_case(f"slice.none.{mode}", win, none, mode=mode),
-                          args.work)["AJ_sources_re"] for mode in ("ll", "a")}
-    for k, (label, stack, kw) in enumerate(runs):
-        out = []
-        for mode in ("ll", "a"):
-            r = run_femm(slice_case(f"slice.{k}.{mode}", win, stack, mode=mode, **kw), args.work)
-            out.append(r["AJ_sources_re"] / ref[mode])
-        print(f"| {label} | {out[0]:.3f} | {out[1]:.3f} |")
+    # The model has no yoke and no mu_r 1e5 material, so only the first rows
+    # get a model value.
+    slice_model = {2: rust_model([("0", "", mnzn2), ("1", "", gap_mnzn2), ("2", "", mnzn5)]),
+                   4: rust_model([("0", "", mnzn2)], layers=4)}
+    kk = math.pi / TAU
+    print("| Slice | layers | FEMM L-L factor | FEMM phase-A factor | model, midplane | model, layered | layered error (L-L) |")
+    print("|---|---|---|---|---|---|---|")
+    for layers, rows in ((2, runs), (4, runs[:1])):
+        ref = {mode: run_femm(slice_case(f"slice.none.{mode}" + ("" if layers == 2 else f".n{layers}"),
+                                         win, none, mode=mode, layers=layers),
+                              args.work)["AJ_sources_re"] for mode in ("ll", "a")}
+        for k, (label, stack, kw) in enumerate(rows):
+            out = []
+            for mode in ("ll", "a"):
+                tag = f"slice.{k}.{mode}" + ("" if layers == 2 else f".n{layers}")
+                r = run_femm(slice_case(tag, win, stack, mode=mode, layers=layers, **kw), args.work)
+                out.append(r["AJ_sources_re"] / ref[mode])
+            a = slice_model[layers].get(str(k), {}).get("analysis")
+            cols = ["", "", ""]
+            if a:
+                mid = 1 + a["image_strength"] * math.exp(-kk * T_PCB)
+                lf = a["inductance_factor"]
+                cols = [f"{mid:.3f}", f"{lf:.3f}", f"{(lf - out[0]) / out[0] * 100:+.1f} %"]
+            print(f"| {label} | {layers} | {out[0]:.3f} | {out[1]:.3f} | " + " | ".join(cols) + " |")
 
 
 if __name__ == "__main__":
