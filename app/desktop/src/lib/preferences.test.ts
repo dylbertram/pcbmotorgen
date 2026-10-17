@@ -23,6 +23,15 @@ describe("preferences", () => {
     expect(readPreferences()).toEqual({ appearance: "auto", rules: DEFAULT_RULES });
   });
 
+  it("migrates a legacy ruleset using its saved copper width", () => {
+    values.set(PREFERENCES_KEY, JSON.stringify({ rules: {
+      min_trace_mm: 0.3, min_space_mm: 0.2, min_via_drill_mm: 0.4, min_via_annular_ring_mm: 0.1,
+    } }));
+    expect(readPreferences().rules.trace_width_mm).toBe(0.3);
+    expect(readPreferences().rules.min_space_mm).toBe(0.2);
+    expect(validRules({ ...DEFAULT_RULES, trace_width_mm: 0.05 })).toBe(false);
+  });
+
   it("recovers from corrupt and invalid preferences", () => {
     for (const value of ["{bad", "null", JSON.stringify({ appearance: "sepia", rules: { ...DEFAULT_RULES, min_trace_mm: -1 } })]) {
       values.set(PREFERENCES_KEY, value);

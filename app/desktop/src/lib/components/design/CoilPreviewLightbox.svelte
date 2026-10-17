@@ -185,7 +185,7 @@
           <PreviewFrame bind:frame={modalFrameRef} {gestures} {measure} interactive={terminalTool?.active ?? false}
             label="Coil preview — expanded">
             {#if view.viewMode === "iso"}
-              <CoilPreviewIsoView geometry={terminalGeometry ?? importedGeometry} {view} />
+              <CoilPreviewIsoView geometry={terminalGeometry ?? importedGeometry} {view} isVisible={isTerminalVisible} />
             {:else}
             <canvas bind:this={modalCanvasRef} class="block h-full w-full"
             ></canvas>

@@ -29,7 +29,8 @@ export const RULE_FIELDS = [
 ] as const;
 
 export function validRules(rules: DrcRules): boolean {
-  return RULE_FIELDS.every(({ key }) => Number.isFinite(rules[key]) && rules[key] > 0);
+  return RULE_FIELDS.every(({ key }) => Number.isFinite(rules[key]) && rules[key] > 0)
+    && rules.trace_width_mm >= rules.min_trace_mm;
 }
 
 export function readPreferences(): Preferences {
@@ -46,6 +47,7 @@ export function readPreferences(): Preferences {
         const value = stored.rules[key];
         if (Number.isFinite(value) && value > 0) defaults.rules[key] = value;
       }
+      if (stored.rules.trace_width_mm == null) defaults.rules.trace_width_mm = defaults.rules.min_trace_mm;
     }
   } catch {
     // Missing, corrupt, or unavailable storage must not prevent startup.

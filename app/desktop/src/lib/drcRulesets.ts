@@ -27,7 +27,9 @@ function parseStored(raw: string | null): DrcRuleset[] {
   try {
     const saved: unknown = JSON.parse(raw ?? "null");
     if (!Array.isArray(saved)) return [];
-    return saved.filter((ruleset): ruleset is DrcRuleset =>
+    return saved.map((entry) => entry && typeof entry === "object" && entry.rules
+      ? { ...entry, rules: { ...entry.rules, trace_width_mm: entry.rules.trace_width_mm ?? entry.rules.min_trace_mm } }
+      : entry).filter((ruleset): ruleset is DrcRuleset =>
       ruleset !== null && typeof ruleset === "object" &&
       rulesetValidationError(ruleset as DrcRuleset) === null);
   } catch {
