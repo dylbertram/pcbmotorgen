@@ -5,9 +5,12 @@
 //! ```json
 //! { "geometry": { "pole_pitch_mm": 6, "magnet_width_mm": 5, "magnet_cross_width_mm": 5,
 //!                 "magnet_height_mm": 3, "magnet_count": 5, "remanence_t": 1.34,
-//!                 "air_gap_mm": 0.5, "pcb_thickness_mm": 1.6 },
+//!                 "air_gap_mm": 0.5, "pcb_thickness_mm": 1.6, "copper_layers": 2 },
 //!   "cases": [ { "name": "mnzn_2mm", "stack": { "layers": [...], "housing": null } } ] }
 //! ```
+//!
+//! `copper_layers` is optional and defaults to 2. It sets `num_layers`, the
+//! copper sheet count of the layered inductance factor.
 //!
 //! and writes one JSON object per case to stdout with the [`BackplaneAnalysis`]
 //! for that geometry plus `field_ratio_2d`: Bz at the PCB top under a magnet
@@ -34,6 +37,12 @@ struct Geometry {
     remanence_t: f64,
     air_gap_mm: f64,
     pcb_thickness_mm: f64,
+    #[serde(default = "default_copper_layers")]
+    copper_layers: u32,
+}
+
+fn default_copper_layers() -> u32 {
+    2
 }
 
 #[derive(Deserialize)]
@@ -61,6 +70,7 @@ fn sim_for(g: &Geometry) -> SimulationInput {
         air_gap_m: mm(g.air_gap_mm),
         pcb_thickness_m: mm(g.pcb_thickness_mm),
         board_width_m: mm(g.magnet_cross_width_mm),
+        num_layers: g.copper_layers,
         ..SimulationInput::default()
     }
 }
@@ -94,5 +104,22 @@ fn main() {
             "magnet_area_m2": sim.magnet_count as f64 * sim.magnet_dims_m[0] * sim.magnet_dims_m[1],
         });
         println!("{out}");
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn copper_layers_default_to_two() {
+        let g: Geometry = serde_json::from_str(
+            r#"{ "pole_pitch_mm": 6, "magnet_width_mm": 5, "magnet_cross_width_mm": 5,
+                 "magnet_height_mm": 3, "magnet_count": 5, "remanence_t": 1.34,
+                 "air_gap_mm": 0.5, "pcb_thickness_mm": 1.6 }"#,
+        )
+        .unwrap();
+        assert_eq!(g.copper_layers, 2);
+        assert_eq!(sim_for(&g).num_layers, 2);
     }
 }
