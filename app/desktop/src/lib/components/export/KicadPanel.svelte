@@ -16,7 +16,7 @@
     InterferenceViolation,
     CadGeometry,
   } from "../../types";
-  import { unmappedCoils } from "../../cadPhases";
+  import { cadMappingProblems } from "../../cadMapping";
   import KicadConnectionCard from "./KicadConnectionCard.svelte";
   import KicadPreflightCard from "./KicadPreflightCard.svelte";
   import KicadWriteControls from "./KicadWriteControls.svelte";
@@ -61,7 +61,7 @@
   let toastTimer: ReturnType<typeof setTimeout> | undefined;
 
   // --- Derived -----------------------------------------------------------
-  let unmapped = $derived(cadGeometry ? unmappedCoils(cadGeometry) : []);
+  let mappingProblems = $derived(cadGeometry ? cadMappingProblems(cadGeometry, config.phases, config.min_trace_mm) : []);
   let connected = $derived(connection?.connected ?? false);
   let boardName = $derived(connection?.board_name ?? "(not connected)");
   let copperLayers = $derived(connection?.copper_layers ?? 0);
@@ -187,8 +187,8 @@
   }
 
   async function handleWrite(): Promise<void> {
-    if (unmapped.length) {
-      error = `Assign a phase to every imported coil before writing (unassigned: ${unmapped.join(", ")}).`;
+    if (mappingProblems.length) {
+      error = mappingProblems.join(" ");
       return;
     }
     if (!overrideDrc && drcGateBlocked) {

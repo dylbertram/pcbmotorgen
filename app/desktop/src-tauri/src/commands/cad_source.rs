@@ -24,8 +24,86 @@ pub struct CadBoard {
     pub width_mm: f64,
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn mapped() -> CadGeometry {
+        serde_json::from_value(serde_json::json!({
+            "motor_mapping_reviewed":true, "trace_width_mm":0.2, "layer_z_mm":[-1.6,0.0],
+            "routing":{"format_version":2,"segments":[
+                {"start":{"x":0.0,"y":0.0},"end":{"x":1.0,"y":0.0},"layer":0,"net":"coil","is_active":true},
+                {"start":{"x":1.0,"y":0.0},"end":{"x":2.0,"y":0.0},"layer":1,"net":"coil","is_active":false}
+            ],"curves":[],"vias":[{"position":{"x":1.0,"y":0.0},"from_layer":0,"to_layer":1,"net":"coil"}]},
+            "coil_phases":{"coil":"A"},
+            "coil_terminals":{"coil":{
+                "input":{"position":{"x":0.0,"y":0.0},"layer":0},
+                "output":{"position":{"x":2.0,"y":0.0},"layer":1}
+            }}
+        })).unwrap()
+    }
+
+    #[test]
+    fn mapped_import_drives_board_and_electrical_inputs_without_regeneration() {
+        let core = LinearMotorConfig { phases:1, routing_pattern:"missing-plugin".into(), ..Default::default() };
+        let cad = mapped();
+        let board = CadBoard::new(&cad, &core).unwrap();
+        assert_eq!(board.routing.segments.len(), 2);
+        assert_eq!(board.routing.segments[0].net, "A");
+        assert!(!board.routing.segments[1].is_active);
+        assert_eq!(board.rules.min_trace_mm, 0.127);
+        assert_eq!(board.rules.trace_width_mm, 0.2);
+        let sim = board.simulation_input(&cad, &core);
+        assert_eq!(sim.min_trace_m, 0.0002);
+        assert_eq!(sim.num_layers, 2);
+        let analysis = pcbmotorgen_simulation::drive::analyze_drive_with(
+            &sim, &board.routing, &Default::default(), None, &CadBoard::drive_hints(&cad));
+        assert!(analysis.phases[0].connected);
+        assert!(analysis.phase_resistance_ohm > 0.0);
+    }
+
+    #[test]
+    fn incomplete_mapping_and_disconnected_islands_are_rejected() {
+        let core = LinearMotorConfig { phases:1, ..Default::default() };
+        let mut cad = mapped();
+        cad.motor_mapping_reviewed = false;
+        assert!(CadBoard::new(&cad, &core).err().unwrap().contains("Review"));
+        cad.motor_mapping_reviewed = true;
+        let mut island = cad.routing.segments[0].clone();
+        island.start.x += 100.0;
+        island.end.x += 100.0;
+        cad.routing.segments.push(island);
+        assert!(CadBoard::new(&cad, &core).err().unwrap().contains("disconnected copper"));
+    }
+}
+
 impl CadBoard {
+    pub fn validate(cad: &CadGeometry, core: &LinearMotorConfig) -> Result<(), String> {
+        cad.validate_motor_mapping(core.phases, core.design_rules().min_trace_mm)?;
+        // Validate each coil before phase mapping can join separate coils to
+        // virtual buses. This is a topology check, not a resistance estimate.
+        for network in pcbmotorgen_simulation::drive::extract_phase_networks(&cad.routing) {
+            let mut neighbors = vec![Vec::new(); network.node_count];
+            for edge in &network.edges {
+                neighbors[edge.a].push(edge.b);
+                neighbors[edge.b].push(edge.a);
+            }
+            let mut visited = vec![false; network.node_count];
+            let mut pending = vec![0];
+            while let Some(node) = pending.pop() {
+                if visited[node] { continue; }
+                visited[node] = true;
+                pending.extend(neighbors[node].iter().copied());
+            }
+            if visited.iter().any(|seen| !seen) {
+                return Err(format!("Coil '{}' contains disconnected copper; review trace endpoints and via connections", network.net));
+            }
+        }
+        Ok(())
+    }
+
     pub fn new(cad: &CadGeometry, core: &LinearMotorConfig) -> Result<Self, String> {
+        Self::validate(cad, core)?;
         let routing = cad.routing_by_phase()?;
         let coils = pcbmotorgen_routing::routing_result_to_phase_coils(&routing, CAD_PATTERN_ID);
         if coils.is_empty() {

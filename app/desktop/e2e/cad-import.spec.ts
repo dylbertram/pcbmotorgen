@@ -20,6 +20,12 @@ test.beforeEach(async ({ page }) => {
     let body = await response.text();
     body = body.replace(/export async function pickCadDxfPath\(\) \{[\s\S]*?\n\}/, `export async function pickCadDxfPath() { return '/fixture/coil-leads.dxf'; }`);
     body = body.replace(/export async function importCadDxf\([\s\S]*?\n\}/, `export async function importCadDxf(path, units, tolerance, width, count, thickness, assignments = {}, preferDetected = false) {
+      if (window.__mappingFixture) {
+        const segments = ['A', 'B', 'C'].map((net, i) => ({ start: {x:0,y:i*2}, end:{x:2,y:i*2}, layer:0, net, is_active:true }));
+        return {warnings:[],geometry:{layer_z_mm:[-1.6,0],trace_width_mm:width,
+          source_layer_coils:{L0_A:'A'}, coil_terminals:Object.fromEntries(segments.map(s => [s.net,{input:{position:s.start,layer:0},output:{position:s.end,layer:0}}])),
+          routing:{format_version:2,segments,curves:[],splines:[],vias:[]}}};
+      }
       const source = { L0_A: 'A', L0_B: 'B', holes: 'holes' };
       const source_layer_coils = Object.fromEntries(Object.entries(source).map(([name, coil]) => [name, (assignments[name] ?? coil).trim()]));
       return { warnings: [], units_to_mm: units, source_units_mm: preferDetected ? 25.4 : undefined, geometry: { layer_z_mm: [-1.6, 0], trace_width_mm: width, source_layer_coils,
@@ -70,6 +76,27 @@ test("imported centerlines retain editable trace and via dimensions", async ({ p
   await expect(page.getByText("DXF centerlines are active", { exact: false })).toBeVisible();
 });
 
+test("import mapping blocks simulation until reviewed and never substitutes generated copper", async ({ page }) => {
+  await page.addInitScript(() => { (window as any).__mappingFixture = true; });
+  await page.route(/\/src\/lib\/ipc\/physics\.ts(?:\?t=\d+)?$/, async route => {
+    const response = await route.fetch();
+    let body = await response.text();
+    body = body.replace('export async function evaluateForceSweep(config, cadGeometry = null, drive = null) {', `export async function evaluateForceSweep(config, cadGeometry = null, drive = null) {
+      window.__mappingSweepCalls = [...(window.__mappingSweepCalls ?? []), cadGeometry];`);
+    await route.fulfill({ response, body });
+  });
+  const dialog = await openImport(page);
+  await dialog.getByRole("button", { name: "Open with this geometry" }).click();
+  await page.getByRole("tab", { name: /^Simulate/i }).click();
+  await expect(page.getByText("Complete the imported motor mapping in Design before simulating.")).toBeVisible();
+  expect(await page.evaluate(() => (window as any).__mappingSweepCalls ?? [])).toEqual([]);
+  await page.getByRole("tab", { name: /^Design/i }).click();
+  await page.getByRole("checkbox", { name: "Imported motor mapping reviewed" }).check();
+  await page.getByRole("tab", { name: /^Simulate/i }).click();
+  await expect.poll(async () => page.evaluate(() => (window as any).__mappingSweepCalls?.length ?? 0)).toBeGreaterThan(0);
+  expect(await page.evaluate(() => (window as any).__mappingSweepCalls.every((g: any) => g?.motor_mapping_reviewed && g.routing.segments.length === 3))).toBe(true);
+});
+
 test("DXF units auto-detect from the file and can be overridden", async ({ page }) => {
   const dialog = await openImport(page);
   const units = dialog.getByLabel("DXF units");
@@ -79,6 +106,19 @@ test("DXF units auto-detect from the file and can be overridden", async ({ page 
   // An explicit choice overrides the header and drops the detection note.
   await units.selectOption("1");
   await expect(dialog.getByTestId("cad-detected-units")).toHaveCount(0);
+});
+
+test("conductor roles can be assigned and undone without changing geometry", async ({ page }) => {
+  const dialog = await openImport(page);
+  await clickTrace(page, 0.5, 0);
+  const tools = dialog.getByRole("group", { name: "Segment selection tools" });
+  await expect(tools).toContainText("1 selected");
+  await tools.getByRole("button", { name: "Mark end-turn", exact: true }).click();
+  await tools.getByRole("button", { name: "Undo assignment", exact: true }).click();
+  await tools.getByRole("button", { name: "Mark end-turn", exact: true }).click();
+  await dialog.getByRole("button", { name: "Open with this geometry" }).click();
+  await expect(page.getByText("3 active conductors · 1 end-turns.", { exact: false })).toBeVisible();
+  await expect(page.getByRole("checkbox", { name: "Imported motor mapping reviewed" })).not.toBeChecked();
 });
 
 test("imported geometry renders in the isometric view", async ({ page }) => {
@@ -249,7 +289,7 @@ test("changing a terminal keeps the inspection zoom and offers keyboard-accessib
   expect(tips.every((tip) => tip.length <= 140)).toBe(true);
 });
 
-test("simulation blocks on unselected coil ends and replaces the imported-coil-phases box", async ({ page }) => {
+test("simulation prompts for coil ends then reports remaining import mapping blockers", async ({ page }) => {
   await page.addInitScript(() => { (window as any).__cadNoVias = true; });
   const dialog = await openImport(page);
   await dialog.getByRole("button", { name: "Open with this geometry" }).click();
@@ -277,7 +317,9 @@ test("simulation blocks on unselected coil ends and replaces the imported-coil-p
 
   await page.getByRole("tab", { name: /^Simulate/i }).click();
   await expect(alert).toHaveCount(0);
-  await expect(panel.getByText("Thrust and driver results use the imported copper.")).toBeVisible();
+  await expect(panel.getByText("Complete the imported motor mapping in Design before simulating.")).toBeVisible();
+  await expect(panel.getByText("No imported coil is assigned to phase C.")).toBeVisible();
+  await expect(panel.getByText("Thrust and driver results use the imported copper.")).toHaveCount(0);
 });
 
 async function openImport(page: Page) {

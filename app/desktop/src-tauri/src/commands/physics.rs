@@ -108,6 +108,9 @@ pub async fn evaluate_force_sweep(
     cad_geometry: Option<pcbmotorgen_export::cad_dxf::CadGeometry>,
     drive: Option<pcbmotorgen_simulation::drive::DriveSettings>,
 ) -> Result<ForceSweepResultIpc, String> {
+    if cad_geometry.as_ref().is_some_and(|cad| cad.terminal_connection == Some(pcbmotorgen_export::cad_dxf::TerminalConnection::Delta)) {
+        return Err("Imported delta force analysis is not available. Select Star (wye) coil terminals.".into());
+    }
     let core = config.to_core();
     let n_positions = config.n_positions.max(2) as usize;
     let meshing = config.meshing.max(1) as usize;
@@ -123,6 +126,7 @@ pub async fn evaluate_force_sweep(
                 (board.routing, sim)
             }
             None => {
+                core.design_rules().validate_trace_width()?;
                 let ctx = core.routing_context();
                 let routing_result = pcbmotorgen_routing::generate_routing_result(
                     &ctx,
@@ -303,9 +307,11 @@ pub async fn analyze_drive(
     let core = config.to_core();
     // Pattern-owned contract from motor-coil-generator-add-inputs:
     // 0 = closed, 1 = delta, 2 = star/wye. Imported copper is independent.
-    let delta = cad_geometry.is_none()
-        && core.routing_pattern_id() == "infinity-braid"
-        && core.routing_params.get("connection").is_some_and(|value| value.round() == 1.0);
+    let delta = match cad_geometry.as_ref() {
+        Some(cad) => cad.terminal_connection == Some(pcbmotorgen_export::cad_dxf::TerminalConnection::Delta),
+        None => core.routing_pattern_id() == "infinity-braid"
+            && core.routing_params.get("connection").is_some_and(|value| value.round() == 1.0),
+    };
     if let Some(error) = pcbmotorgen_simulation::drive::driver_connection_error(&drive.driver, delta) {
         return Err(error);
     }
@@ -320,6 +326,7 @@ pub async fn analyze_drive(
                 &super::cad_source::CadBoard::drive_hints(cad),
             ));
         }
+        core.design_rules().validate_trace_width()?;
         let routing = pcbmotorgen_routing::generate_routing_result(
             &core.routing_context(),
             &core.routing_pattern_id(),
@@ -694,7 +701,8 @@ mod cad_source_tests {
     /// The default design exported as CAD geometry, with its coils renamed
     /// so they need a phase mapping.
     fn exported_default() -> (LinearMotorConfigIpc, pcbmotorgen_export::cad_dxf::CadGeometry) {
-        let ipc = crate::ipc::ProjectConfigStateIpc::default().to_linear_motor_ipc();
+        let mut ipc = crate::ipc::ProjectConfigStateIpc::default().to_linear_motor_ipc();
+        ipc.routing_params.insert("connection".into(), 2.0);
         let core = ipc.to_core();
         let mut cad = pcbmotorgen_export::cad_dxf::phase_coils_to_cad_geometry(
             &core.generate_coils_for_board(),
@@ -707,6 +715,24 @@ mod cad_source_tests {
         cad.routing.segments.iter_mut().for_each(|s| rename(&mut s.net));
         cad.routing.curves.iter_mut().for_each(|c| rename(&mut c.net));
         cad.routing.vias.iter_mut().for_each(|v| rename(&mut v.net));
+        // This fixture explicitly reviews the generated star terminals. A
+        // fresh DXF import must still prompt the user instead of inferring
+        // electrical buses behind their back.
+        use pcbmotorgen_simulation::drive::{extract_phase_networks, EdgeKind};
+        use pcbmotorgen_export::cad_dxf::{CadTerminal, CadCoilTerminals};
+        for network in extract_phase_networks(&cad.routing) {
+            assert_eq!(network.terminal.len(), 1);
+            assert_eq!(network.star.len(), 1);
+            let endpoint = |node| network.edges.iter().find_map(|edge| {
+                if let EdgeKind::Trace { layer, points, .. } = &edge.kind {
+                    let point = if edge.a == node { points.first() } else if edge.b == node { points.last() } else { None }?;
+                    Some(CadTerminal { layer: *layer, position: pcbmotorgen_routing::Point::new(point[0]*1000.0, point[1]*1000.0) })
+                } else { None }
+            }).unwrap();
+            cad.coil_terminals.insert(network.net.clone(), CadCoilTerminals {
+                input: endpoint(network.terminal[0]), output: endpoint(network.star[0]),
+            });
+        }
         (ipc, cad)
     }
 

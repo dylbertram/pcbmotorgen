@@ -39,6 +39,7 @@
               <CoilPhaseMapping
                 geometry={projects.cadGeometry}
                 phases={config.phases}
+                minimumWidth={config.min_trace_mm}
                 onChange={(g) => projects.setCadGeometry(g)}
               />
             </div>

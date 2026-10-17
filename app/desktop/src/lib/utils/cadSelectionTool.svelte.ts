@@ -1,5 +1,5 @@
 import type { CadGeometry, CadPoint } from "../types";
-import { reassignTraces, traceChain, traceDistance, traceInBox, type SelectionBox, type SelectableTrace } from "../cadSelection";
+import { assignTraceRole, reassignTraces, traceChain, traceDistance, traceInBox, type SelectionBox, type SelectableTrace } from "../cadSelection";
 
 interface Options {
   getGeometry: () => CadGeometry | null;
@@ -59,5 +59,13 @@ export class CadSelectionTool {
     this.before = null; this.after = null;
     this.notice = "Assignment undone.";
   };
+  setRole(active: boolean): void {
+    const geometry = this.#options.getGeometry();
+    if (!geometry || !this.selected.length) return;
+    this.before = geometry;
+    this.after = assignTraceRole(geometry, this.selected, active);
+    this.#options.onChange(this.after);
+    this.notice = active ? "Selected conductors marked active." : "Selected conductors marked as end-turns.";
+  }
   get canUndo() { return this.before !== null && this.#options.getGeometry() === this.after; }
 }

@@ -30,6 +30,21 @@ choose **Save ruleset**; the saved set appears in the list and can be **Load**ed
 into the draft or **Delete**d. Saved rulesets persist on this device, separately
 from projects, and only affect a design when you save settings.
 
+## Imported motor mapping
+
+An imported motor stays authoritative while its mapping is incomplete. The app
+does not substitute generated coils for it. In Design, assign every coil to a
+configured motor phase and review its layer heights and via connections. In the
+expanded preview, select conductors and use **Mark active** or **Mark end-turn**
+to set their roles. Both roles remain conducting copper.
+
+Select each coil's driver and opposite ends, then confirm **Imported motor
+mapping reviewed**. DRC, simulation, and KiCad writing reject incomplete mappings
+with the blocking coil, layer, or via. Via connections must land on trace
+endpoints on both specified planes, matching the electrical graph. Split a trace
+at a via landing if needed. Disconnected copper islands within a coil are rejected.
+Changing conductor roles or coil/layer assignments requires another review.
+
 ## Files and projects
 
 Motor coils use `.pmmotor` files. Sensor coils use `.pmsensor` files. These are

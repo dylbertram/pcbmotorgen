@@ -60,6 +60,8 @@ export interface CadRoutingResult {
 }
 /** Saved/imported centerline geometry. All coordinates and elevations are mm. */
 export interface CadGeometry {
+  /** Confirmed conductor roles, layer heights, and via connections. */
+  motor_mapping_reviewed?: boolean;
   routing: CadRoutingResult;
   /** Imported CAD basename, retained with saved geometry. Absent in older projects. */
   source_file_name?: string;

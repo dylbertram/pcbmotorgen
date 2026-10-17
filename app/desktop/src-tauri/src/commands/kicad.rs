@@ -187,6 +187,7 @@ fn board_source(
     core: &crate::config::LinearMotorConfig,
     cad: Option<&pcbmotorgen_export::cad_dxf::CadGeometry>,
 ) -> Result<(Vec<pcbmotorgen_routing::PhaseCoil>, u32, DesignRules, f64), String> {
+    if cad.is_none() { core.design_rules().validate_trace_width()?; }
     match cad {
         Some(cad) => {
             let board = super::cad_source::CadBoard::new(cad, core)?;
@@ -350,4 +351,3 @@ pub async fn preview_coils(
     .await
     .map_err(|e| format!("preview_coils worker failed: {e}"))?
 }
-
