@@ -72,6 +72,7 @@ function makeConfig(overrides: Partial<LinearMotorConfig> = {}): LinearMotorConf
     commutation: "max_thrust",
     n_positions: 50,
     meshing: 20,
+    backplane: null,
     name: null,
     ...overrides,
   };
@@ -240,8 +241,33 @@ describe("mockHeightStack", () => {
     const h = mockHeightStack(c);
     expect(h.total_height_m).toBeCloseTo(
       h.pcb_thickness_m + h.cu_protrusion_m + h.solder_mask_m + h.air_gap_m +
-        h.magnet_height_m + h.tolerance_m,
+        h.magnet_height_m + h.tolerance_m + h.backplane_m + h.housing_gap_m + h.housing_m,
     );
+  });
+
+  it("adds backplane layers, housing gap and housing to the total", () => {
+    const bare = mockHeightStack(makeConfig());
+    const h = mockHeightStack(makeConfig({
+      backplane: {
+        layers: [
+          { material: "fr4", thickness_m: 0.0016 },
+          { material: "mn_zn_ferrite", thickness_m: 0.002 },
+        ],
+        housing: { material: "aluminum6061", thickness_m: 0.003, gap_m: 0.001 },
+      },
+    }));
+    expect(h.backplane_m).toBeCloseTo(0.0036);
+    expect(h.housing_gap_m).toBeCloseTo(0.001);
+    expect(h.housing_m).toBeCloseTo(0.003);
+    expect(h.total_height_m).toBeCloseTo(bare.total_height_m + 0.0036 + 0.001 + 0.003);
+    expect(h.backplane_analysis).toBeNull();
+  });
+
+  it("reports zero backplane heights when no backplane is configured", () => {
+    const h = mockHeightStack(makeConfig());
+    expect(h.backplane_m).toBe(0);
+    expect(h.housing_gap_m).toBe(0);
+    expect(h.housing_m).toBe(0);
   });
 });
 

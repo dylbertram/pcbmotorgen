@@ -96,6 +96,7 @@ impl LinearMotorConfig {
             // No config field maps to declared phase bands yet; empty keeps
             // the analytic commutation offsets (kata hzs2 fallback).
             phase_bands: Vec::new(),
+            backplane: self.backplane.clone(),
         }
     }
 

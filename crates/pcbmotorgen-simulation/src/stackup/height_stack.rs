@@ -36,6 +36,10 @@ impl HeightStackCalculator {
             air_gap_m: config.air_gap_m,
             magnet_height_m: config.magnet_dims_m[2],
             tolerance_m: self.tolerance_m,
+            backplane_m: config.backplane.as_ref().map_or(0.0, |b| b.stack_thickness_m()),
+            housing_gap_m: config.backplane.as_ref().map_or(0.0, |b| b.housing_gap_m()),
+            housing_m: config.backplane.as_ref().map_or(0.0, |b| b.housing_thickness_m()),
+            backplane_analysis: config.backplane.as_ref().map(|b| b.analyze(config)),
         }
     }
 

@@ -11,6 +11,9 @@ impl SimulationInput {
 
     /// Validate all fields.
     pub fn validate(&self) -> Result<(), SimulationError> {
+        if let Some(stack) = &self.backplane {
+            stack.validate().map_err(SimulationError)?;
+        }
         if self.magnet_dims_m.len() != 3 {
             return Err(SimulationError(
                 "magnet_dims_m must be a 3-tuple (width, length, height)".into(),

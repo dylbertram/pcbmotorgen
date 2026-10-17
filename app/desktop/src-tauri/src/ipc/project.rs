@@ -187,6 +187,12 @@ pub struct ProjectConfigStateIpc {
     // --- Driver suitability (Simulation tab) ---
     /// Driver IC limits and operating assumptions; absent in older files.
     pub drive: pcbmotorgen_simulation::drive::DriveSettings,
+
+    // --- Backplane and housing stackup (t707) ---
+    /// Layers below the PCB and the optional housing; absent in older files,
+    /// which load with no backplane.
+    #[serde(default)]
+    pub backplane: Option<pcbmotorgen_simulation::backplane::BackplaneStack>,
 }
 
 /// Defaults mirror the frontend `ConfigStore` initial values (the app's
@@ -231,6 +237,7 @@ impl Default for ProjectConfigStateIpc {
             drive_frequency_hz: 500.0,
             max_temperature_rise_c: 20.0,
             drive: pcbmotorgen_simulation::drive::DriveSettings::default(),
+            backplane: None,
         }
     }
 }
@@ -281,6 +288,7 @@ impl ProjectConfigStateIpc {
             min_via_annular_ring_m: m(self.min_via_annular_ring_mm),
             max_layers: self.max_layers,
             drive_frequency_hz: self.drive_frequency_hz,
+            backplane: self.backplane.clone(),
             max_temperature_rise_c: self.max_temperature_rise_c,
             target_force_n: self.target_force_n,
             peak_force_n: self.peak_force_n,

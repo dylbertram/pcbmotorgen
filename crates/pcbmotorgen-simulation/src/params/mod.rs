@@ -151,6 +151,12 @@ pub struct SimulationInput {
     /// and the context copper region remain the fallback.
     #[serde(default)]
     pub phase_bands: Vec<PhaseBandPosition>,
+
+    // --- Backplane and housing (t707) ---
+    /// Stack of soft or non-magnetic layers and an optional housing below the
+    /// PCB. `None` (the default) leaves every result unchanged.
+    #[serde(default)]
+    pub backplane: Option<crate::backplane::BackplaneStack>,
 }
 
 impl Default for SimulationInput {
@@ -185,6 +191,7 @@ impl Default for SimulationInput {
             max_accel_m_s2: 2.0,
             capacitor_bank_uf: 1000.0,
             phase_bands: Vec::new(),
+            backplane: None,
         }
     }
 }

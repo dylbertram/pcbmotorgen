@@ -149,6 +149,9 @@ pub struct LinearMotorConfig {
     pub num_layers: u32,
     /// Nominal electrical drive frequency for skin-depth [Hz].
     pub drive_frequency_hz: f64,
+    /// Backplane and housing below the PCB (t707). Absent in older projects.
+    #[serde(default)]
+    pub backplane: Option<pcbmotorgen_simulation::backplane::BackplaneStack>,
     /// Maximum acceptable PCB temperature rise [°C].
     pub max_temperature_rise_c: f64,
 
@@ -218,6 +221,7 @@ impl Default for LinearMotorConfig {
             // 4-layer board when the user has not yet narrowed the field.
             num_layers: 4,
             drive_frequency_hz: 500.0,
+            backplane: None,
             max_temperature_rise_c: 20.0,
             target_force_n: 0.5,
             peak_force_n: 1.0,
@@ -322,6 +326,10 @@ mod tests {
             air_gap_m: 0.0005,
             magnet_height_m: 0.004,
             tolerance_m: 0.0003,
+            backplane_m: 0.0,
+            housing_gap_m: 0.0,
+            housing_m: 0.0,
+            backplane_analysis: None,
         };
         let expected = 0.0016 + 35e-6 + 20e-6 + 0.0005 + 0.004 + 0.0003;
         assert!((hs.total_height_m() - expected).abs() < 1e-12);
@@ -336,6 +344,10 @@ mod tests {
             air_gap_m: 0.0005,
             magnet_height_m: 0.004,
             tolerance_m: 0.0003,
+            backplane_m: 0.0,
+            housing_gap_m: 0.0,
+            housing_m: 0.0,
+            backplane_analysis: None,
         };
         assert!(hs.fits_in_budget(0.010));
         assert!(!hs.fits_in_budget(0.001));
@@ -350,6 +362,10 @@ mod tests {
             air_gap_m: 0.0005,
             magnet_height_m: 0.004,
             tolerance_m: 0.0003,
+            backplane_m: 0.0,
+            housing_gap_m: 0.0,
+            housing_m: 0.0,
+            backplane_analysis: None,
         };
         let total = hs.total_height_m();
         assert!((hs.headroom_m(0.010) - (0.010 - total)).abs() < 1e-12);

@@ -107,6 +107,15 @@ pub struct HeightStackResultIpc {
     pub magnet_height_m: f64,
     pub tolerance_m: f64,
     pub total_height_m: f64,
+    /// Backplane layer thickness below the PCB [m] (t707).
+    pub backplane_m: f64,
+    /// Air gap between the backplane and the housing [m] (t707).
+    pub housing_gap_m: f64,
+    /// Housing wall thickness below the backplane [m] (t707).
+    pub housing_m: f64,
+    /// Backplane image, attraction and saturation estimates; `None` without a
+    /// backplane (t707).
+    pub backplane_analysis: Option<pcbmotorgen_simulation::backplane::BackplaneAnalysis>,
 }
 
 /// Mechanical friction breakdown.

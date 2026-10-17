@@ -15,6 +15,7 @@ import type { CommutationMode } from "./enums";
 import type { CadGeometry } from "./dxf";
 import type { SensorConfig } from "./sensor";
 import type { DriveSettings } from "./drive";
+import type { BackplaneStack } from "./backplane";
 
 export type DocumentKind = "motor" | "sensor";
 
@@ -87,6 +88,10 @@ export interface ProjectConfigState {
   // --- Driver suitability (Simulation tab) ---
   /** Missing in files saved before the driver check existed. */
   drive?: DriveSettings;
+
+  // --- Backplane and housing (t707) ---
+  /** Missing in files saved before the backplane existed. `null` = none. */
+  backplane?: BackplaneStack | null;
 }
 
 /** The saved working state: design inputs + mover position. */

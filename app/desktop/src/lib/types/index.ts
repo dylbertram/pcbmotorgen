@@ -8,6 +8,7 @@
  * Consumers can keep importing from `../types` — this barrel resolves it.
  */
 
+export * from "./backplane";
 export * from "./coils";
 export * from "./config";
 export * from "./drive";

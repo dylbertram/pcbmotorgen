@@ -2,6 +2,8 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::backplane::BackplaneAnalysis;
+
 /// Explicit vertical stack from PCB bottom to magnet top.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HeightStackResult {
@@ -11,10 +13,24 @@ pub struct HeightStackResult {
     pub air_gap_m: f64,
     pub magnet_height_m: f64,
     pub tolerance_m: f64,
+    /// Total backplane layer thickness below the PCB [m] (t707).
+    #[serde(default)]
+    pub backplane_m: f64,
+    /// Air gap between the backplane and the housing [m] (t707).
+    #[serde(default)]
+    pub housing_gap_m: f64,
+    /// Housing wall thickness below the backplane [m] (t707).
+    #[serde(default)]
+    pub housing_m: f64,
+    /// Backplane image, attraction and saturation estimates. `None` when no
+    /// backplane is configured (t707).
+    #[serde(default)]
+    pub backplane_analysis: Option<BackplaneAnalysis>,
 }
 
 impl HeightStackResult {
-    /// Total stack height from PCB bottom to magnet top [m].
+    /// Total stack height from PCB bottom to magnet top [m]. The backplane
+    /// and housing are measured below the PCB, so they add to the total.
     pub fn total_height_m(&self) -> f64 {
         self.pcb_thickness_m
             + self.cu_protrusion_m
@@ -22,6 +38,9 @@ impl HeightStackResult {
             + self.air_gap_m
             + self.magnet_height_m
             + self.tolerance_m
+            + self.backplane_m
+            + self.housing_gap_m
+            + self.housing_m
     }
 
     /// True if the total stack fits within `budget_m`.
@@ -45,6 +64,15 @@ impl HeightStackResult {
             format!("  Magnet height:    {:.2} mm", self.magnet_height_m * 1e3),
         ];
         lines.push(format!("  Tolerance:        {:.2} mm", self.tolerance_m * 1e3));
+        if self.backplane_m > 0.0 {
+            lines.push(format!("  Backplane:        {:.2} mm", self.backplane_m * 1e3));
+        }
+        if self.housing_gap_m > 0.0 {
+            lines.push(format!("  Housing gap:      {:.2} mm", self.housing_gap_m * 1e3));
+        }
+        if self.housing_m > 0.0 {
+            lines.push(format!("  Housing:          {:.2} mm", self.housing_m * 1e3));
+        }
         lines.push("  ─────────────────────────────".to_string());
         lines.push(format!(
             "  Total height:     {:.2} mm",

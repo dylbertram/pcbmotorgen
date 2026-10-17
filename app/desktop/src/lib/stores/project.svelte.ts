@@ -173,6 +173,7 @@ export class ProjectStore {
         drive_frequency_hz: this.config.drive_frequency_hz,
         max_temperature_rise_c: this.config.max_temperature_rise_c,
         drive: $state.snapshot(this.config.drive),
+        backplane: $state.snapshot(this.config.backplane),
       },
       mover_position_mm: this.motion.positionMm,
       cad_geometry: this.cadGeometry,
@@ -233,6 +234,8 @@ export class ProjectStore {
     this.config.drive = c.drive
       ? { ...DEFAULT_DRIVE_SETTINGS, ...c.drive, driver: { ...DEFAULT_DRIVE_SETTINGS.driver, ...c.drive.driver } }
       : structuredClone(DEFAULT_DRIVE_SETTINGS);
+    // Files saved before the backplane existed have no field: start with none.
+    this.config.backplane = c.backplane ? structuredClone(c.backplane) : null;
     this.motion.positionMm = state.mover_position_mm;
     this.cadGeometry = state.cad_geometry ?? null;
     this.sensor?.apply(state.sensor_config);

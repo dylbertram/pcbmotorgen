@@ -3,6 +3,7 @@
  * budgets, and the B-field sampling grid.
  */
 
+import type { BackplaneAnalysis } from "./backplane";
 import type { CommutationMode } from "./enums";
 
 /** Force-vs-position sweep (evaluate_force_sweep). */
@@ -30,7 +31,15 @@ export interface HeightStackResultDto {
   air_gap_m: number;
   magnet_height_m: number;
   tolerance_m: number;
+  /** Backplane layers below the PCB [m]. Zero when none. */
+  backplane_m: number;
+  /** Air gap between the backplane and the housing [m]. Zero when none. */
+  housing_gap_m: number;
+  /** Housing wall thickness [m]. Zero when none. */
+  housing_m: number;
   total_height_m: number;
+  /** Present only when a backplane is configured. */
+  backplane_analysis?: BackplaneAnalysis | null;
 }
 
 /** Friction budget breakdown (compute_friction). */

@@ -94,6 +94,9 @@ pub struct LinearMotorConfigIpc {
     pub max_layers: u32,
     pub drive_frequency_hz: f64,
     pub max_temperature_rise_c: f64,
+    /// Backplane and housing below the PCB (t707).
+    #[serde(default)]
+    pub backplane: Option<pcbmotorgen_simulation::backplane::BackplaneStack>,
 
     pub target_force_n: f64,
     pub peak_force_n: f64,
@@ -151,6 +154,7 @@ impl LinearMotorConfigIpc {
             num_layers: self.num_layers,
             drive_frequency_hz: self.drive_frequency_hz,
             max_temperature_rise_c: self.max_temperature_rise_c,
+            backplane: self.backplane.clone(),
             target_force_n: self.target_force_n,
             peak_force_n: self.peak_force_n,
             friction_n: self.friction_n,
@@ -198,6 +202,7 @@ impl From<&CoreConfig> for LinearMotorConfigIpc {
             max_layers: c.max_layers,
             drive_frequency_hz: c.drive_frequency_hz,
             max_temperature_rise_c: c.max_temperature_rise_c,
+            backplane: c.backplane.clone(),
             target_force_n: c.target_force_n,
             peak_force_n: c.peak_force_n,
             friction_n: c.friction_n,
