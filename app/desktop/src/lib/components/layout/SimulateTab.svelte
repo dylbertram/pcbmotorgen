@@ -8,6 +8,7 @@
     CadGeometry,
   } from "../../types";
   import { unmappedCoils } from "../../cadPhases";
+  import { cadMappingProblems } from "../../cadMapping";
   import { coilsMissingEnds } from "../../cadTerminals";
   import { usesDeltaConnection } from "../../driverConnection";
   import FluxDiagram from "../simulate/FluxDiagram.svelte";
@@ -66,9 +67,10 @@
             <button type="button" onclick={onSelectEnds} class="mt-2 rounded border border-rose-400/60 px-2 py-1 font-medium text-rose-100 hover:bg-rose-500/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-rose-300">Select coil ends</button>
           {/if}
         </div>
-      {:else if unmappedCoils(cadGeometry).length}
-        <div class="rounded-md border border-amber-500/50 bg-amber-500/10 px-3 py-2 text-xs text-amber-100" role="status">
-          Simulation uses the generated coils until every imported coil has a phase.
+      {:else if cadMappingProblems(cadGeometry, config.phases, config.min_trace_mm).length}
+        <div class="rounded-md border border-amber-500/50 bg-amber-500/10 px-3 py-2 text-xs text-amber-100" role="alert">
+          <p>Complete the imported motor mapping in Design before simulating.</p>
+          <ul>{#each cadMappingProblems(cadGeometry, config.phases, config.min_trace_mm) as problem (problem)}<li>{problem}</li>{/each}</ul>
         </div>
       {:else}
         <p class="text-xs text-slate-400" role="status">Thrust and driver results use the imported copper.</p>

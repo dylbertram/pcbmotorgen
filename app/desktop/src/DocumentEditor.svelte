@@ -30,7 +30,7 @@
   import { cadGeometryToPreview } from "./lib/cadPreview";
   import { saveTextToFile } from "./lib/files";
   import { geometryKey, unmappedCoils } from "./lib/cadPhases";
-  import { coilsMissingEnds } from "./lib/cadTerminals";
+  import { cadMappingProblems } from "./lib/cadMapping";
 
   import TabNav from "./lib/components/layout/TabNav.svelte";
   import DrcStatus from "./lib/components/layout/DrcStatus.svelte";
@@ -268,11 +268,9 @@
   // that was already in flight when the user changed tabs.
   let simulationGeneration = 0;
 
-  /** Imported copper the sweep and drive analysis run on, once every coil
-   *  has a phase. Unmapped imports fall back to the generated coils. */
+  /** An active import is always authoritative, even while its mapping is incomplete. */
   function simulationCad(): CadGeometry | null {
-    const g = projects.cadGeometry;
-    return g && unmappedCoils(g).length === 0 ? g : null;
+    return projects.cadGeometry;
   }
   const scheduleSimulation = debounce((generation: number) => {
     if (!isCurrentSimulation(generation)) return;
@@ -311,7 +309,7 @@
     // Imported copper without confirmed ends has no valid electrical model.
     // Reset rather than present numbers derived from the inferred defaults;
     // the Simulation tab shows the ends prompt in their place.
-    if (projects.cadGeometry && coilsMissingEnds(projects.cadGeometry).length) {
+    if (projects.cadGeometry && cadMappingProblems(projects.cadGeometry, config.phases, config.min_trace_mm).length) {
       clearSimulationResults();
       driveError = null;
       error = null;
@@ -434,7 +432,7 @@
       drive = null;
       return;
     }
-    if (projects.cadGeometry && coilsMissingEnds(projects.cadGeometry).length) {
+    if (projects.cadGeometry && cadMappingProblems(projects.cadGeometry, config.phases, config.min_trace_mm).length) {
       drive = null;
       driveError = null;
       return;

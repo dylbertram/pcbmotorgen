@@ -9,6 +9,7 @@
  */
 
 import { invoke } from "@tauri-apps/api/core";
+import { assertCadMapping } from "../cadMapping";
 import type {
   CadGeometry,
   LinearMotorConfig,
@@ -50,6 +51,7 @@ export async function writeCoilsToBoard(
   dryRun: boolean = false,
   cadGeometry: CadGeometry | null = null,
 ): Promise<KicadWriteResult> {
+  assertCadMapping(cadGeometry, config);
   if (!isTauriAvailable()) return mockKicadWrite();
   return await invoke<KicadWriteResult>("write_coils_to_board", {
     config,
@@ -82,6 +84,7 @@ export async function validateWritePreconditions(
   diagnostics: BoardDiagnostics,
   cadGeometry: CadGeometry | null = null,
 ): Promise<PreconditionWarning[]> {
+  assertCadMapping(cadGeometry, config);
   if (!isTauriAvailable()) return mockValidatePreconditions(config, diagnostics);
   return await invoke<PreconditionWarning[]>("validate_write_preconditions", {
     config,
@@ -99,6 +102,7 @@ export async function previewCoils(
   config: LinearMotorConfig,
   cadGeometry: CadGeometry | null = null,
 ): Promise<CoilPreview> {
+  assertCadMapping(cadGeometry, config);
   if (!isTauriAvailable()) return mockPreviewCoils(config);
   return await invoke<CoilPreview>("preview_coils", { config, cadGeometry });
 }

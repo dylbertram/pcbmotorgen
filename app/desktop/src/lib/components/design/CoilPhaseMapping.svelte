@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { CadGeometry } from "../../types";
   import { PHASE_LABELS, coilNames, phaseOf, unmappedCoils, withCoilPhase } from "../../cadPhases";
+  import { cadMappingProblems } from "../../cadMapping";
 
   /**
    * Assign each imported coil to a motor phase. KiCad export, DRC, and the
@@ -10,16 +11,19 @@
     geometry,
     phases,
     onChange,
+    minimumWidth = 0,
   }: {
     geometry: CadGeometry;
     /** Phase count of the design; limits the offered labels. */
     phases: number;
     onChange: (geometry: CadGeometry) => void;
+    minimumWidth?: number;
   } = $props();
 
   let coils = $derived(coilNames(geometry));
   let labels = $derived(PHASE_LABELS.slice(0, Math.max(1, phases)));
   let missing = $derived(unmappedCoils(geometry));
+  let paths = $derived([...geometry.routing.segments, ...geometry.routing.curves, ...(geometry.routing.splines ?? [])]);
 
   // Count coils per phase so parallel groups are visible.
   let groupSize = $derived.by(() => {
@@ -68,5 +72,17 @@
         </select>
       </li>
     {/each}
+  </ul>
+  <p class="mt-3 text-xs text-slate-400">
+    {paths.filter((p) => p.is_active).length} active conductors · {paths.filter((p) => !p.is_active).length} end-turns.
+    Use the expanded preview's selection tools to mark conductor roles. End-turns remain copper, not disconnected or omitted paths.
+  </p>
+  <p class="mt-2 text-xs text-slate-400">Copper heights: {geometry.layer_z_mm.map((z, i) => `L${i}: ${z} mm`).join(", ")}. {geometry.routing.vias.length} vias.</p>
+  <label class="mt-3 flex items-start gap-2 text-xs text-slate-300">
+    <input type="checkbox" aria-label="Imported motor mapping reviewed" checked={geometry.motor_mapping_reviewed ?? false} onchange={(event) => onChange({ ...geometry, motor_mapping_reviewed: event.currentTarget.checked })} />
+    I reviewed the conductor roles, copper layers, and via connections.
+  </label>
+  <ul class="mt-2 space-y-1 text-xs text-amber-300" aria-label="Imported mapping problems">
+    {#each cadMappingProblems(geometry, phases, minimumWidth) as problem (problem)}<li>{problem}</li>{/each}
   </ul>
 </section>

@@ -8,6 +8,7 @@
  */
 
 import { invoke } from "@tauri-apps/api/core";
+import { assertCadMapping } from "../cadMapping";
 import { driverConnectionError, usesDeltaConnection } from "../driverConnection";
 import type {
   LinearMotorConfig,
@@ -65,6 +66,8 @@ export async function evaluateForceSweep(
   cadGeometry: CadGeometry | null = null,
   drive: DriveSettings | null = null,
 ): Promise<ForceSweepResult> {
+  assertCadMapping(cadGeometry, config);
+  if (cadGeometry?.terminal_connection === "delta") throw new Error("Imported delta force analysis is not available. Select Star (wye) coil terminals.");
   if (!isTauriAvailable()) return mockForceSweep(config);
   return await invoke<ForceSweepResult>("evaluate_force_sweep", { config, cadGeometry, drive });
 }
@@ -93,7 +96,9 @@ export async function analyzeDrive(
   kf: number | null,
   cadGeometry: CadGeometry | null = null,
 ): Promise<DriveAnalysis> {
-  const connectionError = driverConnectionError(drive.driver, usesDeltaConnection(config, cadGeometry !== null));
+  assertCadMapping(cadGeometry, config);
+  const delta = cadGeometry ? cadGeometry.terminal_connection === "delta" : usesDeltaConnection(config);
+  const connectionError = driverConnectionError(drive.driver, delta);
   if (connectionError) throw new Error(connectionError);
   if (!isTauriAvailable()) return mockDriveAnalysis(config, drive, kf);
   return await invoke<DriveAnalysis>("analyze_drive", {

@@ -39,6 +39,7 @@ pub struct DxfExportSummary {
 #[tauri::command]
 pub async fn editable_coil_geometry(config: LinearMotorConfigIpc) -> Result<CadGeometry, String> {
     let core = config.to_core();
+    core.design_rules().validate_trace_width()?;
     tauri::async_runtime::spawn_blocking(move || {
         let coils = core.generate_coils_for_board();
         phase_coils_to_cad_geometry(
@@ -61,6 +62,7 @@ pub async fn editable_coil_geometry(config: LinearMotorConfigIpc) -> Result<CadG
 #[tauri::command]
 pub async fn export_coils_dxf(config: LinearMotorConfigIpc) -> Result<DxfExportResult, String> {
     let core = config.to_core();
+    core.design_rules().validate_trace_width()?;
     tauri::async_runtime::spawn_blocking(move || {
         let coils = core.generate_coils_for_board();
         let num_layers = core.num_layers;
@@ -157,6 +159,16 @@ fn build_sensor_dxf(config: &SensorConfig) -> Result<DxfExportResult, String> {
 #[cfg(test)]
 mod sensor_tests {
     use super::*;
+
+    #[test]
+    fn generated_dxf_rejects_undersized_nominal_width_before_generating() {
+        let mut config = crate::ipc::ProjectConfigStateIpc::default().to_linear_motor_ipc();
+        config.trace_width_m = 0.00005;
+        config.routing_pattern = "missing-plugin".into();
+        let error = tauri::async_runtime::block_on(export_coils_dxf(config.clone())).unwrap_err();
+        assert!(error.contains("minimum trace width"));
+        assert!(tauri::async_runtime::block_on(editable_coil_geometry(config)).unwrap_err().contains("minimum trace width"));
+    }
 
     #[test]
     fn sensor_dxf_counts_tracks_and_vertical_vias_and_round_trips_layers() {

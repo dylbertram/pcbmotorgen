@@ -249,6 +249,7 @@ pub async fn check_coil_interference(
             // Imported copper is checked as drawn. Before every coil has a
             // phase, coils keep their own nets so DRC still runs.
             Some(cad) => {
+                super::cad_source::CadBoard::validate(cad, &core)?;
                 let mut rules = core.design_rules();
                 // Imported copper is checked at its drawn width; the config's
                 // minimum trace width is the floor for the clearance check.
@@ -256,6 +257,7 @@ pub async fn check_coil_interference(
                 (cad.routing_by_phase().unwrap_or_else(|_| cad.routing.clone()), rules)
             }
             None => {
+                core.design_rules().validate_trace_width()?;
                 let ctx = core.routing_context();
                 let result =
                     pcbmotorgen_routing::generate_routing_result(&ctx, &core.routing_pattern_id())

@@ -37,6 +37,10 @@ pub struct CadGeometry {
     /// already named after a phase maps to it without an entry.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub coil_phases: BTreeMap<String, String>,
+    /// User confirmed conductor roles, layer heights, and via connectivity.
+    /// Imports and older files require review before motor workflows run.
+    #[serde(default)]
+    pub motor_mapping_reviewed: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
@@ -47,6 +51,52 @@ pub enum TerminalConnection {
 }
 
 impl CadGeometry {
+    /// Validate the mapping before DRC, motor simulation, or KiCad writing.
+    /// Connectivity uses trace endpoints, matching the electrical graph.
+    pub fn validate_motor_mapping(&self, phases: u32, min_width_mm: f64) -> Result<(), String> {
+        validate_geometry(self)?;
+        let mut problems = Vec::new();
+        if !self.motor_mapping_reviewed {
+            problems.push("Review imported conductor roles, layer heights, and via connections".to_string());
+        }
+        if self.trace_width_mm < min_width_mm {
+            problems.push(format!("Imported trace width {} mm is below the minimum {} mm", self.trace_width_mm, min_width_mm));
+        }
+        let labels = &pcbmotorgen_routing::PHASE_NAMES[..(phases as usize).min(pcbmotorgen_routing::PHASE_NAMES.len())];
+        let coils = self.coil_names();
+        if coils.is_empty() { problems.push("Imported geometry has no copper".into()); }
+        for coil in &coils {
+            if !self.phase_of(coil).is_some_and(|phase| labels.contains(&phase.as_str())) {
+                problems.push(format!("Assign a configured motor phase to coil '{coil}'"));
+            }
+            if !self.coil_terminals.contains_key(coil) {
+                problems.push(format!("Select driver and opposite ends for coil '{coil}'"));
+            }
+        }
+        for label in labels {
+            if !coils.iter().any(|coil| self.phase_of(coil).as_deref() == Some(*label)) {
+                problems.push(format!("No imported coil is assigned to phase {label}"));
+            }
+        }
+        let lands = |net: &str, layer: u32, point: Point| {
+            let matches = |p: Point| p.distance_to(point) <= 1e-6;
+            self.routing.segments.iter().any(|s| s.net == net && s.layer == layer && (matches(s.start) || matches(s.end)))
+                || self.routing.curves.iter().any(|s| s.net == net && s.layer == layer && (matches(s.start) || matches(s.end)))
+                || self.routing.splines.iter().any(|s| s.net == net && s.layer == layer && (matches(s.point_at(s.knots[s.degree])) || matches(s.point_at(s.knots[s.control_points.len()]))))
+        };
+        for (i, via) in self.routing.vias.iter().enumerate() {
+            if via.from_layer == via.to_layer {
+                problems.push(format!("Via {} must connect distinct copper layers", i + 1));
+            }
+            for layer in [via.from_layer, via.to_layer] {
+                if !lands(&via.net, layer, via.position) {
+                    problems.push(format!("Via {} on coil '{}' has no trace endpoint on layer {}", i + 1, via.net, layer));
+                }
+            }
+        }
+        if problems.is_empty() { Ok(()) } else { Err(problems.join(". ")) }
+    }
+
     /// Every coil/net identity carrying copper, sorted.
     pub fn coil_names(&self) -> Vec<String> {
         let mut names: BTreeSet<String> = BTreeSet::new();
@@ -281,6 +331,7 @@ pub fn sensor_geometry_to_cad_geometry(sensor: &SensorGeometry) -> CadGeometry {
         coil_terminals: BTreeMap::new(),
         terminal_connection: None,
         coil_phases: BTreeMap::new(),
+        motor_mapping_reviewed: false,
     }
 }
 
@@ -470,6 +521,7 @@ pub fn phase_coils_to_cad_geometry(
         coil_terminals: BTreeMap::new(),
         terminal_connection: None,
         coil_phases: BTreeMap::new(),
+        motor_mapping_reviewed: true,
     };
     validate_geometry(&geometry)?;
     Ok(geometry)
@@ -972,6 +1024,7 @@ pub fn import_3d_dxf_with_coils(
         coil_terminals: BTreeMap::new(),
         terminal_connection: None,
         coil_phases: BTreeMap::new(),
+        motor_mapping_reviewed: false,
     };
     validate_geometry(&geometry)?;
     Ok(CadImportResult { geometry, warnings, units_to_mm: options.units_to_mm, source_units_mm })
@@ -1427,6 +1480,7 @@ mod tests {
             coil_terminals: BTreeMap::new(),
             terminal_connection: None,
             coil_phases: BTreeMap::new(),
+            motor_mapping_reviewed: false,
         };
         let text = cad_geometry_to_3d_dxf(&geometry).unwrap();
         let imported = import_3d_dxf(
@@ -1481,6 +1535,35 @@ mod tests {
         assert_eq!(dxf_insunits_to_mm(0), None);
     }
 
+    #[test]
+    fn motor_mapping_requires_review_phase_ends_and_landed_vias() {
+        let mut geometry: CadGeometry = serde_json::from_value(serde_json::json!({
+            "layer_z_mm": [-1.6, 0.0], "trace_width_mm": 0.2,
+            "routing": { "format_version": 2, "segments": [
+                { "start": {"x":0.0,"y":0.0}, "end":{"x":1.0,"y":0.0}, "layer":0,"net":"A","is_active":true },
+                { "start": {"x":1.0,"y":0.0}, "end":{"x":2.0,"y":0.0}, "layer":1,"net":"A","is_active":false }
+            ], "curves": [], "vias": [{ "position":{"x":1.0,"y":0.0},"from_layer":0,"to_layer":1,"net":"A" }] },
+            "coil_terminals": {"A": {
+                "input":{"position":{"x":0.0,"y":0.0},"layer":0},
+                "output":{"position":{"x":2.0,"y":0.0},"layer":1}
+            }}
+        })).unwrap();
+        assert!(geometry.validate_motor_mapping(1, 0.127).unwrap_err().contains("Review"));
+        geometry.motor_mapping_reviewed = true;
+        geometry.validate_motor_mapping(1, 0.127).unwrap();
+        let saved: CadGeometry = serde_json::from_str(&serde_json::to_string(&geometry).unwrap()).unwrap();
+        assert!(saved.motor_mapping_reviewed);
+        assert!(!saved.routing.segments[1].is_active);
+        saved.validate_motor_mapping(1, 0.127).unwrap();
+        assert!(geometry.validate_motor_mapping(2, 0.127).unwrap_err().contains("phase B"));
+        assert!(geometry.validate_motor_mapping(1, 0.3).unwrap_err().contains("below the minimum"));
+        geometry.routing.vias[0].net = "B".into();
+        assert!(geometry.validate_motor_mapping(1, 0.127).unwrap_err().contains("Via 1 on coil 'B'"));
+        geometry.routing.vias[0].net = "A".into();
+        geometry.coil_terminals.clear();
+        assert!(geometry.validate_motor_mapping(1, 0.127).unwrap_err().contains("Select driver"));
+    }
+
     fn sample() -> CadGeometry {
         let mut routing = RoutingResult::default();
         routing.segments.push(RouteSegment {
@@ -1520,6 +1603,7 @@ mod tests {
             coil_terminals: BTreeMap::new(),
             terminal_connection: None,
             coil_phases: BTreeMap::new(),
+            motor_mapping_reviewed: false,
         }
     }
 

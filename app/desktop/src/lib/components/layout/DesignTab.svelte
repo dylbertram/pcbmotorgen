@@ -2,6 +2,7 @@
   import type { ConfigStore } from "../../stores/config.svelte";
   import type { CadGeometry } from "../../types";
   import TopologySelector from "../design/TopologySelector.svelte";
+  import CoilPhaseMapping from "../design/CoilPhaseMapping.svelte";
   import TracesBoardPanel from "../design/parameters/TracesBoardPanel.svelte";
   import MagnetsPanel from "../design/parameters/MagnetsPanel.svelte";
   import ValidationWarning from "../design/ValidationWarning.svelte";
@@ -195,6 +196,9 @@
               </div>
             </dl>
           </div>
+        {/if}
+        {#if cadGeometry && onGeometryChange}
+          <CoilPhaseMapping geometry={cadGeometry} phases={config.phases} minimumWidth={config.min_trace_mm} onChange={onGeometryChange} />
         {/if}
         <TracesBoardPanel {config} traceWidthMm={cadGeometry?.trace_width_mm}
           onTraceWidthChange={cadGeometry && onGeometryChange ? (width) => {

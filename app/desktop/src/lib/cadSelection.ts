@@ -125,5 +125,18 @@ export function reassignTraces(geometry: CadGeometry, selected: string[], net?: 
   const routing = { ...geometry.routing, segments: update(geometry.routing.segments, "segments"), curves: update(geometry.routing.curves, "curves"), splines: update(geometry.routing.splines ?? [], "splines") };
   // Changed membership can invalidate explicit endpoints. Never keep stale terminals.
   const coil_terminals = Object.fromEntries(Object.entries(geometry.coil_terminals ?? {}).filter(([coil]) => !affected.has(coil)));
-  return { ...geometry, routing, coil_terminals };
+  return { ...geometry, routing, coil_terminals, motor_mapping_reviewed: false };
+}
+
+/** Set the electrical role without changing copper geometry or terminal picks. */
+export function assignTraceRole(geometry: CadGeometry, selected: string[], active: boolean): CadGeometry {
+  const ids = new Set(selected);
+  const update = <T extends { is_active: boolean }>(items: T[], kind: string) => items.map((s, i) =>
+    ids.has(`${kind}:${i}`) ? { ...s, is_active: active } : s);
+  return { ...geometry, motor_mapping_reviewed: false, routing: {
+    ...geometry.routing,
+    segments: update(geometry.routing.segments, "segments"),
+    curves: update(geometry.routing.curves, "curves"),
+    splines: update(geometry.routing.splines ?? [], "splines"),
+  } };
 }

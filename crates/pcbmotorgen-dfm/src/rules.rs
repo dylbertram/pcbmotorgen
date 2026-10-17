@@ -87,6 +87,15 @@ impl Default for DesignRules {
 }
 
 impl DesignRules {
+    /// Reject invalid copper sizing rather than silently widening a track.
+    pub fn validate_trace_width(&self) -> Result<(), String> {
+        if !self.min_trace_mm.is_finite() || self.min_trace_mm <= 0.0
+            || !self.trace_width_mm.is_finite() || self.trace_width_mm < self.min_trace_mm {
+            return Err(format!("Trace width must be finite and at least the positive minimum trace width (nominal {} mm, minimum {} mm)", self.trace_width_mm, self.min_trace_mm));
+        }
+        Ok(())
+    }
+
     /// Minimum via pad diameter [mm] = drill + 2 × annular ring.
     pub fn via_pad_diameter_mm(&self) -> f64 {
         self.min_via_drill_mm + 2.0 * self.min_via_annular_ring_mm
@@ -135,6 +144,14 @@ mod tests {
         assert_eq!(rules.min_via_annular_ring_mm, 0.1);
         assert_eq!(rules.via_pad_diameter_mm(), 0.4);
         assert_eq!(rules.io_tht_pad_diameter_mm(), 0.4);
+    }
+
+    #[test]
+    fn nominal_width_must_clear_the_floor_without_clamping() {
+        for width in [0.05, 0.0, -1.0, f64::NAN, f64::INFINITY] {
+            assert!(DesignRules { trace_width_mm: width, ..Default::default() }.validate_trace_width().is_err());
+        }
+        DesignRules { trace_width_mm: 0.3, ..Default::default() }.validate_trace_width().unwrap();
     }
 
     #[test]
