@@ -12,7 +12,7 @@ vi.mock("./core", async (original) => ({ ...await original<typeof import("./core
 afterEach(() => vi.clearAllMocks());
 
 function geometry(): CadGeometry {
-  return { motor_mapping_reviewed: true, layer_z_mm: [0], trace_width_mm: 0.2,
+  return { layer_z_mm: [0], trace_width_mm: 0.2,
     coil_terminals: { A: { input: { position: { x: 0, y: 0 }, layer: 0 }, output: { position: { x: 1, y: 0 }, layer: 0 } } },
     routing: { format_version: 2, curves: [], vias: [], segments: [
       { start: { x: 0, y: 0 }, end: { x: 1, y: 0 }, layer: 0, net: "A", is_active: false },
@@ -31,7 +31,7 @@ describe("import mapping IPC gates", () => {
   it("blocks every motor workflow before invoking the backend for an incomplete import", async () => {
     const config = new ConfigStore(); config.phases = 1;
     const ipc = config.toIpc();
-    const g = geometry(); g.motor_mapping_reviewed = false;
+    const g = geometry(); g.coil_terminals = {};
     const calls = [
       () => evaluateForceSweep(ipc, g, config.drive),
       () => analyzeDrive(ipc, config.drive, null, g),
@@ -40,7 +40,7 @@ describe("import mapping IPC gates", () => {
       () => validateWritePreconditions(ipc, mockBoardDiagnostics(), g),
       () => writeCoilsToBoard(ipc, false, g),
     ];
-    for (const call of calls) await expect(call()).rejects.toThrow("Review conductor roles");
+    for (const call of calls) await expect(call()).rejects.toThrow("Select driver and opposite ends");
     expect(invoke).not.toHaveBeenCalled();
   });
 

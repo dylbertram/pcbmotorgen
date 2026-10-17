@@ -142,6 +142,7 @@
   });
   function startTerminalTool(coil?: string): void {
     if (!terminalGeometry || !onGeometryChange) return;
+    view.viewMode = "top";
     measure.mode = false;
     measure.clear();
     view.oneSection = false;
@@ -153,7 +154,7 @@
   $effect(() => {
     const request = view.terminalRequest;
     if (!request) return;
-    untrack(() => startTerminalTool());
+    untrack(() => startTerminalTool(view.requestedTerminalCoil));
   });
   // A generated pattern is re-derived on every parameter edit. Re-anchor the
   // open terminal tool so its automatic ends reselect instead of going stale.

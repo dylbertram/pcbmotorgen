@@ -6,7 +6,6 @@
   import KicadPanel from "../export/KicadPanel.svelte";
   import SensorKicadPanel from "../export/SensorKicadPanel.svelte";
   import type { SensorStore } from "../../stores/sensor.svelte";
-  import CoilPhaseMapping from "../design/CoilPhaseMapping.svelte";
 
   let { open = $bindable(false), config, projects, drc, sensor }: {
     open: boolean;
@@ -34,16 +33,6 @@
         {:else if projects.kind === "sensor" && sensor}
           <SensorKicadPanel {sensor} />
         {:else}
-          {#if projects.cadGeometry}
-            <div class="mb-4">
-              <CoilPhaseMapping
-                geometry={projects.cadGeometry}
-                phases={config.phases}
-                minimumWidth={config.min_trace_mm}
-                onChange={(g) => projects.setCadGeometry(g)}
-              />
-            </div>
-          {/if}
           <KicadPanel
             {config}
             cadGeometry={projects.cadGeometry}

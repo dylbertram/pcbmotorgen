@@ -30,7 +30,7 @@ mod tests {
 
     fn mapped() -> CadGeometry {
         serde_json::from_value(serde_json::json!({
-            "motor_mapping_reviewed":true, "trace_width_mm":0.2, "layer_z_mm":[-1.6,0.0],
+            "trace_width_mm":0.2, "layer_z_mm":[-1.6,0.0],
             "routing":{"format_version":2,"segments":[
                 {"start":{"x":0.0,"y":0.0},"end":{"x":1.0,"y":0.0},"layer":0,"net":"coil","is_active":true},
                 {"start":{"x":1.0,"y":0.0},"end":{"x":2.0,"y":0.0},"layer":1,"net":"coil","is_active":false}
@@ -66,9 +66,9 @@ mod tests {
     fn incomplete_mapping_and_disconnected_islands_are_rejected() {
         let core = LinearMotorConfig { phases:1, ..Default::default() };
         let mut cad = mapped();
-        cad.motor_mapping_reviewed = false;
-        assert!(CadBoard::new(&cad, &core).err().unwrap().contains("Review"));
-        cad.motor_mapping_reviewed = true;
+        let terminals = std::mem::take(&mut cad.coil_terminals);
+        assert!(CadBoard::new(&cad, &core).err().unwrap().contains("Select driver"));
+        cad.coil_terminals = terminals;
         let mut island = cad.routing.segments[0].clone();
         island.start.x += 100.0;
         island.end.x += 100.0;

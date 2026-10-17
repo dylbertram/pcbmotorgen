@@ -45,8 +45,10 @@ export class CoilPreviewViewState {
    *  open the coil-ends panel in the expanded preview. CoilPreview watches
    *  the counter, so repeated requests always fire. */
   terminalRequest = $state(0);
+  requestedTerminalCoil = $state<string | undefined>(undefined);
 
-  requestTerminals(): void {
+  requestTerminals(coil?: string): void {
+    this.requestedTerminalCoil = coil;
     this.terminalPanelOpen = true;
     this.terminalRequest += 1;
   }

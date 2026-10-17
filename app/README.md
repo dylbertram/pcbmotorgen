@@ -32,18 +32,24 @@ from projects, and only affect a design when you save settings.
 
 ## Imported motor mapping
 
-An imported motor stays authoritative while its mapping is incomplete. The app
-does not substitute generated coils for it. In Design, assign every coil to a
-configured motor phase and review its layer heights and via connections. In the
-expanded preview, select conductors and use **Mark active** or **Mark end-turn**
-to set their roles. Both roles remain conducting copper.
+An imported motor stays authoritative. The app never substitutes generated
+coils for it. Assign source coils and motor phases in Import CAD.
 
-Select each coil's driver and opposite ends, then confirm **Imported motor
-mapping reviewed**. DRC, simulation, and KiCad writing reject incomplete mappings
-with the blocking coil, layer, or via. Via connections must land on trace
-endpoints on both specified planes, matching the electrical graph. Split a trace
-at a via landing if needed. Disconnected copper islands within a coil are rejected.
-Changing conductor roles or coil/layer assignments requires another review.
+Simulation shows **Coil ends inferred** when it can identify the driver and
+opposite ends. Choose **Use inferred ends** to accept them, or **Review** to
+open the coil preview with those ends selected for editing. Either action
+dismisses the notice. Accepted or edited ends are saved with the design.
+
+If the ends cannot be inferred, Simulation prompts you to select them in the
+coil preview before continuing. That notice clears once all ends are selected.
+Changing coil or layer assignments clears affected ends and starts this flow
+again. There is no general review checkbox.
+
+The app checks phases, layer heights, trace widths, and via connections
+automatically. Via connections must land on trace endpoints on both specified
+planes, matching the electrical graph. Disconnected islands within a coil are
+reported as errors. Internal active/end-turn labels do not remove imported
+copper from force calculations, so they are not exposed as editing controls.
 
 ## Files and projects
 

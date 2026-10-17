@@ -18,8 +18,6 @@
     <span class="text-slate-400" aria-live="polite">{tool.selected.length} selected</span>
     <button type="button" class="icon-button" aria-label="Clear" disabled={disabled || !tool.selected.length} onclick={tool.clear} title="Clear selected segments and the chain start."><X size={16} aria-hidden="true" /></button>
     <SelectionAssignmentMenu {tool} {geometry} {disabled} variant="button" triggerClass="flex h-8 w-8 items-center justify-center rounded border border-slate-700 hover:bg-slate-800 disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500" />
-    <button type="button" disabled={disabled || !tool.selected.length} onclick={() => tool.setRole(true)}>Mark active</button>
-    <button type="button" disabled={disabled || !tool.selected.length} onclick={() => tool.setRole(false)}>Mark end-turn</button>
     {#if tool.canUndo}<button type="button" class="icon-button" aria-label="Undo assignment" title="Undo the last coil or layer assignment." {disabled} onclick={tool.undo}><Undo2 size={16} aria-hidden="true" /></button>{/if}
   </div>
 </div>

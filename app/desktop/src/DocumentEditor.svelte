@@ -29,8 +29,9 @@
   import { measureTrace } from "./lib/previewGeometry";
   import { cadGeometryToPreview } from "./lib/cadPreview";
   import { saveTextToFile } from "./lib/files";
-  import { geometryKey, unmappedCoils } from "./lib/cadPhases";
+  import { geometryKey } from "./lib/cadPhases";
   import { cadMappingProblems } from "./lib/cadMapping";
+  import { inferMissingCoilEnds } from "./lib/cadTerminals";
 
   import TabNav from "./lib/components/layout/TabNav.svelte";
   import DrcStatus from "./lib/components/layout/DrcStatus.svelte";
@@ -290,8 +291,18 @@
 
   /** Opening the coil-ends panel lives in the design reflection preview. */
   function selectCoilEnds(): void {
+    const proposal = projects.cadGeometry ? inferMissingCoilEnds(projects.cadGeometry) : null;
+    // Review starts from the inferred pairs, so closing the preview without
+    // edits keeps those ends. Ambiguous coils still require manual selection.
+    if (proposal && proposal.geometry !== projects.cadGeometry) projects.setCadGeometry(proposal.geometry);
     selectTab("design");
-    session.previewView.requestTerminals();
+    session.previewView.requestTerminals(proposal?.unresolved[0] ?? proposal?.pending[0]);
+  }
+
+  function useInferredEnds(): void {
+    if (!projects.cadGeometry) return;
+    const proposal = inferMissingCoilEnds(projects.cadGeometry);
+    if (!proposal.unresolved.length) projects.setCadGeometry(proposal.geometry);
   }
 
   async function runSimulation(generation: number): Promise<void> {
@@ -688,6 +699,7 @@
               {error}
               cadGeometry={projects.cadGeometry}
               onSelectEnds={selectCoilEnds}
+              onUseInferredEnds={useInferredEnds}
             />
           </Tabs.Content>
         </div>
