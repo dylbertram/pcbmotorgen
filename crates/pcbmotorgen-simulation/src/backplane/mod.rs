@@ -22,9 +22,14 @@
 //!   the slab, FR4 below it and the housing gap are air. The housing is folded
 //!   in with the standard layered-media recursion, so a non-magnetic housing
 //!   changes nothing.
-//! - The coil sits at the PCB midplane: inductance factor `1 + R·e^(−k·t_pcb)`.
-//!   Copper on the bottom layer sits closer to the stack, so this is low for
-//!   2-layer boards.
+//! - The coil is `N` copper sheets (`N = num_layers ≥ 2`) spread evenly
+//!   through the PCB of thickness `T`, at `d_i = i·T/(N−1)` above the PCB
+//!   bottom: `d = 0` is the bottom face, `d = T` the top face. Each sheet
+//!   sees its own image `2·d_i` away, so the inductance factor is
+//!   `1 + R·(1/N)·Σ e^(−2k·d_i)`. For `N = 2` this is `1 + R·(1 + e^(−2kT))/2`.
+//! - Every sheet carries the same current, as in a series-connected coil.
+//!   Sheets are evenly spaced; real 4- and 6-layer stackups have uneven core
+//!   and prepreg thicknesses, so inner-layer depths are approximate.
 //! - Attraction is the mean Maxwell stress `R·B0²/μ0` over the array footprint
 //!   `N·τ·D`. `B0` is the 2-D fundamental of the bare array at the stack top.
 //! - Eddy-current loss and eddy drag in conductive housings are not modelled.
@@ -234,6 +239,11 @@ pub struct BackplaneAnalysis {
     pub housing_plane_z_m: Option<f64>,
     /// Fundamental normal field of the bare magnet array at the stack top [T].
     pub b0_t: f64,
+    /// Copper sheet count `N` used for `inductance_factor` (`num_layers`,
+    /// at least 2).
+    pub copper_layers: u32,
+    /// Height of each copper sheet above the PCB bottom [m], bottom first.
+    pub copper_depths_m: Vec<f64>,
     /// Multiplier on per-phase inductance from the image currents.
     pub inductance_factor: f64,
     /// Estimated normal attraction between the magnets and the backplane +
@@ -326,8 +336,12 @@ impl BackplaneStack {
         let footprint = sim.magnet_count as f64 * tau * depth;
         let attraction_n = image_strength * b0 * b0 / MU_0 * footprint;
 
-        // Image of a coil at the PCB midplane, t_pcb/2 above the PCB bottom.
-        let inductance_factor = 1.0 + image_strength * (-k * t_pcb).exp();
+        // Equal-current copper sheets spread over the PCB, each with its own
+        // image. Validation rejects num_layers < 2; clamp so analyze never
+        // divides by zero on unvalidated input.
+        let copper_layers = sim.num_layers.max(2);
+        let copper_depths_m = copper_depths(t_pcb, copper_layers);
+        let inductance_factor = inductance_factor(image_strength, k, &copper_depths_m);
 
         // Flux-conservation saturation estimate. The normal flux (1+R)·B0
         // entering the stack top, a half-pitch of it per unit width
@@ -390,6 +404,8 @@ impl BackplaneStack {
             image_plane_z_m: -t_pcb,
             housing_plane_z_m: self.housing.as_ref().map(|h| -(t_pcb + stack_t + h.gap_m)),
             b0_t: b0,
+            copper_layers,
+            copper_depths_m,
             inductance_factor,
             attraction_n,
             layer_peak_b_t,
@@ -421,6 +437,19 @@ fn reflection(k: f64, media: &[(f64, f64)]) -> f64 {
     }
     let rho = (mu_below - 1.0) / (mu_below + 1.0);
     (rho + g) / (1.0 + rho * g)
+}
+
+/// Heights of `n ≥ 2` evenly spaced copper sheets above the PCB bottom [m]:
+/// `d_i = i·T/(n−1)`, from the bottom face to the top face.
+fn copper_depths(t_pcb: f64, n: u32) -> Vec<f64> {
+    (0..n).map(|i| t_pcb * i as f64 / (n - 1) as f64).collect()
+}
+
+/// `1 + R·(1/N)·Σ e^(−2k·d_i)`: each equal-current sheet at `d_i` above the
+/// reflecting plane couples to its image `2·d_i` away.
+fn inductance_factor(r: f64, k: f64, depths: &[f64]) -> f64 {
+    let mean: f64 = depths.iter().map(|d| (-2.0 * k * d).exp()).sum::<f64>() / depths.len() as f64;
+    1.0 + r * mean
 }
 
 fn check_thickness(what: &str, t: f64) -> Result<(), String> {
@@ -565,6 +594,74 @@ mod tests {
         let decay = (-2.0 * k * mm(1.0)).exp();
         assert!((spaced.image_strength - bare.image_strength * decay).abs() < 1e-12);
         assert!(spaced.inductance_factor < bare.inductance_factor);
+    }
+
+    fn layered(num_layers: u32) -> (SimulationInput, BackplaneAnalysis) {
+        let mut s = sim();
+        s.num_layers = num_layers;
+        let a = stack(LayerMaterial::MnZnFerrite, mm(2.0)).analyze(&s);
+        (s, a)
+    }
+
+    #[test]
+    fn two_layers_match_closed_form() {
+        let (s, a) = layered(2);
+        let k = std::f64::consts::PI / s.pole_pitch_m();
+        let t = s.pcb_thickness_m;
+        let expected = 1.0 + a.image_strength * (1.0 + (-2.0 * k * t).exp()) / 2.0;
+        assert_eq!(a.copper_layers, 2);
+        assert_eq!(a.copper_depths_m, vec![0.0, t]);
+        assert!((a.inductance_factor - expected).abs() < 1e-12);
+    }
+
+    #[test]
+    fn four_layers_match_closed_form() {
+        let (s, a) = layered(4);
+        let k = std::f64::consts::PI / s.pole_pitch_m();
+        let t = s.pcb_thickness_m;
+        let sum: f64 = [0.0, t / 3.0, 2.0 * t / 3.0, t]
+            .iter()
+            .map(|d| (-2.0 * k * d).exp())
+            .sum();
+        let expected = 1.0 + a.image_strength * sum / 4.0;
+        assert!((a.inductance_factor - expected).abs() < 1e-12);
+    }
+
+    #[test]
+    fn many_layers_tend_to_continuous_average() {
+        let (s, a) = layered(201);
+        let x = 2.0 * std::f64::consts::PI / s.pole_pitch_m() * s.pcb_thickness_m;
+        let limit = (1.0 - (-x).exp()) / x;
+        let mean = (a.inductance_factor - 1.0) / a.image_strength;
+        assert!((mean / limit - 1.0).abs() < 0.01, "{mean} vs {limit}");
+    }
+
+    #[test]
+    fn fewer_than_two_layers_clamp_to_two() {
+        assert_eq!(layered(0).1, layered(2).1);
+        assert_eq!(layered(1).1, layered(2).1);
+    }
+
+    #[test]
+    fn spacer_lowers_image_and_inductance() {
+        let s = sim();
+        let bare = stack(LayerMaterial::MnZnFerrite, mm(2.0)).analyze(&s);
+        let gapped = BackplaneStack {
+            layers: vec![
+                BackplaneLayer {
+                    material: LayerMaterial::Fr4,
+                    thickness_m: mm(0.1),
+                },
+                BackplaneLayer {
+                    material: LayerMaterial::MnZnFerrite,
+                    thickness_m: mm(2.0),
+                },
+            ],
+            housing: None,
+        }
+        .analyze(&s);
+        assert!(gapped.image_strength < bare.image_strength);
+        assert!(gapped.inductance_factor < bare.inductance_factor);
     }
 
     #[test]
