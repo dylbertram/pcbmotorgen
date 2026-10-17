@@ -22,7 +22,7 @@ analytical magnetic B-field, Lorentz force, and torque — runs natively in Rust
 
 ### Rationale
 
-- **magba** (v0.6.2, BSD-3-Clause) is a Rust crate that explicitly implements
+- **magba** (v0.7.2, BSD-3-Clause) is a Rust crate that explicitly implements
   Magpylib's analytical closed-form B-field formulas for cuboid magnets,
   validated against Magpylib itself. It provides `CuboidMagnet`,
   `PathCurrent` (polyline conductors), the `sources!` collection macro, and

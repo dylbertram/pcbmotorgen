@@ -16,7 +16,7 @@ You are a core simulation engineering subagent. Your sole responsibility is impl
 
 ## Domain Stack
 
-- **magba (0.6.2):** Compute analytical B-fields using `CuboidMagnet` and `PathCurrent`.
+- **magba (0.7.2):** Compute analytical B-fields using `CuboidMagnet` and `PathCurrent`.
 - **nalgebra (0.33+):** Coordinate transforms, vector operations (`.cross()`, `.dot()`), and orientation via `UnitQuaternion`.
 - **rayon (1.10+):** Grid sampling loops must use parallel iterators (`.par_iter()`).
 - **cfsem (11.2):** Advanced Biot-Savart filament tracking and eddy-current force modeling.

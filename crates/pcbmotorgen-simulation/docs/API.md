@@ -24,7 +24,7 @@ app crate or on `pcbmotorgen-export`. It depends on:
 | Dependency | Role |
 | --- | --- |
 | `pcbmotorgen-routing` | Coil geometry — `PhaseCoil`, `CoilSegment`, `CoilArc`, `PHASE_NAMES` (re-exported at the crate root). |
-| `magba` (0.6.2) | Analytical closed-form B-field of cuboid magnets (Magpylib formulas). |
+| `magba` (0.7.2) | Analytical closed-form B-field of cuboid magnets (Magpylib formulas). |
 | `nalgebra` | Vectors / points / quaternions for the Lorentz and torque loops. |
 | `rayon` | Point-parallel B-field sampling and position-parallel force sweeps. |
 | `serde` / `serde_json` | Serialization of `SimulationInput` and all result DTOs. |

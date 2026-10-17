@@ -4,7 +4,7 @@
 //! these wrappers instead of touching `magba` types directly. If a future
 //! magba version changes its API, only this file needs updating.
 //!
-//! ## magba 0.6.2 API mapping
+//! ## magba 0.7.2 API mapping
 //!
 //! | Magpylib (Python)                              | magba (Rust)                                        |
 //! |------------------------------------------------|-----------------------------------------------------|
