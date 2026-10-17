@@ -7,6 +7,15 @@ const KEY = "pcbmotorgen.drc_rulesets.v1";
 afterEach(() => vi.unstubAllGlobals());
 
 describe("drc rulesets", () => {
+  it("retains legacy named rulesets with a customized trace width", () => {
+    vi.stubGlobal("localStorage", { getItem: () => JSON.stringify([{ name: "Legacy", rules: {
+      min_trace_mm: 0.3, min_space_mm: 0.2, min_via_drill_mm: 0.4, min_via_annular_ring_mm: 0.1,
+    } }]) });
+    expect(readRulesets()).toEqual([{ name: "Legacy", rules: {
+      min_trace_mm: 0.3, trace_width_mm: 0.3, min_space_mm: 0.2, min_via_drill_mm: 0.4, min_via_annular_ring_mm: 0.1,
+    } }]);
+  });
+
   it("reads an empty list without storage or with corrupt data", () => {
     expect(readRulesets()).toEqual([]);
     const values = new Map<string, string>();
