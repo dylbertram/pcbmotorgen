@@ -28,9 +28,11 @@ marched exponential half-cycles and verify the required-frequency inversion.
 ## Reported closed-infinity project
 
 `app/desktop/src-tauri/src/commands/fixtures/closed_infinity_pattern.config.json`
-preserves the supplied project's config. It contains generated Star/wye
-copper, not imported CAD: five magnets, three strands, 0.1 mm traces, 1 oz,
-12 V, 1 A, 100 kHz. Do not substitute earlier feasibility-search settings.
+is the `versions[0].state.config` object of the supplied `.pmmotor` project. It
+contains generated Star/wye copper, not imported CAD: five magnets, three
+strands, 0.2 mm traces, 1 oz, 12 V, 1 A, 100 kHz. Reference result:
+`ripple_pp_a` ≈ 2.39 A at R ≈ 2.51 Ω. Do not substitute earlier
+feasibility-search settings.
 
 ```sh
 RAYON_NUM_THREADS=4 cargo test -p pcbmotorgen closed_infinity_user_project_diagnostics --bin pcbmotorgen -- --ignored --nocapture
