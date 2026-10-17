@@ -34,6 +34,49 @@ fn signed_branch_currents_obey_kirchhoff_and_power_balance() {
 }
 
 #[test]
+fn generated_braid_currents_obey_kirchhoff_and_power_balance() {
+    for strands in [2, 3, 5] {
+        for length in [92.0, 110.0] {
+            let ctx = pcbmotorgen_routing::RoutingContext {
+                active_area_length_mm: length, board_width_mm: 8.0,
+                num_layers: 2, phases: 3, min_trace_mm: 0.1, trace_width_mm: 0.1, min_space_mm: 0.127,
+                expects_continuous: false,
+                params: std::collections::HashMap::from([("num_strands".into(), strands as f64), ("connection".into(), 2.0)]),
+                magnet_pitch_mm: Some(6.0), magnet_array_span_mm: Some(35.0), phase_clearance_mm: None,
+            };
+            let routing = pcbmotorgen_routing::generate_routing_result(&ctx, "infinity-braid").unwrap();
+            for net in extract_phase_networks(&routing) {
+                // Non-uniform resistances so the split is not trivially symmetric.
+                let resistances: Vec<f64> = (0..net.edges.len()).map(|k| 1.0 + 0.1 * (k % 3) as f64).collect();
+                let solution = solve_network(&net, &resistances);
+                let label = format!("{} strands={strands} length={length}", net.net);
+                assert!(solution.connected, "{label}: network did not solve");
+                // Positive share flows a -> b; net inflow must vanish at every internal node.
+                let mut balance = vec![0.0; net.node_count];
+                for (edge, current) in net.edges.iter().zip(&solution.current_share) {
+                    balance[edge.a] -= current;
+                    balance[edge.b] += current;
+                }
+                for node in (0..net.node_count)
+                    .filter(|n| !net.terminal.contains(n) && !net.star.contains(n))
+                {
+                    assert!(balance[node].abs() < 1e-9, "{label}: KCL violated at node {node}: {}", balance[node]);
+                }
+                let injected: f64 = net.terminal.iter().map(|&n| -balance[n]).sum();
+                let returned: f64 = net.star.iter().map(|&n| balance[n]).sum();
+                assert!(injected > 0.0, "{label}: no current injected");
+                assert!((injected - returned).abs() < 1e-9, "{label}: terminal and star currents differ");
+                let dissipated: f64 = solution.current_share.iter().zip(&resistances).map(|(i, r)| i * i * r).sum();
+                assert!(
+                    (dissipated - injected * injected * solution.resistance_ohm).abs() < 1e-9 * dissipated.max(1.0),
+                    "{label}: power balance {dissipated} vs {}", injected * injected * solution.resistance_ohm
+                );
+            }
+        }
+    }
+}
+
+#[test]
 fn empty_routing_cannot_produce_a_force_result() {
     use crate::magnetic::force_eval::ForceEvaluator;
     assert!(ForceEvaluator::default().with_routed_currents(
