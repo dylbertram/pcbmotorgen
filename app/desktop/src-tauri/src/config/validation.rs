@@ -279,13 +279,17 @@ mod tests {
 
     #[test]
     fn test_active_area_le_magnet_array_span_raises() {
-        let cfg = LinearMotorConfig {
-            active_area_length_m: mm(120.0),
+        let mut cfg = LinearMotorConfig {
             magnet_count: 10,
             magnet_pitch_m: mm(12.0),
             ..LinearMotorConfig::default()
         };
+        cfg.active_area_length_m = cfg.magnet_array_span_m();
         assert!(cfg.validate().is_err());
+        cfg.active_area_length_m -= mm(0.001);
+        assert!(cfg.validate().is_err());
+        cfg.active_area_length_m = cfg.magnet_array_span_m() + mm(1.0);
+        assert!(cfg.validate().is_ok());
     }
 
     #[test]

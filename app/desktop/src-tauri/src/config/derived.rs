@@ -205,7 +205,8 @@ mod tests {
     #[test]
     fn test_magnet_array_span() {
         let cfg = default_config();
-        let expected = cfg.magnet_count as f64 * cfg.magnet_pitch_m;
+        // Nine centre spacings plus the two outer half-magnet widths.
+        let expected = 9.0 * mm(12.0) + mm(10.0);
         assert!((cfg.magnet_array_span_m() - expected).abs() < 1e-12);
     }
 
@@ -256,8 +257,8 @@ mod tests {
     fn test_summary_contains_travel() {
         let cfg = default_config();
         let s = cfg.summary();
-        // travel = 195 - 120 = 75 mm
-        assert!(s.contains("75"));
+        // Physical span = 9 * 12 + 10 = 118 mm; travel = 195 - 118.
+        assert!(s.contains("77"));
     }
 
     #[test]
