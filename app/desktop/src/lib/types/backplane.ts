@@ -24,7 +24,12 @@ export type HousingMaterial =
 /** One layer of the backplane, ordered from the PCB downward. */
 export interface BackplaneLayer {
   material: LayerMaterial;
+  /** Thickness of the magnetic material only (no adhesive or film) [m]. */
   thickness_m: number;
+  /** Datasheet relative permeability. Absent or null = material default. */
+  mu_r?: number | null;
+  /** Datasheet saturation flux density [T]. Absent or null = default. */
+  bsat_t?: number | null;
 }
 
 /** Housing below the backplane, separated from it by an air gap. */
@@ -42,23 +47,54 @@ export interface BackplaneStack {
   housing: HousingSpec | null;
 }
 
+/** Magnetic state of one layer or the housing under the magnets. */
+export interface MagneticState {
+  mu_initial: number;
+  /** Null for linear material. */
+  bsat_t: number | null;
+  /** Effective μr for the magnet field, with saturation. */
+  mu_effective: number;
+  /** Small-signal μr the coil sees under the magnets. */
+  mu_incremental: number;
+  /** Peak |B| of the linear model [T]: what it would take, not what happens. */
+  linear_peak_b_t: number;
+  /** Thickness-mean in-plane flux density of the linear model [T]. */
+  linear_mean_b_t: number;
+  /** Peak |B| at the solved, saturation-aware state [T]. */
+  peak_b_t: number;
+  /** Linear flux over the flux carried at Bsat. Above 1 = saturated. */
+  flux_overload: number;
+  /** Thickness of this material that carries the flux at Bsat [m]. */
+  required_thickness_m: number | null;
+  /** The same for sintered MnZn ferrite [m]. */
+  mnzn_thickness_m: number | null;
+}
+
 /** Derived backplane quantities (present only when a backplane is set). */
 export interface BackplaneAnalysis {
   stack_thickness_m: number;
-  /** Composite reflection `R` of stack and housing at the PCB bottom (0..1). */
+  /** Composite reflection `R` at the PCB bottom for the magnets, saturated. */
   image_strength: number;
+  /** `R` with every layer at its initial μr. */
+  linear_image_strength: number;
   /** 2-D fundamental normal field of the bare array at the stack top [T]. */
   b0_t: number;
   /** Copper sheet count used for `inductance_factor`. */
   copper_layers: number;
   /** Height of each copper sheet above the PCB bottom [m], bottom first. */
   copper_depths_m: number[];
+  /** Share of the winding length under the magnets. */
+  magnet_coverage: number;
+  /** Low-frequency inductance factor, with the magnets' bias. */
   inductance_factor: number;
-  /** Positive pulls the mover toward the stack [N]. */
+  /** At standstill. Positive pulls the mover toward the stack [N]. */
   attraction_n: number;
-  /** Peak flux density per layer [T], same order as `layers`. */
+  /** Peak flux density per layer at the solved state [T], same order as `layers`. */
   layer_peak_b_t: number[];
   housing_peak_b_t: number;
+  /** Same order as `layers`. */
+  layer_states: MagneticState[];
+  housing_state: MagneticState | null;
   warnings: string[];
 }
 
@@ -88,8 +124,32 @@ export const LAYER_DEFAULT_THICKNESS_M: Record<LayerMaterial, number> = {
   silicon_steel: 0.35e-3,
   mn_zn_ferrite: 2.0e-3,
   ni_zn_ferrite: 2.0e-3,
-  flex_ferrite: 0.3e-3,
+  flex_ferrite: 0.1e-3,
 };
+
+/** Typical relative permeability (`LayerMaterial::mu_r`). */
+export const LAYER_DEFAULT_MU_R: Record<LayerMaterial, number> = {
+  fr4: 1,
+  silicon_steel: 4000,
+  mn_zn_ferrite: 2500,
+  ni_zn_ferrite: 500,
+  flex_ferrite: 130,
+};
+
+/** Typical saturation flux density [T] (`LayerMaterial::bsat_t`); null = non-magnetic. */
+export const LAYER_DEFAULT_BSAT_T: Record<LayerMaterial, number | null> = {
+  fr4: null,
+  silicon_steel: 1.8,
+  mn_zn_ferrite: 0.45,
+  ni_zn_ferrite: 0.35,
+  flex_ferrite: 0.25,
+};
+
+/** Largest accepted μr override (`MAX_MU_R`). */
+export const BACKPLANE_MAX_MU_R = 1e6;
+
+/** Largest accepted Bsat override [T] (`MAX_BSAT_T`). */
+export const BACKPLANE_MAX_BSAT_T = 3;
 
 /** A new layer of `material` at its default thickness. */
 export function newLayer(material: LayerMaterial): BackplaneLayer {

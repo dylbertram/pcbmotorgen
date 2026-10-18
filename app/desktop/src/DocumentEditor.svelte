@@ -675,7 +675,7 @@
             class="h-full p-4 lg:pr-0"
           >
             <div hidden={designType !== "motor"} class="h-full">
-              <DesignTab {config} cadGeometry={projects.cadGeometry} onGeometryChange={(geometry) => projects.setCadGeometry(geometry)} onImportCad={() => (cadImportDialogOpen = true)} onUseGenerated={() => projects.setCadGeometry(null)} backplaneAnalysis={height?.backplane_analysis ?? null} />
+              <DesignTab {config} cadGeometry={projects.cadGeometry} onGeometryChange={(geometry) => projects.setCadGeometry(geometry)} onImportCad={() => (cadImportDialogOpen = true)} onUseGenerated={() => projects.setCadGeometry(null)} backplaneAnalysis={height?.backplane_analysis ?? null} driveBackplane={drive?.backplane ?? null} />
             </div>
             <div hidden={designType !== "sensor"} class="h-full overflow-y-auto">
               <SensorTab store={sensorStore} />
