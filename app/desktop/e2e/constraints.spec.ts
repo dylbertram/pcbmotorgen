@@ -10,6 +10,26 @@ import {
 } from "./helpers";
 
 test.describe("Design constraints restructure", () => {
+  test("assembly views and readouts live with their controls", async ({ page }) => {
+    await gotoDesignApp(page);
+    const constraints = designConstraintsPanel(page);
+    const stackup = page.locator("section[aria-labelledby='backplane-heading']");
+    await expect(constraints.getByRole("img", { name: "Three-quarter isometric view of the assembly" })).toBeVisible();
+    await expect(constraints.getByLabel("Mover position (mm)", { exact: true })).toBeVisible();
+    await expect(stackup.getByRole("img", { name: /Front-on orthographic/ })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Design reflection", exact: true })).toHaveCount(0);
+    await expect(page.getByRole("heading", { name: "Design dimensions", exact: true })).toHaveCount(0);
+    await expect(constraints.getByRole("img", { name: /Per-phase holding force/ })).toHaveCount(0);
+    await expect(constraints.getByText("Band margin", { exact: true })).toBeVisible();
+
+    const inline = page.locator("aside[aria-label='Coil preview panel']");
+    await expect(inline.getByRole("group", { name: "Coil terminal markers" })).toHaveCount(0);
+    await inline.getByRole("button", { name: "Expand coil preview" }).click();
+    const dialog = page.getByRole("dialog");
+    await expect(dialog.getByRole("img", { name: /Per-phase holding force/ })).toBeVisible();
+    await expect(dialog.getByRole("group", { name: "Coil terminal markers" })).toBeVisible();
+  });
+
   test("desired center-to-center travel is set in the Design constraints box", async ({
     page,
   }) => {
@@ -57,7 +77,7 @@ test.describe("Design constraints restructure", () => {
   }) => {
     await gotoDesignApp(page);
 
-    // The four general geometry fields live inside the Design constraints box.
+    // Travel geometry stays in constraints; vertical geometry lives in Stackup.
     await expect(page.locator("details", { hasText: "General" })).toHaveCount(0);
 
     const driver = designConstraintsPanel(page);
@@ -66,8 +86,11 @@ test.describe("Design constraints restructure", () => {
     await expect(numberField(page, "PCB thickness (mm)")).toBeVisible();
     await expect(numberField(page, "Air gap (mm)")).toBeVisible();
     await expect(driver.getByLabel("Active area width (mm)")).toBeVisible();
-    await expect(driver.getByLabel("PCB thickness (mm)")).toBeVisible();
-    await expect(driver.getByLabel("Air gap (mm)")).toBeVisible();
+    await expect(driver.getByLabel("PCB thickness (mm)")).toHaveCount(0);
+    await expect(driver.getByLabel("Air gap (mm)")).toHaveCount(0);
+    const stackup = page.locator("section[aria-labelledby='backplane-heading']");
+    await expect(stackup.getByLabel("PCB thickness (mm)")).toBeVisible();
+    await expect(stackup.getByLabel("Air gap (mm)")).toBeVisible();
 
     // No active-area fields remain under the combined Topology & Board panel.
     const traces = page.locator(
@@ -88,21 +111,14 @@ test.describe("Design constraints restructure", () => {
       page.locator("details", { hasText: "Stackup" }),
     ).toHaveCount(0);
 
-    // The old driver toggle is gone and no range sliders remain in the
-    // constraints box; the numeric fields are the editable controls. (The
-    // mover-position slider in the design reflection aside is a separate
-    // feature and is not counted here.)
+    // The old driver toggle is gone. Position now lives with the isometric view.
     await expect(
       page.getByRole("button", { name: "Magnets", exact: true }),
     ).toHaveCount(0);
     await expect(
       page.getByRole("button", { name: "Traces", exact: true }),
     ).toHaveCount(0);
-    await expect(
-      page.locator(
-        "section[aria-labelledby='design-constraints-heading'] input[type='range']",
-      ),
-    ).toHaveCount(0);
+    await expect(driver.getByRole("slider", { name: "Mover position slider (mm)" })).toBeVisible();
 
     await expect(numberField(page, "PCB thickness (mm)")).toBeEnabled();
     await expect(numberField(page, "Air gap (mm)")).toBeEnabled();

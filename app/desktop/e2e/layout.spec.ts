@@ -17,6 +17,7 @@ test.describe("Design tab layout geometry", () => {
       const viewport = root.locator("[data-scroll-area-viewport]");
       const track = root.locator("[data-scroll-area-scrollbar]");
       const thumb = track.locator("[data-scroll-area-thumb]");
+      if (await viewport.evaluate((el) => el.scrollHeight <= el.clientHeight)) continue;
       await root.hover();
       await expect(track).toBeVisible();
       await expect(thumb).toBeVisible();
@@ -116,7 +117,7 @@ test.describe("Design tab layout geometry", () => {
 
     const overflow = await page.evaluate(() => {
       const left = document.querySelector(
-        "aside[aria-label='Persistent design reflection'] [data-scroll-area-viewport]",
+        "aside[aria-label='Coil preview panel'] [data-scroll-area-viewport]",
       )!;
       const settings = document.querySelector(
         "#design-settings-scroll [data-scroll-area-viewport]",
@@ -140,7 +141,7 @@ test.describe("Design tab layout geometry", () => {
     });
     await page.waitForTimeout(120);
     const afterLeft = await page.evaluate(() => ({
-      left: document.querySelector("aside[aria-label='Persistent design reflection'] [data-scroll-area-viewport]")!.scrollTop,
+      left: document.querySelector("aside[aria-label='Coil preview panel'] [data-scroll-area-viewport]")!.scrollTop,
       right: document.querySelector("#design-settings-scroll [data-scroll-area-viewport]")!.scrollTop,
       windowY: window.scrollY,
     }));
@@ -154,7 +155,7 @@ test.describe("Design tab layout geometry", () => {
     });
     await page.waitForTimeout(120);
     const afterRight = await page.evaluate(() => ({
-      left: document.querySelector("aside[aria-label='Persistent design reflection'] [data-scroll-area-viewport]")!.scrollTop,
+      left: document.querySelector("aside[aria-label='Coil preview panel'] [data-scroll-area-viewport]")!.scrollTop,
       right: document.querySelector("#design-settings-scroll [data-scroll-area-viewport]")!.scrollTop,
     }));
     expect(afterRight.right).toBeGreaterThan(0);
