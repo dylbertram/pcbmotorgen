@@ -31,10 +31,20 @@
 //!   sees the describing-function permeability
 //!   `μ_eff = 1 + (μi − 1)·(2/π)·(asin x + x·√(1 − x²))`, `x = H_knee/H1`,
 //!   `H_knee = Bsat/(μ0(μi − 1))`. `H1` is the thickness mean of the in-plane
-//!   field, from the layer's own flux `|A_top − A_bottom|/T`. The fixed point
-//!   `μ_eff = f(H1(μ_eff))` is solved per layer by bisection, layer by layer
-//!   until the stack settles. One `μ_eff` per layer: a thick plate whose face
-//!   saturates but whose mean flux fits keeps `μi` and gets a warning.
+//!   field, from the layer's own flux `|A_top − A_bottom|/T`. A layer whose
+//!   linear in-plane field reaches Bsat on a face is split into sublayers of
+//!   `k·T ≤ 0.1` (at most 32), each with its own `μ_eff`, so a thick plate can
+//!   saturate near its face and stay linear deeper down. The fixed point
+//!   `μ_eff = f(H1(μ_eff))` is solved per sublayer by bisection, sweeping
+//!   until the stack settles. Reported `μ_eff` and `μ_inc` are thickness
+//!   means over the sublayers: in-plane flux runs through them in parallel.
+//! - Only the in-plane field saturates a layer. Under the magnet centres the
+//!   field enters a thick plate normally and saturates a skin at its face,
+//!   which lowers `R`; the model misses that, so for plates thicker than
+//!   about `1/k` near `flux_overload ≈ 1` it overstates `R`, K_f and the
+//!   attraction (FEMM: +13 % field and +52 % attraction for 5 mm flex sheet,
+//!   +14 % attraction for 2 mm MnZn, both on a 0.8 mm PCB). The suggested
+//!   thicknesses are lower bounds.
 //! - The magnet field model mirrors the array across the PCB bottom with the
 //!   saturated `R`, which sets K_f. Attraction is the mean Maxwell stress
 //!   `Re R(κ)·B(κ)²/μ0` summed over the cross-travel spectrum of the
@@ -53,13 +63,19 @@
 //!   linkage is `L0·F·i`, so `L = L0·Re F` and the added resistance is
 //!   `−ω·L0·Im F ≥ 0`. Sheets are evenly spaced; real 4- and 6-layer
 //!   stackups have uneven core and prepreg thicknesses.
-//! - Under the magnets a saturated layer is biased: its incremental
-//!   permeability is `μi` where `|H| < H_knee` and 1 elsewhere. Coil flux runs
-//!   along the layer through both parts in series, so the coil sees the
-//!   harmonic mean over a pole pitch, `1/μ_inc = (1 − p)/μi + p`, with
-//!   `p = 1 − (2/π)·asin x` the saturated share. Away from the magnets the
-//!   layer keeps `μi`. `R` is averaged over the winding length with weight
-//!   `N·τ / active_area_length` under the magnets.
+//! - Under the magnets a saturated layer is biased by
+//!   `H = (H1·sin kx, Hz·cos kx)`, in-plane and normal, `Hz` from the normal
+//!   field at the solved state. A small in-plane coil field sees the
+//!   differential permeability along the bias (`μi` below the knee, 1 above
+//!   it) and the secant permeability `B/(μ0·|H|)` across it, so
+//!   `μ_xx = μ_diff·cos²α + μ_sec·sin²α`, `α` the bias angle to the plane.
+//!   Coil flux runs along the layer through all of it in series, so the coil
+//!   sees the harmonic mean of `μ_xx` over a pole pitch, per sublayer. This
+//!   ignores where the coil flux sits relative to the saturated regions,
+//!   which moves with the mover (a saliency); FEMM gives a spread around the
+//!   model value. Away from the magnets the layer keeps `μi`. `R` is averaged
+//!   over the winding length with weight `N·τ / active_area_length` under the
+//!   magnets.
 //! - The drive evaluates `F` at the PWM frequency for the ripple and at the
 //!   electrical frequency `v/(2τ)` for the `ω·L` voltage terms.
 //!
@@ -99,6 +115,10 @@ pub const MAX_THICKNESS_M: f64 = 0.02;
 pub const MAX_MU_R: f64 = 1e6;
 /// Largest accepted saturation flux density override [T].
 pub const MAX_BSAT_T: f64 = 3.0;
+/// Sublayer thickness, as `k·T`, of a layer that reaches Bsat.
+const SUBLAYER_KT: f64 = 0.1;
+/// Most sublayers per layer.
+const MAX_SUBLAYERS: usize = 32;
 
 /// Material for a backplane layer.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -320,6 +340,9 @@ pub struct MagneticState {
     pub linear_peak_b_t: f64,
     /// Thickness-mean in-plane flux density of the linear model [T].
     pub linear_mean_b_t: f64,
+    /// Thickness-mean in-plane flux density of the fundamental at the
+    /// solved state, `μ0·μ_eff·H1` [T].
+    pub mean_b_t: f64,
     /// Peak `|B|` at the solved, saturation-aware state [T].
     pub peak_b_t: f64,
     /// Linear in-plane flux over the flux the layer carries at Bsat. Above 1
@@ -422,10 +445,14 @@ pub struct SolvedStack {
     /// Initial permeability: the linear model, and the coil field away from
     /// the magnets.
     free: Vec<Medium>,
-    /// Effective permeability for the magnet field.
+    /// Effective permeability for the magnet field, layers that reach Bsat
+    /// split into sublayers.
     magnet: Vec<Medium>,
-    /// Incremental permeability for the coil field under the magnets.
+    /// Incremental permeability for the coil field under the magnets, split
+    /// like `magnet`.
     biased: Vec<Medium>,
+    /// Index into `free` of each entry of `magnet` and `biased`.
+    owner: Vec<usize>,
     coverage: f64,
     /// `(1/N)·Σ e^(−2k·d_i)`.
     copper_weight: f64,
@@ -551,15 +578,21 @@ impl BackplaneStack {
         let k = PI / sim.pole_pitch_m();
         let b0 = mode_bz(sim, k);
         let free = self.media();
-        let magnet = saturate(k, b0, &free);
+        let (fine, owner) = split_saturating(k, b0, &free);
+        let magnet = saturate(k, b0, &fine);
         let (_, faces) = dc_fields(k, &magnet);
-        let biased = free
+        let biased = fine
             .iter()
             .zip(&magnet)
             .zip(&faces)
             .map(|((m, e), f)| match m.saturable() {
                 Some(bsat) => Medium {
-                    mu: incremental_mu(m.mu, bsat, f.mean * b0 / (MU_0 * e.mu)),
+                    mu: incremental_mu(
+                        m.mu,
+                        bsat,
+                        f.mean * b0 / (MU_0 * e.mu),
+                        (f.a_top.abs() + f.a_bottom.abs()) / 2.0 * b0 / (MU_0 * e.mu),
+                    ),
                     ..*m
                 },
                 None => *m,
@@ -578,6 +611,7 @@ impl BackplaneStack {
             free,
             magnet,
             biased,
+            owner,
             coverage,
             copper_weight: copper_weight(k, &depths),
         }
@@ -606,9 +640,25 @@ impl BackplaneStack {
         let (_, eff_faces) = dc_fields(k, &solved.magnet);
         let state = |i: usize| -> MagneticState {
             let m = &solved.free[i];
-            let (lin, eff) = (&lin_faces[i], &eff_faces[i]);
-            let mu_eff = solved.magnet[i].mu;
-            let bh = |b_inplane: f64| bh_curve(m.mu, m.bsat, b_inplane / (MU_0 * mu_eff));
+            let lin = &lin_faces[i];
+            let subs: Vec<usize> = (0..solved.owner.len())
+                .filter(|&j| solved.owner[j] == i)
+                .collect();
+            // In-plane flux runs through the sublayers in parallel, so they
+            // lump by their thickness-weighted mean.
+            let lumped = |media: &[Medium]| match subs.as_slice() {
+                [j] => media[*j].mu,
+                _ => subs.iter().map(|&j| media[j].mu * media[j].t).sum::<f64>() / m.t,
+            };
+            let (first, last) = (subs[0], subs[subs.len() - 1]);
+            let peak_b_t = subs
+                .iter()
+                .map(|&j| {
+                    let (e, mu_eff) = (&eff_faces[j], solved.magnet[j].mu);
+                    let bh = |b: f64| bh_curve(m.mu, m.bsat, b / (MU_0 * mu_eff));
+                    bh(e.top * b0).max(bh(e.bottom * b0)).max(e.normal * b0)
+                })
+                .fold(0.0, f64::max);
             let linear_mean_b_t = lin.mean * b0;
             let flux_overload = m.saturable().map_or(0.0, |bsat| linear_mean_b_t / bsat);
             let saturated = flux_overload > 1.0;
@@ -621,13 +671,13 @@ impl BackplaneStack {
             MagneticState {
                 mu_initial: m.mu,
                 bsat_t: m.bsat,
-                mu_effective: mu_eff,
-                mu_incremental: solved.biased[i].mu,
+                mu_effective: lumped(&solved.magnet),
+                mu_incremental: lumped(&solved.biased),
                 linear_peak_b_t: lin.peak() * b0,
                 linear_mean_b_t,
-                peak_b_t: bh(eff.top * b0)
-                    .max(bh(eff.bottom * b0))
-                    .max(eff.normal * b0),
+                mean_b_t: (eff_faces[first].a_top - eff_faces[last].a_bottom).abs() / (k * m.t)
+                    * b0,
+                peak_b_t,
                 flux_overload,
                 required_thickness_m: saturated
                     .then(|| thickness_for_bsat(k, b0, &solved.free, i, *m))
@@ -718,12 +768,12 @@ fn saturation_warning(
     if s.saturated() {
         let fix = match (s.required_thickness_m, s.mnzn_thickness_m) {
             (Some(t), Some(m)) => format!(
-                "Carrying it needs about {:.1} mm of this material, or {:.1} mm of sintered MnZn ferrite.",
+                "Carrying it needs at least {:.1} mm of this material, or {:.1} mm of sintered MnZn ferrite.",
                 t * 1e3,
                 m * 1e3
             ),
             (None, Some(m)) => format!(
-                "Carrying it needs more than {:.0} mm of this material, or about {:.1} mm of sintered MnZn ferrite.",
+                "Carrying it needs more than {:.0} mm of this material, or at least {:.1} mm of sintered MnZn ferrite.",
                 MAX_THICKNESS_M * 1e3,
                 m * 1e3
             ),
@@ -740,9 +790,9 @@ fn saturation_warning(
         ));
     } else if s.linear_peak_b_t > bsat {
         warnings.push(format!(
-            "{what}: the face reaches {:.2} T, above Bsat {bsat:.2} T, but the mean flux fits ({:.2} T). \
-             Only a skin at the face saturates, so R is a little lower than modelled.",
-            s.linear_peak_b_t, s.linear_mean_b_t
+            "{what}: the linear field at the face reaches {:.2} T, above Bsat {bsat:.2} T, but the mean \
+             flux fits ({:.2} T). A skin at the face saturates; effective μr {:.0} of {:.0}.",
+            s.linear_peak_b_t, s.linear_mean_b_t, s.mu_effective, s.mu_initial
         ));
     }
 }
@@ -789,6 +839,10 @@ fn reflection_ac(kappa: f64, omega: f64, media: &[Medium]) -> Complex<f64> {
 /// field at the stack top.
 #[derive(Debug, Clone, Copy)]
 struct Faces {
+    /// Flux function `A` at the top and bottom faces; their difference is
+    /// the in-plane flux, per `B0/k`.
+    a_top: f64,
+    a_bottom: f64,
     /// In-plane `|B|` at the top and bottom faces.
     top: f64,
     bottom: f64,
@@ -832,6 +886,8 @@ fn dc_fields(k: f64, media: &[Medium]) -> (f64, Vec<Faces>) {
         let a_top = a * (1.0 + g_top[i]);
         let a_bottom = a * decay * (1.0 + g_bottom[i]);
         faces.push(Faces {
+            a_top,
+            a_bottom,
             top: (a * (g_top[i] - 1.0)).abs(),
             bottom: (a * decay * (g_bottom[i] - 1.0)).abs(),
             normal: a_top.abs().max(a_bottom.abs()),
@@ -864,16 +920,50 @@ fn describing_mu(mu_i: f64, bsat: f64, h1: f64) -> f64 {
     }
 }
 
-/// Harmonic mean over a pole pitch of the incremental permeability (`μi`
-/// below the knee, 1 above it) for an in-plane bias `h1·sin(kx)`.
-fn incremental_mu(mu_i: f64, bsat: f64, h1: f64) -> f64 {
-    match knee_ratio(mu_i, bsat, h1) {
-        Some(x) => {
-            let p = 1.0 - 2.0 / PI * x.asin();
-            1.0 / ((1.0 - p) / mu_i + p)
-        }
-        None => mu_i,
+/// Harmonic mean over a pole pitch of the small-signal in-plane permeability
+/// under the bias `H = (hx·sin kx, hz·cos kx)`: differential along the bias
+/// (`μi` below the knee, 1 above it), secant `B/(μ0·|H|)` across it.
+fn incremental_mu(mu_i: f64, bsat: f64, hx: f64, hz: f64) -> f64 {
+    // A quarter period covers every bias by symmetry.
+    const SAMPLES: usize = 256;
+    let h_knee = bsat / (MU_0 * (mu_i - 1.0));
+    let mean_inverse = (0..SAMPLES)
+        .map(|i| {
+            let theta = (i as f64 + 0.5) / SAMPLES as f64 * PI / 2.0;
+            let (x, z) = (hx * theta.sin(), hz * theta.cos());
+            let h = x.hypot(z);
+            if h <= h_knee {
+                return 1.0 / mu_i;
+            }
+            let secant = bh_curve(mu_i, Some(bsat), h) / (MU_0 * h);
+            let along = (x / h).powi(2);
+            1.0 / (along + (1.0 - along) * secant)
+        })
+        .sum::<f64>()
+        / SAMPLES as f64;
+    1.0 / mean_inverse
+}
+
+/// `media` with each saturable medium whose linear in-plane field reaches
+/// Bsat on a face split into sublayers of `k·T ≤ SUBLAYER_KT` (at most
+/// [`MAX_SUBLAYERS`]), so saturation can vary with depth. Returns the media
+/// and the index of the medium each entry came from.
+fn split_saturating(k: f64, b0: f64, media: &[Medium]) -> (Vec<Medium>, Vec<usize>) {
+    let (_, faces) = dc_fields(k, media);
+    let mut fine = Vec::new();
+    let mut owner = Vec::new();
+    for (i, (m, f)) in media.iter().zip(&faces).enumerate() {
+        let n = match m.saturable() {
+            Some(bsat) if f.top.max(f.bottom) * b0 > bsat => {
+                ((k * m.t / SUBLAYER_KT).ceil() as usize).clamp(1, MAX_SUBLAYERS)
+            }
+            _ => 1,
+        };
+        let t = if n == 1 { m.t } else { m.t / n as f64 };
+        fine.extend(std::iter::repeat(Medium { t, ..*m }).take(n));
+        owner.extend(std::iter::repeat(i).take(n));
     }
+    (fine, owner)
 }
 
 /// Effective permeability of every saturable medium under the magnet

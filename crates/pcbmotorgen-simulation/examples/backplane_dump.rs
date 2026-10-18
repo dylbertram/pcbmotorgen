@@ -13,7 +13,8 @@
 //! `copper_layers` is optional and defaults to 2. It sets `num_layers`, the
 //! copper sheet count of the layered inductance factor. `active_area_length_mm`
 //! defaults to the magnet span, so the whole winding sits under the magnets.
-//! `freqs_hz` and `speeds_m_s` are optional.
+//! `freqs_hz` and `speeds_m_s` are optional. `linear: true` raises every
+//! layer's Bsat to the override limit, for comparison with linear FEM runs.
 //!
 //! and writes one JSON object per case to stdout with the [`BackplaneAnalysis`]
 //! for that geometry plus `field_ratio_2d`: Bz at the PCB top under a magnet
@@ -28,7 +29,7 @@
 
 use std::io::Read;
 
-use pcbmotorgen_simulation::backplane::BackplaneStack;
+use pcbmotorgen_simulation::backplane::{BackplaneStack, MAX_BSAT_T};
 use pcbmotorgen_simulation::units::mm;
 use pcbmotorgen_simulation::{MagnetArray, SimulationInput};
 use serde::Deserialize;
@@ -51,6 +52,8 @@ struct Geometry {
     freqs_hz: Vec<f64>,
     #[serde(default)]
     speeds_m_s: Vec<f64>,
+    #[serde(default)]
+    linear: bool,
 }
 
 fn default_copper_layers() -> u32 {
@@ -110,9 +113,15 @@ fn main() {
     let sim = sim_for(g);
     let b0 = centre_bz(&sim, None);
     for case in &input.cases {
-        let analysis = case.stack.analyze(&sim);
-        let solved = case.stack.solve(&sim);
-        let b1 = centre_bz(&sim, Some(&case.stack));
+        let mut stack = case.stack.clone();
+        if g.linear {
+            for l in &mut stack.layers {
+                l.bsat_t = Some(MAX_BSAT_T);
+            }
+        }
+        let analysis = stack.analyze(&sim);
+        let solved = stack.solve(&sim);
+        let b1 = centre_bz(&sim, Some(&stack));
         let coil: Vec<_> = g
             .freqs_hz
             .iter()
