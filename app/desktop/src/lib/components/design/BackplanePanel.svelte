@@ -1,9 +1,13 @@
 <script lang="ts">
   import type { ConfigStore } from "../../stores/config.svelte";
   import {
+    BACKPLANE_MAX_BSAT_T,
+    BACKPLANE_MAX_MU_R,
     BACKPLANE_MAX_THICKNESS_M,
     DEFAULT_HOUSING,
     HOUSING_MATERIAL_OPTIONS,
+    LAYER_DEFAULT_BSAT_T,
+    LAYER_DEFAULT_MU_R,
     LAYER_MATERIAL_OPTIONS,
     SILICON_STEEL_PWM_LIMIT_HZ,
     layerMaterialLabel,
@@ -14,7 +18,9 @@
     type HousingMaterial,
     type HousingSpec,
     type LayerMaterial,
+    type MagneticState,
   } from "../../types/backplane";
+  import type { DriveBackplane } from "../../types/drive";
   import NumberField from "../ui/NumberField.svelte";
   import HelpTag from "../ui/HelpTag.svelte";
 
@@ -26,13 +32,17 @@
   let {
     config,
     backplaneAnalysis = null,
+    driveBackplane = null,
   }: {
     config: ConfigStore;
     /** Output of the last simulation run. Null until a run has a backplane. */
     backplaneAnalysis?: BackplaneAnalysis | null;
+    /** Eddy-current results of the last driver analysis, if any. */
+    driveBackplane?: DriveBackplane | null;
   } = $props();
 
   const fieldClass = "w-24 shrink-0 px-2 py-1 text-xs font-mono text-emerald-200";
+  const overrideClass = "w-16 shrink-0 px-1.5 py-0.5 text-[11px] font-mono text-emerald-200";
   const selectClass =
     "w-40 shrink-0 rounded border border-slate-700 bg-slate-900 px-2 py-1 text-xs text-slate-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-400";
   const layerSelectClass =
@@ -47,6 +57,20 @@
 
   let backplane = $derived(config.backplane);
   let housing = $derived(backplane?.housing ?? null);
+  let hasFlexSheet = $derived(
+    backplane?.layers.some((layer) => layer.material === "flex_ferrite") ?? false,
+  );
+
+  /** One line on how a layer carries the magnet flux. */
+  function stateSummary(state: MagneticState): string {
+    if (state.bsat_t === null || state.mu_initial <= 1) return "linear";
+    if (state.flux_overload > 1) {
+      return `saturated, ${state.flux_overload.toFixed(1)}× flux, μr ${state.mu_initial.toFixed(0)}→${state.mu_effective.toFixed(1)}`;
+    }
+    return `${state.peak_b_t.toPrecision(3)} T peak, Bsat ${state.bsat_t.toFixed(2)} T`;
+  }
+
+  const isMagnetic = (material: LayerMaterial) => LAYER_DEFAULT_BSAT_T[material] !== null;
 
   // Silicon steel loses efficiency at high switching frequency. This checks
   // the PWM frequency from DriveSettings. Keep SILICON_STEEL_PWM_LIMIT_HZ in
@@ -119,7 +143,7 @@
   >
     Backplane &amp; housing<HelpTag
       label="About the backplane model"
-      tip="Planar 1-D image model. Boundaries are treated as infinite planes, so edge effects and localized saturation are approximated. Eddy-current and core losses are not modelled."
+      tip="Planar layered model of the magnet fundamental. Saturation uses one effective permeability per layer; eddy currents use the layers' conductivity at the PWM frequency and at the mover speed. Boundaries are infinite planes, so edges are ignored. Core and hysteresis losses are not modelled."
     />
   </h2>
 
@@ -136,51 +160,94 @@
 
       <ol class="space-y-1.5" aria-label="Backplane layers, from the PCB downward">
         {#each backplane.layers as layer, i (i)}
-          <li class="flex items-center gap-1.5">
-            <span class="w-4 shrink-0 text-right font-mono text-[10px] text-slate-500">{i + 1}</span>
-            <select
-              aria-label="Layer {i + 1} material"
-              value={layer.material}
-              onchange={(e) => patchLayer(i, { material: e.currentTarget.value as LayerMaterial })}
-              class={layerSelectClass}
-            >
-              {#each LAYER_MATERIAL_OPTIONS as option (option.value)}
-                <option value={option.value}>{option.label}</option>
-              {/each}
-            </select>
-            <NumberField
-              value={toMm(layer.thickness_m)}
-              min={0.01}
-              max={BACKPLANE_MAX_THICKNESS_M * 1e3}
-              step={0.05}
-              ariaLabel="Layer {i + 1} thickness (mm)"
-              class={fieldClass}
-              onCommit={(mm) => patchLayer(i, { thickness_m: toM(mm) })}
-            />
-            <button
-              type="button"
-              class={buttonClass}
-              aria-label="Move layer {i + 1} up"
-              disabled={i === 0}
-              onclick={() => moveLayer(i, -1)}
-            >↑</button>
-            <button
-              type="button"
-              class={buttonClass}
-              aria-label="Move layer {i + 1} down"
-              disabled={i === backplane.layers.length - 1}
-              onclick={() => moveLayer(i, 1)}
-            >↓</button>
-            <button
-              type="button"
-              class={buttonClass}
-              aria-label="Remove layer {i + 1}"
-              disabled={backplane.layers.length <= 1}
-              onclick={() => removeLayer(i)}
-            >Remove</button>
+          <li class="space-y-1">
+            <div class="flex items-center gap-1.5">
+              <span class="w-4 shrink-0 text-right font-mono text-[10px] text-slate-500">{i + 1}</span>
+              <select
+                aria-label="Layer {i + 1} material"
+                value={layer.material}
+                onchange={(e) =>
+                  patchLayer(i, { material: e.currentTarget.value as LayerMaterial, mu_r: null, bsat_t: null })}
+                class={layerSelectClass}
+              >
+                {#each LAYER_MATERIAL_OPTIONS as option (option.value)}
+                  <option value={option.value}>{option.label}</option>
+                {/each}
+              </select>
+              <NumberField
+                value={toMm(layer.thickness_m)}
+                min={0.01}
+                max={BACKPLANE_MAX_THICKNESS_M * 1e3}
+                step={0.05}
+                ariaLabel="Layer {i + 1} thickness (mm)"
+                class={fieldClass}
+                onCommit={(mm) => patchLayer(i, { thickness_m: toM(mm) })}
+              />
+              <button
+                type="button"
+                class={buttonClass}
+                aria-label="Move layer {i + 1} up"
+                disabled={i === 0}
+                onclick={() => moveLayer(i, -1)}
+              >↑</button>
+              <button
+                type="button"
+                class={buttonClass}
+                aria-label="Move layer {i + 1} down"
+                disabled={i === backplane.layers.length - 1}
+                onclick={() => moveLayer(i, 1)}
+              >↓</button>
+              <button
+                type="button"
+                class={buttonClass}
+                aria-label="Remove layer {i + 1}"
+                disabled={backplane.layers.length <= 1}
+                onclick={() => removeLayer(i)}
+              >Remove</button>
+            </div>
+            {#if isMagnetic(layer.material)}
+              <div class="flex items-center gap-1.5 pl-[22px] text-[11px] text-slate-400">
+                <span class="shrink-0">μr</span>
+                <NumberField
+                  value={layer.mu_r ?? LAYER_DEFAULT_MU_R[layer.material]}
+                  min={1}
+                  max={BACKPLANE_MAX_MU_R}
+                  step={10}
+                  ariaLabel="Layer {i + 1} relative permeability"
+                  class={overrideClass}
+                  onCommit={(mu) => patchLayer(i, { mu_r: mu })}
+                />
+                <span class="shrink-0">Bsat (T)</span>
+                <NumberField
+                  value={layer.bsat_t ?? LAYER_DEFAULT_BSAT_T[layer.material] ?? 0}
+                  min={0.01}
+                  max={BACKPLANE_MAX_BSAT_T}
+                  step={0.01}
+                  ariaLabel="Layer {i + 1} saturation flux density (T)"
+                  class={overrideClass}
+                  onCommit={(bsat) => patchLayer(i, { bsat_t: bsat })}
+                />
+                {#if layer.mu_r != null || layer.bsat_t != null}
+                  <button
+                    type="button"
+                    class={buttonClass}
+                    aria-label="Use typical values for layer {i + 1}"
+                    onclick={() => patchLayer(i, { mu_r: null, bsat_t: null })}
+                  >Typical</button>
+                {:else}
+                  <span class="text-slate-500">typical</span>
+                {/if}
+              </div>
+            {/if}
           </li>
         {/each}
       </ol>
+      {#if hasFlexSheet}
+        <p class="text-[11px] leading-relaxed text-slate-400">
+          Enter the ferrite thickness of a sheet only. Datasheet totals include adhesive and
+          cover film. Put datasheet μr and Bsat in the fields above.
+        </p>
+      {/if}
 
       <button type="button" class={buttonClass} onclick={addLayer}>Add layer</button>
     </div>
@@ -250,7 +317,7 @@
         >
           Silicon steel is selected with PWM at {(config.drive.pwm_hz / 1e3).toFixed(1)} kHz,
           above {SILICON_STEEL_PWM_LIMIT_HZ / 1e3} kHz. Eddy and core losses rise steeply here
-          and are not modelled. Consider sintered MnZn or NiZn ferrite, or soft magnetic
+          are only partly modelled. Consider sintered MnZn or NiZn ferrite, or soft magnetic
           composite (SMC).
         </p>
       {/if}
@@ -267,27 +334,62 @@
         From the last simulation run; may lag recent edits
       </p>
       <dl class="grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
+        <dt class="text-slate-400">Image strength R</dt>
+        <dd class="font-mono text-slate-200">
+          {backplaneAnalysis.image_strength.toFixed(3)}
+          {#if backplaneAnalysis.linear_image_strength !== backplaneAnalysis.image_strength}
+            <span class="text-slate-500">(unsaturated {backplaneAnalysis.linear_image_strength.toFixed(3)})</span>
+          {/if}
+        </dd>
         <dt class="text-slate-400">Inductance factor</dt>
         <dd class="font-mono text-slate-200">{backplaneAnalysis.inductance_factor.toFixed(2)}×</dd>
         <dt class="text-slate-400">Normal attraction</dt>
         <dd class="font-mono text-slate-200">{backplaneAnalysis.attraction_n.toPrecision(3)} N</dd>
-        <dt class="text-slate-400">Image strength R</dt>
-        <dd class="font-mono text-slate-200">{backplaneAnalysis.image_strength.toFixed(3)}</dd>
-        {#if housing}
-          <dt class="text-slate-400">Housing peak B</dt>
-          <dd class="font-mono text-slate-200">{backplaneAnalysis.housing_peak_b_t.toPrecision(3)} T</dd>
+        {#if housing && backplaneAnalysis.housing_state && backplaneAnalysis.housing_state.mu_initial > 1}
+          <dt class="text-slate-400">Housing</dt>
+          <dd class="font-mono text-slate-200">{stateSummary(backplaneAnalysis.housing_state)}</dd>
         {/if}
       </dl>
 
-      {#if backplaneAnalysis.layer_peak_b_t.length === backplane.layers.length}
+      {#if backplaneAnalysis.layer_states.length === backplane.layers.length}
         <ul class="mt-2 space-y-0.5 text-[11px] text-slate-300">
-          {#each backplaneAnalysis.layer_peak_b_t as peak, i (i)}
+          {#each backplaneAnalysis.layer_states as state, i (i)}
             <li class="flex justify-between gap-2">
               <span>Layer {i + 1}, {layerMaterialLabel(backplane.layers[i].material)}</span>
-              <span class="font-mono">{peak.toPrecision(3)} T peak</span>
+              <span class="font-mono" class:text-amber-200={state.flux_overload > 1}>{stateSummary(state)}</span>
             </li>
           {/each}
         </ul>
+      {/if}
+
+      {#if driveBackplane}
+        <p class="mt-2.5 mb-1 text-[10px] uppercase tracking-wider text-slate-500">
+          Eddy currents, from the last driver analysis
+        </p>
+        <dl class="grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
+          <dt class="text-slate-400">L at {(config.drive.pwm_hz / 1e3).toFixed(0)} kHz PWM</dt>
+          <dd class="font-mono text-slate-200">
+            {(driveBackplane.pwm_inductance_h * 1e6).toFixed(2)} µH ({driveBackplane.pwm_inductance_factor.toFixed(2)}×)
+          </dd>
+          <dt class="text-slate-400">Added R at PWM</dt>
+          <dd class="font-mono text-slate-200">{(driveBackplane.pwm_resistance_ohm * 1e3).toPrecision(3)} mΩ</dd>
+          <dt class="text-slate-400">Eddy loss from ripple</dt>
+          <dd class="font-mono text-slate-200">{driveBackplane.ripple_eddy_loss_w.toPrecision(3)} W</dd>
+          <dt class="text-slate-400">Drag at {config.drive.target_speed_m_s} m/s</dt>
+          <dd class="font-mono text-slate-200">
+            {driveBackplane.drag_n.toPrecision(3)} N ({driveBackplane.drag_power_w.toPrecision(3)} W)
+          </dd>
+          {#if driveBackplane.net_thrust_n != null}
+            <dt class="text-slate-400">Thrust minus drag</dt>
+            <dd class="font-mono" class:text-amber-200={driveBackplane.net_thrust_n < 0} class:text-slate-200={driveBackplane.net_thrust_n >= 0}>
+              {driveBackplane.net_thrust_n.toPrecision(3)} N
+            </dd>
+          {/if}
+          {#if driveBackplane.drag_limited_speed_m_s != null}
+            <dt class="text-slate-400">Drag equals thrust at</dt>
+            <dd class="font-mono text-amber-200">{driveBackplane.drag_limited_speed_m_s.toPrecision(3)} m/s</dd>
+          {/if}
+        </dl>
       {/if}
 
       {#if backplaneAnalysis.warnings.length}

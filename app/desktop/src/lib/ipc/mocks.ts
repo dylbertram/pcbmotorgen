@@ -523,6 +523,8 @@ export function mockBFieldGrid(
 /**
  * Mock driver analysis for `vite dev`: a single-strand, two-layer estimate
  * with the same check formulas as the backend. The geometry is NOT measured.
+ * It skips the backplane saturation and eddy-current analysis, so
+ * `backplane` is absent.
  */
 export function mockDriveAnalysis(
   c: LinearMotorConfig,

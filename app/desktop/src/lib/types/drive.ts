@@ -69,6 +69,36 @@ export interface SpeedVoltagePoint {
   required_v: number;
 }
 
+/** Eddy drag and normal force at one mover speed. */
+export interface DragPoint {
+  speed_m_s: number;
+  drag_n: number;
+  normal_n: number;
+}
+
+/** Backplane and housing at the operating point (`DriveBackplane`). */
+export interface DriveBackplane {
+  /** Low-frequency inductance factor, with the magnets' bias. */
+  inductance_factor: number;
+  /** Inductance factor at the PWM frequency, eddy currents included. */
+  pwm_inductance_factor: number;
+  /** Per-phase inductance at the PWM frequency plus series [H]; used by the ripple check. */
+  pwm_inductance_h: number;
+  /** Series resistance per phase added by eddy currents at the PWM frequency [Ω]. */
+  pwm_resistance_ohm: number;
+  /** Eddy loss in the backplane and housing from the PWM ripple [W]. */
+  ripple_eddy_loss_w: number;
+  /** Eddy drag at the target speed [N], opposing motion. */
+  drag_n: number;
+  normal_force_n: number;
+  drag_power_w: number;
+  /** Mean thrust minus drag at the target speed [N]. */
+  net_thrust_n?: number | null;
+  /** Lowest speed at which drag reaches the full-current thrust [m/s]. */
+  drag_limited_speed_m_s?: number | null;
+  drag_curve: DragPoint[];
+}
+
 export interface DriveAnalysis {
   driver_name: string;
   phases: PhaseElectrical[];
@@ -111,6 +141,8 @@ export interface DriveAnalysis {
   checks: DriveCheck[];
   speed_curve: SpeedVoltagePoint[];
   notes: string[];
+  /** Absent without a backplane. */
+  backplane?: DriveBackplane | null;
 }
 
 /**
