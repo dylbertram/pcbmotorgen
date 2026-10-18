@@ -20,6 +20,18 @@ The model check uses the model's own assumptions:
   * attraction / field: the alternating magnet row, linear materials.
 The benchmark slice cuts the benchmark winding (DXF) at the middle of the board and
 reports the line-to-line inductance factor of that copper layout.
+
+Saturation and eddy currents (tickets 04n2, q9nw), on the user's version 2
+geometry (0.8 mm PCB) unless noted:
+  * nonlinear magnetostatics with the magnet row and a smooth B-H curve,
+    B = mu0 H + Bsat tanh(mu0 (mu_i - 1) H / Bsat), so the same initial mu and
+    saturation as the model's two-slope curve but a soft knee;
+  * the coil sheets solved with the incremental permeability of that biased
+    state (FEMM's mi_setprevious), for two alignments of coil and magnets;
+  * time-harmonic coil sheets at 100 kHz (inductance and added resistance);
+  * a travelling current sheet J0 e^(-jkx) at f = v/(2 tau), which is the magnet
+    fundamental seen from the stator at speed v: time-averaged x and y force
+    on the stack and housing against -Im R and Re R.
 """
 import argparse
 import json
@@ -46,24 +58,29 @@ Y_MAG1 = Y_MAG0 + G["magnet_height_mm"]
 FAR = 40.0  # distance to the A = 0 lines; exp(-pi*40/6) ~ 1e-9
 PWM_HZ = 100e3
 
-# Same mu_r as crates/pcbmotorgen-simulation/src/backplane/mod.rs. Conductivity
-# [MS/m] is only used by the 100 kHz runs (the model has no eddy currents):
-# typical handbook values.
+# Same mu_r, conductivity [MS/m] and Bsat [T] as
+# crates/pcbmotorgen-simulation/src/backplane/mod.rs.
 LAYER = {
     "fr4": (1.0, 0.0),
     "silicon_steel": (4000.0, 2.0),
-    "mn_zn_ferrite": (2500.0, 1e-6),
+    "mn_zn_ferrite": (2500.0, 0.2e-6),
     "ni_zn_ferrite": (500.0, 0.0),
-    "flex_ferrite": (60.0, 0.0),
+    "flex_ferrite": (130.0, 0.0),
 }
 HOUSING = {
     "aluminum6061": (1.0, 25.0),
-    "steel1018": (800.0, 6.0),
+    "steel1018": (800.0, 5.8),
 }
+BSAT = {"silicon_steel": 1.8, "mn_zn_ferrite": 0.45, "ni_zn_ferrite": 0.35,
+        "flex_ferrite": 0.25, "steel1018": 1.6}
 
 
-def layer(material, t_mm):
-    return {"material": material, "thickness_m": t_mm * 1e-3}
+def layer(material, t_mm, mu_r=None):
+    lay = {"material": material, "thickness_m": t_mm * 1e-3}
+    if mu_r is not None:
+        # A linear stand-in at a model permeability: no saturation.
+        lay.update(mu_r=mu_r, bsat_t=3.0)
+    return lay
 
 
 def housing(material, t_mm, gap_mm):
@@ -112,15 +129,33 @@ def mesh_for(t):
     return min(t / 4.0, 0.25)
 
 
-def stack_bands(stack, freq):
+def bh_points(mu_i, bsat, knee=False):
+    """B-H curve with initial mu_i and saturation polarization bsat: smooth
+    (tanh), or the model's two-slope curve when `knee`."""
+    if not knee:
+        hs = [0.0] + [10 ** (e / 8) for e in range(57)]  # 1 A/m .. 1e7 A/m
+        return [(MU0 * h + bsat * math.tanh(MU0 * (mu_i - 1) * h / bsat), h) for h in hs]
+    # Dense points on both sides of the knee keep FEMM's spline on the lines.
+    h_knee = bsat / (MU0 * (mu_i - 1))
+    hs = [h_knee * f for f in (0, 0.2, 0.4, 0.6, 0.8, 0.9, 0.95, 0.99, 1.0)]
+    hs += [h_knee * (1 + 10 ** (e / 8)) for e in range(-24, math.ceil(8 * math.log10(1e7 / h_knee)) + 1)]
+    return [(MU0 * h + min(MU0 * (mu_i - 1) * h, bsat), h) for h in hs]
+
+
+def stack_bands(stack, freq, nonlinear=False):
     """Bands below y = 0 (bottom to top) and the materials they use."""
     mats, bands = {}, []
     y = 0.0
     for lay in stack["layers"]:
         t = lay["thickness_m"] * 1e3
         mu, sig = LAYER[lay["material"]]
-        mats[lay["material"]] = dict(name=lay["material"], mu=mu, sigma=sig if freq else 0.0)
-        bands.append(dict(y0=y - t, y1=y, mat=lay["material"] if mu > 1 else "air",
+        name = lay["material"]
+        if "mu_r" in lay:
+            mu, name = lay["mu_r"], f"{name}_mu{lay['mu_r']:.4g}"
+        mats[name] = dict(name=name, mu=mu, sigma=sig if freq else 0.0)
+        if nonlinear and name in BSAT:
+            mats[name]["bh"] = bh_points(mu, BSAT[name], nonlinear == "knee")
+        bands.append(dict(y0=y - t, y1=y, mat=name if mu > 1 else "air",
                           mesh=mesh_for(t), group=2 if mu > 1 else 0))
         y -= t
     h = stack["housing"]
@@ -128,6 +163,8 @@ def stack_bands(stack, freq):
         gap, t = h["gap_m"] * 1e3, h["thickness_m"] * 1e3
         mu, sig = HOUSING[h["material"]]
         mats[h["material"]] = dict(name=h["material"], mu=mu, sigma=sig if freq else 0.0)
+        if nonlinear and h["material"] in BSAT:
+            mats[h["material"]]["bh"] = bh_points(mu, BSAT[h["material"]], nonlinear == "knee")
         bands.append(dict(y0=y - gap, y1=y, mat="air", mesh=mesh_for(gap), group=0))
         y -= gap
         if freq and sig > 0:
@@ -143,7 +180,7 @@ def stack_bands(stack, freq):
         # Silicon steel at 100 kHz: refine the top of the sheet the same way.
         for b in bands:
             m = mats.get(b["mat"])
-            if m and m["sigma"] > 0.1 and b["group"] == 2 and b["mat"] in LAYER:
+            if m and m["sigma"] > 0.1 and b["group"] == 2 and b["mat"] not in HOUSING:
                 delta = 1e3 * math.sqrt(2 / (2 * math.pi * freq * m["mu"] * MU0 * m["sigma"] * 1e6))
                 b["mesh"] = max(delta / 3, 0.002)
     bands.reverse()
@@ -162,16 +199,21 @@ def sheet_ys(layers):
     return [SHEET_T / 2 + i * (T_PCB - SHEET_T) / (layers - 1) for i in range(layers)]
 
 
-def sheet_rects(ys, n=48, t=SHEET_T, j0=1.0):
+def sheet_rects(ys, n=48, t=SHEET_T, j0=1.0, phase=0.0, travelling=False, live=None):
     """Equal sinusoidal current sheets at heights `ys`, wavenumber pi/tau, as
-    n strips each."""
+    n strips each: J0 cos(kx - phase), or the phasor J0 e^(-jkx) when
+    `travelling`. Only the sheets listed in `live` carry current (all by
+    default); the others keep the geometry."""
     mats, rects = [], []
     w = PERIOD / n
     for s, y in enumerate(ys):
+        on = j0 if live is None or s in live else 0.0
         for i in range(n):
             xc = -PERIOD / 2 + (i + 0.5) * w
             name = f"src{s}_{i}"
-            mats.append(dict(name=name, mu=1.0, j=j0 * math.cos(math.pi * xc / TAU)))
+            th = math.pi * xc / TAU - phase
+            mats.append(dict(name=name, mu=1.0, j=on * math.cos(th),
+                             ji=-on * math.sin(th) if travelling else 0.0))
             rects.append(dict(x0=xc - 0.4 * w, x1=xc + 0.4 * w, y0=y - t / 2, y1=y + t / 2,
                               mat=name, mesh=t, group=1))
     return rects, mats
@@ -191,9 +233,9 @@ def sheet_factors(name, stack, work, layers=2, freq=0.0, base=None):
     return alone, together
 
 
-def magnet_rects():
+def magnet_rects(on=True):
     w = G["magnet_width_mm"]
-    hc = G["remanence_t"] / MU0
+    hc = G["remanence_t"] / MU0 if on else 0.0
     mats = [dict(name="magnet", mu=1.0, hc=hc)]
     rects = [dict(x0=xc - w / 2, x1=xc + w / 2, y0=Y_MAG0, y1=Y_MAG1, mat="magnet",
                   mesh=0.1, group=3, magdir=d) for xc, d in ((-TAU / 2, 90), (TAU / 2, 270))]
@@ -217,23 +259,33 @@ def upper_bands(top_extra=None):
     return bands
 
 
-def build_case(name, stack, source, freq=0.0, upper=None, extra_mats=()):
-    lower, mats = stack_bands(stack, freq)
+def build_case(name, stack, source, freq=0.0, upper=None, extra_mats=(), nonlinear=False,
+               previous=None, extra_lines=()):
+    lower, mats = stack_bands(stack, freq, nonlinear)
     labels = []
     if source == "magnets":
         rects, smats, labels = magnet_rects()
+    elif isinstance(source, tuple) and len(source) == 3:
+        # Magnets (on or off) plus current sheets in the same geometry.
+        mag_on, rects, smats = source
+        mrects, mmats, labels = magnet_rects(mag_on)
+        rects, smats = mrects + rects, mmats + smats
     else:
         rects, smats = source
     bands = lower + (upper or upper_bands())
     mats = [dict(name="air", mu=1.0)] + mats + smats + list(extra_mats)
     lines = [dict(name="pcb_top", y=T_PCB, n=240), dict(name="stack_top", y=0.0, n=240)]
+    lines += list(extra_lines)
     points = [dict(name="mag_centre_pcb_top", x=-TAU / 2, y=T_PCB)]
     if source == "magnets":
         # |B| just inside the stack top, for the saturation estimate.
         points += [dict(name=f"top{i}", x=-PERIOD / 2 + (i + 0.5) * PERIOD / PEAK_N, y=-0.01)
                    for i in range(PEAK_N)]
-    return dict(name=name, period=PERIOD, freq=freq, materials=mats, bands=bands,
+    case = dict(name=name, period=PERIOD, freq=freq, materials=mats, bands=bands,
                 rects=rects, labels=labels, lines=lines, points=points)
+    if previous:
+        case["previous"] = previous
+    return case
 
 
 def run_femm(case, work):
@@ -261,8 +313,8 @@ def run_femm(case, work):
 # Rust model
 # --------------------------------------------------------------------------
 
-def rust_model(cases, layers=2):
-    geometry = dict(G, copper_layers=layers)
+def rust_model(cases, layers=2, **extra):
+    geometry = dict(G, copper_layers=layers, pcb_thickness_mm=T_PCB, **extra)
     payload = json.dumps({"geometry": geometry, "cases": [{"name": n, "stack": s} for n, _, s in cases]})
     r = subprocess.run(["cargo", "run", "-q", "-p", "pcbmotorgen-simulation", "--example",
                         "backplane_dump"], input=payload, capture_output=True, text=True,
@@ -437,10 +489,17 @@ def main():
     ap.add_argument("--work", default=os.path.expanduser("~/.local/opt/femm-runs/t707"))
     ap.add_argument("--dxf", default=os.path.join(REPO, "motor-coils_3s_0-4mm_star.dxf"))
     ap.add_argument("--trace-mm", type=float, default=0.2)
+    ap.add_argument("--new-only", action="store_true",
+                    help="run only the saturation and eddy-current section")
     args = ap.parse_args()
     os.makedirs(args.work, exist_ok=True)
+    if args.new_only:
+        saturation_and_eddy(args.work)
+        return
 
-    model = rust_model(CASES)
+    # The FEMM runs in this part are linear, so the model runs without
+    # saturation too.
+    model = rust_model(CASES, linear=True, freqs_hz=[0.0])
     femm = {}
     base_sheet = sheet_factors("none", CASES[0][2], args.work)
     base_ac = sheet_factors("none", CASES[0][2], args.work, freq=PWM_HZ)
@@ -473,8 +532,9 @@ def main():
         fr_femm = f["mag"]["mag_centre_pcb_top_By"] / base["mag"]["mag_centre_pcb_top_By"]
         fr_err = (m["field_ratio_2d"] - fr_femm) / fr_femm * 100
         peak_femm = max(math.hypot(f["mag"][f"top{i}_Bx"], f["mag"][f"top{i}_By"]) for i in range(PEAK_N))
-        # Only a magnetic layer 1 sits at the sampled stack top.
-        peak_model = a["layer_peak_b_t"][0] if stack["layers"] else 0.0
+        # Only a magnetic layer 1 sits at the sampled stack top. FEMM is
+        # linear here, so compare the model's linear peak.
+        peak_model = a["layer_peak_b_t"][0] and a["layer_states"][0]["linear_peak_b_t"] if stack["layers"] else 0.0
         peak = f"{peak_model:.3f} | {peak_femm:.3f}" if peak_model > 0 else " | "
         rows_f.append(f"| {label} | {p_model:.1f} | {p_femm:.1f} | {p_err} | "
                       f"{m['field_ratio_2d']:.3f} | {fr_femm:.3f} | {fr_err:+.1f} % | "
@@ -488,7 +548,7 @@ def main():
 
     # 4 copper layers, MnZn 2 mm: sheets at 0, T/3, 2T/3, T.
     mnzn = next(c for c in CASES if c[0] == "mnzn_2")
-    m4 = rust_model([mnzn], layers=4)["mnzn_2"]["analysis"]
+    m4 = rust_model([mnzn], layers=4, linear=True)["mnzn_2"]["analysis"]
     alone, together = sheet_factors("mnzn_2", mnzn[2], args.work, layers=4,
                                     base=sheet_factors("none", CASES[0][2], args.work, layers=4))
     exact = exact_sheet_factor(mnzn[2], sheet_ys(4))
@@ -529,8 +589,8 @@ def main():
     ]
     # The model has no yoke and no mu_r 1e5 material, so only the first rows
     # get a model value.
-    slice_model = {2: rust_model([("0", "", mnzn2), ("1", "", gap_mnzn2), ("2", "", mnzn5)]),
-                   4: rust_model([("0", "", mnzn2)], layers=4)}
+    slice_model = {2: rust_model([("0", "", mnzn2), ("1", "", gap_mnzn2), ("2", "", mnzn5)], linear=True),
+                   4: rust_model([("0", "", mnzn2)], layers=4, linear=True)}
     kk = math.pi / TAU
     print("| Slice | layers | FEMM L-L factor | FEMM phase-A factor | model, midplane | model, layered | layered error (L-L) |")
     print("|---|---|---|---|---|---|---|")
@@ -551,6 +611,231 @@ def main():
                 lf = a["inductance_factor"]
                 cols = [f"{mid:.3f}", f"{lf:.3f}", f"{(lf - out[0]) / out[0] * 100:+.1f} %"]
             print(f"| {label} | {layers} | {out[0]:.3f} | {out[1]:.3f} | " + " | ".join(cols) + " |")
+
+    saturation_and_eddy(args.work)
+
+# --------------------------------------------------------------------------
+# Saturation and eddy currents (tickets 04n2, q9nw)
+# --------------------------------------------------------------------------
+
+def set_pcb(t_pcb):
+    """Switch the FEMM geometry to a PCB of thickness `t_pcb` [mm]."""
+    global T_PCB, Y_MAG0, Y_MAG1
+    T_PCB = t_pcb
+    Y_MAG0 = T_PCB + G["air_gap_mm"]
+    Y_MAG1 = Y_MAG0 + G["magnet_height_mm"]
+
+
+def err(model, ref, tol):
+    """Relative error and pass / fail against `tol` (a fraction)."""
+    e = (model - ref) / ref
+    return f"{e * 100:+.1f} % | {'pass' if abs(e) <= tol else 'FAIL'}"
+
+
+def flex(t_mm, **kw):
+    return {"layers": [layer("flex_ferrite", t_mm, **kw)], "housing": None}
+
+
+NONE = {"layers": [], "housing": None}
+NL_STACKS = [
+    ("flex_0.1", "Flex ferrite 0.1 mm", flex(0.1)),
+    ("flex_0.2", "Flex ferrite 0.2 mm (version 2)", flex(0.2)),
+    ("flex_1", "Flex ferrite 1 mm", flex(1.0)),
+    ("flex_5", "Flex ferrite 5 mm", flex(5.0)),
+    ("mnzn_2", "MnZn 2 mm", {"layers": [layer("mn_zn_ferrite", 2.0)], "housing": None}),
+    ("mnzn_2.8", "MnZn 2.8 mm", {"layers": [layer("mn_zn_ferrite", 2.8)], "housing": None}),
+]
+V2_AL = housing("aluminum6061", 1.0, 0.1)
+
+
+def nonlinear_section(work):
+    """Magnet row over saturating layers on the 0.8 mm PCB."""
+    set_pcb(0.8)
+    model = rust_model(NL_STACKS)
+    linear = rust_model(NL_STACKS, linear=True)
+    base = run_femm(build_case("v2.none.mag", NONE, "magnets"), work)
+    w = G["magnet_width_mm"] * 1e-3
+    rows_f, rows_b, rows_k = [], [], []
+    for name, label, st in NL_STACKS:
+        t = st["layers"][0]["thickness_m"] * 1e3
+        mid = [dict(name="sheet_mid", y=-t / 2, n=240)]
+        lin = run_femm(build_case(f"v2.{name}.mag", st, "magnets", extra_lines=mid), work)
+        nl = run_femm(build_case(f"v2.{name}.nl", st, "magnets", nonlinear=True, extra_lines=mid), work)
+        knee = run_femm(build_case(f"v2.{name}.knee", st, "magnets", nonlinear="knee", extra_lines=mid), work)
+        m, ml = model[name], linear[name]
+        a, s0 = m["analysis"], m["analysis"]["layer_states"][0]
+        ratio = lambda f: f["mag_centre_pcb_top_By"] / base["mag_centre_pcb_top_By"]
+        press = lambda f: f["Fy_stack"] / (2 * w * 1.0) / 1e3
+        p_model = a["attraction_n"] / m["magnet_area_m2"] / 1e3
+        p_lin = ml["analysis"]["attraction_n"] / m["magnet_area_m2"] / 1e3
+        peak = max(math.hypot(nl[f"top{i}_Bx"], nl[f"top{i}_By"]) for i in range(PEAK_N))
+        rows_f.append(f"| {label} | {a['linear_image_strength']:.3f} | {a['image_strength']:.3f} | "
+                      f"{m['field_ratio_2d']:.3f} | {ratio(nl):.3f} | {err(m['field_ratio_2d'], ratio(nl), 0.05)} | "
+                      f"{ml['field_ratio_2d']:.3f} | {ratio(lin):.3f} | "
+                      f"{p_model:.1f} | {press(nl):.1f} | {err(p_model, press(nl), 0.10)} | "
+                      f"{p_lin:.1f} | {press(lin):.1f} |")
+        rows_b.append(f"| {label} | {s0['flux_overload']:.2f} | {s0['mu_effective']:.1f} | "
+                      f"{s0['mean_b_t']:.3f} | {nl['sheet_mid_Bx1']:.3f} | {err(s0['mean_b_t'], nl['sheet_mid_Bx1'], 0.10)} | "
+                      f"{s0['peak_b_t']:.3f} | {peak:.3f} | {err(s0['peak_b_t'], peak, 0.10)} | "
+                      f"{s0['linear_peak_b_t']:.2f} |")
+        rows_k.append(f"| {label} | {m['field_ratio_2d']:.3f} | {ratio(knee):.3f} | {err(m['field_ratio_2d'], ratio(knee), 0.05)} | "
+                      f"{p_model:.1f} | {press(knee):.1f} | {err(p_model, press(knee), 0.10)} | "
+                      f"{s0['mean_b_t']:.3f} | {knee['sheet_mid_Bx1']:.3f} | {err(s0['mean_b_t'], knee['sheet_mid_Bx1'], 0.10)} |")
+    print("\n### Saturation: field and attraction (0.8 mm PCB, magnet row, 1 m deep)\n")
+    print("| Stack | model R, linear | model R, saturated | model B ratio | FEMM B ratio, nonlinear | B ratio error | | "
+          "model B ratio, linear | FEMM B ratio, linear | model p [kPa] | FEMM p, nonlinear [kPa] | p error | | "
+          "model p, linear [kPa] | FEMM p, linear [kPa] |")
+    print("|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|")
+    print("\n".join(rows_f))
+    print("\n### Saturation: flux density in the layer\n")
+    print("| Stack | model flux overload | model mu_eff | model mean in-plane B1 [T] | FEMM Bx1 at mid-layer [T] | error | | "
+          "model peak [T] | FEMM peak, 0.01 mm inside the face [T] | error | | model linear peak [T] |")
+    print("|---|---|---|---|---|---|---|---|---|---|---|---|")
+    print("\n".join(rows_b))
+    print("\n### Saturation with the model's two-slope B-H curve in FEMM\n")
+    print("| Stack | model B ratio | FEMM B ratio | error | | model p [kPa] | FEMM p [kPa] | error | | "
+          "model mean in-plane B1 [T] | FEMM Bx1 at mid-layer [T] | error | |")
+    print("|---|---|---|---|---|---|---|---|---|---|---|---|---|")
+    print("\n".join(rows_k))
+    return model
+
+
+INC_STACKS = [s for s in NL_STACKS if s[0] in ("flex_0.2", "flex_1", "mnzn_2")]
+
+
+def incremental_section(work):
+    """Coil sheets with the incremental permeability of the magnet bias."""
+    set_pcb(0.8)
+    model = rust_model(INC_STACKS, freqs_hz=[0.0])
+    ys = sheet_ys(2)
+    phases = (("coil flux on the saturated regions", 0.0), ("coil flux on the unsaturated regions", math.pi / 2))
+    base = {k: sum(run_femm(build_case(f"v2.inc.none.p{k}.{s}", NONE, sheet_rects([y], phase=ph)), work)
+                   ["AJ_sources_re"] for s, y in enumerate(ys))
+            for k, (_, ph) in enumerate(phases)}
+    rows = []
+    for name, label, st in INC_STACKS:
+        bias = build_case(f"v2.inc.{name}.bias", st, (True, *sheet_rects(ys, live=())), nonlinear=True)
+        run_femm(bias, work)
+        tag = hash_text(lua(bias))
+        out = []
+        for k, (_, ph) in enumerate(phases):
+            total = 0.0
+            for s in range(len(ys)):
+                case = build_case(f"v2.inc.{name}.p{k}.{s}", st, (False, *sheet_rects(ys, phase=ph, live=(s,))),
+                                  nonlinear=True, previous=bias["name"])
+                case["previous_text"] = tag
+                total += run_femm(case, work)["AJ_sources_re"]
+            out.append(total / base[k])
+        coil = model[name]["coil"][0]
+        under, away = coil["under"][0], coil["away"][0]
+        mean = sum(out) / 2
+        rows.append(f"| {label} | {model[name]['analysis']['layer_states'][0]['mu_incremental']:.2f} | {under:.3f} | "
+                    f"{out[0]:.3f} | {out[1]:.3f} | {mean:.3f} | {err(under, mean, 0.05)} | {away:.3f} |")
+    print("\n### Inductance under the magnets (incremental permeability, 0.8 mm PCB)\n")
+    print("| Stack | model mu_inc | model factor under the magnets | FEMM, " + phases[0][0] + " | FEMM, " + phases[1][0]
+          + " | FEMM mean | error vs mean | | model factor away from the magnets |")
+    print("|---|---|---|---|---|---|---|---|---|")
+    print("\n".join(rows))
+
+
+def hash_text(text):
+    import hashlib
+    return hashlib.sha1(text.encode()).hexdigest()[:12]
+
+
+def ac_coil_section(work, model_v2):
+    """Inductance factor and added resistance at the PWM frequency."""
+    mu_inc = model_v2["flex_0.2"]["analysis"]["layer_states"][0]["mu_incremental"]
+    groups = [
+        (1.6, "", [
+            ("al_only", "Al 3 mm @1 mm", {"layers": [], "housing": housing("aluminum6061", 3.0, 1.0)}),
+            ("steel_only", "Steel 1018 3 mm @1 mm", {"layers": [], "housing": housing("steel1018", 3.0, 1.0)}),
+            ("sisteel_0.35", "Si steel 0.35 mm", {"layers": [layer("silicon_steel", 0.35)], "housing": None}),
+            ("mnzn_2+al", "MnZn 2 mm + Al 3 mm @1 mm", {"layers": [layer("mn_zn_ferrite", 2.0)],
+                                                       "housing": housing("aluminum6061", 3.0, 1.0)}),
+        ]),
+        (0.8, "v2.", [
+            ("al_1@0.3", "Al 1 mm @0.3 mm (version 2 without the sheet)",
+             {"layers": [], "housing": housing("aluminum6061", 1.0, 0.3)}),
+            ("away", "Version 2 away from the magnets: flex 0.2 mm (mu 130) + Al 1 mm @0.1 mm",
+             {"layers": [layer("flex_ferrite", 0.2)], "housing": V2_AL}),
+            ("under", f"Version 2 under the magnets: flex 0.2 mm at the model's mu_inc {mu_inc:.3f} + Al",
+             {"layers": [layer("flex_ferrite", 0.2, mu_r=mu_inc)], "housing": V2_AL}),
+        ]),
+    ]
+    rows = []
+    for t_pcb, prefix, cases in groups:
+        set_pcb(t_pcb)
+        model = rust_model(cases, linear=True, freqs_hz=[0.0, PWM_HZ])
+        for name, label, st in cases:
+            # The 1.6 mm cases reuse the 100 kHz runs of the first table.
+            f = ac_alone(prefix + name, st, prefix + "none", work)
+            c0, c1 = model[name]["coil"]
+            m = complex(*c1["away"])
+            rows.append(f"| {label} | {t_pcb} | {c0['away'][0]:.3f} | {m.real:.3f} | {f.real:.3f} | {err(m.real, f.real, 0.05)} | "
+                        f"{-m.imag:.4f} | {-f.imag:.4f} | {err(-m.imag, -f.imag, 0.10) if abs(f.imag) > 1e-3 else ' | '} |")
+    print("\n### Coil at 100 kHz (2 sin current sheets solved alone, time-harmonic)\n")
+    print("Added resistance per phase is `-Im F` times `2*pi*f*L0`.\n")
+    print("| Stack | PCB [mm] | model factor, DC | model Re F | FEMM Re F | error | | model -Im F | FEMM -Im F | error | |")
+    print("|---|---|---|---|---|---|---|---|---|---|---|")
+    print("\n".join(rows))
+
+
+def ac_alone(name, stack, base, work):
+    """Complex inductance factor at 100 kHz: the A.J of the two sheets solved
+    alone with the stack, over the same without it. Case names follow the
+    first table, so its runs are reused."""
+    ys = sheet_ys(2)
+    def total(n, st):
+        r = [run_femm(build_case(f"{n}.sheet2.ac.{s}", st, sheet_rects([y]), freq=PWM_HZ), work)
+             for s, y in enumerate(ys)]
+        return complex(sum(x["AJ_sources_re"] for x in r), sum(x["AJ_sources_im"] for x in r))
+    return total(name, stack) / total(base, NONE)
+
+
+def drag_section(work, model_v2):
+    """Travelling current sheet over conductive stacks: drag and normal force."""
+    mu_eff = model_v2["flex_0.2"]["analysis"]["layer_states"][0]["mu_effective"]
+    speeds = [1.0, 20.0, 100.0]
+    groups = [
+        (1.6, [("al_only", "Al 3 mm @1 mm", {"layers": [], "housing": housing("aluminum6061", 3.0, 1.0)}),
+               ("steel_only", "Steel 1018 3 mm @1 mm", {"layers": [], "housing": housing("steel1018", 3.0, 1.0)})]),
+        (0.8, [("v2_magnet", f"Version 2: flex 0.2 mm at the model's mu_eff {mu_eff:.2f} + Al 1 mm @0.1 mm",
+                {"layers": [layer("flex_ferrite", 0.2, mu_r=mu_eff)], "housing": V2_AL})]),
+    ]
+    rows = []
+    for t_pcb, cases in groups:
+        set_pcb(t_pcb)
+        model = rust_model(cases, linear=True, speeds_m_s=speeds)
+        ys = sheet_ys(2)
+        for name, label, st in cases:
+            for k, v in enumerate(speeds):
+                freq = v / (2 * TAU * 1e-3)
+                src = sheet_rects([ys[1]], travelling=True)
+                b = run_femm(build_case(f"drag.pcb{t_pcb}.none.v{v:g}", NONE, src, freq=freq), work)
+                r = run_femm(build_case(f"drag.pcb{t_pcb}.{name}.v{v:g}", st, src, freq=freq), work)
+                q = b["stack_top_By1f"] ** 2 / MU0 * PERIOD * 1e-3 * 1.0
+                drag_f, normal_f = r["Fx_stack"] / q, r["Fy_stack"] / q
+                refl = model[name]["motion"][k]["reflection"]
+                drag_m, normal_m = -refl[1], refl[0]
+                balance = r["loss_stack"] / (r["Fx_stack"] * v) if abs(r["Fx_stack"]) > 1e-12 else float("nan")
+                rows.append(f"| {label} | {v:g} | {freq:.0f} | {drag_m:.4f} | {drag_f:.4f} | {err(drag_m, drag_f, 0.10)} | "
+                            f"{normal_m:+.4f} | {normal_f:+.4f} | {err(normal_m, normal_f, 0.10) if abs(normal_f) > 5e-3 else 'floor | '} | "
+                            f"{balance:.3f} |")
+    print("\n### Eddy drag of a travelling field (2-D fundamental, per B0^2/mu0 of the bare field at the stack top)\n")
+    print("Normal forces below 0.005 are at FEMM's numerical floor (the no-stack rows above give ±0.002).\n")
+    print("| Stack | v [m/s] | f [Hz] | model -Im R | FEMM drag | error | | model Re R | FEMM normal | error | | FEMM loss / (F v) |")
+    print("|---|---|---|---|---|---|---|---|---|---|---|---|")
+    print("\n".join(rows))
+
+
+def saturation_and_eddy(work):
+    model_v2 = nonlinear_section(work)
+    incremental_section(work)
+    ac_coil_section(work, model_v2)
+    drag_section(work, model_v2)
+    set_pcb(G["pcb_thickness_mm"])
+
 
 
 if __name__ == "__main__":

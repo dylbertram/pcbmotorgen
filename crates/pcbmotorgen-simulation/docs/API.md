@@ -41,7 +41,7 @@ app crate or on `pcbmotorgen-export`. It depends on:
 | `magnetic::coil_model` | `CoilCurrentModel` — geometry → sampled conductor sub-segments. |
 | `magnetic::force_eval` | `ForceEvaluator`, `CommutationMode`, `ForceResult`. |
 | `stackup` | `HeightStackCalculator`, `PowerEstimator`, `FrictionEstimator`. |
-| `backplane` | `BackplaneStack` below the PCB (t707): reflection `R`, inductance factor, attraction, saturation. See §8.4. |
+| `backplane` | `BackplaneStack` below the PCB (t707, 04n2, q9nw): reflection `R`, saturation, inductance factor, attraction, eddy currents. See §8.4. |
 | `equilibrium` | Mover equilibrium rest positions + travel envelope (Clarke baseline). |
 | `equilibrium::charge` | Charge-based travel endpoints (kata k5r5) — first/last magnet equilibrium under the phase-band charge state. |
 
@@ -556,28 +556,59 @@ force.
 
 ### 8.4 Backplane: `backplane::BackplaneStack`
 
-Linear, planar 1-D image model of the layers below the PCB and an optional
-housing. Assumptions and their FEMM / magpylib checks are in the module docs
-and `scripts/femm/RESULTS.md`.
+Planar layered model of the layers below the PCB and an optional housing,
+for the fundamental `k = π/τ`: saturation of soft-magnetic layers under the
+magnets, and eddy currents at the PWM frequency and at the mover speed.
+Conventions (`e^(jωt)`, signs of `R`), assumptions and their FEMM / magpylib
+checks are in the module docs and `scripts/femm/RESULTS.md`.
 
 ```rust
 pub struct BackplaneStack { pub layers: Vec<BackplaneLayer>, pub housing: Option<HousingSpec> }
-pub struct BackplaneLayer { pub material: LayerMaterial, pub thickness_m: f64 }   // layers[0] touches the PCB
+pub struct BackplaneLayer {                       // layers[0] touches the PCB
+    pub material: LayerMaterial,
+    pub thickness_m: f64,                         // magnetic material only
+    pub mu_r: Option<f64>,                        // serde default None = material value; omitted when None
+    pub bsat_t: Option<f64>,                      // serde default None = material value; omitted when None
+}
 pub struct HousingSpec { pub material: HousingMaterial, pub thickness_m: f64, pub gap_m: f64 }
 
 impl BackplaneStack {
-    pub fn validate(&self) -> Result<(), String>;               // thicknesses in (0, 20 mm], gap in [0, 20 mm]
-    pub fn image_strength(&self, sim: &SimulationInput) -> f64; // reflection R at k = π/τ
+    pub fn validate(&self) -> Result<(), String>;               // thicknesses in (0, 20 mm], gap in [0, 20 mm],
+                                                                // mu_r in [1, 1e6], bsat_t in (0, 3 T]
+    pub fn image_strength(&self, sim: &SimulationInput) -> f64; // saturated R at k = π/τ
+    pub fn solve(&self, sim: &SimulationInput) -> SolvedStack;
     pub fn analyze(&self, sim: &SimulationInput) -> BackplaneAnalysis;
+}
+
+impl SolvedStack {
+    pub fn image_strength(&self) -> f64;
+    pub fn coil_factor(&self, freq_hz: f64) -> Complex<f64>;          // F: L = L0·Re F, ΔR = −2πf·L0·Im F
+    pub fn coil_factor_parts(&self, freq_hz: f64) -> [Complex<f64>; 2]; // [away from, under] the magnets
+    pub fn magnet_reflection(&self, speed_m_s: f64) -> Complex<f64>;  // 2-D R of the moving magnet field
+    pub fn magnet_forces(&self, sim: &SimulationInput, speed_m_s: f64) -> MagnetForces; // normal_n, drag_n
+    pub fn conducts(&self) -> bool;
 }
 ```
 
 | Result | Model |
 | --- | --- |
-| `image_strength` | `R` from the layered recursion over every layer, the housing gap and the housing |
-| `inductance_factor` | `1 + R·(1/N)·Σ e^(−2k·d_i)`, `N = num_layers` sheets at `d_i = i·t_pcb/(N−1)`; multiplies `L_s` in `drive` |
-| `attraction_n` | `R(κ)·B(κ)²/μ0` summed over the cross-travel spectrum of `N` magnets of depth `D`; `R·B0²/μ0·N·τ·D` for `D → ∞` |
-| `layer_peak_b_t`, `housing_peak_b_t` | `(1+R)·B0·coth(k·T)` per magnetic part; warns above Bsat |
+| `image_strength` | `R` from the layered recursion, each saturable layer at its describing-function `μ_eff` (two-slope B-H curve, thickness-mean in-plane field) |
+| `linear_image_strength` | the same at initial `μr` |
+| `inductance_factor` | `Re F` at DC: `F = 1 + R·(1/N)·Σ e^(−2k·d_i)`, `N = num_layers` sheets at `d_i = i·t_pcb/(N−1)`; `R` is the incremental (harmonic-mean) one under the magnets and the initial one elsewhere, weighted by `magnet_coverage = N·τ / active_area_length` |
+| `attraction_n` | `Re R(κ)·B(κ)²/μ0` summed over the cross-travel spectrum of `N` magnets of depth `D`, at standstill |
+| `layer_states`, `housing_state` | `MagneticState`: `mu_effective`, `mu_incremental`, `flux_overload` (linear flux over `Bsat·T`), `mean_b_t`, `peak_b_t` (solved), `linear_peak_b_t`, `linear_mean_b_t`, `required_thickness_m`, `mnzn_thickness_m` |
+| `layer_peak_b_t`, `housing_peak_b_t` | `peak_b_t` of each magnetic part: `B(H)` on the faces at the solved state, or the normal field |
+
+`drive::analyze_drive` adds `DriveAnalysis::backplane: Option<DriveBackplane>`
+(omitted when there is no backplane): inductance factor at DC and at the PWM
+frequency, `pwm_inductance_h` (used by the ripple check), `pwm_resistance_ohm`,
+`ripple_eddy_loss_w` (odd harmonics of the ripple estimate's ±V_bus/2 square
+wave on the two-phase loop), `drag_n`, `normal_force_n`, `drag_power_w`,
+`net_thrust_n` at the target speed, `drag_limited_speed_m_s` and a
+`drag_curve` at the `speed_curve` speeds. The `ω·L` voltage terms use `L` and
+the eddy resistance at the electrical frequency `v/(2τ)`. When anything
+conducts, the checks include `eddy_drag` (pass below 10 % of the thrust,
+fail at or above it).
 
 ---
 
