@@ -4,7 +4,7 @@ import { expect, type Locator, type Page } from "@playwright/test";
 export const DESIGN_SCROLL = "#design-settings-scroll";
 
 /** The persistent left column (aside) of the main grid. */
-export const ASIDE = "aside[aria-label='Persistent design reflection']";
+export const ASIDE = "aside[aria-label='Coil preview panel']";
 
 /** Open a motor document with generated defaults in the workspace. */
 export async function gotoDesignApp(page: Page): Promise<void> {
@@ -31,9 +31,7 @@ export function designPanel(page: Page) {
 }
 
 /**
- * The first card of the left column (TravelDiagram). The reflection column
- * is a Bits UI ScrollArea since kata 2npg: the card sits inside the
- * viewport's content wrapper.
+ * The coil preview card in the left column's scroll area.
  */
 export function leftColumnFirstCard(page: Page) {
   return page.locator(
@@ -41,17 +39,17 @@ export function leftColumnFirstCard(page: Page) {
   );
 }
 
-/** Active-area length readout in the Design-dimensions box. */
+/** Active-area length readout in Design constraints. */
 export function activeLengthReadout(page: Page) {
   return page.locator(
-    `section[aria-labelledby="design-dimensions-heading"] dt:has(> span:text-is("Active copper region")) + dd`,
+    `section[aria-labelledby="design-constraints-heading"] dt:has(> span:text-is("Active copper region")) + dd`,
   );
 }
 
 /** The "PCB trace total (X)" live output (traces' first-to-last X span). */
 export function traceTotalReadout(page: Page) {
   return page.locator(
-    `section[aria-labelledby="design-dimensions-heading"] dt:has(> span:text-is("PCB trace total (X)")) + dd`,
+    `section[aria-labelledby="design-constraints-heading"] dt:has(> span:text-is("PCB trace total (X)")) + dd`,
   );
 }
 

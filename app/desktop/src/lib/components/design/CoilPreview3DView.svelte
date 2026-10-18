@@ -6,10 +6,11 @@
   import CoilPreviewScene from "./CoilPreviewScene.svelte";
   import Slider from "../ui/Slider.svelte";
 
-  let { geometry, view, isVisible = () => true }: {
+  let { geometry, view, isVisible = () => true, showTerminals = true }: {
     geometry: CadGeometry | null;
     view: CoilPreviewViewState;
     isVisible?: (coil: string, layer: number) => boolean;
+    showTerminals?: boolean;
   } = $props();
 
   let scene = $derived(buildCoilScene(geometry));
@@ -17,7 +18,7 @@
   let vias = $derived(view.showVias ? scene?.vias.filter(v =>
     (view.isLayerVisible(v.from_layer) && isVisible(v.net, v.from_layer)) ||
     (view.isLayerVisible(v.to_layer) && isVisible(v.net, v.to_layer))) ?? [] : []);
-  let terminals = $derived(view.showTerminals ? scene?.terminals.filter(t => view.isLayerVisible(t.layer) && isVisible(t.net, t.layer)) ?? [] : []);
+  let terminals = $derived(showTerminals && view.showTerminals ? scene?.terminals.filter(t => view.isLayerVisible(t.layer) && isVisible(t.net, t.layer)) ?? [] : []);
   let reset = $state(0);
   let command = $state({ id: 0, zoom: 1 });
 </script>

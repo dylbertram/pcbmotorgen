@@ -15,7 +15,7 @@
    * not yet fetched) the endpoints are a fixed reference pin and the
    * store's `envelopeWarning` is rendered below — never silent (kata ab30).
    *
-   * Used by the Design reflection (TravelDiagram) and the CoilPreview
+    * Used by Design constraints and the CoilPreview
    * lightbox so both screens expose identical position controls on the same
    * shared store.
    */
