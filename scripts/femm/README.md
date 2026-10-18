@@ -13,7 +13,8 @@ user-prefix Xvfb. Everything goes under `~/.local/opt` (`FEMM_OPT` overrides).
 scripts/femm/install_femm.sh                 # once; about 130 MB of downloads
 scripts/femm/run_femm.sh scripts/femm/smoke_wire.lua ~/.local/opt/femm-runs/smoke
 cat ~/.local/opt/femm-runs/smoke/smoke_wire.csv
-python3 -I scripts/femm/femm_backplane.py    # full comparison, about 5 min
+python3 -I scripts/femm/femm_backplane.py    # full comparison
+python3 -I scripts/femm/femm_backplane.py --new-only   # saturation and eddy-current part only
 ```
 
 What `install_femm.sh` does, and why:
@@ -56,6 +57,6 @@ FEMM's automatic one.
 
 | File | Role |
 |---|---|
-| `solve_case.lua` | Generic planar case: one electrical period with periodic left and right edges, A = 0 40 mm above and below, horizontal material bands, and embedded rectangles. Writes A·J over the sources, the weighted-stress-tensor force on the stack and on the magnets, the By fundamental on sample lines, and point values. Magnetostatic, or time-harmonic when `freq` > 0. |
+| `solve_case.lua` | Generic planar case: one electrical period with periodic left and right edges, A = 0 40 mm above and below, horizontal material bands, and embedded rectangles. Materials can be nonlinear (B-H points) and sources complex. Writes A·J over the sources, the weighted-stress-tensor force (x and y, time-averaged when harmonic) and resistive loss of the stack, the force on the magnets, the Bx and By fundamentals and the travelling-wave By part on sample lines, and point values. Magnetostatic, time-harmonic when `freq` > 0, or incremental on a previous nonlinear solution (`previous`). |
 | `femm_backplane.py` | Builds the cases, runs FEMM and the Rust model, and prints the Markdown tables in RESULTS.md. Uses the stdlib only. |
 | `../../crates/pcbmotorgen-simulation/examples/backplane_dump.rs` | Prints the model's `BackplaneAnalysis` for given stacks (JSON in and out). |
