@@ -33,8 +33,9 @@ REPO = os.path.dirname(os.path.dirname(HERE))
 MU0 = 4e-7 * math.pi
 
 # Benchmark geometry (closed_infinity_pattern.pmmotor): electrical pitch 12 mm,
-# so pole pitch tau = 6 mm.
-G = dict(pole_pitch_mm=6.0, magnet_width_mm=5.0, magnet_cross_width_mm=5.0,
+# so pole pitch tau = 6 mm. The magnets are 5 mm deep; the model gets 1 m so its
+# attraction is the 2-D value that the planar FEMM slice computes.
+G = dict(pole_pitch_mm=6.0, magnet_width_mm=5.0, magnet_cross_width_mm=1000.0,
          magnet_height_mm=3.0, magnet_count=5, remanence_t=1.34,
          air_gap_mm=0.5, pcb_thickness_mm=1.6)
 TAU = G["pole_pitch_mm"]
@@ -82,6 +83,12 @@ CASES = [
     ("mnzn_2+steel", "MnZn 2 mm + steel 3 mm @1 mm", {"layers": [layer("mn_zn_ferrite", 2.0)], "housing": housing("steel1018", 3.0, 1.0)}),
     ("al_only", "Al 3 mm @1 mm (no layers)", {"layers": [], "housing": housing("aluminum6061", 3.0, 1.0)}),
     ("steel_only", "Steel 3 mm @1 mm (no layers)", {"layers": [], "housing": housing("steel1018", 3.0, 1.0)}),
+    ("mnzn_1+fr4_0.5+mnzn_1", "MnZn 1 mm + FR4 0.5 mm + MnZn 1 mm",
+     {"layers": [layer("mn_zn_ferrite", 1.0), layer("fr4", 0.5), layer("mn_zn_ferrite", 1.0)], "housing": None}),
+    ("flex_0.3+sisteel_0.35", "Flex ferrite 0.3 mm + Si steel 0.35 mm",
+     {"layers": [layer("flex_ferrite", 0.3), layer("silicon_steel", 0.35)], "housing": None}),
+    ("flex_0.3+fr4_0.2+flex_0.3", "Flex 0.3 mm + FR4 0.2 mm + flex 0.3 mm",
+     {"layers": [layer("flex_ferrite", 0.3), layer("fr4", 0.2), layer("flex_ferrite", 0.3)], "housing": None}),
 ]
 # Cases with conductive material that also get a 100 kHz run.
 AC_CASES = {"none", "sisteel_0.35", "mnzn_2+al", "mnzn_2+steel", "al_only", "steel_only"}
@@ -146,6 +153,7 @@ def stack_bands(stack, freq):
 
 
 SHEET_T = 0.02  # current sheet thickness [mm]
+PEAK_N = 48  # samples of |B| along the stack top
 
 
 def sheet_ys(layers):
@@ -220,6 +228,10 @@ def build_case(name, stack, source, freq=0.0, upper=None, extra_mats=()):
     mats = [dict(name="air", mu=1.0)] + mats + smats + list(extra_mats)
     lines = [dict(name="pcb_top", y=T_PCB, n=240), dict(name="stack_top", y=0.0, n=240)]
     points = [dict(name="mag_centre_pcb_top", x=-TAU / 2, y=T_PCB)]
+    if source == "magnets":
+        # |B| just inside the stack top, for the saturation estimate.
+        points += [dict(name=f"top{i}", x=-PERIOD / 2 + (i + 0.5) * PERIOD / PEAK_N, y=-0.01)
+                   for i in range(PEAK_N)]
     return dict(name=name, period=PERIOD, freq=freq, materials=mats, bands=bands,
                 rects=rects, labels=labels, lines=lines, points=points)
 
@@ -460,9 +472,13 @@ def main():
         p_err = "" if abs(p_femm) < 0.05 else f"{(p_model - p_femm) / p_femm * 100:+.0f} %"
         fr_femm = f["mag"]["mag_centre_pcb_top_By"] / base["mag"]["mag_centre_pcb_top_By"]
         fr_err = (m["field_ratio_2d"] - fr_femm) / fr_femm * 100
+        peak_femm = max(math.hypot(f["mag"][f"top{i}_Bx"], f["mag"][f"top{i}_By"]) for i in range(PEAK_N))
+        # Only a magnetic layer 1 sits at the sampled stack top.
+        peak_model = a["layer_peak_b_t"][0] if stack["layers"] else 0.0
+        peak = f"{peak_model:.3f} | {peak_femm:.3f}" if peak_model > 0 else " | "
         rows_f.append(f"| {label} | {p_model:.1f} | {p_femm:.1f} | {p_err} | "
                       f"{m['field_ratio_2d']:.3f} | {fr_femm:.3f} | {fr_err:+.1f} % | "
-                      f"{-(f['mag']['Fy_magnets'] - base['mag']['Fy_magnets']) / (2 * w) / 1e3:.1f} |")
+                      f"{-(f['mag']['Fy_magnets'] - base['mag']['Fy_magnets']) / (2 * w) / 1e3:.1f} | {peak} |")
 
     print("\n### Inductance factor (2 sin current sheets, PCB bottom and top)\n")
     print("| Stack | model K | model factor | FEMM, sheets alone | exact 1-D | model error | "
@@ -482,8 +498,9 @@ def main():
     print(f"| {m4['inductance_factor']:.3f} | {alone:.3f} | {exact[0]:.3f} | "
           f"{(m4['inductance_factor'] - alone) / alone * 100:+.1f} % | {together:.3f} | {exact[1]:.3f} |")
     print("\n### Attraction and field (alternating magnet row)\n")
-    print("| Stack | model p [kPa] | FEMM p [kPa] | p error | model B ratio | FEMM B ratio | B error | FEMM p, magnet-side check [kPa] |")
-    print("|---|---|---|---|---|---|---|---|")
+    print("| Stack | model p [kPa] | FEMM p [kPa] | p error | model B ratio | FEMM B ratio | B error | "
+          "FEMM p, magnet-side check [kPa] | model peak B, layer 1 [T] | FEMM peak B, stack top [T] |")
+    print("|---|---|---|---|---|---|---|---|---|---|")
     print("\n".join(rows_f))
     b_plane = base["mag"]["stack_top_By1"]
     print(f"\nField at the stack face (no stack), fundamental: FEMM {b_plane:.4f} T, "
