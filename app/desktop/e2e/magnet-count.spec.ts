@@ -11,8 +11,6 @@ test("odd magnet counts are accepted and step controls increment by one", async 
   await expect(count).toHaveValue("5");
   await expect(count).toHaveAttribute("aria-invalid", "false");
   await expect(page.getByText(/Magnet count must be/)).toHaveCount(0);
-  const countReadout = page.locator("section[aria-labelledby='design-dimensions-heading'] dt", { hasText: /^Magnet count$/ }).locator("+ dd");
-  await expect(countReadout).toHaveText("5");
   await count.focus();
   await count.press("ArrowDown");
   await count.press("Tab");
@@ -20,5 +18,5 @@ test("odd magnet counts are accepted and step controls increment by one", async 
   await count.focus();
   await count.press("ArrowUp");
   await count.press("Tab");
-  await expect(countReadout).toHaveText("5");
+  await expect(count).toHaveValue("5");
 });

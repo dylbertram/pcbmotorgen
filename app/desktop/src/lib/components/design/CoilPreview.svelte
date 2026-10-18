@@ -41,7 +41,6 @@
   import type { CadGeometry, CoilPathDto } from "../../types";
   import { CadSimplifyTool } from "../../utils/cadSimplifyTool.svelte";
   import { CoilTerminalTool } from "../../utils/coilTerminalTool.svelte";
-  import CoilTerminalOverlay from "./CoilTerminalOverlay.svelte";
   import { withAutomaticCadTerminals } from "../../cadTerminals";
   import { generatedTerminalGeometry } from "../../generatedTerminalGeometry";
   import {
@@ -559,12 +558,9 @@
          renderer (canvas.dataset in coilPreviewCanvas.ts), NOT bound
          reactively — see the counter comment there. -->
     {#if view.viewMode === "iso"}
-      <CoilPreviewIsoView geometry={terminalGeometry} {view} isVisible={isTerminalVisible} />
+      <CoilPreviewIsoView geometry={terminalGeometry} {view} isVisible={isTerminalVisible} showTerminals={false} />
     {:else}
       <canvas bind:this={canvasRef} class="block h-full w-full"></canvas>
-      {#if terminalGeometry}
-        <CoilTerminalOverlay geometry={terminalGeometry} transform={worldTransform} panX={gestures.panX} panY={gestures.panY} width={W} height={H} isVisible={isTerminalVisible} showMarkers={view.showTerminals} />
-      {/if}
     {/if}
   </PreviewFrame>
 

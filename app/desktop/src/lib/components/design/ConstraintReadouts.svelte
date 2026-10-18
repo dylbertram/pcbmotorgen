@@ -17,7 +17,6 @@
     config,
     measuredTraceLengthMm = null,
     routingDimensions = null,
-    cadGeometryActive = false,
   }: {
     config: ConfigStore;
     /** Trace X-span MEASURED from the returned coil payload (mm); falls back
@@ -28,8 +27,6 @@
      *  inside are additionally pattern-dependent and stay null when the
      *  pattern declares no leg grid. */
     routingDimensions?: RoutingDimensionsDto | null;
-    /** True when the displayed trace geometry came from a DXF import. */
-    cadGeometryActive?: boolean;
   } = $props();
 
   // Vernier phase-band pitch / rest-offset formulas live in lib/geometry.
@@ -109,15 +106,7 @@
   );
 </script>
 
-<section
-  class="rounded-md border border-slate-700 bg-slate-800/40 px-2.5 py-2"
-  aria-labelledby="design-dimensions-heading"
->
-  <div class="mb-1.5 flex items-center justify-between gap-2">
-    <h2 id="design-dimensions-heading" class="text-[11px] font-semibold uppercase tracking-wider text-slate-300">
-      Design dimensions
-    </h2>
-  </div>
+<div class="mt-3 border-t border-slate-700/60 pt-3" aria-label="Derived constraint dimensions">
 
   <dl class="grid grid-cols-2 gap-x-3 gap-y-1.5 sm:grid-cols-3">
     <div class="min-w-0">
@@ -138,10 +127,6 @@
         <HelpTag tip="Mover span + travel." />
       </dt>
       <dd class="font-mono text-xs text-sky-200">{config.active_area_length_mm.toFixed(1)} mm</dd>
-    </div>
-    <div class="min-w-0">
-      <dt class="truncate text-[10px] text-slate-500">Active area width</dt>
-      <dd class="font-mono text-xs text-sky-200">{config.active_area_width_mm.toFixed(1)} mm</dd>
     </div>
     <div class="min-w-0">
       <dt class="truncate text-[10px] text-slate-500">Mover span</dt>
@@ -167,40 +152,11 @@
       <dd class="font-mono text-xs text-sky-200">{restOffsetMm.toFixed(2)} mm</dd>
     </div>
     <div class="min-w-0">
-      <dt class="truncate text-[10px] text-slate-500">Magnet count</dt>
-      <dd class="font-mono text-xs text-sky-200">{config.magnet_count}</dd>
-    </div>
-    <div class="min-w-0">
-      <dt class="truncate text-[10px] text-slate-500">Magnet size</dt>
-      <dd class="font-mono text-xs text-sky-200">{config.magnet_width_mm.toFixed(1)} &times; {config.magnet_cross_width_mm.toFixed(1)} mm</dd>
-    </div>
-    <div class="min-w-0">
       <dt class="flex min-w-0 items-center gap-0.5 text-[10px] text-slate-500">
         <span class="truncate">Magnet gap (auto)</span>
         <HelpTag tip="Derived: pole pitch − X Length." />
       </dt>
       <dd class="font-mono text-xs text-sky-200">{config.magnet_gap_mm.toFixed(1)} mm</dd>
-    </div>
-    <div class="min-w-0">
-      <dt class="flex min-w-0 items-center gap-0.5 text-[10px] text-slate-500">
-        <span class="truncate">{cadGeometryActive ? "Routing pattern" : "Routing"}</span>
-        <HelpTag
-          tip={cadGeometryActive
-            ? "Active trace geometry was imported from a DXF; no generated routing pattern is active."
-            : "Active routing pattern id. Switch or add generators in the Design tab's routing-pattern selector."}
-        />
-      </dt>
-      <dd class="truncate font-mono text-xs text-sky-200">
-        {cadGeometryActive ? "Imported CAD pattern" : config.routing_pattern}
-      </dd>
-    </div>
-    <div class="min-w-0">
-      <dt class="truncate text-[10px] text-slate-500">Layers</dt>
-      <dd class="font-mono text-xs text-sky-200">{config.num_layers}</dd>
-    </div>
-    <div class="min-w-0">
-      <dt class="truncate text-[10px] text-slate-500">Phases</dt>
-      <dd class="font-mono text-xs text-sky-200">{config.phases}</dd>
     </div>
   </dl>
 
@@ -271,4 +227,4 @@
       </dl>
     </div>
   </div>
-</section>
+</div>

@@ -39,9 +39,7 @@
   import StatusBanner from "./lib/components/ui/StatusBanner.svelte";
   import ProjectNotification from "./lib/components/ui/ProjectNotification.svelte";
   import ScrollArea from "./lib/components/ui/ScrollArea.svelte";
-  import TravelDiagram from "./lib/components/design/TravelDiagram.svelte";
   import CoilPreview from "./lib/components/design/CoilPreview.svelte";
-  import DesignDimensions from "./lib/components/design/DesignDimensions.svelte";
   import DesignTab from "./lib/components/layout/DesignTab.svelte";
   import SimulateTab from "./lib/components/layout/SimulateTab.svelte";
   import KicadDialog from "./lib/components/layout/KicadDialog.svelte";
@@ -95,7 +93,7 @@
   // Whether the current config produces a valid travel range.
   let valid = $derived(config.travel_mm > 0);
 
-  // Shared mover position for the design reflection: the TravelDiagram slider
+  // Shared mover position for Design constraints: the position slider
   // and the CoilPreview magnet strip both read from this store.
 
   // Project save/load (kata 0cgm): all persistence logic lives in the Rust
@@ -628,9 +626,7 @@
         </div>
       {/if}
 
-      <!-- The reflection stays mounted beside every workflow panel. On desktop
-           only the settings/content column scrolls; on small screens the columns
-           stack so the reflection remains available above the active panel. -->
+       <!-- The coil preview stays mounted beside every workflow panel. -->
       <div
         class="grid min-h-0 flex-1 items-start gap-4 px-4 pb-4 lg:grid-cols-[minmax(360px,0.9fr)_minmax(0,1.35fr)] lg:grid-rows-[minmax(0,1fr)] lg:items-stretch lg:pb-0 lg:pr-0"
       >
@@ -640,23 +636,16 @@
              scrolls. Below lg the columns stack and the page scrolls normally. -->
         <aside
         class="relative min-w-0 min-h-0 lg:h-full lg:pt-4 lg:pb-4 lg:pr-2"
-          aria-label="Persistent design reflection"
+          aria-label="Coil preview panel"
         >
           <ScrollArea class="h-full min-h-0">
             {#if designType === "sensor"}
               <SensorPreview store={sensorStore} camera={session.camera} previewView={session.previewView} />
             {:else}
-              <TravelDiagram {config} {motion} {measuredTrace} />
               <!-- Traces view lives here in the Design tab so layout and geometry can
                    be inspected side by side; the Simulation tab keeps its own copy. -->
-              <div class="mt-3 space-y-3">
+              <div>
                 <CoilPreview {config} coils={activeCoils} {motion} camera={session.camera} view={session.previewView} importedGeometry={projects.cadGeometry} onGeometryChange={(geometry) => projects.setCadGeometry(geometry)} />
-                <DesignDimensions
-                  {config}
-                  measuredTraceLengthMm={measuredTrace?.traceLengthMm ?? null}
-                  routingDimensions={activeCoils?.routing_dimensions ?? null}
-                  cadGeometryActive={projects.cadGeometry !== null}
-                />
               </div>
             {/if}
           </ScrollArea>
@@ -675,7 +664,7 @@
             class="h-full p-4 lg:pr-0"
           >
             <div hidden={designType !== "motor"} class="h-full">
-              <DesignTab {config} cadGeometry={projects.cadGeometry} onGeometryChange={(geometry) => projects.setCadGeometry(geometry)} onImportCad={() => (cadImportDialogOpen = true)} onUseGenerated={() => projects.setCadGeometry(null)} backplaneAnalysis={height?.backplane_analysis ?? null} driveBackplane={drive?.backplane ?? null} />
+               <DesignTab {config} {motion} {measuredTrace} routingDimensions={activeCoils?.routing_dimensions ?? null} cadGeometry={projects.cadGeometry} onGeometryChange={(geometry) => projects.setCadGeometry(geometry)} onImportCad={() => (cadImportDialogOpen = true)} onUseGenerated={() => projects.setCadGeometry(null)} backplaneAnalysis={height?.backplane_analysis ?? null} driveBackplane={drive?.backplane ?? null} />
             </div>
             <div hidden={designType !== "sensor"} class="h-full overflow-y-auto">
               <SensorTab store={sensorStore} />

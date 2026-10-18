@@ -1,6 +1,11 @@
 <script lang="ts">
   import type { ConfigStore } from "../../stores/config.svelte";
-  import type { BackplaneAnalysis, CadGeometry, DriveBackplane } from "../../types";
+  import type { BackplaneAnalysis, CadGeometry, DriveBackplane, RoutingDimensionsDto } from "../../types";
+  import type { MotionStore } from "../../stores/motion.svelte";
+  import { stripBoundsDomainMm, type TraceMeasure } from "../../previewGeometry";
+  import TravelIsoView from "../design/TravelIsoView.svelte";
+  import MoverPositionControls from "../design/MoverPositionControls.svelte";
+  import ConstraintReadouts from "../design/ConstraintReadouts.svelte";
   import BackplanePanel from "../design/BackplanePanel.svelte";
   import TopologySelector from "../design/TopologySelector.svelte";
   import TracesBoardPanel from "../design/parameters/TracesBoardPanel.svelte";
@@ -13,6 +18,9 @@
 
   let {
     config,
+    motion,
+    measuredTrace = null,
+    routingDimensions = null,
     cadGeometry = null,
     onImportCad,
     onUseGenerated,
@@ -21,6 +29,9 @@
     driveBackplane = null,
   }: {
     config: ConfigStore;
+    motion: MotionStore;
+    measuredTrace?: TraceMeasure | null;
+    routingDimensions?: RoutingDimensionsDto | null;
     cadGeometry?: CadGeometry | null;
     onImportCad: () => void;
     onUseGenerated: () => void;
@@ -30,6 +41,7 @@
     /** Backplane results at the drive's operating point, if analysed. */
     driveBackplane?: DriveBackplane | null;
   } = $props();
+  const stripBounds = $derived(stripBoundsDomainMm(config, motion));
 </script>
 
 <ScrollArea
@@ -38,9 +50,7 @@
   aria-label="Design settings"
 >
   <div class="space-y-3">
-    <!-- General geometry + clearance. No driver toggle: every field here is
-         a normal user input. Derived values (travel, pole pitch, mover span,
-         rest offset, preview metrics) stay read-only in the reflection. -->
+    <!-- Travel inputs, live assembly geometry and derived sizing readouts. -->
     <section
       class="rounded-md border border-slate-700 bg-slate-800/40 px-3 py-2.5"
       aria-labelledby="design-constraints-heading"
@@ -92,21 +102,6 @@
 
         <label class="min-w-0">
           <span class="flex items-center justify-between gap-2">
-            <span class="min-w-0 truncate text-xs text-slate-300">PCB thickness (mm)</span>
-            <NumberField
-              id="pcb-thickness"
-              value={config.pcb_thickness_mm}
-              min={0.1}
-              step={0.1}
-              ariaLabel="PCB thickness (mm)"
-              class="w-24 shrink-0 px-2 py-1 text-xs font-mono text-emerald-200"
-              onCommit={(value) => (config.pcb_thickness_mm = value)}
-            />
-          </span>
-        </label>
-
-        <label class="min-w-0">
-          <span class="flex items-center justify-between gap-2">
             <span class="min-w-0 truncate text-xs text-slate-300"
               >Electrical pitch <span class="italic">P<sub>e</sub></span> (mm)<HelpTag
                 label="About electrical pitch"
@@ -133,21 +128,14 @@
           </span>
         </label>
 
-        <label class="min-w-0">
-          <span class="flex items-center justify-between gap-2">
-            <span class="min-w-0 truncate text-xs text-slate-300">Air gap (mm)</span>
-            <NumberField
-              id="air-gap"
-              value={config.air_gap_mm}
-              min={0}
-              step={0.05}
-              ariaLabel="Air gap (mm)"
-              class="w-24 shrink-0 px-2 py-1 text-xs font-mono text-emerald-200"
-              onCommit={(value) => (config.air_gap_mm = value)}
-            />
-          </span>
-        </label>
       </div>
+      <div class="mt-3 grid items-center gap-3 sm:grid-cols-2">
+        <div class="mx-auto w-full max-w-xs">
+          <TravelIsoView {config} {measuredTrace} stripStartMm={stripBounds.startMm} stripEndMm={stripBounds.endMm} />
+        </div>
+        <MoverPositionControls {config} {motion} showWaveform={false} />
+      </div>
+      <ConstraintReadouts {config} measuredTraceLengthMm={measuredTrace?.traceLengthMm ?? null} {routingDimensions} />
     </section>
 
     <BackplanePanel {config} {backplaneAnalysis} {driveBackplane} />
