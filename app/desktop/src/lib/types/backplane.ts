@@ -60,6 +60,8 @@ export interface MagneticState {
   linear_peak_b_t: number;
   /** Thickness-mean in-plane flux density of the linear model [T]. */
   linear_mean_b_t: number;
+  /** Thickness-mean in-plane flux density of the fundamental, solved state [T]. */
+  mean_b_t: number;
   /** Peak |B| at the solved, saturation-aware state [T]. */
   peak_b_t: number;
   /** Linear flux over the flux carried at Bsat. Above 1 = saturated. */

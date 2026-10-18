@@ -135,10 +135,11 @@ fn old_pairs(s: &BackplaneStack) -> Vec<(f64, f64)> {
 fn unsaturated_stacks_reproduce_the_magnetostatic_model_exactly() {
     let s = benchmark();
     let k = PI / s.pole_pitch_m();
+    // None of these reaches Bsat anywhere, so nothing is split or saturated.
     for st in [
-        mnzn(2.0),
         mnzn(5.0),
-        stack(vec![layer(LayerMaterial::NiZnFerrite, 5.0)], None),
+        linear(mnzn(2.0)),
+        linear(stack(vec![layer(LayerMaterial::NiZnFerrite, 2.0)], None)),
         stack(
             vec![
                 layer(LayerMaterial::Fr4, 1.0),
@@ -149,7 +150,10 @@ fn unsaturated_stacks_reproduce_the_magnetostatic_model_exactly() {
         stack(vec![], housing(HousingMaterial::Steel1018, 3.0, 1.0)),
     ] {
         let a = st.analyze(&s);
-        assert!(a.layer_states.iter().all(|l| !l.saturated()));
+        assert!(a
+            .layer_states
+            .iter()
+            .all(|l| l.mu_effective == l.mu_initial));
         let pairs = old_pairs(&st);
         let r = old_reflection(k, &pairs);
         let mean = ((-2.0 * k * 0.0).exp() + (-2.0 * k * s.pcb_thickness_m).exp()) / 2.0;
@@ -304,7 +308,7 @@ fn split_magnetic_layers_reflect_like_one_plate() {
     );
     let r = split.analyze(&benchmark()).linear_image_strength;
     assert!(
-        r > 0.998 && r < mnzn(2.0).image_strength(&benchmark()),
+        r > 0.998 && r < linear(mnzn(2.0)).image_strength(&benchmark()),
         "{r}"
     );
 }
@@ -370,13 +374,15 @@ fn attraction_of_benchmark_magnets_matches_3d_images() {
     // Benchmark: 5 magnets, 5 × 5 × 3 mm, τ = 6 mm, 0.5 mm gap, 1.6 mm
     // PCB, 2 mm MnZn. Magpylib, force between the magnets and their
     // R-scaled images in 3-D: 3.889 N. This model: 3.67 N, short by the
-    // two array ends it ignores. The 2-D R·B0²/μ0·N·τ·D: 5.63 N.
+    // two array ends it ignores. The 2-D R·B0²/μ0·N·τ·D: 5.63 N. Magpylib's
+    // images are linear, so the plate is too.
     let s = benchmark();
-    let f = mnzn(2.0).analyze(&s).attraction_n;
+    let plate = linear(mnzn(2.0));
+    let f = plate.analyze(&s).attraction_n;
     assert!((f / 3.889 - 1.0).abs() < 0.07, "{f}");
     let mut more = s.clone();
     more.magnet_count *= 2;
-    assert!((mnzn(2.0).analyze(&more).attraction_n / f - 2.0).abs() < 1e-9);
+    assert!((plate.analyze(&more).attraction_n / f - 2.0).abs() < 1e-9);
 }
 
 #[test]
@@ -406,19 +412,26 @@ fn linear_peak_matches_femm() {
 }
 
 #[test]
-fn face_saturation_of_a_thick_plate_warns_but_keeps_mu() {
+fn face_saturation_of_a_thick_plate_stays_in_a_skin() {
     // 2 mm MnZn on the benchmark: the face reaches 0.56 T > 0.45 T, the mean
     // flux (0.42 T) fits.
-    let a = mnzn(2.0).analyze(&benchmark());
+    let s = benchmark();
+    let a = mnzn(2.0).analyze(&s);
     let st = &a.layer_states[0];
     assert!(!st.saturated());
-    assert_eq!(st.mu_effective, st.mu_initial);
     assert!(st.linear_peak_b_t > 0.45 && st.linear_mean_b_t < 0.45);
+    assert!(st.mu_effective < st.mu_initial && st.mu_effective > 0.5 * st.mu_initial);
+    assert!(a.image_strength < a.linear_image_strength && a.image_strength > 0.99);
     assert!(
-        a.warnings.iter().any(|w| w.contains("Only a skin")),
+        a.warnings.iter().any(|w| w.contains("skin")),
         "{:?}",
         a.warnings
     );
+    // The plate is split; the sublayers saturate from the face down.
+    let solved = mnzn(2.0).solve(&s);
+    assert_eq!(solved.magnet.len(), 11);
+    assert!(solved.magnet[0].mu < solved.magnet[10].mu);
+    assert_eq!(solved.magnet[10].mu, 2500.0);
 }
 
 #[test]
@@ -430,16 +443,26 @@ fn saturated_sheet_clamps_polarization_and_loses_reflection() {
     assert!(st.saturated() && st.linear_peak_b_t > bsat);
     assert!(st.mu_effective < st.mu_initial);
     assert!(a.image_strength < a.linear_image_strength);
-    // At the solved state the polarization of the fundamental is at most that
-    // of a square wave at Bsat, 4/π·Bsat.
+    // In every sublayer the describing function is a fixed point, and the
+    // polarization of the fundamental is at most that of a square wave at
+    // Bsat, 4/π·Bsat.
     let solved = stack(vec![layer(LayerMaterial::SiliconSteel, 0.35)], None).solve(&s);
-    let mean = dc_fields(solved.k, &solved.magnet).1[0].mean * solved.b0;
-    let h1 = mean / (MU_0 * st.mu_effective);
-    assert!(mean - MU_0 * h1 <= 4.0 / PI * bsat * (1.0 + 1e-9), "{mean}");
-    // The describing function is a fixed point.
-    assert!((describing_mu(st.mu_initial, bsat, h1) / st.mu_effective - 1.0).abs() < 1e-9);
+    let faces = dc_fields(solved.k, &solved.magnet).1;
+    let mut h_max: f64 = 0.0;
+    for (m, f) in solved.magnet.iter().zip(&faces) {
+        let mean = f.mean * solved.b0;
+        let h1 = mean / (MU_0 * m.mu);
+        assert!(mean - MU_0 * h1 <= 4.0 / PI * bsat * (1.0 + 1e-9), "{mean}");
+        // Sweeping coupled sublayers converges slowly; 1e-6 is ample.
+        assert!((describing_mu(st.mu_initial, bsat, h1) / m.mu - 1.0).abs() < 1e-6);
+        h_max = h_max.max(f.top.max(f.bottom) * solved.b0 / (MU_0 * m.mu));
+    }
     // The peak is the B-H curve, not a linear multi-tesla number.
-    assert!(st.peak_b_t < bsat + MU_0 * h1 * 2.0, "{}", st.peak_b_t);
+    assert!(
+        st.peak_b_t <= bsat + MU_0 * h_max * (1.0 + 1e-9),
+        "{}",
+        st.peak_b_t
+    );
     assert!(st.mu_incremental < st.mu_effective);
     assert!(a.warnings.iter().any(|w| w.contains("saturated")));
 }
@@ -454,7 +477,20 @@ fn describing_function_limits() {
     let h = knee * 1e4;
     let j1 = (describing_mu(mu, bsat, h) - 1.0) * MU_0 * h;
     assert!((j1 / (4.0 / PI * bsat) - 1.0).abs() < 1e-3);
-    assert!((incremental_mu(mu, bsat, h) - 1.0).abs() < 1e-3);
+    // A purely in-plane bias leaves the differential permeability: 1.
+    assert!((incremental_mu(mu, bsat, h, 0.0) - 1.0).abs() < 1e-3);
+    // Below the knee everywhere the material is linear.
+    assert!((incremental_mu(mu, bsat, knee * 0.5, knee * 0.5) / mu - 1.0).abs() < 1e-12);
+    // Just above the knee the saturated share is p = 1 − (2/π)·asin x.
+    let x: f64 = 0.5;
+    let p = 1.0 - 2.0 / PI * x.asin();
+    let closed = 1.0 / ((1.0 - p) / mu + p);
+    assert!((incremental_mu(mu, bsat, knee / x, 0.0) / closed - 1.0).abs() < 0.02);
+    // In-plane coil flux crosses a normal bias, so it sees the secant
+    // permeability, at least that of the peak bias.
+    let secant = bh_curve(mu, Some(bsat), h) / (MU_0 * h);
+    let across = incremental_mu(mu, bsat, 0.0, h);
+    assert!(across > secant && across < mu, "{across} vs {secant}");
 }
 
 #[test]
@@ -494,8 +530,10 @@ fn version_two_reports_saturation_instead_of_a_multi_tesla_peak() {
     // them it does not; aluminium is invisible at DC.
     let solved = st.solve(&s);
     let [away, under] = solved.coil_factor_parts(0.0);
+    // FEMM with incremental permeability: 1.004 to 1.060 with the mover
+    // position (RESULTS.md).
     assert!(
-        sheet.mu_incremental < 1.1 && (under.re - 1.0).abs() < 0.01,
+        sheet.mu_incremental < 1.5 && under.re > 1.004 && under.re < 1.060,
         "{under}"
     );
     let expected = a.magnet_coverage * under.re + (1.0 - a.magnet_coverage) * away.re;
