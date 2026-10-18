@@ -515,3 +515,49 @@ fn picked_terminals_override_the_inferred_ones() {
     assert!(a.phases[0].connected);
     assert_eq!(a.phases[0].strands, 2);
 }
+
+#[test]
+fn through_hole_barrel_connects_inner_layers_without_outer_trace_stubs() {
+    let mut routing = RoutingResult::default();
+    routing.segments = vec![
+        RouteSegment { start: Point::new(0.0, 0.0), end: Point::new(1.0, 0.0), layer: 1, net: "A".into(), is_active: true },
+        RouteSegment { start: Point::new(1.0, 0.0), end: Point::new(2.0, 0.0), layer: 2, net: "A".into(), is_active: true },
+    ];
+    routing.vias.push(Via { position: Point::new(1.0, 0.0), from_layer: 0, to_layer: 3, net: "A".into() });
+    let hints = DriveGeometryHints {
+        layer_z_m: vec![0.0, 0.3e-3, 0.5e-3, 0.8e-3],
+        terminals: std::collections::BTreeMap::from([("A".into(), vec![TerminalPair {
+            input: TerminalPoint { layer: 1, position: Point::new(0.0, 0.0) },
+            output: TerminalPoint { layer: 2, position: Point::new(2.0, 0.0) },
+        }])]),
+    };
+    let s = SimulationInput { num_layers: 4, ..sim() };
+    let a = analyze_drive_with(&s, &routing, &DriveSettings::default(), None, &hints);
+    assert!(a.phases[0].connected);
+    assert_eq!(a.phases[0].layers, vec![1, 2]);
+    assert_eq!(extract_phase_networks(&routing)[0].via_count(), 1);
+}
+
+#[test]
+fn coincident_vias_preserve_distinct_spans_without_duplicate_connections() {
+    let mut routing = RoutingResult::default();
+    for layer in 0..4 {
+        routing.segments.push(RouteSegment {
+            start: Point::new(0.0, 0.0), end: Point::new(1.0, 0.0),
+            layer, net: "A".into(), is_active: true,
+        });
+    }
+    // Distinct layer pairs at the same XY must both survive. Exact duplicate
+    // records, including a reversed one, must not add parallel conductances.
+    for (from_layer, to_layer) in [(0, 1), (2, 3), (0, 1), (3, 2)] {
+        routing.vias.push(Via { position: Point::new(1.0, 0.0), from_layer, to_layer, net: "A".into() });
+    }
+    let networks = extract_phase_networks(&routing);
+    assert_eq!(networks[0].via_count(), 2);
+    // A full-span barrel adds only the missing inner connection, regardless
+    // of whether it is listed before or after the shorter spans.
+    routing.vias.push(Via { position: Point::new(1.0, 0.0), from_layer: 0, to_layer: 3, net: "A".into() });
+    assert_eq!(extract_phase_networks(&routing)[0].via_count(), 3);
+    routing.vias.reverse();
+    assert_eq!(extract_phase_networks(&routing)[0].via_count(), 3);
+}
