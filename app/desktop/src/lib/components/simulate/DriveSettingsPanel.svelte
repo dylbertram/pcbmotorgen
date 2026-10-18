@@ -1,42 +1,17 @@
 <script lang="ts">
   import type { ConfigStore } from "../../stores/config.svelte";
-  import type { DriveSettings, DriverSpec } from "../../types";
+  import type { DriveSettings } from "../../types";
   import NumberField from "../ui/NumberField.svelte";
   import Separator from "../ui/Separator.svelte";
   import SettingRow from "./SettingRow.svelte";
-  import AddDriverModal from "./AddDriverModal.svelte";
-  import { driverLibrary } from "../../stores/driverLibrary.svelte";
+  import DriverSelector from "./DriverSelector.svelte";
 
   let { config }: { config: ConfigStore } = $props();
 
   const COPPER_WEIGHTS = [0.5, 1, 2, 3];
 
-  let addingDriver = $state(false);
-  // The driver library is the single source of selectable drivers. The
-  // project's own driver stays first even when the library no longer holds it
-  // (an older project, or a library entry that was removed).
-  let drivers = $derived([
-    config.drive.driver,
-    ...driverLibrary.drivers.filter((driver) => driver.name !== config.drive.driver.name),
-  ]);
-
   function update(patch: Partial<DriveSettings>): void {
     config.drive = { ...config.drive, ...patch };
-  }
-
-  function choosePreset(name: string): void {
-    const preset = drivers.find((p) => p.name === name);
-    const current = config.drive.driver;
-    if (!driverLibrary.drivers.some((driver) => driver.name === current.name)) {
-      driverLibrary.add(current);
-    }
-    if (preset) update({ driver: { ...preset } });
-  }
-
-  function addDriver(driver: DriverSpec): void {
-    driverLibrary.add(driver);
-    update({ driver });
-    addingDriver = false;
   }
 
   const field = "w-24 shrink-0 px-2 py-1 text-xs font-mono text-emerald-200";
@@ -48,24 +23,9 @@
 <section aria-labelledby="driver-settings-heading" class="overflow-hidden rounded-md border border-slate-700 bg-slate-800/30">
   <div class="flex items-center justify-between gap-3 px-3 py-2">
     <h3 id="driver-settings-heading" class="text-xs font-semibold uppercase tracking-wider text-slate-200">Driver</h3>
-    <button type="button" onclick={() => (addingDriver = true)} class="rounded border border-slate-600 px-2 py-1 text-xs text-slate-200 hover:bg-slate-700">Add driver…</button>
   </div>
   <div class="px-3 pb-3">
-    <label for="evaluation-driver" class="mb-1 block text-[11px] text-slate-400">Evaluate against</label>
-    <select
-      id="evaluation-driver"
-      aria-label="Driver to evaluate"
-      value={config.drive.driver.name}
-      onchange={(e) => choosePreset(e.currentTarget.value)}
-      class="rounded border border-slate-700 bg-slate-900 px-2 py-1 text-xs text-slate-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-400"
-    >
-      {#each drivers as preset (preset.name)}
-        <option value={preset.name}>{preset.name}</option>
-      {/each}
-    </select>
-    <p class="mt-2 text-[11px] text-slate-400">{config.drive.driver.min_supply_v}–{config.drive.driver.max_supply_v} V · {config.drive.driver.continuous_rms_a} A RMS · {config.drive.driver.peak_current_a} A peak</p>
-    <p class="mt-1 text-[11px] text-slate-400">{config.drive.driver.supports_delta ? "Delta handling declared" : "Requires Star (wye) for evaluation"}</p>
-    {#if !driverLibrary.storageAvailable}<p role="status" class="mt-2 text-xs text-amber-200">Driver selected. Library storage is unavailable, so save this project to keep its parameters.</p>{/if}
+    <DriverSelector {config} />
   </div>
 
   <Separator />
@@ -105,7 +65,3 @@
     </fieldset>
   </div>
 </section>
-
-{#if addingDriver}
-  <AddDriverModal existingNames={drivers.map((driver) => driver.name)} onAdd={addDriver} onClose={() => (addingDriver = false)} />
-{/if}
