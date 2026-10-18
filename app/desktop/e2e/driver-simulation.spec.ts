@@ -1,6 +1,33 @@
 import { test, expect } from "@playwright/test";
 import { gotoDesignApp } from "./helpers";
 
+test("coil preview driver inductor stays synchronized with simulation", async ({ page }) => {
+  await gotoDesignApp(page);
+  await page.getByRole("combobox", { name: "Winding connection", exact: true }).selectOption("2");
+  await page.getByRole("button", { name: "Expand coil preview", exact: true }).click();
+  const preview = page.getByRole("dialog", { name: "Coil Preview", exact: true });
+  await preview.getByRole("button", { name: "Driver settings", exact: true }).click();
+  const inductor = preview.getByRole("spinbutton", { name: "Series inductor per phase (µH)", exact: true });
+  await expect(inductor).toHaveValue("0");
+  await inductor.fill("47");
+  await inductor.press("Enter");
+  await preview.getByRole("button", { name: "Close coil preview", exact: true }).click();
+
+  await page.getByRole("tab", { name: /^Simulate/i }).click();
+  const simulationInductor = page.getByRole("spinbutton", { name: "Series inductor per phase (µH)", exact: true });
+  await expect(simulationInductor).toHaveValue("47");
+  const results = page.locator('section[aria-labelledby="driver-suitability-heading"]');
+  await expect(results).toContainText("with 47.0 µH series per phase");
+  await simulationInductor.fill("0");
+  await simulationInductor.press("Enter");
+  await expect(results).not.toContainText("series per phase");
+
+  await page.getByRole("tab", { name: /^Design/i }).click();
+  await page.getByRole("button", { name: "Expand coil preview", exact: true }).click();
+  await preview.getByRole("button", { name: "Driver settings", exact: true }).click();
+  await expect(inductor).toHaveValue("0");
+});
+
 test("a defined series inductor tames the PWM ripple estimate", async ({ page }) => {
   await gotoDesignApp(page);
   await page.getByRole("combobox", { name: "Winding connection", exact: true }).selectOption("2");
