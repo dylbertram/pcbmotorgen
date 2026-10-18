@@ -41,6 +41,7 @@ app crate or on `pcbmotorgen-export`. It depends on:
 | `magnetic::coil_model` | `CoilCurrentModel` — geometry → sampled conductor sub-segments. |
 | `magnetic::force_eval` | `ForceEvaluator`, `CommutationMode`, `ForceResult`. |
 | `stackup` | `HeightStackCalculator`, `PowerEstimator`, `FrictionEstimator`. |
+| `backplane` | `BackplaneStack` below the PCB (t707): reflection `R`, inductance factor, attraction, saturation. See §8.4. |
 | `equilibrium` | Mover equilibrium rest positions + travel envelope (Clarke baseline). |
 | `equilibrium::charge` | Charge-based travel endpoints (kata k5r5) — first/last magnet equilibrium under the phase-band charge state. |
 
@@ -122,6 +123,9 @@ pub struct SimulationInput {
 
     // Declared phase bands (kata hzs2, serde default = empty)
     pub phase_bands: Vec<PhaseBandPosition>, // per-(layer, net) band records [m]
+
+    // Backplane and housing below the PCB (t707, serde default = None)
+    pub backplane: Option<BackplaneStack>,
 }
 ```
 
@@ -148,6 +152,7 @@ footprint violation, and the force / mass / accel / capacitor targets.
 - `strands_per_phase` defaults to **1** when absent (historical single-strand).
 - `phase_bands` defaults to **empty** when absent (kata hzs2): the analytic
   commutation offsets and the caller's copper region remain the fallback.
+- `backplane` defaults to **`None`** when absent: every result is unchanged.
 
 ### 3.3 Derived-geometry accessors
 
@@ -190,8 +195,11 @@ pub struct SimulationError(pub String);   // Display + std::error::Error
 `crate::magnetic::MagnetArray<'a>` builds and manages the magnet source
 assembly. The mover always uses the **plain alternating** arrangement:
 `magnet_count` Z-polarised cuboids alternating `±Br` along `z`, spaced
-`magnet_pitch_m` apart. (Halbach interleaves and method-of-images back-iron
-copies were removed from the product scope to simplify the app and simulation.)
+`magnet_pitch_m` apart. (Halbach interleaves and back iron on the mover were
+removed from the product scope to simplify the app and simulation.) With a
+magnetic `backplane`, `build_assembly` also appends the mirror image of the
+array across the PCB bottom (`z = −pcb_thickness_m`), polarised `±R·Br`, so
+every field and force result includes the stack (§8.4).
 
 ### 4.1 Public methods
 
@@ -542,6 +550,34 @@ impl FrictionEstimator {
         // normal force always 0 (no back-iron pull-in in the current scope)
 }
 ```
+
+`from_config` does not yet use the backplane attraction (§8.4) as a normal
+force.
+
+### 8.4 Backplane: `backplane::BackplaneStack`
+
+Linear, planar 1-D image model of the layers below the PCB and an optional
+housing. Assumptions and their FEMM / magpylib checks are in the module docs
+and `scripts/femm/RESULTS.md`.
+
+```rust
+pub struct BackplaneStack { pub layers: Vec<BackplaneLayer>, pub housing: Option<HousingSpec> }
+pub struct BackplaneLayer { pub material: LayerMaterial, pub thickness_m: f64 }   // layers[0] touches the PCB
+pub struct HousingSpec { pub material: HousingMaterial, pub thickness_m: f64, pub gap_m: f64 }
+
+impl BackplaneStack {
+    pub fn validate(&self) -> Result<(), String>;               // thicknesses in (0, 20 mm], gap in [0, 20 mm]
+    pub fn image_strength(&self, sim: &SimulationInput) -> f64; // reflection R at k = π/τ
+    pub fn analyze(&self, sim: &SimulationInput) -> BackplaneAnalysis;
+}
+```
+
+| Result | Model |
+| --- | --- |
+| `image_strength` | `R` from the layered recursion over every layer, the housing gap and the housing |
+| `inductance_factor` | `1 + R·(1/N)·Σ e^(−2k·d_i)`, `N = num_layers` sheets at `d_i = i·t_pcb/(N−1)`; multiplies `L_s` in `drive` |
+| `attraction_n` | `R(κ)·B(κ)²/μ0` summed over the cross-travel spectrum of `N` magnets of depth `D`; `R·B0²/μ0·N·τ·D` for `D → ∞` |
+| `layer_peak_b_t`, `housing_peak_b_t` | `(1+R)·B0·coth(k·T)` per magnetic part; warns above Bsat |
 
 ---
 

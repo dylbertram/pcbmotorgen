@@ -271,8 +271,8 @@
         <dd class="font-mono text-slate-200">{backplaneAnalysis.inductance_factor.toFixed(2)}×</dd>
         <dt class="text-slate-400">Normal attraction</dt>
         <dd class="font-mono text-slate-200">{backplaneAnalysis.attraction_n.toPrecision(3)} N</dd>
-        <dt class="text-slate-400">Effective μr</dt>
-        <dd class="font-mono text-slate-200">{backplaneAnalysis.mu_eff.toPrecision(3)}</dd>
+        <dt class="text-slate-400">Image strength R</dt>
+        <dd class="font-mono text-slate-200">{backplaneAnalysis.image_strength.toFixed(3)}</dd>
         {#if housing}
           <dt class="text-slate-400">Housing peak B</dt>
           <dd class="font-mono text-slate-200">{backplaneAnalysis.housing_peak_b_t.toPrecision(3)} T</dd>

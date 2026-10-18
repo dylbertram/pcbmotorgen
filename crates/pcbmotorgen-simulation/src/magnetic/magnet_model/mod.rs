@@ -49,14 +49,16 @@ impl<'a> MagnetArray<'a> {
 
     /// Build a `SourceAssembly` for the plain alternating array at the given
     /// mover position.
-    /// With a backplane configured, the mirror images of the array across
-    /// the backplane and housing planes are appended. Without one, the
+    /// With a magnetic backplane or housing configured, the mirror image of
+    /// the array across the PCB bottom is appended. Without one, the
     /// assembly is unchanged.
     pub fn build_assembly(&self, mover_position_m: f64) -> physics::MagbaSourceAssembly {
         let mut magnets = self.build_alternating(mover_position_m);
         if let Some(stack) = &self.config.backplane {
-            let analysis = stack.analyze(self.config);
-            magnets.extend(self.build_backplane_images(mover_position_m, &analysis));
+            let strength = stack.image_strength(self.config);
+            if strength > 0.0 {
+                magnets.extend(self.build_backplane_images(mover_position_m, strength));
+            }
         }
         physics::make_source_assembly(magnets)
     }

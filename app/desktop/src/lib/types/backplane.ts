@@ -45,13 +45,14 @@ export interface BackplaneStack {
 /** Derived backplane quantities (present only when a backplane is set). */
 export interface BackplaneAnalysis {
   stack_thickness_m: number;
-  spacer_m: number;
-  magnetic_thickness_m: number;
-  mu_eff: number;
+  /** Composite reflection `R` of stack and housing at the PCB bottom (0..1). */
   image_strength: number;
-  housing_image_strength: number;
-  image_plane_z_m: number;
-  housing_plane_z_m: number | null;
+  /** 2-D fundamental normal field of the bare array at the stack top [T]. */
+  b0_t: number;
+  /** Copper sheet count used for `inductance_factor`. */
+  copper_layers: number;
+  /** Height of each copper sheet above the PCB bottom [m], bottom first. */
+  copper_depths_m: number[];
   inductance_factor: number;
   /** Positive pulls the mover toward the stack [N]. */
   attraction_n: number;
