@@ -317,6 +317,50 @@ pub struct DriveAnalysis {
     pub speed_curve: Vec<SpeedVoltagePoint>,
     /// Assumptions the user should know about.
     pub notes: Vec<String>,
+    /// Backplane and housing at the operating point; absent without one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub backplane: Option<DriveBackplane>,
+}
+
+/// Backplane and housing effects at the drive's operating point (tickets
+/// 04n2, q9nw). See [`crate::backplane`] for the model.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DriveBackplane {
+    /// Low-frequency inductance factor, with the magnets' bias on saturated
+    /// layers.
+    pub inductance_factor: f64,
+    /// Inductance factor `Re F` at the PWM frequency, eddy currents included.
+    pub pwm_inductance_factor: f64,
+    /// Per-phase inductance at the PWM frequency plus series inductance [H].
+    /// The ripple check uses it.
+    pub pwm_inductance_h: f64,
+    /// Series resistance per phase that eddy currents add at the PWM
+    /// frequency [Ω].
+    pub pwm_resistance_ohm: f64,
+    /// Eddy loss in the backplane and housing from the PWM ripple [W].
+    pub ripple_eddy_loss_w: f64,
+    /// Eddy drag on the mover at the target speed [N], opposing motion.
+    pub drag_n: f64,
+    /// Normal attraction at the target speed [N].
+    pub normal_force_n: f64,
+    /// Drag power at the target speed, `drag·v` [W].
+    pub drag_power_w: f64,
+    /// Mean sweep thrust minus drag at the target speed [N].
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub net_thrust_n: Option<f64>,
+    /// Lowest speed at which the drag reaches the full-current thrust [m/s].
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub drag_limited_speed_m_s: Option<f64>,
+    /// Drag and normal force at the `speed_curve` speeds.
+    pub drag_curve: Vec<DragPoint>,
+}
+
+/// Eddy drag and normal force at one mover speed.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub struct DragPoint {
+    pub speed_m_s: f64,
+    pub drag_n: f64,
+    pub normal_n: f64,
 }
 
 /// Copper resistivity at `temp_c` [Ω·m].
@@ -522,8 +566,12 @@ pub fn analyze_drive_with(
         l_ll = 2.0 * l_self;
     }
     // A backplane or housing adds image currents that raise the copper
-    // inductance (t707). With no backplane the factor is 1 and nothing changes.
-    let mut l_s = l_ll / 2.0;
+    // inductance (t707). Saturation under the magnets and eddy currents make
+    // the factor depend on frequency (04n2, q9nw). With no backplane the
+    // factor is 1 and nothing changes.
+    let l_copper = l_ll / 2.0;
+    let mut l_s = l_copper;
+    let solved = sim.backplane.as_ref().map(|stack| stack.solve(sim));
     if let Some(stack) = &sim.backplane {
         let analysis = stack.analyze(sim);
         l_s *= analysis.inductance_factor;
@@ -541,6 +589,22 @@ pub fn analyze_drive_with(
     // each phase, so one per-phase value raises the effective synchronous
     // inductance that the ripple, time-constant, and ω·L terms see.
     let l_total = l_s + settings.series_inductance_h.max(0.0);
+    // Per-phase inductance and the series resistance eddy currents add, at
+    // frequency `f`: `L0·Re F` and `−2π·f·L0·Im F`.
+    let coil_at = |f: f64| -> (f64, f64) {
+        match &solved {
+            Some(s) => {
+                let c = s.coil_factor(f);
+                (
+                    l_copper * c.re + settings.series_inductance_h.max(0.0),
+                    -2.0 * std::f64::consts::PI * f * l_copper * c.im,
+                )
+            }
+            None => (l_total, 0.0),
+        }
+    };
+    // The ripple sees the inductance at the switching frequency.
+    let (l_ripple, r_pwm) = coil_at(settings.pwm_hz);
 
     let r_phase = phases.iter().map(|p| p.resistance_hot_ohm).fold(0.0, f64::max);
     let i = sim.max_current_a.max(0.0);
@@ -567,7 +631,9 @@ pub fn analyze_drive_with(
         } else {
             0.0
         };
-        let v_ph = ((i * r_phase + e).powi(2) + (omega * l_total * i).powi(2)).sqrt();
+        // L and R at the electrical frequency of this speed.
+        let (l_e, r_eddy) = coil_at(omega / (2.0 * std::f64::consts::PI));
+        let v_ph = ((i * (r_phase + r_eddy) + e).powi(2) + (omega * l_e * i).powi(2)).sqrt();
         sqrt3 * v_ph + i * d.rds_on_ohm
     };
     let speed_v = ke.map(|_| required_v(settings.target_speed_m_s));
@@ -594,11 +660,13 @@ pub fn analyze_drive_with(
     // --- Ripple ---------------------------------------------------------
     // Steady-state RL response to +/- Vbus/2 across Rloop=2R, Lloop=2Ls.
     // The inductive V/(8fLs) approximation is valid only when R/(4fLs)<<1.
-    let ripple = if settings.pwm_hz > 0.0 && l_total > 0.0 {
+    // Ls is the inductance at the PWM frequency (`l_ripple`); R stays the DC
+    // resistance.
+    let ripple = if settings.pwm_hz > 0.0 && l_ripple > 0.0 {
         if r_phase > 1e-12 {
-            v_bus / (2.0 * r_phase) * (r_phase / (4.0 * settings.pwm_hz * l_total)).tanh()
+            v_bus / (2.0 * r_phase) * (r_phase / (4.0 * settings.pwm_hz * l_ripple)).tanh()
         } else {
-            v_bus / (8.0 * settings.pwm_hz * l_total)
+            v_bus / (8.0 * settings.pwm_hz * l_ripple)
         }
     } else {
         f64::INFINITY
@@ -613,17 +681,52 @@ pub fn analyze_drive_with(
     } else {
         r_phase / (4.0 * (2.0 * r_phase * ripple_limit / v_bus).atanh())
     };
-    let min_pwm = if l_total > 0.0 {
-        required_fl / l_total
+    let min_pwm = if l_ripple > 0.0 {
+        required_fl / l_ripple
     } else {
         f64::INFINITY
     };
     let peak_current = i + ripple / 2.0;
     let added_inductance = if settings.pwm_hz > 0.0 && ripple_limit > 0.0 {
-        (required_fl / settings.pwm_hz - l_total).max(0.0)
+        (required_fl / settings.pwm_hz - l_ripple).max(0.0)
     } else {
         0.0
     };
+
+    // --- Backplane at the operating point --------------------------------
+    let thrust = kf.map(|k| k * i);
+    let backplane = solved.as_ref().map(|s| {
+        // The ripple estimate's 50%-duty ±Vbus/2 square wave across the
+        // two-phase loop: odd harmonic n has amplitude 4/(nπ)·Vbus/2.
+        let ripple_eddy_loss_w = (1..=49)
+            .step_by(2)
+            .map(|n| {
+                let f = n as f64 * settings.pwm_hz;
+                let (l, r_eddy) = coil_at(f);
+                let z = 2.0 * (r_phase + r_eddy).hypot(2.0 * std::f64::consts::PI * f * l);
+                let amplitude = 4.0 / (n as f64 * std::f64::consts::PI) * v_bus / 2.0 / z;
+                if z > 0.0 {
+                    amplitude * amplitude * r_eddy
+                } else {
+                    0.0
+                }
+            })
+            .sum();
+        let at_target = s.magnet_forces(sim, settings.target_speed_m_s);
+        DriveBackplane {
+            inductance_factor: s.coil_factor(0.0).re,
+            pwm_inductance_factor: s.coil_factor(settings.pwm_hz).re,
+            pwm_inductance_h: l_ripple,
+            pwm_resistance_ohm: r_pwm,
+            ripple_eddy_loss_w,
+            drag_n: at_target.drag_n,
+            normal_force_n: at_target.normal_n,
+            drag_power_w: at_target.drag_n * settings.target_speed_m_s.abs(),
+            net_thrust_n: thrust.map(|f| f - at_target.drag_n),
+            drag_limited_speed_m_s: None,
+            drag_curve: Vec::new(),
+        }
+    });
 
     // --- Ampacity -------------------------------------------------------
     let ampacity = phase_ampacity.iter().copied().fold(f64::INFINITY, f64::min);
@@ -721,7 +824,7 @@ pub fn analyze_drive_with(
         detail: if added_inductance > 0.0 {
             format!(
                 "50%-duty RL estimate, not a switched-waveform simulation: V_bus/(2R)·tanh(R/(4·f_sw·L_s)), L_s = {:.2} µH. Meeting {:.0} % of the phase current needs f_sw ≥ {:.0} kHz, or {:.1} µH added in series per phase at {:.0} kHz.",
-                l_total * 1e6,
+                l_ripple * 1e6,
                 settings.ripple_limit_fraction * 100.0,
                 min_pwm / 1e3,
                 added_inductance * 1e6,
@@ -730,7 +833,7 @@ pub fn analyze_drive_with(
         } else {
             format!(
                 "50%-duty RL estimate, not a switched-waveform simulation: V_bus/(2R)·tanh(R/(4·f_sw·L_s)), L_s = {:.2} µH. The limit holds down to f_sw = {:.0} kHz.",
-                l_total * 1e6,
+                l_ripple * 1e6,
                 min_pwm / 1e3
             )
         },
@@ -796,12 +899,76 @@ pub fn analyze_drive_with(
         .max(settings.target_speed_m_s)
         .max(0.1)
         * 1.4;
-    let speed_curve = (0..=40)
+    let speed_curve: Vec<SpeedVoltagePoint> = (0..=40)
         .map(|k| {
             let s = top * k as f64 / 40.0;
             SpeedVoltagePoint { speed_m_s: s, required_v: required_v(s) }
         })
         .collect();
+
+    // --- Eddy drag ------------------------------------------------------
+    let mut backplane = backplane;
+    if let (Some(bp), Some(s)) = (backplane.as_mut(), solved.as_ref()) {
+        let drag = |v: f64| s.magnet_forces(sim, v);
+        bp.drag_curve = speed_curve
+            .iter()
+            .map(|p| {
+                let f = drag(p.speed_m_s);
+                DragPoint {
+                    speed_m_s: p.speed_m_s,
+                    drag_n: f.drag_n,
+                    normal_n: f.normal_n,
+                }
+            })
+            .collect();
+        // First crossing of drag over thrust on the curve, refined by bisection.
+        bp.drag_limited_speed_m_s = thrust.and_then(|f| {
+            let hit = bp.drag_curve.iter().position(|p| p.drag_n >= f)?;
+            let (mut lo, mut hi) = (
+                bp.drag_curve[hit.saturating_sub(1)].speed_m_s,
+                bp.drag_curve[hit].speed_m_s,
+            );
+            for _ in 0..40 {
+                let mid = 0.5 * (lo + hi);
+                if drag(mid).drag_n >= f {
+                    hi = mid;
+                } else {
+                    lo = mid;
+                }
+            }
+            Some(hi)
+        });
+        if s.conducts() {
+            let v = settings.target_speed_m_s;
+            let limit = match bp.drag_limited_speed_m_s {
+                Some(v_lim) => format!("Drag reaches the full-current thrust at {v_lim:.2} m/s."),
+                None => format!("Drag stays below the full-current thrust up to {top:.1} m/s."),
+            };
+            checks.push(DriveCheck {
+                id: "eddy_drag".into(),
+                label: format!("Eddy drag at {v:.2} m/s vs thrust"),
+                status: match thrust {
+                    Some(f) => status(bp.drag_n <= 0.1 * f, bp.drag_n < f),
+                    None => CheckStatus::Unknown,
+                },
+                value: bp.drag_n,
+                limit: thrust.map_or(0.0, |f| 0.1 * f),
+                unit: "N".into(),
+                detail: format!(
+                    "Eddy currents in the backplane and housing drag the mover with {:.3} N ({:.2} W) at {v:.2} m/s. {limit} Passes below 10 % of the thrust.",
+                    bp.drag_n, bp.drag_power_w
+                ),
+            });
+            notes.push(format!(
+                "Eddy currents at {:.0} kHz PWM: inductance factor {:.2}× at low frequency, {:.2}× at the PWM frequency, {:.3} Ω added per phase, {:.3} W lost in the backplane and housing from the ripple.",
+                settings.pwm_hz / 1e3,
+                bp.inductance_factor,
+                bp.pwm_inductance_factor,
+                bp.pwm_resistance_ohm,
+                bp.ripple_eddy_loss_w
+            ));
+        }
+    }
 
     notes.push(format!(
         "Resistance uses ρ_Cu at {:.0} °C ({:.2e} Ω·m), trace width {:.3} mm, via drill {:.2} mm with {:.0} µm plating.",
@@ -862,6 +1029,7 @@ pub fn analyze_drive_with(
         checks,
         speed_curve,
         notes,
+        backplane,
     }
 }
 

@@ -385,6 +385,73 @@ fn external_series_inductance_tames_ripple_and_raises_voltage() {
 }
 
 #[test]
+fn backplane_ripple_uses_the_pwm_inductance_and_reports_eddy_drag() {
+    use crate::backplane::*;
+    let settings = DriveSettings::default();
+    let bare = analyze_drive(&sim(), &two_strand_fixture(), &settings, Some(0.5));
+    assert!(bare.backplane.is_none());
+    assert!(!serde_json::to_string(&bare).unwrap().contains("backplane"));
+
+    let with = |stack: BackplaneStack| {
+        let cfg = SimulationInput {
+            backplane: Some(stack),
+            ..sim()
+        };
+        analyze_drive(&cfg, &two_strand_fixture(), &settings, Some(0.5))
+    };
+    // Ferrite alone: no eddy currents, so every frequency sees the same L.
+    let ferrite = with(BackplaneStack {
+        layers: vec![BackplaneLayer::new(LayerMaterial::NiZnFerrite, 5e-3)],
+        housing: None,
+    });
+    let bp = ferrite.backplane.as_ref().unwrap();
+    assert_eq!(bp.pwm_inductance_h, ferrite.effective_inductance_h);
+    assert_eq!(
+        (bp.pwm_resistance_ohm, bp.ripple_eddy_loss_w, bp.drag_n),
+        (0.0, 0.0, 0.0)
+    );
+    assert!(ferrite.checks.iter().all(|c| c.id != "eddy_drag"));
+
+    // An aluminium wall right under the PCB screens the coil at 100 kHz and
+    // drags the moving magnets.
+    let al = with(al_stack().unwrap());
+    let bp = al.backplane.as_ref().unwrap();
+    assert_eq!(al.synchronous_inductance_h, bare.synchronous_inductance_h);
+    assert!(bp.pwm_inductance_h < al.effective_inductance_h);
+    assert!(bp.pwm_resistance_ohm > 0.0 && bp.ripple_eddy_loss_w > 0.0);
+    let expected_ripple = 12.0 / (2.0 * al.phase_resistance_ohm)
+        * (al.phase_resistance_ohm / (4.0 * settings.pwm_hz * bp.pwm_inductance_h)).tanh();
+    assert!((al.ripple_pp_a - expected_ripple).abs() < 1e-12);
+    assert!(al.ripple_pp_a >= bare.ripple_pp_a);
+    assert!(bp.drag_n > 0.0 && bp.drag_curve.len() == al.speed_curve.len());
+    assert_eq!(bp.drag_curve[0].drag_n, 0.0);
+    assert!((bp.drag_power_w - bp.drag_n * settings.target_speed_m_s).abs() < 1e-15);
+    assert_eq!(bp.net_thrust_n, Some(0.4 - bp.drag_n));
+    let check = al.checks.iter().find(|c| c.id == "eddy_drag").unwrap();
+    assert_eq!(check.value, bp.drag_n);
+    // The 0.4 N thrust is reached on the curve, and the bisection finds it.
+    let v = bp.drag_limited_speed_m_s.unwrap();
+    let s = SimulationInput {
+        backplane: al_stack(),
+        ..sim()
+    };
+    let solved = s.backplane.as_ref().unwrap().solve(&s);
+    assert!((solved.magnet_forces(&s, v).drag_n / 0.4 - 1.0).abs() < 1e-6);
+}
+
+fn al_stack() -> Option<crate::backplane::BackplaneStack> {
+    use crate::backplane::*;
+    Some(BackplaneStack {
+        layers: vec![],
+        housing: Some(HousingSpec {
+            material: HousingMaterial::Aluminum6061,
+            thickness_m: 3e-3,
+            gap_m: 0.1e-3,
+        }),
+    })
+}
+
+#[test]
 fn braid_fixture_produces_plausible_values() {
     let ctx = RoutingContext {
         active_area_length_mm: 147.0,
