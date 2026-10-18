@@ -87,6 +87,8 @@
   let height = $state<HeightStackResultDto | null>(untrack(() => session.runtime.height));
   let drive = $state<DriveAnalysis | null>(untrack(() => session.runtime.drive));
   let driveError = $state<string | null>(null);
+  let coilPreviewExpanded = $state(false);
+  let drivePending = $state(false);
   let loading = $state(false);
   let error = $state<string | null>(null);
 
@@ -431,21 +433,23 @@
 
   // Driver suitability runs after each sweep (it needs the thrust constant)
   // and again when only the driver settings change, without re-running the
-  // sweep. It shares the Simulation-tab gate.
+  // sweep. The expanded preview also needs live electrical results.
   let driveGeneration = 0;
   const scheduleDrive = debounce((generation: number) => {
-    if (generation !== driveGeneration || !active || activeTab !== "simulate") return;
+    if (generation !== driveGeneration || !active || (activeTab !== "simulate" && !coilPreviewExpanded)) return;
     void runDrive(generation);
   }, 120);
 
   async function runDrive(generation: number): Promise<void> {
     if (!valid) {
       drive = null;
+      drivePending = false;
       return;
     }
     if (projects.cadGeometry && cadMappingProblems(projects.cadGeometry, config.phases, config.min_trace_mm).length) {
       drive = null;
       driveError = null;
+      drivePending = false;
       return;
     }
     const kf = sweep && sweep.current_a > 0 ? Math.abs(sweep.mean_thrust_n) / sweep.current_a : null;
@@ -454,10 +458,12 @@
       if (generation !== driveGeneration) return;
       drive = result;
       driveError = null;
+      drivePending = false;
     } catch (e) {
       if (generation !== driveGeneration) return;
       drive = null;
       driveError = e instanceof Error ? e.message : String(e);
+      drivePending = false;
     }
   }
 
@@ -470,10 +476,14 @@
     void geometryKey(projects.cadGeometry);
     void valid;
     const generation = ++driveGeneration;
-    if (!active || activeTab !== "simulate") {
+    if (!active || (activeTab !== "simulate" && !coilPreviewExpanded)) {
       scheduleDrive.cancel();
+      drivePending = false;
       return;
     }
+    drive = null;
+    driveError = null;
+    drivePending = true;
     scheduleDrive(generation);
   });
 
@@ -647,7 +657,7 @@
               <!-- Traces view lives here in the Design tab so layout and geometry can
                    be inspected side by side; the Simulation tab keeps its own copy. -->
               <div>
-                <CoilPreview {config} coils={activeCoils} {motion} camera={session.camera} view={session.previewView} importedGeometry={projects.cadGeometry} onGeometryChange={(geometry) => projects.setCadGeometry(geometry)} />
+                <CoilPreview {config} coils={activeCoils} {motion} bind:expanded={coilPreviewExpanded} {drive} {driveError} {drivePending} camera={session.camera} view={session.previewView} importedGeometry={projects.cadGeometry} onGeometryChange={(geometry) => projects.setCadGeometry(geometry)} />
               </div>
             {/if}
           </ScrollArea>

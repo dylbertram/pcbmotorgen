@@ -7,15 +7,29 @@ test("coil preview driver inductor stays synchronized with simulation", async ({
   await page.getByRole("button", { name: "Expand coil preview", exact: true }).click();
   const preview = page.getByRole("dialog", { name: "Coil Preview", exact: true });
   await preview.getByRole("button", { name: "Driver settings", exact: true }).click();
+  const panel = page.getByRole("dialog", { name: "Preview driver settings", exact: true });
+  const driverSelector = panel.getByRole("combobox", { name: "Driver to evaluate" });
+  await driverSelector.selectOption("DRV8316");
+  await expect(panel).toContainText("Adding inductance can reduce PWM current ripple");
+  const previewResults = panel.getByRole("region", { name: "Preview driver simulation results" });
+  await expect(previewResults).toContainText("DRV8316");
+  const ripple = previewResults.locator("dt", { hasText: "Current ripple, peak-to-peak" }).locator("+ dd");
+  const initialRipple = await ripple.textContent();
   const inductor = preview.getByRole("spinbutton", { name: "Series inductor per phase (µH)", exact: true });
   await expect(inductor).toHaveValue("0");
   await inductor.fill("47");
   await inductor.press("Enter");
+  await expect(ripple).not.toHaveText(initialRipple!);
+  await expect(previewResults).toContainText("Effective phase inductance");
+  await expect(previewResults).toContainText("Additional inductance for ripple limit");
   await preview.getByRole("button", { name: "Close coil preview", exact: true }).click();
 
   await page.getByRole("tab", { name: /^Simulate/i }).click();
   const simulationInductor = page.getByRole("spinbutton", { name: "Series inductor per phase (µH)", exact: true });
   await expect(simulationInductor).toHaveValue("47");
+  const simulationDriver = page.getByRole("combobox", { name: "Driver to evaluate" });
+  await expect(simulationDriver).toHaveValue("DRV8316");
+  await simulationDriver.selectOption("DRV8313");
   const results = page.locator('section[aria-labelledby="driver-suitability-heading"]');
   await expect(results).toContainText("with 47.0 µH series per phase");
   await simulationInductor.fill("0");
@@ -26,6 +40,8 @@ test("coil preview driver inductor stays synchronized with simulation", async ({
   await page.getByRole("button", { name: "Expand coil preview", exact: true }).click();
   await preview.getByRole("button", { name: "Driver settings", exact: true }).click();
   await expect(inductor).toHaveValue("0");
+  await expect(driverSelector).toHaveValue("DRV8313");
+  await expect(previewResults).toContainText("DRV8313");
 });
 
 test("a defined series inductor tames the PWM ripple estimate", async ({ page }) => {

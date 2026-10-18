@@ -38,11 +38,15 @@
   import { CadSelectionTool } from "../../utils/cadSelectionTool.svelte";
   import HoldingForceChart from "./HoldingForceChart.svelte";
   import { stripBoundsDomainMm } from "../../previewGeometry";
+  import type { DriveAnalysis } from "../../types";
 
   let {
     expanded = $bindable(false),
     height = PREVIEW_H,
     config,
+    drive = null,
+    driveError = null,
+    drivePending = false,
     motion,
     view,
     gestures,
@@ -72,6 +76,9 @@
     expanded?: boolean;
     height?: number;
     config: ConfigStore;
+    drive?: DriveAnalysis | null;
+    driveError?: string | null;
+    drivePending?: boolean;
     motion: MotionStore;
     view: CoilPreviewViewState;
     gestures: CoilPreviewGestures;
@@ -214,7 +221,7 @@
         <!-- Right rail: hangs from the bottom of the top toolbar down to the
              status bar, so the Layers and Display panels pull out under it. -->
         <div class="absolute bottom-0 right-0 z-30 w-11" style:top={`${toolbarHeight}px`}>
-          <PreviewSideRail bind:open={sidePanel} {config} {view} layers={importedGeometry ? importedGeometry.layer_z_mm.map((_, idx) => ({ idx })) : uniqueLayers} phases={importedGeometry ? [] : uniquePhases}
+          <PreviewSideRail bind:open={sidePanel} {config} {drive} {driveError} {drivePending} {view} layers={importedGeometry ? importedGeometry.layer_z_mm.map((_, idx) => ({ idx })) : uniqueLayers} phases={importedGeometry ? [] : uniquePhases}
             {terminalTool} {onStartTerminals} terminalsDisabled={!onGeometryChange || view.viewMode === "iso"}
            geometry={terminalGeometry ?? importedGeometry} selection={importedGeometry ? selection : undefined} assignmentDisabled={view.viewMode === "iso" || !importedGeometry || !onGeometryChange || measure.mode || !!terminalTool?.active || view.oneSection}
           coils={importedGeometry ? uniquePhases.map((phase) => ({ name: phase.name, colorIdx: phase.colorIdx })) : []}
