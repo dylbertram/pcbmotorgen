@@ -32,9 +32,16 @@ export function cadMappingProblems(g: CadGeometry, phases: number, minimumWidth:
   g.routing.vias.forEach((v, i) => {
     if (v.from_layer === v.to_layer) problems.push(`Via ${i + 1} must connect distinct copper layers.`);
     for (const layer of [v.from_layer, v.to_layer]) {
-      if (!endpoints.some((s) => s.net === v.net && s.layer === layer && s.points.some((p) => Math.hypot(p.x - v.position.x, p.y - v.position.y) <= 1e-6)))
-        problems.push(`Via ${i + 1} on coil '${v.net}' has no trace endpoint on layer ${layer}.`);
+      if (!Number.isInteger(layer) || layer < 0 || layer >= g.layer_z_mm.length)
+        problems.push(`Via ${i + 1} refers to missing layer ${layer}.`);
     }
+    // A through-hole barrel may join inner layers with unused outer stubs.
+    const lo = Math.min(v.from_layer, v.to_layer);
+    const hi = Math.max(v.from_layer, v.to_layer);
+    const landed = new Set(endpoints.filter((s) => s.net === v.net && s.layer >= lo && s.layer <= hi
+      && s.points.some((p) => Math.hypot(p.x - v.position.x, p.y - v.position.y) <= 1e-6)).map((s) => s.layer));
+    if (landed.size < 2)
+      problems.push(`Via ${i + 1} on coil '${v.net}' must connect trace endpoints on at least two distinct copper layers within its span.`);
   });
   return [...new Set(problems)];
 }

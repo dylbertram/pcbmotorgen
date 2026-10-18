@@ -63,6 +63,57 @@ mod tests {
     }
 
     #[test]
+    fn through_hole_barrel_with_only_inner_landings_drives_the_imported_coil() {
+        let core = LinearMotorConfig { phases:1, num_layers:4, ..Default::default() };
+        let mut cad = mapped();
+        cad.layer_z_mm = vec![-0.8, -0.5, -0.3, 0.0];
+        cad.routing.segments[0].layer = 1;
+        cad.routing.segments[1].layer = 2;
+        cad.routing.vias[0].to_layer = 3;
+        let terminals = cad.coil_terminals.get_mut("coil").unwrap();
+        terminals.input.layer = 1;
+        terminals.output.layer = 2;
+        let board = CadBoard::new(&cad, &core).unwrap();
+        let sim = board.simulation_input(&cad, &core);
+        let analysis = pcbmotorgen_simulation::drive::analyze_drive_with(
+            &sim, &board.routing, &Default::default(), None, &CadBoard::drive_hints(&cad));
+        assert!(analysis.phases[0].connected);
+        assert_eq!(analysis.phases[0].layers, vec![1, 2]);
+        assert!(analysis.phase_resistance_ohm.is_finite() && analysis.phase_resistance_ohm > 0.0);
+    }
+
+    /// Run against an untracked user project without making it a test fixture:
+    /// PCB_MOTOR_PROJECT_PATH=/absolute/path.pmmotor cargo test -p pcbmotorgen
+    /// imported_user_project_connectivity -- --ignored --nocapture
+    #[test]
+    #[ignore = "Requires PCB_MOTOR_PROJECT_PATH pointing to a user project"]
+    fn imported_user_project_connectivity() {
+        let path = std::env::var("PCB_MOTOR_PROJECT_PATH").expect("set PCB_MOTOR_PROJECT_PATH");
+        let project: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
+        let mut checked = 0;
+        for version in project["versions"].as_array().unwrap() {
+            let state = &version["state"];
+            if state["cad_geometry"].is_null() { continue; }
+            let config: crate::ipc::ProjectConfigStateIpc = serde_json::from_value(state["config"].clone()).unwrap();
+            let cad: CadGeometry = serde_json::from_value(state["cad_geometry"].clone()).unwrap();
+            let core = config.to_linear_motor_ipc().to_core();
+            let board = CadBoard::new(&cad, &core).unwrap();
+            let sim = board.simulation_input(&cad, &core);
+            let analysis = pcbmotorgen_simulation::drive::analyze_drive_with(
+                &sim, &board.routing, &config.drive, None, &CadBoard::drive_hints(&cad));
+            assert_eq!(analysis.phases.len(), core.phases as usize);
+            assert!(analysis.phases.iter().all(|phase| phase.connected));
+            assert!(analysis.phase_resistance_ohm.is_finite() && analysis.phase_resistance_ohm > 0.0);
+            let sweep = tauri::async_runtime::block_on(crate::commands::physics::evaluate_force_sweep(
+                config.to_linear_motor_ipc(), Some(cad.clone()), Some(config.drive.clone()))).unwrap();
+            assert!(!sweep.force_x_n.is_empty() && sweep.force_x_n.iter().all(|force| force.is_finite()));
+            eprintln!("Imported version {}: {} segments, {} vias, {} connected phases, mean thrust {} N", version["id"], cad.routing.segments.len(), cad.routing.vias.len(), analysis.phases.len(), sweep.mean_thrust_n);
+            checked += 1;
+        }
+        assert!(checked > 0, "project has no imported geometry");
+    }
+
+    #[test]
     fn incomplete_mapping_and_disconnected_islands_are_rejected() {
         let core = LinearMotorConfig { phases:1, ..Default::default() };
         let mut cad = mapped();

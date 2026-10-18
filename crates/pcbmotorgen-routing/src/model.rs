@@ -75,6 +75,9 @@ pub struct RouteCurve {
 }
 
 /// One via / inter-layer connection.
+/// The layer pair defines the physical barrel span. Trace endpoints may
+/// connect on any layers inside that span, with unused barrel stubs outside
+/// the electrical landings.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Via {
     pub position: Point,

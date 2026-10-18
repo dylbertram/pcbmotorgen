@@ -1,7 +1,8 @@
 //! Round-trippable 3D DXF exchange for trace centerlines.
 //!
 //! Copper planes are represented by Z elevations. Vias are vertical LINE
-//! entities whose endpoints lie on the connected copper planes. DXF layer
+//! entities whose endpoints define the barrel span. Traces may connect on any
+//! copper plane within that span, leaving unused barrel stubs. DXF layer
 //! names carry the logical net and layer index as helpful metadata, but Z is
 //! the physical source of truth when importing.
 
@@ -71,20 +72,12 @@ impl CadGeometry {
                 problems.push(format!("No imported coil is assigned to phase {label}"));
             }
         }
-        let lands = |net: &str, layer: u32, point: Point| {
-            let matches = |p: Point| p.distance_to(point) <= 1e-6;
-            self.routing.segments.iter().any(|s| s.net == net && s.layer == layer && (matches(s.start) || matches(s.end)))
-                || self.routing.curves.iter().any(|s| s.net == net && s.layer == layer && (matches(s.start) || matches(s.end)))
-                || self.routing.splines.iter().any(|s| s.net == net && s.layer == layer && (matches(s.point_at(s.knots[s.degree])) || matches(s.point_at(s.knots[s.control_points.len()]))))
-        };
         for (i, via) in self.routing.vias.iter().enumerate() {
             if via.from_layer == via.to_layer {
                 problems.push(format!("Via {} must connect distinct copper layers", i + 1));
             }
-            for layer in [via.from_layer, via.to_layer] {
-                if !lands(&via.net, layer, via.position) {
-                    problems.push(format!("Via {} on coil '{}' has no trace endpoint on layer {}", i + 1, via.net, layer));
-                }
+            if via_landing_layers(&self.routing, via, 1e-6).len() < 2 {
+                problems.push(format!("Via {} on coil '{}' must connect trace endpoints on at least two distinct copper layers within its span", i + 1, via.net));
             }
         }
         if problems.is_empty() { Ok(()) } else { Err(problems.join(". ")) }
@@ -964,35 +957,11 @@ pub fn import_3d_dxf_with_coils(
         });
     }
     for via in &routing.vias {
-        for endpoint in [via.from_layer, via.to_layer] {
-            let connected = routing.segments.iter().any(|segment| {
-                segment.layer == endpoint
-                    && segment.net == via.net
-                    && (segment.start.distance_to(via.position) <= options.z_tolerance_mm
-                        || segment.end.distance_to(via.position) <= options.z_tolerance_mm)
-            }) || routing.curves.iter().any(|curve| {
-                curve.layer == endpoint
-                    && curve.net == via.net
-                    && (curve.start.distance_to(via.position) <= options.z_tolerance_mm
-                        || curve.end.distance_to(via.position) <= options.z_tolerance_mm)
-            }) || routing.splines.iter().any(|spline| {
-                spline.layer == endpoint
-                    && spline.net == via.net
-                    && [
-                        spline.knots[spline.degree],
-                        spline.knots[spline.control_points.len()],
-                    ]
-                    .iter()
-                    .any(|&t| {
-                        spline.point_at(t).distance_to(via.position) <= options.z_tolerance_mm
-                    })
-            });
-            if !connected {
-                warnings.push(format!(
-                    "Via at ({:.3}, {:.3}) mm has no matching trace endpoint on layer {endpoint}.",
-                    via.position.x, via.position.y
-                ));
-            }
+        if via_landing_layers(&routing, via, options.z_tolerance_mm).len() < 2 {
+            warnings.push(format!(
+                "Via at ({:.3}, {:.3}) mm must connect matching trace endpoints on at least two distinct copper layers within its span.",
+                via.position.x, via.position.y
+            ));
         }
     }
     if !warnings.is_empty() {
@@ -1018,6 +987,26 @@ pub fn import_3d_dxf_with_coils(
     };
     validate_geometry(&geometry)?;
     Ok(CadImportResult { geometry, warnings, units_to_mm: options.units_to_mm, source_units_mm })
+}
+
+/// Electrical landings, not the barrel's physical ends. A plated through-hole
+/// can connect two inner layers without any trace on its outer-layer stubs.
+fn via_landing_layers(routing: &RoutingResult, via: &Via, tolerance_mm: f64) -> BTreeSet<u32> {
+    let lo = via.from_layer.min(via.to_layer);
+    let hi = via.from_layer.max(via.to_layer);
+    let lands = |net: &str, layer: u32, start: Point, end: Point| {
+        net == via.net && (lo..=hi).contains(&layer)
+            && (start.distance_to(via.position) <= tolerance_mm
+                || end.distance_to(via.position) <= tolerance_mm)
+    };
+    routing.segments.iter()
+        .filter(|s| lands(&s.net, s.layer, s.start, s.end)).map(|s| s.layer)
+        .chain(routing.curves.iter()
+            .filter(|s| lands(&s.net, s.layer, s.start, s.end)).map(|s| s.layer))
+        .chain(routing.splines.iter()
+            .filter(|s| lands(&s.net, s.layer, s.point_at(s.knots[s.degree]), s.point_at(s.knots[s.control_points.len()])))
+            .map(|s| s.layer))
+        .collect()
 }
 
 fn validate_geometry(geometry: &CadGeometry) -> Result<(), String> {
@@ -1548,6 +1537,88 @@ mod tests {
         geometry.routing.vias[0].net = "A".into();
         geometry.coil_terminals.clear();
         assert!(geometry.validate_motor_mapping(1, 0.127).unwrap_err().contains("Select driver"));
+    }
+
+    fn inner_layer_connection() -> CadGeometry {
+        serde_json::from_value(serde_json::json!({
+            "layer_z_mm": [-0.8, -0.5, -0.3, 0.0], "trace_width_mm": 0.2,
+            "routing": { "format_version": 2, "segments": [
+                { "start": {"x":0.0,"y":0.0}, "end":{"x":1.0,"y":0.0}, "layer":1,"net":"A","is_active":true },
+                { "start": {"x":1.0,"y":0.0}, "end":{"x":2.0,"y":0.0}, "layer":2,"net":"A","is_active":false }
+            ], "curves": [], "vias": [{ "position":{"x":1.0,"y":0.0},"from_layer":0,"to_layer":3,"net":"A" }] },
+            "coil_terminals": {"A": {
+                "input":{"position":{"x":0.0,"y":0.0},"layer":1},
+                "output":{"position":{"x":2.0,"y":0.0},"layer":2}
+            }}
+        })).unwrap()
+    }
+
+    #[test]
+    fn motor_mapping_accepts_two_landings_anywhere_in_the_via_span() {
+        for (from, to) in [(0, 3), (3, 0), (1, 3), (0, 2)] {
+            let mut geometry = inner_layer_connection();
+            geometry.routing.vias[0].from_layer = from;
+            geometry.routing.vias[0].to_layer = to;
+            geometry.validate_motor_mapping(1, 0.127).unwrap();
+        }
+    }
+
+    #[test]
+    fn motor_mapping_rejects_vias_without_two_distinct_matching_layers() {
+        for case in ["one layer", "wrong coil", "outside span", "floating", "same-layer via", "missing layer"] {
+            let mut geometry = inner_layer_connection();
+            match case {
+                "one layer" => {
+                    geometry.routing.segments[1].layer = 1;
+                    geometry.coil_terminals.get_mut("A").unwrap().output.layer = 1;
+                    geometry.routing.segments.push(geometry.routing.segments[0].clone());
+                }
+                "wrong coil" => geometry.routing.vias[0].net = "B".into(),
+                "outside span" => geometry.routing.vias[0].to_layer = 1,
+                "floating" => geometry.routing.vias[0].position.x = 99.0,
+                "same-layer via" => {
+                    geometry.routing.vias[0].from_layer = 1;
+                    geometry.routing.vias[0].to_layer = 1;
+                }
+                _ => geometry.routing.vias[0].to_layer = 4,
+            }
+            assert!(geometry.validate_motor_mapping(1, 0.127).is_err(), "{case}");
+        }
+    }
+
+    #[test]
+    fn inner_via_landings_include_arc_and_evaluated_spline_endpoints() {
+        let mut geometry = inner_layer_connection();
+        geometry.routing.segments.clear();
+        geometry.routing.curves.push(RouteCurve {
+            start: Point::new(0.0, 0.0), mid: Point::new(0.5, 0.5), end: Point::new(1.0, 0.0),
+            layer: 1, net: "A".into(), is_active: true,
+        });
+        geometry.routing.splines.push(serde_json::from_value(serde_json::json!({
+            "degree": 2, "knots": [0,0,0,1,1,1], "control_points": [{"x":1.0,"y":0.0},{"x":1.5,"y":1.0},{"x":2.0,"y":0.0}],
+            "weights": [1,1,1], "layer":2, "net":"A", "is_active":true
+        })).unwrap());
+        geometry.validate_motor_mapping(1, 0.127).unwrap();
+    }
+
+    #[test]
+    fn dxf_import_accepts_unused_outer_via_stubs_but_warns_on_dangling_barrels() {
+        let geometry = inner_layer_connection();
+        let options = CadImportOptions {
+            units_to_mm: 1.0, z_tolerance_mm: 1e-6, default_trace_width_mm: 0.2,
+            legacy_layer_count: 4, legacy_pcb_thickness_mm: 0.8, prefer_detected_units: true,
+        };
+        let dxf = cad_geometry_to_3d_dxf(&geometry).unwrap();
+        let imported = import_3d_dxf(&dxf, options).unwrap();
+        assert!(imported.warnings.is_empty(), "{:?}", imported.warnings);
+        let via = &imported.geometry.routing.vias[0];
+        assert_eq!((via.from_layer, via.to_layer), (0, 3));
+        assert_eq!(via_landing_layers(&imported.geometry.routing, via, 1e-6), BTreeSet::from([1, 2]));
+
+        let mut dangling = geometry;
+        dangling.routing.vias[0].position.x = 99.0;
+        let imported = import_3d_dxf(&cad_geometry_to_3d_dxf(&dangling).unwrap(), options).unwrap();
+        assert!(imported.warnings.iter().any(|w| w.contains("at least two distinct copper layers")));
     }
 
     fn sample() -> CadGeometry {

@@ -385,13 +385,15 @@ pub fn extract_phase_networks_with_terminals(
     for v in &routing.vias {
         let Some(b) = nets.get_mut(&v.net) else { continue };
         let (x, y) = snap(v.position);
-        if !seen.insert((v.net.clone(), x, y)) {
-            continue;
-        }
         let (lo, hi) = (v.from_layer.min(v.to_layer), v.from_layer.max(v.to_layer));
         let landed: Vec<usize> = (lo..=hi).filter_map(|l| b.nodes.get(&(l, x, y)).copied()).collect();
         for w in landed.windows(2) {
-            b.edges.push(Edge { a: w[0], b: w[1], kind: EdgeKind::Via });
+            // One barrel may be described by several spans at the same XY.
+            // Deduplicate electrical connections, not the whole position, so
+            // a 0-to-1 record cannot hide a separate 2-to-3 connection.
+            if seen.insert((v.net.clone(), w[0], w[1])) {
+                b.edges.push(Edge { a: w[0], b: w[1], kind: EdgeKind::Via });
+            }
         }
     }
 
