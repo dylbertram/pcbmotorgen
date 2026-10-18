@@ -20,7 +20,9 @@
   import CoilPreviewVisibilityPanel from "./CoilPreviewVisibilityPanel.svelte";
   import CoilPreviewDisplayPanel from "./CoilPreviewDisplayPanel.svelte";
   import type { CoilPreviewViewState } from "./coilPreviewViewState.svelte";
-  import type { CadGeometry } from "../../types";
+  import type { CadGeometry, DriveAnalysis } from "../../types";
+  import DriverSelector from "../simulate/DriverSelector.svelte";
+  import { formatSi } from "../../format";
   import type { CadSelectionTool } from "../../utils/cadSelectionTool.svelte";
   import type { ConfigStore } from "../../stores/config.svelte";
   import NumberField from "../ui/NumberField.svelte";
@@ -29,9 +31,13 @@
     phases = [], showMotorControls = false, hasPolePitchData = false,
     hasBandWidthData = false, hasPoleRegionData = false, poleRegionPhases = [],
     geometry, selection, assignmentDisabled = false, terminalTool, onStartTerminals,
-    terminalsDisabled = false, dismissOnOutsideClick = true, showViewMode = false, config }: {
+    terminalsDisabled = false, dismissOnOutsideClick = true, showViewMode = false, config,
+    drive = null, driveError = null, drivePending = false }: {
     /** Shared motor settings, supplied by the expanded coil preview. */
     config?: ConfigStore;
+    drive?: DriveAnalysis | null;
+    driveError?: string | null;
+    drivePending?: boolean;
     view: CoilPreviewViewState;
     layers: { idx: number }[];
     coils?: { name: string; colorIdx: number }[];
@@ -65,6 +71,7 @@
 
   type PanelId = "layers" | "display" | "terminals" | "driver";
   let open = $state<PanelId | null>(null);
+  const rippleCheck = $derived(drive?.checks.find((check) => check.id === "ripple"));
   let railEl: HTMLDivElement | null = $state(null);
   const triggers: Record<PanelId, HTMLButtonElement | null> = { layers: null, display: null, terminals: null, driver: null };
   const panelClass = "absolute bottom-0 right-full top-0 z-30 flex w-60 max-w-[calc(100vw-4rem)] flex-col overflow-hidden border-l border-slate-700 bg-slate-900 text-slate-200 shadow-xl shadow-black/40";
@@ -128,7 +135,7 @@
     {#if config}
       <button type="button" bind:this={triggers.driver} aria-label="Driver settings" aria-expanded={open === "driver"} onclick={() => toggle("driver")}
         class="flex h-8 w-8 items-center justify-center rounded-md border border-transparent text-slate-300 hover:bg-slate-800 aria-expanded:border-emerald-500 aria-expanded:text-emerald-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
-        title="Set external series inductance at the driver ends.">
+        title="Choose a driver and set external series inductance.">
         <CircuitBoard size={16} aria-hidden="true" />
       </button>
     {/if}
@@ -161,8 +168,32 @@
               ariaLabel="Series inductor per phase (µH)" class="w-20 shrink-0 px-2 py-1 text-xs font-mono text-emerald-200"
               onCommit={(v) => { if (config) config.drive = { ...config.drive, series_inductance_h: v * 1e-6 }; }} />
           </label>
+          <p class="text-[11px] text-slate-400">Adding inductance can reduce PWM current ripple, but needs more voltage at speed.</p>
           <p class="text-[11px] text-slate-400">An external series inductor at each driver end. The same value applies to every phase. Use 0 for none. Included in driver simulation, not PCB geometry.</p>
         </fieldset>
+        <div class="mt-4 border-t border-slate-700 pt-3"><DriverSelector {config} /></div>
+        <section aria-label="Preview driver simulation results" aria-busy={drivePending} class="mt-4 space-y-2 border-t border-slate-700 pt-3">
+          <h4 class="text-xs font-semibold text-slate-200">Simulation results</h4>
+          {#if drivePending}
+            <p role="status" class="text-[11px] text-slate-400">Updating driver simulation…</p>
+          {:else if driveError}
+            <p role="alert" class="text-[11px] text-rose-300">{driveError}</p>
+          {:else if drive}
+            <p class="text-[11px] text-slate-400">{drive.driver_name} · {formatSi(drive.pwm_hz, "Hz")} PWM</p>
+            <dl class="space-y-2 text-[11px]">
+              <div><dt class="text-slate-400">Current ripple, peak-to-peak</dt><dd class="font-mono text-slate-100">{formatSi(drive.ripple_pp_a, "A")}</dd></div>
+              <div><dt class="text-slate-400">Effective phase inductance</dt><dd class="font-mono text-slate-100">{formatSi(drive.effective_inductance_h, "H")}</dd></div>
+              <div><dt class="text-slate-400">Additional inductance for ripple limit</dt><dd class="font-mono text-slate-100">{formatSi(drive.added_inductance_h, "H")} per phase</dd></div>
+              <div><dt class="text-slate-400">PWM for ripple limit</dt><dd class="font-mono text-slate-100">≥ {formatSi(drive.min_pwm_hz, "Hz")}</dd></div>
+            </dl>
+            {#if rippleCheck}
+              <p class="text-[11px] {rippleCheck.status === 'pass' ? 'text-emerald-300' : rippleCheck.status === 'unknown' ? 'text-slate-400' : 'text-amber-300'}">Ripple check: {rippleCheck.status}. {rippleCheck.detail}</p>
+            {/if}
+            <p class="text-[11px] text-slate-500">Updates when the driver or inductance changes. Full checks are in Simulate.</p>
+          {:else}
+            <p role="status" class="text-[11px] text-slate-400">Driver results unavailable. Check the design and coil connections in Simulate.</p>
+          {/if}
+        </section>
       </div>
     </div>
   {/if}

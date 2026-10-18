@@ -38,7 +38,7 @@
   import { editableCoilGeometry } from "../../ipc/dxf";
   import type { ConfigStore } from "../../stores/config.svelte";
   import type { MotionStore } from "../../stores/motion.svelte";
-  import type { CadGeometry, CoilPathDto } from "../../types";
+  import type { CadGeometry, CoilPathDto, DriveAnalysis } from "../../types";
   import { CadSimplifyTool } from "../../utils/cadSimplifyTool.svelte";
   import { CoilTerminalTool } from "../../utils/coilTerminalTool.svelte";
   import { withAutomaticCadTerminals } from "../../cadTerminals";
@@ -82,11 +82,15 @@
     config,
     coils,
     motion,
+    expanded = $bindable(false),
+    drive = null,
+    driveError = null,
+    drivePending = false,
     importedGeometry = null,
     onGeometryChange,
     camera,
     view = new CoilPreviewViewState(),
-  }: { config: ConfigStore; coils: CoilPathDto | null; motion: MotionStore; importedGeometry?: CadGeometry | null; onGeometryChange?: (geometry: CadGeometry) => void; camera?: PreviewCamera; view?: CoilPreviewViewState } =
+  }: { config: ConfigStore; coils: CoilPathDto | null; motion: MotionStore; expanded?: boolean; drive?: DriveAnalysis | null; driveError?: string | null; drivePending?: boolean; importedGeometry?: CadGeometry | null; onGeometryChange?: (geometry: CadGeometry) => void; camera?: PreviewCamera; view?: CoilPreviewViewState } =
     $props();
 
   const simplifyTool = new CadSimplifyTool({ getGeometry: () => importedGeometry, onChange: (geometry) => onGeometryChange?.(geometry) });
@@ -115,7 +119,6 @@
   // these virtual px so it matches the SVG markup exactly. The paint routines
   // live in ./coilPreviewCanvas.ts, which shares these constants.
   const W = PREVIEW_W;
-  let expanded = $state(false);
   let modalWidth = $state(PREVIEW_W);
   let modalHeight = $state(PREVIEW_H);
   const H = $derived(expanded && modalWidth > 0 ? W * modalHeight / modalWidth : PREVIEW_H);
@@ -577,6 +580,9 @@
       bind:expanded
       height={H}
       {config}
+      {drive}
+      {driveError}
+      {drivePending}
       {motion}
       {view}
       {gestures}
