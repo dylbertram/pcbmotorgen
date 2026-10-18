@@ -15,13 +15,13 @@
 //!   included, becomes one reflection coefficient `R` at the PCB bottom, and
 //!   the magnet field model mirrors the array across that plane with
 //!   strength `R`.
-//! - The magnetic layers, and any FR4 between them, are collapsed into one
-//!   slab with the series permeability `μ_eff = ΣT / Σ(T/μ)`. A slab of
-//!   thickness `T` with air below reflects
-//!   `R = r(1 − e^(−2kT)) / (1 − r²e^(−2kT))`, `r = (μ−1)/(μ+1)`. FR4 above
-//!   the slab, FR4 below it and the housing gap are air. The housing is folded
-//!   in with the standard layered-media recursion, so a non-magnetic housing
-//!   changes nothing.
+//! - `R` comes from the layered-media recursion over every layer, the
+//!   housing gap and the housing, bottom up:
+//!   `R_top = (r + R_b·e^(−2kT)) / (1 + r·R_b·e^(−2kT))`, with `r` the
+//!   interface coefficient seen from above and `R_b` the reflection below the
+//!   layer of thickness `T`. One slab in air gives
+//!   `R = r(1 − e^(−2kT)) / (1 − r²e^(−2kT))`, `r = (μ−1)/(μ+1)`. FR4 and a
+//!   non-magnetic housing have μ = 1, so they only add distance.
 //! - The coil is `N` copper sheets (`N = num_layers ≥ 2`) spread evenly
 //!   through the PCB of thickness `T`, at `d_i = i·T/(N−1)` above the PCB
 //!   bottom: `d = 0` is the bottom face, `d = T` the top face. Each sheet
@@ -30,23 +30,29 @@
 //! - Every sheet carries the same current, as in a series-connected coil.
 //!   Sheets are evenly spaced; real 4- and 6-layer stackups have uneven core
 //!   and prepreg thicknesses, so inner-layer depths are approximate.
-//! - Attraction is the mean Maxwell stress `R·B0²/μ0` over the array footprint
-//!   `N·τ·D`. `B0` is the 2-D fundamental of the bare array at the stack top.
+//! - Attraction is the mean Maxwell stress on the stack top. For an infinitely
+//!   deep array it is `R·B0²/μ0` over the footprint `N·τ·D`, where `B0` is the
+//!   2-D fundamental of the bare array at the stack top. Magnets of finite depth
+//!   `D` are summed over their cross-travel spectrum, see [`attraction_n`].
+//!   Array ends in the travel direction are ignored.
 //! - Eddy-current loss and eddy drag in conductive housings are not modelled.
 //!   Silicon steel above 20 kHz is flagged as a warning instead.
-//! - Saturation is a 1-D flux-conservation estimate: the normal flux
-//!   `(1+R)·B0` entering the stack top turns and runs through each magnetic
-//!   layer and the housing on its own, so it is conservative.
+//! - Saturation: the normal field `(1+R)·B0` at the stack top turns into a
+//!   high-μ plate of thickness `T` and peaks at its top face at
+//!   `(1+R)·B0·coth(kT)`. Every magnetic layer and the housing is assumed to
+//!   carry all of the flux on its own, so deeper layers are overestimated.
 //!
 //! Material values are typical handbook numbers, not supplier data. Check
 //! them against the datasheet of the part you buy.
+
+use std::f64::consts::PI;
 
 use serde::{Deserialize, Serialize};
 
 use crate::params::SimulationInput;
 
 /// Vacuum permeability [H/m].
-const MU_0: f64 = 4.0e-7 * std::f64::consts::PI;
+const MU_0: f64 = 4.0e-7 * PI;
 /// Switching frequency above which silicon steel is flagged [Hz].
 pub const SILICON_STEEL_PWM_LIMIT_HZ: f64 = 20e3;
 /// Largest accepted thickness for one layer or the housing [m].
@@ -69,15 +75,6 @@ pub enum LayerMaterial {
 }
 
 impl LayerMaterial {
-    /// Every material, in UI order.
-    pub const ALL: [LayerMaterial; 5] = [
-        LayerMaterial::Fr4,
-        LayerMaterial::SiliconSteel,
-        LayerMaterial::MnZnFerrite,
-        LayerMaterial::NiZnFerrite,
-        LayerMaterial::FlexFerrite,
-    ];
-
     /// Relative permeability (typical starting value).
     pub fn mu_r(self) -> f64 {
         match self {
@@ -111,11 +108,6 @@ impl LayerMaterial {
         }
     }
 
-    /// True when the material carries flux (μr > 1).
-    pub fn is_magnetic(self) -> bool {
-        self.mu_r() > 1.0
-    }
-
     /// Display name.
     pub fn label(self) -> &'static str {
         match self {
@@ -147,16 +139,6 @@ pub enum HousingMaterial {
 }
 
 impl HousingMaterial {
-    /// Every housing material, in UI order.
-    pub const ALL: [HousingMaterial; 6] = [
-        HousingMaterial::Aluminum6061,
-        HousingMaterial::Aluminum5052,
-        HousingMaterial::Steel1018,
-        HousingMaterial::Stainless304,
-        HousingMaterial::Stainless316,
-        HousingMaterial::Stainless430,
-    ];
-
     /// Relative permeability (typical starting value).
     pub fn mu_r(self) -> f64 {
         match self {
@@ -221,23 +203,11 @@ pub struct BackplaneStack {
 pub struct BackplaneAnalysis {
     /// Total thickness of the backplane layers [m].
     pub stack_thickness_m: f64,
-    /// Non-magnetic thickness between the PCB and the first magnetic layer [m].
-    pub spacer_m: f64,
-    /// Thickness from the first to the last magnetic layer, including any FR4
-    /// between them [m].
-    pub magnetic_thickness_m: f64,
-    /// Series-combined permeability over `magnetic_thickness_m`.
-    pub mu_eff: f64,
     /// Composite reflection `R` of the stack and housing at the PCB bottom,
     /// at the fundamental. Zero when nothing below the PCB is magnetic.
     pub image_strength: f64,
-    /// Always zero: the housing is folded into `image_strength`.
-    pub housing_image_strength: f64,
-    /// z of the image plane [m]: the PCB bottom, `−pcb_thickness_m`.
-    pub image_plane_z_m: f64,
-    /// z of the housing top face [m], when a housing is present.
-    pub housing_plane_z_m: Option<f64>,
-    /// Fundamental normal field of the bare magnet array at the stack top [T].
+    /// Fundamental normal field of the bare magnet array at the stack top,
+    /// 2-D (infinitely deep magnets) [T].
     pub b0_t: f64,
     /// Copper sheet count `N` used for `inductance_factor` (`num_layers`,
     /// at least 2).
@@ -291,50 +261,33 @@ impl BackplaneStack {
         Ok(())
     }
 
+    /// Media below the PCB bottom, top down, as `(μr, thickness)`.
+    fn media(&self) -> Vec<(f64, f64)> {
+        let mut media: Vec<(f64, f64)> = self
+            .layers
+            .iter()
+            .map(|l| (l.material.mu_r(), l.thickness_m))
+            .collect();
+        if let Some(h) = &self.housing {
+            media.extend([(1.0, h.gap_m), (h.material.mu_r(), h.thickness_m)]);
+        }
+        media
+    }
+
+    /// Composite reflection `R` at the PCB bottom for the fundamental of `sim`.
+    pub fn image_strength(&self, sim: &SimulationInput) -> f64 {
+        reflection(PI / sim.pole_pitch_m(), &self.media())
+    }
+
     /// Derive the composite reflection, inductance factor, attraction and
     /// saturation estimates for `sim`.
     pub fn analyze(&self, sim: &SimulationInput) -> BackplaneAnalysis {
         let tau = sim.pole_pitch_m();
-        let k = std::f64::consts::PI / tau;
+        let k = PI / tau;
         let t_pcb = sim.pcb_thickness_m;
-        let stack_t = self.stack_thickness_m();
-        let mut warnings = Vec::new();
-
-        // Magnetic span: first to last magnetic layer. Non-magnetic layers
-        // above and below it act as air.
-        let first_mag = self.layers.iter().position(|l| l.material.is_magnetic());
-        let last_mag = self.layers.iter().rposition(|l| l.material.is_magnetic());
-        let (spacer, t_m, mu_eff) = match (first_mag, last_mag) {
-            (Some(i), Some(j)) => {
-                let span = &self.layers[i..=j];
-                let t: f64 = span.iter().map(|l| l.thickness_m).sum();
-                // Series rule for normal flux.
-                let reluctance: f64 = span.iter().map(|l| l.thickness_m / l.material.mu_r()).sum();
-                let spacer = self.layers[..i].iter().map(|l| l.thickness_m).sum();
-                (spacer, t, t / reluctance)
-            }
-            _ => (0.0, 0.0, 1.0),
-        };
-
-        // Media below the PCB bottom, top down, as (μr, thickness).
-        let mut media = vec![(1.0, spacer), (mu_eff, t_m)];
-        if let Some(h) = &self.housing {
-            let below = stack_t - spacer - t_m + h.gap_m;
-            media.extend([(1.0, below), (h.material.mu_r(), h.thickness_m)]);
-        }
+        let media = self.media();
         let image_strength = reflection(k, &media);
-
-        // Fundamental of the bare array at the stack top, 2-D.
-        let [w, depth, h_mag] = sim.magnet_dims_m;
-        let b0 = 2.0 / std::f64::consts::PI
-            * sim.magnet_remanence_t
-            * (std::f64::consts::PI * w / (2.0 * tau)).sin()
-            * (1.0 - (-k * h_mag).exp())
-            * (-k * (sim.air_gap_m + t_pcb)).exp();
-
-        // Mean Maxwell stress R·B0²/μ0 over the array footprint N·τ·D.
-        let footprint = sim.magnet_count as f64 * tau * depth;
-        let attraction_n = image_strength * b0 * b0 / MU_0 * footprint;
+        let b0 = mode_bz(sim, k);
 
         // Equal-current copper sheets spread over the PCB, each with its own
         // image. Validation rejects num_layers < 2; clamp so analyze never
@@ -343,71 +296,50 @@ impl BackplaneStack {
         let copper_depths_m = copper_depths(t_pcb, copper_layers);
         let inductance_factor = inductance_factor(image_strength, k, &copper_depths_m);
 
-        // Flux-conservation saturation estimate. The normal flux (1+R)·B0
-        // entering the stack top, a half-pitch of it per unit width
-        // (Φ/width = B·τ/π), turns and runs through each magnetic part alone.
-        let flux_per_width = if image_strength > 0.0 {
-            (1.0 + image_strength) * b0 * tau / std::f64::consts::PI
-        } else {
-            0.0
+        // Peak flux density at the top face of a high-μ plate of thickness t
+        // that carries all the flux entering the stack top on its own.
+        let b_surface = (1.0 + image_strength) * b0;
+        let mut warnings = Vec::new();
+        let mut peak = |what: String, bsat: Option<f64>, t: f64, advice: &str| -> f64 {
+            let Some(bsat) = bsat else { return 0.0 };
+            let b = b_surface / (k * t).tanh();
+            if b > bsat {
+                warnings.push(format!(
+                    "{what}: estimated peak {b:.2} T exceeds Bsat {bsat:.2} T. {advice}"
+                ));
+            }
+            b
         };
         let layer_peak_b_t: Vec<f64> = self
             .layers
             .iter()
             .enumerate()
-            .map(|(i, layer)| {
-                if !layer.material.is_magnetic() {
-                    return 0.0;
-                }
-                let b = flux_per_width / layer.thickness_m;
-                if let Some(bsat) = layer.material.bsat_t() {
-                    if b > bsat {
-                        warnings.push(format!(
-                            "Backplane layer {} ({}): estimated peak {:.2} T exceeds Bsat {:.2} T. The linear model is not valid here; add thickness or change material.",
-                            i + 1,
-                            layer.material.label(),
-                            b,
-                            bsat
-                        ));
-                    }
-                }
-                b
+            .map(|(i, l)| {
+                peak(
+                    format!("Backplane layer {} ({})", i + 1, l.material.label()),
+                    l.material.bsat_t(),
+                    l.thickness_m,
+                    "The linear model is not valid here; add thickness or change material.",
+                )
             })
             .collect();
-
-        let housing_peak_b_t = match &self.housing {
-            Some(h) => match h.material.bsat_t() {
-                Some(bsat) => {
-                    let b = flux_per_width / h.thickness_m;
-                    if b > bsat {
-                        warnings.push(format!(
-                            "Housing ({}): estimated peak {:.2} T exceeds Bsat {:.2} T. Increase wall thickness or use a non-magnetic grade.",
-                            h.material.label(),
-                            b,
-                            bsat
-                        ));
-                    }
-                    b
-                }
-                None => 0.0,
-            },
-            None => 0.0,
-        };
+        let housing_peak_b_t = self.housing.as_ref().map_or(0.0, |h| {
+            peak(
+                format!("Housing ({})", h.material.label()),
+                h.material.bsat_t(),
+                h.thickness_m,
+                "Increase wall thickness or use a non-magnetic grade.",
+            )
+        });
 
         BackplaneAnalysis {
-            stack_thickness_m: stack_t,
-            spacer_m: spacer,
-            magnetic_thickness_m: t_m,
-            mu_eff,
+            stack_thickness_m: self.stack_thickness_m(),
             image_strength,
-            housing_image_strength: 0.0,
-            image_plane_z_m: -t_pcb,
-            housing_plane_z_m: self.housing.as_ref().map(|h| -(t_pcb + stack_t + h.gap_m)),
             b0_t: b0,
             copper_layers,
             copper_depths_m,
             inductance_factor,
-            attraction_n,
+            attraction_n: attraction_n(sim, &media),
             layer_peak_b_t,
             housing_peak_b_t,
             warnings,
@@ -437,6 +369,63 @@ fn reflection(k: f64, media: &[(f64, f64)]) -> f64 {
     }
     let rho = (mu_below - 1.0) / (mu_below + 1.0);
     (rho + g) / (1.0 + rho * g)
+}
+
+/// Normal-field amplitude at the stack top of one spatial mode `kappa` of
+/// the bare alternating array: `(2/π)·Br·sin(πw/2τ)·(1 − e^(−κh))·e^(−κd)`,
+/// `d = air_gap + t_pcb`. At `κ = k = π/τ` this is the 2-D fundamental `B0`.
+fn mode_bz(sim: &SimulationInput, kappa: f64) -> f64 {
+    let [w, _, h] = sim.magnet_dims_m;
+    let d = sim.air_gap_m + sim.pcb_thickness_m;
+    2.0 / PI
+        * sim.magnet_remanence_t
+        * (PI * w / (2.0 * sim.pole_pitch_m())).sin()
+        * (1.0 - (-kappa * h).exp())
+        * (-kappa * d).exp()
+}
+
+/// Normal attraction between the magnets and the stack [N].
+///
+/// Each spatial mode `(k, k_y)` of the array field presses on the stack with
+/// the mean Maxwell stress `R(κ)·B(κ)²/μ0`, `κ = √(k² + k_y²)`. A row of `N`
+/// magnets of depth `D` spans `N·τ` along travel and has the cross-travel
+/// spectrum `2·sin(k_y·D/2)/k_y`, so
+/// `F = N·τ/(π·μ0) · ∫₀^∞ R(κ)·B(κ)²·(2·sin(k_y·D/2)/k_y)² dk_y`.
+/// For `D → ∞` this is `R·B0²/μ0·N·τ·D`.
+fn attraction_n(sim: &SimulationInput, media: &[(f64, f64)]) -> f64 {
+    let tau = sim.pole_pitch_m();
+    let k = PI / tau;
+    let depth = sim.magnet_dims_m[1];
+    let d = sim.air_gap_m + sim.pcb_thickness_m;
+    // The field falls off as e^(−k_y·d): stop at e^(−15). Resolve both that
+    // decay and the depth spectrum, whose lobes are 2π/D wide.
+    let ky_max = 15.0 / d;
+    let n = ((ky_max * depth / (2.0 * PI) * 16.0).ceil() as usize).max(200) / 2 * 2;
+    let step = ky_max / n as f64;
+    let integrand = |ky: f64| {
+        let kappa = k.hypot(ky);
+        let b = mode_bz(sim, kappa);
+        let spectrum = if ky == 0.0 {
+            depth
+        } else {
+            2.0 * (ky * depth / 2.0).sin() / ky
+        };
+        reflection(kappa, media) * b * b * spectrum * spectrum
+    };
+    // Composite Simpson.
+    let sum: f64 = (0..=n)
+        .map(|i| {
+            let weight = if i == 0 || i == n {
+                1.0
+            } else if i % 2 == 1 {
+                4.0
+            } else {
+                2.0
+            };
+            weight * integrand(i as f64 * step)
+        })
+        .sum();
+    sim.magnet_count as f64 * tau / (PI * MU_0) * sum * step / 3.0
 }
 
 /// Heights of `n ≥ 2` evenly spaced copper sheets above the PCB bottom [m]:
@@ -471,299 +460,45 @@ mod tests {
         SimulationInput::default()
     }
 
-    fn stack(material: LayerMaterial, thickness_m: f64) -> BackplaneStack {
-        BackplaneStack {
-            layers: vec![BackplaneLayer {
-                material,
-                thickness_m,
-            }],
-            housing: None,
+    fn layer(material: LayerMaterial, t_mm: f64) -> BackplaneLayer {
+        BackplaneLayer {
+            material,
+            thickness_m: mm(t_mm),
         }
     }
 
-    #[test]
-    fn fr4_only_adds_height_and_no_flux() {
-        let s = sim();
-        let a = stack(LayerMaterial::Fr4, mm(1.6)).analyze(&s);
-        assert_eq!(a.image_strength, 0.0);
-        assert_eq!(a.inductance_factor, 1.0);
-        assert_eq!(a.attraction_n, 0.0);
-        assert!((a.stack_thickness_m - mm(1.6)).abs() < 1e-12);
-        assert!(a.warnings.is_empty());
+    fn housing(material: HousingMaterial, t_mm: f64, gap_mm: f64) -> Option<HousingSpec> {
+        Some(HousingSpec {
+            material,
+            thickness_m: mm(t_mm),
+            gap_m: mm(gap_mm),
+        })
     }
 
-    #[test]
-    fn higher_permeability_gives_more_image_strength() {
-        let s = sim();
-        let nizn = stack(LayerMaterial::NiZnFerrite, mm(3.0)).analyze(&s);
-        let mnzn = stack(LayerMaterial::MnZnFerrite, mm(3.0)).analyze(&s);
-        assert!(mnzn.image_strength > nizn.image_strength);
-        assert!(mnzn.image_strength <= 1.0);
-        assert!(mnzn.inductance_factor > nizn.inductance_factor);
-        assert!(mnzn.inductance_factor > 1.0);
+    fn stack(layers: Vec<BackplaneLayer>, housing: Option<HousingSpec>) -> BackplaneStack {
+        BackplaneStack { layers, housing }
     }
 
-    #[test]
-    fn thicker_layer_gives_more_image_strength_up_to_r() {
-        let s = sim();
-        let thin = stack(LayerMaterial::MnZnFerrite, mm(0.5)).analyze(&s);
-        let thick = stack(LayerMaterial::MnZnFerrite, mm(5.0)).analyze(&s);
-        assert!(thick.image_strength > thin.image_strength);
-        assert!(thick.image_strength < 1.0);
+    fn mnzn(t_mm: f64) -> BackplaneStack {
+        stack(vec![layer(LayerMaterial::MnZnFerrite, t_mm)], None)
     }
 
-    #[test]
-    fn thick_slab_reflects_r() {
-        let mu = LayerMaterial::FlexFerrite.mu_r();
-        let r = (mu - 1.0) / (mu + 1.0);
-        let k = std::f64::consts::PI / mm(6.0);
-        assert!((reflection(k, &[(mu, 1.0)]) - r).abs() < 1e-12);
-    }
-
-    #[test]
-    fn slab_closed_form_matches_recursion() {
-        let k = std::f64::consts::PI / mm(6.0);
-        for (mu, t) in [
-            (60.0, mm(0.3)),
-            (2500.0, mm(2.0)),
-            (4000.0, mm(0.35)),
-            (1.5, mm(5.0)),
-        ] {
-            let r: f64 = (mu - 1.0) / (mu + 1.0);
-            let e = (-2.0 * k * t).exp();
-            let closed = r * (1.0 - e) / (1.0 - r * r * e);
-            // One step of R_top = (r + R_b·e)/(1 + r·R_b·e) with air below, R_b = −r.
-            let step = (r - r * e) / (1.0 - r * r * e);
-            assert!((reflection(k, &[(mu, t)]) - closed).abs() < 1e-12);
-            assert!((step - closed).abs() < 1e-12);
+    /// The closed-infinity benchmark used in scripts/femm/RESULTS.md.
+    fn benchmark() -> SimulationInput {
+        SimulationInput {
+            magnet_dims_m: [mm(5.0), mm(5.0), mm(3.0)],
+            magnet_count: 5,
+            magnet_pitch_m: mm(6.0),
+            magnet_remanence_t: 1.34,
+            air_gap_m: mm(0.5),
+            pcb_thickness_m: mm(1.6),
+            num_layers: 2,
+            ..sim()
         }
     }
 
-    #[test]
-    fn unit_permeability_changes_nothing() {
-        let k = std::f64::consts::PI / mm(6.0);
-        assert_eq!(reflection(k, &[(1.0, mm(1.0)), (1.0, mm(3.0))]), 0.0);
-        let a = BackplaneStack {
-            layers: vec![],
-            housing: Some(HousingSpec {
-                material: HousingMaterial::Aluminum6061,
-                thickness_m: mm(3.0),
-                gap_m: mm(1.0),
-            }),
-        }
-        .analyze(&sim());
-        assert_eq!(a.inductance_factor, 1.0);
-        assert_eq!(a.attraction_n, 0.0);
-    }
-
-    #[test]
-    fn attraction_scales_with_count_and_depth() {
-        let st = stack(LayerMaterial::MnZnFerrite, mm(2.0));
-        let base = sim();
-        let a = st.analyze(&base).attraction_n;
-        let mut more = sim();
-        more.magnet_count *= 2;
-        let mut deeper = sim();
-        deeper.magnet_dims_m[1] *= 3.0;
-        assert!(a > 0.0);
-        assert!((st.analyze(&more).attraction_n / a - 2.0).abs() < 1e-9);
-        assert!((st.analyze(&deeper).attraction_n / a - 3.0).abs() < 1e-9);
-    }
-
-    #[test]
-    fn spacer_above_magnetic_layer_weakens_reflection() {
-        let s = sim();
-        let bare = stack(LayerMaterial::MnZnFerrite, mm(2.0)).analyze(&s);
-        let spaced = BackplaneStack {
-            layers: vec![
-                BackplaneLayer {
-                    material: LayerMaterial::Fr4,
-                    thickness_m: mm(1.0),
-                },
-                BackplaneLayer {
-                    material: LayerMaterial::MnZnFerrite,
-                    thickness_m: mm(2.0),
-                },
-            ],
-            housing: None,
-        }
-        .analyze(&s);
-        assert!((spaced.spacer_m - mm(1.0)).abs() < 1e-12);
-        assert_eq!(spaced.image_plane_z_m, -s.pcb_thickness_m);
-        let k = std::f64::consts::PI / s.pole_pitch_m();
-        let decay = (-2.0 * k * mm(1.0)).exp();
-        assert!((spaced.image_strength - bare.image_strength * decay).abs() < 1e-12);
-        assert!(spaced.inductance_factor < bare.inductance_factor);
-    }
-
-    fn layered(num_layers: u32) -> (SimulationInput, BackplaneAnalysis) {
-        let mut s = sim();
-        s.num_layers = num_layers;
-        let a = stack(LayerMaterial::MnZnFerrite, mm(2.0)).analyze(&s);
-        (s, a)
-    }
-
-    #[test]
-    fn two_layers_match_closed_form() {
-        let (s, a) = layered(2);
-        let k = std::f64::consts::PI / s.pole_pitch_m();
-        let t = s.pcb_thickness_m;
-        let expected = 1.0 + a.image_strength * (1.0 + (-2.0 * k * t).exp()) / 2.0;
-        assert_eq!(a.copper_layers, 2);
-        assert_eq!(a.copper_depths_m, vec![0.0, t]);
-        assert!((a.inductance_factor - expected).abs() < 1e-12);
-    }
-
-    #[test]
-    fn four_layers_match_closed_form() {
-        let (s, a) = layered(4);
-        let k = std::f64::consts::PI / s.pole_pitch_m();
-        let t = s.pcb_thickness_m;
-        let sum: f64 = [0.0, t / 3.0, 2.0 * t / 3.0, t]
-            .iter()
-            .map(|d| (-2.0 * k * d).exp())
-            .sum();
-        let expected = 1.0 + a.image_strength * sum / 4.0;
-        assert!((a.inductance_factor - expected).abs() < 1e-12);
-    }
-
-    #[test]
-    fn many_layers_tend_to_continuous_average() {
-        let (s, a) = layered(201);
-        let x = 2.0 * std::f64::consts::PI / s.pole_pitch_m() * s.pcb_thickness_m;
-        let limit = (1.0 - (-x).exp()) / x;
-        let mean = (a.inductance_factor - 1.0) / a.image_strength;
-        assert!((mean / limit - 1.0).abs() < 0.01, "{mean} vs {limit}");
-    }
-
-    #[test]
-    fn fewer_than_two_layers_clamp_to_two() {
-        assert_eq!(layered(0).1, layered(2).1);
-        assert_eq!(layered(1).1, layered(2).1);
-    }
-
-    #[test]
-    fn spacer_lowers_image_and_inductance() {
-        let s = sim();
-        let bare = stack(LayerMaterial::MnZnFerrite, mm(2.0)).analyze(&s);
-        let gapped = BackplaneStack {
-            layers: vec![
-                BackplaneLayer {
-                    material: LayerMaterial::Fr4,
-                    thickness_m: mm(0.1),
-                },
-                BackplaneLayer {
-                    material: LayerMaterial::MnZnFerrite,
-                    thickness_m: mm(2.0),
-                },
-            ],
-            housing: None,
-        }
-        .analyze(&s);
-        assert!(gapped.image_strength < bare.image_strength);
-        assert!(gapped.inductance_factor < bare.inductance_factor);
-    }
-
-    #[test]
-    fn thin_silicon_steel_saturates_and_warns() {
-        let s = sim();
-        let a = stack(LayerMaterial::SiliconSteel, mm(0.35)).analyze(&s);
-        assert!(a.layer_peak_b_t[0] > LayerMaterial::SiliconSteel.bsat_t().unwrap());
-        assert!(a.warnings.iter().any(|w| w.contains("Silicon steel")));
-    }
-
-    #[test]
-    fn non_magnetic_housing_adds_gap_but_no_image() {
-        let s = sim();
-        let stack = BackplaneStack {
-            layers: vec![BackplaneLayer {
-                material: LayerMaterial::MnZnFerrite,
-                thickness_m: mm(2.0),
-            }],
-            housing: Some(HousingSpec {
-                material: HousingMaterial::Aluminum6061,
-                thickness_m: mm(3.0),
-                gap_m: mm(1.0),
-            }),
-        };
-        let a = stack.analyze(&s);
-        assert_eq!(a.housing_peak_b_t, 0.0);
-        assert!(a.housing_plane_z_m.is_some());
-        let bare = stack_of_one(LayerMaterial::MnZnFerrite, mm(2.0)).analyze(&s);
-        assert_eq!(a.image_strength, bare.image_strength);
-        assert_eq!(a.inductance_factor, bare.inductance_factor);
-        assert_eq!(a.attraction_n, bare.attraction_n);
-    }
-
-    #[test]
-    fn magnetic_housing_adds_inductance_and_attraction() {
-        let s = sim();
-        let steel = HousingSpec {
-            material: HousingMaterial::Steel1018,
-            thickness_m: mm(3.0),
-            gap_m: mm(0.5),
-        };
-        let alone = BackplaneStack {
-            layers: vec![],
-            housing: Some(steel.clone()),
-        }
-        .analyze(&s);
-        assert!(alone.inductance_factor > 1.0);
-        assert!(alone.attraction_n > 0.0);
-        // Behind 2 mm of MnZn the housing is screened: it adds only a little.
-        let plain = stack_of_one(LayerMaterial::MnZnFerrite, mm(2.0)).analyze(&s);
-        let with_steel = BackplaneStack {
-            layers: plain_layers(),
-            housing: Some(steel),
-        }
-        .analyze(&s);
-        assert!(with_steel.inductance_factor > plain.inductance_factor);
-        assert!(with_steel.attraction_n > plain.attraction_n);
-        assert!(with_steel.inductance_factor / plain.inductance_factor < 1.01);
-    }
-
-    fn plain_layers() -> Vec<BackplaneLayer> {
-        vec![BackplaneLayer {
-            material: LayerMaterial::MnZnFerrite,
-            thickness_m: mm(2.0),
-        }]
-    }
-
-    #[test]
-    fn housing_gap_weakens_housing_image_inductance() {
-        let s = sim();
-        let make = |gap| BackplaneStack {
-            layers: vec![],
-            housing: Some(HousingSpec {
-                material: HousingMaterial::Steel1018,
-                thickness_m: mm(3.0),
-                gap_m: gap,
-            }),
-        };
-        let near = make(mm(0.2)).analyze(&s);
-        let far = make(mm(3.0)).analyze(&s);
-        assert!(near.inductance_factor > far.inductance_factor);
-    }
-
-    #[test]
-    fn validation_rejects_bad_thickness_and_gap() {
-        assert!(stack(LayerMaterial::FlexFerrite, 0.0).validate().is_err());
-        assert!(stack(LayerMaterial::FlexFerrite, -1.0e-3)
-            .validate()
-            .is_err());
-        assert!(stack(LayerMaterial::FlexFerrite, f64::NAN)
-            .validate()
-            .is_err());
-        assert!(stack(LayerMaterial::FlexFerrite, 0.3e-3).validate().is_ok());
-        let bad_gap = BackplaneStack {
-            layers: vec![],
-            housing: Some(HousingSpec {
-                material: HousingMaterial::Steel1018,
-                thickness_m: mm(2.0),
-                gap_m: -1.0,
-            }),
-        };
-        assert!(bad_gap.validate().is_err());
+    fn k() -> f64 {
+        PI / sim().pole_pitch_m()
     }
 
     #[test]
@@ -772,18 +507,257 @@ mod tests {
         let a = stack.analyze(&sim());
         assert_eq!(a.image_strength, 0.0);
         assert_eq!(a.inductance_factor, 1.0);
+        assert_eq!(a.attraction_n, 0.0);
         assert_eq!(stack.stack_thickness_m(), 0.0);
     }
 
-    fn stack_of_one(material: LayerMaterial, thickness_m: f64) -> BackplaneStack {
-        stack(material, thickness_m)
+    #[test]
+    fn non_magnetic_material_only_adds_height() {
+        let fr4 = stack(vec![layer(LayerMaterial::Fr4, 1.6)], None).analyze(&sim());
+        let al = stack(vec![], housing(HousingMaterial::Aluminum6061, 3.0, 1.0)).analyze(&sim());
+        for a in [&fr4, &al] {
+            assert_eq!(a.image_strength, 0.0);
+            assert_eq!(a.inductance_factor, 1.0);
+            assert_eq!(a.attraction_n, 0.0);
+            assert_eq!(a.housing_peak_b_t, 0.0);
+            assert!(a.warnings.is_empty());
+        }
+        assert!((fr4.stack_thickness_m - mm(1.6)).abs() < 1e-12);
+    }
+
+    #[test]
+    fn thick_slab_reflects_r() {
+        let mu = LayerMaterial::FlexFerrite.mu_r();
+        let r = (mu - 1.0) / (mu + 1.0);
+        assert!((reflection(k(), &[(mu, 1.0)]) - r).abs() < 1e-12);
+    }
+
+    #[test]
+    fn slab_closed_form_matches_recursion() {
+        for (mu, t) in [
+            (60.0, mm(0.3)),
+            (2500.0, mm(2.0)),
+            (4000.0, mm(0.35)),
+            (1.5, mm(5.0)),
+        ] {
+            let r: f64 = (mu - 1.0) / (mu + 1.0);
+            let e = (-2.0 * k() * t).exp();
+            let closed = r * (1.0 - e) / (1.0 - r * r * e);
+            assert!((reflection(k(), &[(mu, t)]) - closed).abs() < 1e-12);
+        }
+    }
+
+    #[test]
+    fn reflection_grows_with_permeability_and_thickness() {
+        let s = sim();
+        let nizn = stack(vec![layer(LayerMaterial::NiZnFerrite, 3.0)], None).analyze(&s);
+        let thin = mnzn(0.5).analyze(&s);
+        let thick = mnzn(3.0).analyze(&s);
+        assert!(thick.image_strength > nizn.image_strength);
+        assert!(thick.image_strength > thin.image_strength);
+        assert!(thick.image_strength < 1.0);
+        assert!(thick.inductance_factor > nizn.inductance_factor);
+    }
+
+    #[test]
+    fn spacer_scales_reflection_by_its_round_trip() {
+        let s = sim();
+        let bare = mnzn(2.0);
+        let spaced = stack(
+            vec![
+                layer(LayerMaterial::Fr4, 1.0),
+                layer(LayerMaterial::MnZnFerrite, 2.0),
+            ],
+            None,
+        );
+        let decay = (-2.0 * k() * mm(1.0)).exp();
+        assert!((spaced.image_strength(&s) - bare.image_strength(&s) * decay).abs() < 1e-12);
+        assert!(spaced.analyze(&s).inductance_factor < bare.analyze(&s).inductance_factor);
+    }
+
+    #[test]
+    fn split_magnetic_layers_reflect_like_one_plate() {
+        // FEMM gives 1.596× for 1 mm MnZn / 0.5 mm FR4 / 1 mm MnZn and for
+        // 2 mm MnZn alone. Collapsing the stack into one series-μ slab gave
+        // R = 0.64 here.
+        let split = stack(
+            vec![
+                layer(LayerMaterial::MnZnFerrite, 1.0),
+                layer(LayerMaterial::Fr4, 0.5),
+                layer(LayerMaterial::MnZnFerrite, 1.0),
+            ],
+            None,
+        );
+        let r = split.image_strength(&benchmark());
+        assert!(
+            r > 0.998 && r < mnzn(2.0).image_strength(&benchmark()),
+            "{r}"
+        );
+    }
+
+    fn layered(num_layers: u32) -> BackplaneAnalysis {
+        let mut s = sim();
+        s.num_layers = num_layers;
+        mnzn(2.0).analyze(&s)
+    }
+
+    #[test]
+    fn two_layers_match_closed_form() {
+        let a = layered(2);
+        let t = sim().pcb_thickness_m;
+        let expected = 1.0 + a.image_strength * (1.0 + (-2.0 * k() * t).exp()) / 2.0;
+        assert_eq!(a.copper_layers, 2);
+        assert_eq!(a.copper_depths_m, vec![0.0, t]);
+        assert!((a.inductance_factor - expected).abs() < 1e-12);
+    }
+
+    #[test]
+    fn four_layers_match_closed_form() {
+        let a = layered(4);
+        let t = sim().pcb_thickness_m;
+        let sum: f64 = [0.0, t / 3.0, 2.0 * t / 3.0, t]
+            .iter()
+            .map(|d| (-2.0 * k() * d).exp())
+            .sum();
+        assert!((a.inductance_factor - (1.0 + a.image_strength * sum / 4.0)).abs() < 1e-12);
+    }
+
+    #[test]
+    fn many_layers_tend_to_continuous_average() {
+        let a = layered(201);
+        let x = 2.0 * k() * sim().pcb_thickness_m;
+        let limit = (1.0 - (-x).exp()) / x;
+        let mean = (a.inductance_factor - 1.0) / a.image_strength;
+        assert!((mean / limit - 1.0).abs() < 0.01, "{mean} vs {limit}");
+    }
+
+    #[test]
+    fn fewer_than_two_layers_clamp_to_two() {
+        assert_eq!(layered(0), layered(2));
+        assert_eq!(layered(1), layered(2));
+    }
+
+    #[test]
+    fn deep_array_attraction_is_mean_maxwell_stress() {
+        let mut s = sim();
+        s.magnet_dims_m[1] = 1.0;
+        let a = mnzn(2.0).analyze(&s);
+        let footprint = s.magnet_count as f64 * s.pole_pitch_m() * s.magnet_dims_m[1];
+        let two_d = a.image_strength * a.b0_t * a.b0_t / MU_0 * footprint;
+        assert!(
+            (a.attraction_n / two_d - 1.0).abs() < 0.005,
+            "{} vs {two_d}",
+            a.attraction_n
+        );
+    }
+
+    #[test]
+    fn attraction_of_benchmark_magnets_matches_3d_images() {
+        // Benchmark: 5 magnets, 5 × 5 × 3 mm, τ = 6 mm, 0.5 mm gap, 1.6 mm
+        // PCB, 2 mm MnZn. Magpylib, force between the magnets and their
+        // R-scaled images in 3-D: 3.889 N. This model: 3.67 N, short by the
+        // two array ends it ignores. The 2-D R·B0²/μ0·N·τ·D: 5.63 N.
+        let s = benchmark();
+        let f = mnzn(2.0).analyze(&s).attraction_n;
+        assert!((f / 3.889 - 1.0).abs() < 0.07, "{f}");
+        let mut more = s.clone();
+        more.magnet_count *= 2;
+        assert!((mnzn(2.0).analyze(&more).attraction_n / f - 2.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn saturation_peak_follows_plate_thickness() {
+        // FEMM, peak |B| at the stack top of the benchmark: 0.556 T for 2 mm
+        // MnZn, 0.439 T for 5 mm and 2.40 T for 0.35 mm Si steel.
+        let s = benchmark();
+        let k = PI / s.pole_pitch_m();
+        for (material, t_mm, femm) in [
+            (LayerMaterial::MnZnFerrite, 2.0, 0.556),
+            (LayerMaterial::MnZnFerrite, 5.0, 0.439),
+            (LayerMaterial::SiliconSteel, 0.35, 2.40),
+        ] {
+            let a = stack(vec![layer(material, t_mm)], None).analyze(&s);
+            let expected = (1.0 + a.image_strength) * a.b0_t / (k * mm(t_mm)).tanh();
+            assert!((a.layer_peak_b_t[0] - expected).abs() < 1e-12);
+            assert!((a.layer_peak_b_t[0] / femm - 1.0).abs() < 0.02, "{t_mm} mm");
+        }
+        let thin_si = stack(vec![layer(LayerMaterial::SiliconSteel, 0.35)], None).analyze(&s);
+        assert!(thin_si.layer_peak_b_t[0] > LayerMaterial::SiliconSteel.bsat_t().unwrap());
+        assert!(thin_si.warnings.iter().any(|w| w.contains("Silicon steel")));
+        let fr4 = stack(
+            vec![
+                layer(LayerMaterial::Fr4, 1.0),
+                layer(LayerMaterial::MnZnFerrite, 2.0),
+            ],
+            None,
+        )
+        .analyze(&s);
+        assert_eq!(fr4.layer_peak_b_t[0], 0.0);
+    }
+
+    #[test]
+    fn non_magnetic_housing_changes_nothing_behind_a_plate() {
+        let s = sim();
+        let with_al = stack(
+            vec![layer(LayerMaterial::MnZnFerrite, 2.0)],
+            housing(HousingMaterial::Aluminum6061, 3.0, 1.0),
+        )
+        .analyze(&s);
+        let bare = mnzn(2.0).analyze(&s);
+        assert_eq!(with_al.image_strength, bare.image_strength);
+        assert_eq!(with_al.inductance_factor, bare.inductance_factor);
+        assert_eq!(with_al.attraction_n, bare.attraction_n);
+        assert_eq!(with_al.housing_peak_b_t, 0.0);
+    }
+
+    #[test]
+    fn magnetic_housing_adds_unless_screened() {
+        let s = sim();
+        let steel = housing(HousingMaterial::Steel1018, 3.0, 0.5);
+        let alone = stack(vec![], steel.clone()).analyze(&s);
+        assert!(alone.inductance_factor > 1.0);
+        assert!(alone.attraction_n > 0.0);
+        assert!(alone.housing_peak_b_t > 0.0);
+        // Behind 2 mm of MnZn the housing is screened: it adds only a little.
+        let plain = mnzn(2.0).analyze(&s);
+        let with_steel = stack(vec![layer(LayerMaterial::MnZnFerrite, 2.0)], steel).analyze(&s);
+        assert!(with_steel.inductance_factor > plain.inductance_factor);
+        assert!(with_steel.attraction_n > plain.attraction_n);
+        assert!(with_steel.inductance_factor / plain.inductance_factor < 1.01);
+    }
+
+    #[test]
+    fn housing_gap_weakens_housing_image() {
+        let s = sim();
+        let make = |gap| stack(vec![], housing(HousingMaterial::Steel1018, 3.0, gap));
+        assert!(make(0.2).analyze(&s).inductance_factor > make(3.0).analyze(&s).inductance_factor);
+    }
+
+    #[test]
+    fn validation_rejects_bad_thickness_and_gap() {
+        let one = |t: f64| {
+            stack(
+                vec![BackplaneLayer {
+                    material: LayerMaterial::FlexFerrite,
+                    thickness_m: t,
+                }],
+                None,
+            )
+        };
+        assert!(one(0.0).validate().is_err());
+        assert!(one(-1.0e-3).validate().is_err());
+        assert!(one(f64::NAN).validate().is_err());
+        assert!(one(MAX_THICKNESS_M * 1.01).validate().is_err());
+        assert!(one(0.3e-3).validate().is_ok());
+        let bad_gap = stack(vec![], housing(HousingMaterial::Steel1018, 2.0, -1.0));
+        assert!(bad_gap.validate().is_err());
     }
 
     #[test]
     fn image_magnets_strengthen_field_at_pcb_surface() {
         let base = sim();
         let mut with = sim();
-        with.backplane = Some(stack(LayerMaterial::MnZnFerrite, mm(2.0)));
+        with.backplane = Some(mnzn(2.0));
         let b0 = crate::MagnetArray::new(&base).bfield_at_pcb_surface(&[0.0], 0.0, 0.0)[0][2];
         let b1 = crate::MagnetArray::new(&with).bfield_at_pcb_surface(&[0.0], 0.0, 0.0)[0][2];
         assert!(
@@ -795,17 +769,10 @@ mod tests {
     #[test]
     fn housing_folds_into_one_image_set() {
         let mut with = sim();
-        with.backplane = Some(BackplaneStack {
-            layers: vec![BackplaneLayer {
-                material: LayerMaterial::MnZnFerrite,
-                thickness_m: mm(2.0),
-            }],
-            housing: Some(HousingSpec {
-                material: HousingMaterial::Steel1018,
-                thickness_m: mm(3.0),
-                gap_m: mm(0.5),
-            }),
-        });
+        with.backplane = Some(stack(
+            vec![layer(LayerMaterial::MnZnFerrite, 2.0)],
+            housing(HousingMaterial::Steel1018, 3.0, 0.5),
+        ));
         let n = with.magnet_count as usize;
         let assembly = crate::MagnetArray::new(&with).build_assembly(0.0);
         assert_eq!(assembly.iter().count(), 2 * n);
