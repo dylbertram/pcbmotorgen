@@ -568,6 +568,44 @@ mod analyze_drive_tests {
         }
     }
 
+    /// The user's "version 2" of the closed-infinity design: 0.8 mm PCB, one
+    /// 0.2 mm flexible ferrite sheet and a 1 mm aluminium 6061 housing 0.1 mm
+    /// below it (tickets 04n2, q9nw).
+    fn closed_infinity_version_two() -> crate::ipc::ProjectConfigStateIpc {
+        use pcbmotorgen_simulation::backplane::*;
+        let mut state: crate::ipc::ProjectConfigStateIpc = serde_json::from_str(include_str!("fixtures/closed_infinity_pattern.config.json")).unwrap();
+        state.pcb_thickness_mm = 0.8;
+        state.trace_width_mm = Some(0.2);
+        state.backplane = Some(BackplaneStack {
+            layers: vec![BackplaneLayer::new(LayerMaterial::FlexFerrite, 0.2e-3)],
+            housing: Some(HousingSpec { material: HousingMaterial::Aluminum6061, thickness_m: 1.0e-3, gap_m: 0.1e-3 }),
+        });
+        state
+    }
+
+    #[test]
+    #[ignore = "Version 2 backplane diagnostics (saturation, eddy currents)"]
+    fn closed_infinity_version_two_diagnostics() {
+        let state = closed_infinity_version_two();
+        let ipc = state.to_linear_motor_ipc();
+        let sweep = tauri::async_runtime::block_on(evaluate_force_sweep(ipc.clone(), None, Some(state.drive.clone()))).unwrap();
+        let kf = sweep.mean_thrust_n / sweep.current_a;
+        let a = tauri::async_runtime::block_on(analyze_drive(ipc.clone(), state.drive.clone(), Some(kf), None)).unwrap();
+        let h = tauri::async_runtime::block_on(compute_height_stack(ipc)).unwrap();
+        eprintln!("V2 mean={} min={} max={}", sweep.mean_thrust_n, sweep.min_thrust_n, sweep.peak_thrust_n);
+        eprintln!("V2 driver={}", serde_json::to_string(&a).unwrap());
+        eprintln!("V2 backplane={}", serde_json::to_string(&h.backplane_analysis).unwrap());
+        // The sheet saturates: no multi-tesla peak, and almost no image left.
+        let bp = h.backplane_analysis.unwrap();
+        assert!(bp.layer_states[0].saturated() && bp.layer_peak_b_t[0] < 1.0);
+        assert!(bp.image_strength < 0.1);
+        // At 20 m/s the aluminium housing drags harder than the motor pushes.
+        let eddy = a.backplane.as_ref().unwrap();
+        assert!(eddy.drag_n > a.thrust_n.unwrap() && eddy.drag_limited_speed_m_s.unwrap() < 20.0);
+        assert_eq!(a.checks.iter().find(|c| c.id == "eddy_drag").unwrap().status, pcbmotorgen_simulation::drive::CheckStatus::Fail);
+        assert!(eddy.pwm_inductance_h < a.effective_inductance_h);
+    }
+
     #[test]
     #[ignore = "Exploratory 5 V versus 12 V geometry comparison"]
     fn drv8311_compare_five_and_twelve_volts() {
