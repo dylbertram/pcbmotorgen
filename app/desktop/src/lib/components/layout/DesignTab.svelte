@@ -39,7 +39,8 @@
 
 <ScrollArea
   id="design-settings-scroll"
-  class="h-full lg:pr-1"
+  class="h-full"
+  viewportClass="p-4 lg:pl-2"
   aria-label="Design settings"
 >
   <div class="space-y-3">
