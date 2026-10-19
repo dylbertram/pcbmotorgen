@@ -109,7 +109,7 @@
 
 <div class="mt-3 border-t border-slate-700/60 pt-3" aria-label="Derived constraint dimensions">
 
-  <dl class="grid grid-cols-2 gap-x-3 gap-y-2 sm:grid-cols-3">
+  <dl class="readout-grid grid grid-cols-2 gap-x-3 gap-y-2">
     <div class="min-w-0">
       <dt class="flex min-w-0 items-center gap-0.5 text-[10px] text-slate-500">
         <span class="truncate">PCB trace total (X)</span>
@@ -153,7 +153,7 @@
   <!-- All normal dimensions use the same value color; warnings retain their tone. -->
   <details class="mt-3 border-t border-slate-700/60 pt-2">
     <summary class="cursor-pointer text-xs text-slate-400 hover:text-slate-200">Winding dimensions</summary>
-    <dl class="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-3">
+    <dl class="readout-grid mt-2 grid grid-cols-2 gap-3">
       <div>
         <dt class="flex items-center text-[10px] text-slate-400">Phase-band pitch<HelpTag label="About phase-band pitch" tip="Band spacing for the Vernier winding. Not the physical slot pitch. Here m is phase count and r is spacing ratio." equation={String.raw`\tau_b = \frac{\tau_p}{m}\,r`} /></dt>
         <dd class="font-mono text-xs text-emerald-300">{phaseBandPitchMm.toFixed(2)} mm</dd>
@@ -168,7 +168,7 @@
           <span class="text-[9px] text-slate-500">{slotGroupCaption}</span>
         {/if}
       </div>
-      <dl class="grid grid-cols-2 gap-x-3 gap-y-1.5 sm:grid-cols-3">
+      <dl class="readout-grid grid grid-cols-2 gap-x-3 gap-y-1.5">
         <div class="min-w-0">
           <dt class="flex min-w-0 items-center gap-0.5 text-[10px] text-slate-500">
             <span class="truncate">Slot count</span>
@@ -203,7 +203,7 @@
       <div class="mb-1 flex items-baseline justify-between gap-2">
         <h3 class="text-xs font-medium text-slate-300">Conductor bundle</h3>
       </div>
-      <dl class="grid grid-cols-2 gap-x-3 gap-y-1.5 sm:grid-cols-3">
+      <dl class="readout-grid grid grid-cols-2 gap-x-3 gap-y-1.5">
         <div class="min-w-0">
           <dt class="flex min-w-0 items-center gap-0.5 text-[10px] text-slate-500">
             <span class="truncate">Band width (bundle)</span>
@@ -216,3 +216,9 @@
     </div>
   </details>
 </div>
+
+<style>
+  @container (min-width: 560px) {
+    .readout-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  }
+</style>

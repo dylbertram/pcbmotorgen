@@ -86,7 +86,7 @@ test.describe("routing pattern select (Bits UI) @interaction @desktop", () => {
 
     // The braid exposes user-editable parameters (num_strands, connection);
     // choosing it must render its controls rather than the empty-state note.
-    await expect(page.getByLabel("Strands per period")).toBeVisible();
+    await expect(page.getByLabel("Strands per period", { exact: true })).toBeVisible();
   });
 });
 

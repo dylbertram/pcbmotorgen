@@ -135,7 +135,7 @@
   });
 </script>
 
-<main class="flex min-h-screen flex-col bg-slate-900 text-slate-100 lg:h-screen lg:overflow-hidden">
+<main class="flex min-h-screen flex-col bg-slate-900 text-slate-100 {workspace.active?.kind === 'motor' ? 'h-dvh overflow-hidden' : 'lg:h-screen lg:overflow-hidden'}">
   <header class="shrink-0 border-b border-slate-700 bg-slate-950/60">
     <nav class="flex min-h-10 items-stretch overflow-x-auto pl-[95px]" aria-label="Open files" data-tauri-drag-region>
       <div role="tablist" aria-label="Coil files" class="flex items-stretch">

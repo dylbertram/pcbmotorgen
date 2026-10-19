@@ -149,7 +149,7 @@
     />
   </h2>
 
-  <div class="mb-2 grid gap-3 sm:grid-cols-[minmax(0,1fr)_160px] items-center">
+  <div class="stackup-fields mb-2 grid items-center gap-3">
     <div class="space-y-2.5">
       <label class="flex items-center justify-between gap-2 text-xs text-slate-300">
         <span>Air gap (mm)<HelpTag label="About air gap" tip="Clearance from the top of the PCB to the magnets. A smaller gap increases field strength." /></span>
@@ -421,3 +421,9 @@
     </p>
   {/if}
 </section>
+
+<style>
+  @container (min-width: 560px) {
+    .stackup-fields { grid-template-columns: minmax(0, 1fr) 160px; }
+  }
+</style>

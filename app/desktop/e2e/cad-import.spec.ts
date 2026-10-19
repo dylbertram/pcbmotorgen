@@ -73,7 +73,7 @@ test("imported centerlines retain editable trace and via dimensions", async ({ p
     await field.press("Tab");
     await expect(field).toHaveValue(value);
   }
-  await expect(page.getByText("DXF centerlines are active", { exact: false })).toBeVisible();
+  await expect(page.getByText("Imported paths are active", { exact: false })).toBeVisible();
 });
 
 test("inferred ends require one acceptance and never substitute generated copper", async ({ page }) => {
@@ -107,10 +107,10 @@ test("review opens coil ends and dismisses the inferred notice without requiring
   await dialog.getByRole("button", { name: "Open with this geometry" }).click();
   await page.getByRole("tab", { name: /^Simulate/i }).click();
   await page.getByRole("status", { name: "Inferred coil ends" }).getByRole("button", { name: "Review", exact: true }).click();
-  const modal = page.getByRole("dialog", { name: "Coil Preview", exact: true });
-  await expect(modal).toBeVisible();
-  await expect(modal.getByRole("region", { name: "Set coil terminals", exact: true })).toBeVisible();
-  await page.getByRole("button", { name: "Close coil preview" }).click();
+  const workspace = page.getByRole("region", { name: "Coil design workspace", exact: true });
+  await expect(workspace).toBeVisible();
+  await expect(workspace.getByRole("region", { name: "Set coil terminals", exact: true })).toBeVisible();
+  await workspace.getByRole("button", { name: "Close terminals panel" }).click();
   await page.getByRole("tab", { name: /^Simulate/i }).click();
   await expect(page.getByRole("status", { name: "Inferred coil ends" })).toHaveCount(0);
 });
@@ -188,7 +188,8 @@ test("terminal defaults are selected automatically, overrides infer the other en
   await expect(summary).toContainText("L0, X 2 mm");
   await page.getByRole("button", { name: "Close coil preview" }).click();
   await page.getByRole("button", { name: "Expand coil preview" }).click();
-  await page.getByRole("button", { name: "Set coil terminals", exact: true }).click();
+  const terminalToggle = page.getByRole("button", { name: "Set coil terminals", exact: true });
+  if (await terminalToggle.getAttribute("aria-expanded") !== "true") await terminalToggle.click();
   await expect(summary).toContainText("L0, X 0 mm");
 });
 
@@ -322,14 +323,14 @@ test("ends that cannot be inferred require manual picks and the notice clears af
   await expect(panel.getByText("Thrust and driver results use the imported copper.")).toHaveCount(0);
 
   await alert.getByRole("button", { name: "Select coil ends" }).click();
-  const modal = page.getByRole("dialog", { name: "Coil Preview", exact: true });
-  await expect(modal).toBeVisible();
+  const workspace = page.getByRole("region", { name: "Coil design workspace", exact: true });
+  await expect(workspace).toBeVisible();
   const command = page.getByRole("region", { name: "Set coil terminals", exact: true });
   await expect(command.getByRole("button", { name: "Apply terminals", exact: true })).toBeDisabled();
   await page.getByRole("button", { name: "Endpoint coil A, L0, X 0 mm, Y 0 mm", exact: true }).click();
   await page.getByRole("button", { name: "Endpoint coil A, L0, X 2 mm, Y 0 mm", exact: true }).click();
   await command.getByRole("button", { name: "Apply terminals", exact: true }).click();
-  await page.getByRole("button", { name: "Close coil preview" }).click();
+  await workspace.getByRole("button", { name: "Close terminals panel" }).click();
 
   await page.getByRole("tab", { name: /^Simulate/i }).click();
   await expect(alert).toHaveCount(0);
@@ -346,6 +347,7 @@ async function openImport(page: Page) {
   await expect(dialog).toBeVisible();
   await dialog.getByRole("button", { name: /Choose DXF/ }).click();
   await expect(dialog.getByLabel("Coil for source layer L0_A")).toHaveValue("A");
+  await expect(page.getByRole("button", { name: "Layers", exact: true })).toHaveCount(1);
   return dialog;
 }
 
@@ -702,6 +704,7 @@ test("outside clicks dismiss context menus and submenus while selecting in CAD a
     if (viewer === "motor") {
       await cad.getByRole("button", { name: "Open with this geometry" }).click();
       await page.getByRole("button", { name: "Expand coil preview" }).click();
+      await page.getByRole("button", { name: "Close design settings panel" }).click();
     }
     const dialog = viewer === "cad" ? cad : page.getByRole("dialog", { name: "Coil Preview", exact: true });
     const tools = dialog.getByRole("group", { name: "Segment selection tools" });
@@ -789,6 +792,7 @@ test("nested motor layers move selections on mobile and toggle only their own co
   await dialog.getByRole("button", { name: "Open with this geometry" }).click();
   await page.getByRole("button", { name: "Expand coil preview" }).click();
   const motor = page.getByRole("dialog", { name: "Coil Preview", exact: true });
+  await motor.getByRole("button", { name: "Close design settings panel" }).click();
   await clickTrace(page, .5, 0);
   await motor.getByRole("button", { name: "Layers", exact: true }).click();
   const panel = page.getByRole("dialog", { name: "Coil preview layers", exact: true });
@@ -945,6 +949,7 @@ test("touch drag selects, two fingers pan, and three-finger pinch zooms without 
   if (viewer === "motor") {
     await dialog.getByRole("button", { name: "Open with this geometry" }).click();
     await page.getByRole("button", { name: "Expand coil preview" }).click();
+    await page.getByRole("button", { name: "Close design settings panel" }).click();
   }
   const activeDialog = viewer === "cad" ? dialog : page.getByRole("dialog", { name: "Coil Preview", exact: true });
   const activeTools = activeDialog.getByRole("group", { name: "Segment selection tools" });
@@ -1079,5 +1084,6 @@ test("routing source shows the imported filename in its trigger and dropdown aft
   const tools = page.getByRole("toolbar", { name: "Coil preview tools" });
   await tools.getByRole("button", { name: "Simplify lines", exact: true }).click();
   await page.getByRole("button", { name: "Close coil preview" }).click();
+  await page.getByRole("button", { name: "Design settings", exact: true }).click();
   await expect(source).toContainText("coil-leads.dxf");
 });

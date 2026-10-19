@@ -62,7 +62,7 @@ test.describe("routing dimensions -> preview overlays", () => {
     await expect(inlineCanvas).toBeVisible();
 
     await eventually(async () => {
-      expect(await inlineCanvas.getAttribute("data-pole-pitch")).toBe("0");
+      expect(await inlineCanvas.getAttribute("data-pole-pitch")).toBe("1");
       expect(await inlineCanvas.getAttribute("data-band-widths")).toBe("0");
     });
 
@@ -83,7 +83,8 @@ test.describe("routing dimensions -> preview overlays", () => {
     await expect(modalCanvas).toBeVisible();
     await expect(modalCanvas).toHaveAttribute("data-pole-pitch", "1");
     await expect(polePitch).toBeChecked();
-    await expect(bandWidths).toBeChecked();
+    await expect(bandWidths).not.toBeChecked();
+    await bandWidths.check();
 
     await polePitch.uncheck();
     await eventually(async () => {
@@ -122,7 +123,8 @@ test.describe("routing dimensions -> preview overlays", () => {
     const phaseB = panel.getByRole("checkbox", { name: "Show phase B" });
 
     await expect(modalCanvas).toBeVisible();
-    await expect(regionsToggle).toBeChecked();
+    await expect(regionsToggle).not.toBeChecked();
+    await regionsToggle.check();
     await expect(phaseSelect).toBeEnabled();
     await expect(phaseB).toBeChecked();
 

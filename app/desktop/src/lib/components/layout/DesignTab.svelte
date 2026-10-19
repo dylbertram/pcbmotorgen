@@ -1,10 +1,11 @@
 <script lang="ts">
   import type { ConfigStore } from "../../stores/config.svelte";
-  import type { CadGeometry, RoutingDimensionsDto } from "../../types";
+  import type { BackplaneAnalysis, DriveBackplane, CadGeometry, RoutingDimensionsDto } from "../../types";
+  import BackplanePanel from "../design/BackplanePanel.svelte";
+  import MagnetsPanel from "../design/parameters/MagnetsPanel.svelte";
   import type { MotionStore } from "../../stores/motion.svelte";
   import { stripBoundsDomainMm, type TraceMeasure } from "../../previewGeometry";
   import TravelIsoView from "../design/TravelIsoView.svelte";
-  import MoverPositionControls from "../design/MoverPositionControls.svelte";
   import ConstraintReadouts from "../design/ConstraintReadouts.svelte";
   import TopologySelector from "../design/TopologySelector.svelte";
   import TracesBoardPanel from "../design/parameters/TracesBoardPanel.svelte";
@@ -24,6 +25,8 @@
     onImportCad,
     onUseGenerated,
     onGeometryChange,
+    backplaneAnalysis = null,
+    driveBackplane = null,
   }: {
     config: ConfigStore;
     motion: MotionStore;
@@ -33,6 +36,8 @@
     onImportCad: () => void;
     onUseGenerated: () => void;
     onGeometryChange?: (geometry: CadGeometry) => void;
+    backplaneAnalysis?: BackplaneAnalysis | null;
+    driveBackplane?: DriveBackplane | null;
   } = $props();
   const stripBounds = $derived(stripBoundsDomainMm(config, motion));
 </script>
@@ -40,10 +45,10 @@
 <ScrollArea
   id="design-settings-scroll"
   class="h-full"
-  viewportClass="p-4 lg:pl-2"
+  viewportClass="p-3"
   aria-label="Design settings"
 >
-  <div class="space-y-3">
+  <div class="design-settings space-y-3">
     <!-- Travel inputs, live assembly geometry and derived sizing readouts. -->
     <section
       class="rounded-md border border-slate-700 bg-slate-800/40 px-3 py-2.5"
@@ -55,7 +60,7 @@
       >
         Design constraints
       </h2>
-      <div class="grid gap-x-3 gap-y-2.5 sm:grid-cols-2">
+      <div class="grid gap-x-3 gap-y-2.5">
         <label
           class="min-w-0"
         >
@@ -127,10 +132,11 @@
         <div class="w-full">
           <TravelIsoView {config} {measuredTrace} stripStartMm={stripBounds.startMm} stripEndMm={stripBounds.endMm} />
         </div>
-        <MoverPositionControls {config} {motion} showWaveform={false} compact />
       </div>
       <ConstraintReadouts {config} measuredTraceLengthMm={measuredTrace?.traceLengthMm ?? null} {routingDimensions} />
     </section>
+
+    <BackplanePanel {config} {backplaneAnalysis} {driveBackplane} />
 
     <!-- Topology (routing pattern + parameters + generator load) and the
          board/winding fields share one panel so winding geometry can be
@@ -192,6 +198,11 @@
       </div>
     </section>
 
+    <MagnetsPanel {config} />
     <ValidationWarning {config} />
   </div>
 </ScrollArea>
+
+<style>
+  .design-settings { container-type: inline-size; }
+</style>

@@ -10,6 +10,12 @@ describe("nested coil/layer visibility", () => {
     expect(view.zScale).toBe(10);
   });
 
+  it("keeps detailed diagnostic overlays off until requested", () => {
+    const view = new CoilPreviewViewState();
+    expect(view.showBandWidths).toBe(false);
+    expect(view.showPoleRegions).toBe(false);
+    expect(view.showPolePitch).toBe(true);
+  });
   it("defaults to visible and hides only the chosen coil/layer", () => {
     const view = new CoilPreviewViewState();
     expect(view.isCoilLayerVisible("A", 0)).toBe(true);

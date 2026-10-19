@@ -3,15 +3,16 @@ import { gotoDesignApp } from "./helpers";
 
 test("zoom controls clear every open side panel", async ({ page }, testInfo) => {
   await gotoDesignApp(page);
-  await page.getByRole("button", { name: "Expand coil preview" }).click();
-  const dialog = page.getByRole("dialog", { name: "Coil Preview", exact: true });
-  const zoom = dialog.getByRole("group", { name: "Zoom controls" });
+  const workspace = page.getByRole("region", { name: "Coil design workspace", exact: true });
+  const closeDesign = workspace.getByRole("button", { name: "Close design settings panel", exact: true });
+  if (await closeDesign.isVisible()) await closeDesign.click();
+  const zoom = workspace.getByRole("group", { name: "Zoom controls" });
   for (const size of [{ width: 1280, height: 800 }, { width: 640, height: 480 }, { width: 390, height: 844 }]) {
     await page.setViewportSize(size);
     const resting = (await zoom.boundingBox())!;
     for (const [trigger, name] of [["Layers", "Coil preview layers"], ["Display", "Coil preview display"], ["Set coil terminals", "Coil terminals"], ["Driver settings", "Preview driver settings"]]) {
-      await dialog.getByRole("button", { name: trigger, exact: true }).click();
-      const panel = dialog.getByRole("dialog", { name, exact: true });
+      await workspace.getByRole("button", { name: trigger, exact: true }).click();
+      const panel = workspace.getByRole("dialog", { name, exact: true });
       await expect(panel).toBeVisible();
       if (size.width < 640) {
         // The narrow drawing has no space for a second floating dock.
@@ -24,14 +25,14 @@ test("zoom controls clear every open side panel", async ({ page }, testInfo) => 
           return z.x + z.width <= p.x;
         }).toBe(true);
         // The zoom buttons remain usable without closing the panel.
-        await dialog.getByRole("button", { name: "Zoom in", exact: true }).click();
+        await workspace.getByRole("button", { name: "Zoom in", exact: true }).click();
       }
       // The last field stays clickable after scrolling, even in a short window.
       const last = panel.locator("button, input").last();
       await last.scrollIntoViewIfNeeded();
       await last.click({ trial: true });
       if (trigger === "Layers") await page.screenshot({ path: testInfo.outputPath(`panel-clearance-${size.width}.png`) });
-      await dialog.getByRole("button", { name: trigger, exact: true }).click();
+      await workspace.getByRole("button", { name: trigger, exact: true }).click();
       await expect(panel).toHaveCount(0);
       await expect(zoom).toBeVisible();
       const restored = (await zoom.boundingBox())!;
@@ -40,23 +41,24 @@ test("zoom controls clear every open side panel", async ({ page }, testInfo) => 
   }
 });
 
-test("inline motor preview is read-only and pans with the primary drag", async ({ page }) => {
+test("embedded motor workspace has editing tools and pans with the middle drag", async ({ page }) => {
   await gotoDesignApp(page);
   const inline = page.getByRole("img", { name: "Coil preview", exact: true });
   await expect(inline).toBeVisible();
-  await expect(page.getByRole("toolbar", { name: "Coil preview tools" })).toHaveCount(0);
-  await expect(page.getByRole("group", { name: "Zoom controls" })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Simplify lines", exact: true })).toHaveCount(0);
+  await page.getByRole("button", { name: "Close design settings panel" }).click();
+  await expect(page.getByRole("toolbar", { name: "Coil preview tools" })).toBeVisible();
+  await expect(page.getByRole("group", { name: "Zoom controls" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Edit segments", exact: true })).toBeVisible();
   const canvas = inline.locator("canvas");
   const revision = Number(await canvas.getAttribute("data-revision"));
   await inline.scrollIntoViewIfNeeded();
   await expect(inline).toHaveCSS("cursor", "grab");
   const box = (await inline.boundingBox())!;
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
-  await page.mouse.down();
+  await page.mouse.down({ button: "middle" });
   await expect(inline).toHaveCSS("cursor", "grabbing");
   await page.mouse.move(box.x + box.width / 2 + 40, box.y + box.height / 2 + 20, { steps: 5 });
-  await page.mouse.up();
+  await page.mouse.up({ button: "middle" });
   await expect.poll(async () => Number(await canvas.getAttribute("data-revision"))).toBeGreaterThan(revision);
   await expect(page.getByRole("dialog", { name: "Coil Preview", exact: true })).toHaveCount(0);
   await expect(inline).toHaveCSS("cursor", "grab");
@@ -277,15 +279,17 @@ test("overlay visibility and phase selection do not change the camera", async ({
   await page.mouse.move(box.x + 130, box.y + 120);
   await page.mouse.up({ button: "middle" });
   await expect(canvas).toHaveAttribute("data-test-camera", /\[/);
-  const camera = (await canvas.getAttribute("data-test-camera"))!;
   await dialog.getByRole("button", { name: "Layers", exact: true }).click();
   const panel = page.getByRole("dialog", { name: "Coil preview layers", exact: true });
+  await panel.getByRole("checkbox", { name: "Show pole regions", exact: true }).check();
+  await expect(canvas).toHaveAttribute("data-pole-regions", /[1-9]/);
+  const camera = (await canvas.getAttribute("data-test-camera"))!;
   const phase = panel.getByRole("combobox", { name: "Pole regions phase" });
   await phase.selectOption({ index: 1 });
   await expect(canvas).toHaveAttribute("data-test-camera", camera);
   for (const name of ["Show pole-pitch dimension ruler", "Show band-width diagnostics", "Show pole regions"]) {
     const revision = await canvas.getAttribute("data-revision");
-    await panel.getByRole("checkbox", { name, exact: true }).uncheck();
+    await panel.getByRole("checkbox", { name, exact: true }).click();
     await expect(canvas).not.toHaveAttribute("data-revision", revision!);
     await expect(canvas).toHaveAttribute("data-test-camera", camera);
   }
@@ -295,6 +299,7 @@ test("full-modal drawing contains docked controls and bottom display menu", asyn
   await gotoDesignApp(page);
   await page.getByRole("button", { name: "Expand coil preview" }).click();
   const dialog = page.getByRole("dialog", { name: "Coil Preview", exact: true });
+  await dialog.getByRole("button", { name: "Close design settings panel" }).click();
   for (const size of [{ width: 1280, height: 800 }, { width: 390, height: 844 }]) {
     await page.setViewportSize(size);
     const frame = dialog.getByRole("img", { name: "Coil preview — expanded", exact: true });
@@ -330,6 +335,7 @@ test("the modal toolbar and zoom controls are bare, the position box is outlined
   await gotoDesignApp(page);
   await page.getByRole("button", { name: "Expand coil preview" }).click();
   const dialog = page.getByRole("dialog", { name: "Coil Preview", exact: true });
+  await dialog.getByRole("button", { name: "Close design settings panel" }).click();
   for (const size of [{ width: 1280, height: 800 }, { width: 390, height: 844 }]) {
     await page.setViewportSize(size);
     const toolbar = dialog.getByRole("toolbar", { name: "Coil preview tools" });
@@ -419,7 +425,6 @@ test("phase waveform visibility preserves mover controls and survives reopening"
   await expect(slider).toBeVisible();
   await page.getByRole("button", { name: "Close coil preview" }).click();
   await page.getByRole("button", { name: "Expand coil preview" }).click();
-  await dialog.getByRole("button", { name: "Layers", exact: true }).click();
   await expect(toggle).not.toBeChecked();
   await expect(waveform).toHaveCount(0);
   await toggle.check();

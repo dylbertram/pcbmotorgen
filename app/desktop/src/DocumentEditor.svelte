@@ -40,8 +40,7 @@
   import ProjectNotification from "./lib/components/ui/ProjectNotification.svelte";
   import ScrollArea from "./lib/components/ui/ScrollArea.svelte";
   import CoilPreview from "./lib/components/design/CoilPreview.svelte";
-  import BackplanePanel from "./lib/components/design/BackplanePanel.svelte";
-  import MagnetsPanel from "./lib/components/design/parameters/MagnetsPanel.svelte";
+  import type { PreviewPanelId } from "./lib/components/design/previewPanels";
   import DesignTab from "./lib/components/layout/DesignTab.svelte";
   import SimulateTab from "./lib/components/layout/SimulateTab.svelte";
   import KicadDialog from "./lib/components/layout/KicadDialog.svelte";
@@ -66,6 +65,7 @@
   let preferencesOpen = $state(false);
   let creatingVersion = $state(false);
   let versionsDialogGeneration = $state(0);
+  const externalDialogOpen = $derived(cadImportDialogOpen || kicadDialogOpen || preferencesOpen || versionsDialogOpen);
 
   function showVersions(creating = false): void {
     if (!active || projects.busy) return;
@@ -90,6 +90,8 @@
   let drive = $state<DriveAnalysis | null>(untrack(() => session.runtime.drive));
   let driveError = $state<string | null>(null);
   let coilPreviewExpanded = $state(false);
+  let previewPanel = $state<PreviewPanelId | null>("design");
+  let coilPreview: CoilPreview | undefined = $state();
   let drivePending = $state(false);
   let loading = $state(false);
   let error = $state<string | null>(null);
@@ -438,7 +440,7 @@
   // sweep. The expanded preview also needs live electrical results.
   let driveGeneration = 0;
   const scheduleDrive = debounce((generation: number) => {
-    if (generation !== driveGeneration || !active || (activeTab !== "simulate" && !coilPreviewExpanded)) return;
+    if (generation !== driveGeneration || !active || (activeTab !== "simulate" && !coilPreviewExpanded && previewPanel !== "driver")) return;
     void runDrive(generation);
   }, 120);
 
@@ -478,7 +480,7 @@
     void geometryKey(projects.cadGeometry);
     void valid;
     const generation = ++driveGeneration;
-    if (!active || (activeTab !== "simulate" && !coilPreviewExpanded)) {
+    if (!active || (activeTab !== "simulate" && !coilPreviewExpanded && previewPanel !== "driver")) {
       scheduleDrive.cancel();
       drivePending = false;
       return;
@@ -573,6 +575,13 @@
   });
 </script>
 
+{#snippet motorSettings()}
+  <DesignTab {config} {motion} {measuredTrace} routingDimensions={activeCoils?.routing_dimensions ?? null}
+    cadGeometry={projects.cadGeometry} onGeometryChange={(geometry) => projects.setCadGeometry(geometry)}
+    onImportCad={() => (cadImportDialogOpen = true)} onUseGenerated={() => projects.setCadGeometry(null)}
+    backplaneAnalysis={height?.backplane_analysis ?? null} driveBackplane={drive?.backplane ?? null} />
+{/snippet}
+
 <main
   class="flex min-h-0 flex-1 flex-col bg-slate-900 text-slate-100"
 >
@@ -643,32 +652,24 @@
       <!-- Scroll viewports fill the space between the workflow and footer
            dividers. Insets belong inside them, so content scrolls to the edges. -->
       <div
-        class="grid min-h-0 flex-1 items-start {activeTab === 'design' ? 'lg:grid-cols-[minmax(360px,0.9fr)_minmax(0,1.35fr)]' : 'lg:grid-cols-1'} lg:grid-rows-[minmax(0,1fr)] lg:items-stretch"
+        inert={externalDialogOpen}
+        aria-hidden={externalDialogOpen || undefined}
+        class="grid min-h-0 flex-1 {activeTab === 'design' && designType === 'sensor' ? 'items-start lg:grid-cols-[minmax(360px,0.9fr)_minmax(0,1.35fr)] lg:grid-rows-[minmax(0,1fr)] lg:items-stretch' : 'grid-cols-1 grid-rows-[minmax(0,1fr)] items-stretch'}"
       >
         <!-- The desktop layout locks the page height: both columns stretch to the
              row (viewport minus header/footer) and scroll independently inside
              themselves, so the footer is always visible and the page never
              scrolls. Below lg the columns stack and the page scrolls normally. -->
-        <aside
+        {#if designType === "sensor"}<aside
           class="relative min-w-0 min-h-0 lg:h-full {activeTab !== 'design' ? 'hidden' : ''}"
           aria-label="Coil preview panel"
         >
           <ScrollArea class="h-full min-h-0" viewportClass="p-4 lg:pr-2">
-            {#if designType === "sensor"}
               <SensorPreview store={sensorStore} camera={session.camera} previewView={session.previewView} />
-            {:else}
-              <!-- Traces view lives here in the Design tab so layout and geometry can
-                   be inspected side by side; the Simulation tab keeps its own copy. -->
-              <div class="space-y-3">
-                <CoilPreview {config} coils={activeCoils} {motion} bind:expanded={coilPreviewExpanded} {drive} {driveError} {drivePending} camera={session.camera} view={session.previewView} importedGeometry={projects.cadGeometry} onGeometryChange={(geometry) => projects.setCadGeometry(geometry)} />
-                <BackplanePanel {config} backplaneAnalysis={height?.backplane_analysis ?? null} driveBackplane={drive?.backplane ?? null} />
-                <MagnetsPanel {config} />
-              </div>
-            {/if}
           </ScrollArea>
-        </aside>
+        </aside>{/if}
 
-        <div class="min-w-0 min-h-0 lg:h-full">
+        <div class="min-w-0 min-h-0 h-full">
           <!-- Workflow panels stay mounted so component-local controls retain
                their state — Bits Tabs.Content never unmounts inactive panels, it
                toggles the hidden attribute instead. Hidden Simulation content is
@@ -681,7 +682,11 @@
             class="h-full"
           >
             <div hidden={designType !== "motor"} class="h-full">
-               <DesignTab {config} {motion} {measuredTrace} routingDimensions={activeCoils?.routing_dimensions ?? null} cadGeometry={projects.cadGeometry} onGeometryChange={(geometry) => projects.setCadGeometry(geometry)} onImportCad={() => (cadImportDialogOpen = true)} onUseGenerated={() => projects.setCadGeometry(null)} />
+              <CoilPreview bind:this={coilPreview} workspace {config} coils={activeCoils} {motion}
+                active={active && (activeTab === "design" || coilPreviewExpanded) && !externalDialogOpen} designSettings={motorSettings}
+                bind:sidePanel={previewPanel} bind:expanded={coilPreviewExpanded} {drive} {driveError} {drivePending}
+                camera={session.camera} view={session.previewView} importedGeometry={projects.cadGeometry}
+                onGeometryChange={(geometry) => projects.setCadGeometry(geometry)} />
             </div>
             <div hidden={designType !== "sensor"} class="h-full">
               <ScrollArea id="sensor-settings-scroll" class="h-full" viewportClass="p-4 lg:pl-2" aria-label="Sensor settings">
@@ -698,7 +703,7 @@
             <ScrollArea id="simulation-scroll" class="h-full" viewportClass="p-4" aria-label="Simulation workspace">
               <SimulateTab
                 onOpenPreview={() => (coilPreviewExpanded = true)}
-                onConfigureWinding={() => selectTab("design")}
+                onConfigureWinding={() => { selectTab("design"); coilPreview?.showDesignSettings(); }}
                 {config}
                 active={active && activeTab === "simulate"}
                 {sweep}
