@@ -7,6 +7,7 @@ import {
   box,
   eventually,
   gotoDesignApp,
+  openCoilPreview,
 } from "./helpers";
 
 test.describe("Design constraints restructure", () => {
@@ -24,7 +25,7 @@ test.describe("Design constraints restructure", () => {
 
     const inline = page.locator("#panel-design");
     await expect(inline.getByRole("group", { name: "Coil terminal markers" })).toBeVisible();
-    await inline.getByRole("button", { name: "Expand coil preview" }).click();
+    await openCoilPreview(page);
     const dialog = page.getByRole("dialog");
     await expect(dialog.getByRole("img", { name: /Per-phase holding force/ })).toBeVisible();
     await expect(dialog.getByRole("group", { name: "Coil terminal markers" })).toBeVisible();
