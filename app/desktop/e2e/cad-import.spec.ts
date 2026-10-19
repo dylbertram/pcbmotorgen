@@ -51,7 +51,7 @@ async function openTerminalTool(page: Page, { layered = false } = {}) {
   await dialog.getByRole("button", { name: "Open with this geometry" }).click();
   await openCoilPreview(page);
   const tools = page.getByRole("toolbar", { name: "Coil preview tools" });
-  await page.getByRole("toolbar", { name: "Preview side tools" }).getByRole("button", { name: "Set coil terminals", exact: true }).click();
+  await page.getByRole("toolbar", { name: "Design side tools" }).getByRole("button", { name: "Set coil terminals", exact: true }).click();
   const command = page.getByRole("region", { name: "Set coil terminals", exact: true });
   await command.getByRole("button", { name: "Select driver end for coil A", exact: true }).click();
   await command.getByRole("button", { name: "Keep current points", exact: true }).click();
