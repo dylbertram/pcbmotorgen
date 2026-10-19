@@ -183,7 +183,7 @@
              mirroring the inline pair). All gestures delegate to the same
              utility instance. -->
         <div class="absolute inset-0">
-          <PreviewFrame bind:frame={modalFrameRef} {gestures} {measure} interactive={terminalTool?.active ?? false}
+          <PreviewFrame bind:frame={modalFrameRef} {gestures} {measure} navigationEnabled={view.viewMode === "top"} interactive={view.viewMode === "top" && (terminalTool?.active ?? false)}
             label="Coil preview — expanded">
             {#if view.viewMode === "iso"}
               <CoilPreviewIsoView geometry={terminalGeometry ?? importedGeometry} {view} isVisible={isTerminalVisible} />
@@ -204,17 +204,19 @@
         <!-- The toolbar spans the workspace top, flush under the header and
              backed so the buttons stay legible over the drawing. -->
         <div class="absolute inset-x-0 top-0 z-20" bind:clientHeight={toolbarHeight}>
+          {#if view.viewMode === "top"}
           <GeometryEditingToolbar label="Coil preview tools" geometry={onGeometryChange ? importedGeometry : null}
             {selection} {measure} {terminalTool} {onSimplify} {onUndoSimplify} {simplifyNotice} borderless
-            onActivateSelection={activateSelection} onPrepareGeometry={onStartSegmentEditing} />
+             onActivateSelection={activateSelection} onPrepareGeometry={onStartSegmentEditing} />
+          {/if}
         </div>
 
         <!-- Right rail: hangs from the bottom of the top toolbar down to the
              status bar, so the Layers and Display panels pull out under it. -->
         <div class="absolute bottom-0 right-0 z-30 w-11" style:top={`${toolbarHeight}px`}>
           <PreviewSideRail bind:open={sidePanel} {config} {view} layers={importedGeometry ? importedGeometry.layer_z_mm.map((_, idx) => ({ idx })) : uniqueLayers} phases={importedGeometry ? [] : uniquePhases}
-            {terminalTool} {onStartTerminals} terminalsDisabled={!onGeometryChange}
-           geometry={terminalGeometry ?? importedGeometry} selection={importedGeometry ? selection : undefined} assignmentDisabled={!importedGeometry || !onGeometryChange || measure.mode || !!terminalTool?.active || view.oneSection}
+            {terminalTool} {onStartTerminals} terminalsDisabled={!onGeometryChange || view.viewMode === "iso"}
+           geometry={terminalGeometry ?? importedGeometry} selection={importedGeometry ? selection : undefined} assignmentDisabled={view.viewMode === "iso" || !importedGeometry || !onGeometryChange || measure.mode || !!terminalTool?.active || view.oneSection}
           coils={importedGeometry ? uniquePhases.map((phase) => ({ name: phase.name, colorIdx: phase.colorIdx })) : []}
           isCoilVisible={(name) => view.isPhaseVisible(uniquePhases.find((phase) => phase.name === name)?.idx ?? -1)}
           onToggleCoil={(name) => { const phase = uniquePhases.find((phase) => phase.name === name); if (phase) view.phaseVisibility[phase.idx] = !view.isPhaseVisible(phase.idx); }} showMotorControls={true}
@@ -223,6 +225,7 @@
 
         <!-- Bare zoom buttons: no background, with the same 12px gap on the
              right as the position box has at the bottom. -->
+        {#if view.viewMode === "top"}
         <div class="absolute z-20 {sidePanel ? 'hidden sm:block sm:top-[var(--dock-top)] lg:top-auto lg:bottom-3' : 'top-[32%] sm:top-auto sm:bottom-3'}"
           style:--dock-top={`${toolbarHeight + 12}px`} style:right={sidePanel ? "calc(15rem + 3.5rem)" : "3.5rem"}>
           <CoilPreviewControls
@@ -235,11 +238,13 @@
             onResetView={gestures.resetView}
           />
         </div>
+        {/if}
 
         <!-- Mover position: same controls as the Design reflection on the
              shared MotionStore, so the slider lives next to the strip it
              moves inside the lightbox. The phase-waveform popover is anchored
              directly above this box at the same width, so it cannot be moved. -->
+        {#if view.viewMode === "top"}
         <div class="absolute bottom-3 left-2 z-20 flex w-[min(420px,calc(100%-4rem))] flex-col gap-2">
           {#if terminalPanelOpen}
             <div class="rounded-md border border-slate-700 bg-slate-900/95 p-3">
@@ -260,6 +265,7 @@
           </div>
           {/if}
         </div>
+        {/if}
       </div>
 
       <div class="z-30 flex shrink-0 items-center justify-between gap-3 border-t border-slate-700 bg-slate-900 px-3 py-2 text-[10px] text-slate-400" role="group" aria-label="Preview status">

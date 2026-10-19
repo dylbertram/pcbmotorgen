@@ -553,7 +553,7 @@
   <!-- Frame div owns the ARIA label (the canvas is the paint surface; data-*
        attributes on the canvas carry the introspection counters). All pan/
        pinch/scroll-zoom handling is delegated to the gesture utility. -->
-  <PreviewFrame bind:frame={frameRef} {gestures} label="Coil preview" aspectRatio={W / PREVIEW_H} ondblclick={onInlineDoubleClick}>
+  <PreviewFrame bind:frame={frameRef} {gestures} navigationEnabled={view.viewMode === "top"} label="Coil preview" aspectRatio={W / PREVIEW_H} ondblclick={onInlineDoubleClick}>
     <!-- data-segments / data-vias / data-pole-pitch / data-band-widths /
          data-pole-regions / data-revision are written imperatively by the
          renderer (canvas.dataset in coilPreviewCanvas.ts), NOT bound
@@ -571,7 +571,7 @@
   {#if coils && coils.phases.length > 0}
     <p class="mt-2 text-xs text-slate-500">
       <span class="text-slate-600"
-        >Drag to pan. Pinch or Ctrl-scroll to zoom. Open the expanded viewer to edit.</span
+        >{view.viewMode === "iso" ? "Drag to orbit. Scroll or pinch to zoom. Editing is available in Top-down." : "Drag to pan. Pinch or Ctrl-scroll to zoom. Open the expanded viewer to edit."}</span
       >
     </p>
   {/if}
