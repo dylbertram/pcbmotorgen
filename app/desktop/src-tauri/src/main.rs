@@ -64,6 +64,7 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             commands::physics::get_magnet_grades,
             commands::physics::compute_height_stack,
+            commands::physics::periodic_backplane_reference,
             commands::physics::generate_coils,
             commands::physics::evaluate_force_sweep,
             commands::physics::sample_b_field,

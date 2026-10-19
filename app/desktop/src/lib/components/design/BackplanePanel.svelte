@@ -23,6 +23,7 @@
   import type { DriveBackplane } from "../../types/drive";
   import NumberField from "../ui/NumberField.svelte";
   import HelpTag from "../ui/HelpTag.svelte";
+  import PeriodicReferencePanel from "./PeriodicReferencePanel.svelte";
 
   /**
    * Backplane and housing below the PCB (t707). Every edit replaces
@@ -242,6 +243,7 @@
           </li>
         {/each}
       </ol>
+      <PeriodicReferencePanel {config} />
       {#if hasFlexSheet}
         <p class="text-[11px] leading-relaxed text-slate-400">
           Enter the ferrite thickness of a sheet only. Datasheet totals include adhesive and
@@ -331,7 +333,12 @@
   {#if backplane && backplaneAnalysis}
     <div class="mt-3 border-t border-slate-700/70 pt-2.5">
       <p class="mb-1.5 text-[10px] uppercase tracking-wider text-slate-500">
-        From the last simulation run; may lag recent edits
+        Analytical screening estimates from the last run; may lag recent edits
+      </p>
+      <p class="mb-2 text-[11px] leading-relaxed text-amber-200" role="note">
+        Infinite flat layers, not the finite housing shape. Edges, slots and current return
+        paths need a 3D solve. Near-knee saturation, drag and operating speed need independent
+        validation before choosing material thickness or bearing loads.
       </p>
       <dl class="grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
         <dt class="text-slate-400">Image strength R</dt>
@@ -343,7 +350,7 @@
         </dd>
         <dt class="text-slate-400">Inductance factor</dt>
         <dd class="font-mono text-slate-200">{backplaneAnalysis.inductance_factor.toFixed(2)}×</dd>
-        <dt class="text-slate-400">Normal attraction</dt>
+        <dt class="text-slate-400">Estimated normal attraction</dt>
         <dd class="font-mono text-slate-200">{backplaneAnalysis.attraction_n.toPrecision(3)} N</dd>
         {#if housing && backplaneAnalysis.housing_state && backplaneAnalysis.housing_state.mu_initial > 1}
           <dt class="text-slate-400">Housing</dt>
@@ -364,7 +371,7 @@
 
       {#if driveBackplane}
         <p class="mt-2.5 mb-1 text-[10px] uppercase tracking-wider text-slate-500">
-          Eddy currents, from the last driver analysis
+          Eddy-current screening, from the last driver analysis
         </p>
         <dl class="grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
           <dt class="text-slate-400">L at {(config.drive.pwm_hz / 1e3).toFixed(0)} kHz PWM</dt>
@@ -386,7 +393,7 @@
             </dd>
           {/if}
           {#if driveBackplane.drag_limited_speed_m_s != null}
-            <dt class="text-slate-400">Drag equals thrust at</dt>
+            <dt class="text-slate-400">Estimated drag/thrust crossing</dt>
             <dd class="font-mono text-amber-200">{driveBackplane.drag_limited_speed_m_s.toPrecision(3)} m/s</dd>
           {/if}
         </dl>

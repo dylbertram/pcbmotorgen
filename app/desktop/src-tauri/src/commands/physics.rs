@@ -55,6 +55,30 @@ pub async fn compute_height_stack(
     .map_err(|e| format!("height_stack worker failed: {e}"))?
 }
 
+static PERIODIC_REFERENCE_JOB: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+/// Explicit periodic static reference. Does not replace previews, finite-array
+/// force, friction or driver calculations, and never substitutes a mock result.
+#[tauri::command]
+pub async fn periodic_backplane_reference(
+    config: LinearMotorConfigIpc,
+) -> Result<pcbmotorgen_simulation::backplane::PeriodicStaticReference, String> {
+    let sim = config.to_core().to_simulation();
+    sim.validate().map_err(|e| e.to_string())?;
+    tauri::async_runtime::spawn_blocking(move || {
+        let _permit = PERIODIC_REFERENCE_JOB.try_lock().map_err(|error| match error {
+            std::sync::TryLockError::WouldBlock => "A periodic reference is already running. Wait for it to finish before starting another.".to_string(),
+            std::sync::TryLockError::Poisoned(_) => "The periodic reference worker failed. Restart the app before retrying.".to_string(),
+        })?;
+        sim.backplane
+            .as_ref()
+            .ok_or_else(|| "Add a magnetic backplane before running the periodic reference".to_string())?
+            .periodic_static_reference(&sim)
+    })
+    .await
+    .map_err(|e| format!("periodic reference worker failed: {e}"))?
+}
+
 // ===========================================================================
 // generate_coils — REAL (core geometry generators)
 // ===========================================================================
@@ -115,6 +139,7 @@ pub async fn evaluate_force_sweep(
     if cad_geometry.as_ref().is_some_and(|cad| cad.terminal_connection == Some(pcbmotorgen_export::cad_dxf::TerminalConnection::Delta)) {
         return Err("Imported delta force analysis is not available. Select Star (wye) coil terminals.".into());
     }
+    let drive = drive.ok_or("Force analysis requires explicit drive settings; use the same copper, temperature and via settings as driver analysis.")?;
     let core = config.to_core();
     let n_positions = config.n_positions.max(2) as usize;
     let meshing = config.meshing.max(1) as usize;
@@ -143,7 +168,7 @@ pub async fn evaluate_force_sweep(
 
         let hints = cad_geometry.as_ref().map(super::cad_source::CadBoard::drive_hints).unwrap_or_default();
         let (mut evaluator, coils) = ForceEvaluator::new(n_positions, meshing, commutation, 0.0)
-            .with_routed_currents(&routing, &sim, &drive.unwrap_or_default(), &hints)
+            .with_routed_currents(&routing, &sim, &drive, &hints)
             .map_err(|e| format!("force current solve failed: {e}"))?;
         let result = evaluator
             .evaluate(&sim, &coils)
@@ -322,12 +347,16 @@ pub async fn analyze_drive(
     tauri::async_runtime::spawn_blocking(move || {
         if let Some(cad) = cad_geometry.as_ref() {
             let board = super::cad_source::CadBoard::new(cad, &core)?;
+            let sim = board.simulation_input(cad, &core);
+            let hints = super::cad_source::CadBoard::drive_hints(cad);
+            pcbmotorgen_simulation::drive::validate_copper_placement(&sim, &board.routing, &hints)
+                .map_err(|error| error.to_string())?;
             return Ok(pcbmotorgen_simulation::drive::analyze_drive_with(
-                &board.simulation_input(cad, &core),
+                &sim,
                 &board.routing,
                 &drive,
                 thrust_constant_n_per_a,
-                &super::cad_source::CadBoard::drive_hints(cad),
+                &hints,
             ));
         }
         core.design_rules().validate_trace_width()?;
@@ -495,8 +524,34 @@ mod travel_envelope_tests {
 }
 
 #[cfg(test)]
+mod periodic_reference_tests {
+    use super::*;
+    use pcbmotorgen_simulation::backplane::{BackplaneLayer, BackplaneStack, LayerMaterial};
+
+    #[test]
+    fn missing_or_unsupported_backplane_is_an_error_not_a_preview_fallback() {
+        let mut config = crate::ipc::ProjectConfigStateIpc::default();
+        let error = tauri::async_runtime::block_on(periodic_backplane_reference(config.to_linear_motor_ipc())).unwrap_err();
+        assert!(error.contains("Add a magnetic backplane"), "{error}");
+        config.backplane = Some(BackplaneStack {
+            layers: vec![BackplaneLayer::new(LayerMaterial::FlexFerrite, 0.0002); 2],
+            housing: None,
+        });
+        let error = tauri::async_runtime::block_on(periodic_backplane_reference(config.to_linear_motor_ipc())).unwrap_err();
+        assert!(error.contains("one magnetic layer"), "{error}");
+    }
+}
+
+#[cfg(test)]
 mod analyze_drive_tests {
     use super::*;
+
+    #[test]
+    fn force_sweep_rejects_implicit_copper_defaults() {
+        let ipc = crate::ipc::ProjectConfigStateIpc::default().to_linear_motor_ipc();
+        let error = tauri::async_runtime::block_on(evaluate_force_sweep(ipc, None, None)).unwrap_err();
+        assert!(error.contains("explicit drive settings"), "{error}");
+    }
 
     #[test]
     #[ignore = "Exports real winding geometry for independent Magpylib validation"]
@@ -618,7 +673,7 @@ mod analyze_drive_tests {
         let mut ipc = state.to_linear_motor_ipc();
         assert!((ipc.active_area_length_m - 0.092).abs() < 1e-12);
         let mut previous: Option<Vec<f64>> = None;
-        for mesh in [10, 20, 40] {
+        for mesh in [10, 20, 40, 80] {
             ipc.meshing = mesh;
             let sweep = tauri::async_runtime::block_on(evaluate_force_sweep(ipc.clone(), None, Some(state.drive.clone()))).unwrap();
             let kf = sweep.mean_thrust_n / sweep.current_a;
@@ -859,9 +914,25 @@ mod cad_source_tests {
     #[test]
     fn unmapped_coils_are_reported() {
         let (ipc, cad) = exported_default();
-        let err = tauri::async_runtime::block_on(evaluate_force_sweep(ipc, Some(cad), None))
+        let err = tauri::async_runtime::block_on(evaluate_force_sweep(ipc, Some(cad), Some(Default::default())))
             .expect_err("unmapped");
         assert!(err.contains("coil A"), "{err}");
+    }
+
+    #[test]
+    fn imported_stack_placement_errors_are_shared_by_force_and_driver_commands() {
+        use pcbmotorgen_simulation::backplane::{BackplaneLayer, BackplaneStack, LayerMaterial};
+        let (mut ipc, mut cad) = exported_default();
+        for p in ["A", "B", "C"] { cad.coil_phases.insert(format!("coil {p}"), p.to_string()); }
+        let count = cad.layer_z_mm.len();
+        cad.layer_z_mm = (0..count).map(|layer| -2.0 * (count - 1 - layer) as f64).collect();
+        ipc.backplane = Some(BackplaneStack { layers: vec![BackplaneLayer::new(LayerMaterial::FlexFerrite, 0.0002)], housing: None });
+        let force_error = tauri::async_runtime::block_on(evaluate_force_sweep(ipc.clone(), Some(cad.clone()), Some(Default::default()))).unwrap_err();
+        let driver_error = tauri::async_runtime::block_on(analyze_drive(ipc, Default::default(), Some(0.4), Some(cad))).unwrap_err();
+        for error in [force_error, driver_error] {
+            assert!(error.contains("below the first magnetic/conducting stack surface"), "{error}");
+            assert!(error.contains("geometry has not been moved"), "{error}");
+        }
     }
 
     #[test]
@@ -872,8 +943,8 @@ mod cad_source_tests {
         for p in ["A", "B", "C"] {
             cad.coil_phases.insert(format!("coil {p}"), p.to_string());
         }
-        let gen = tauri::async_runtime::block_on(evaluate_force_sweep(ipc.clone(), None, None)).unwrap();
-        let imp = tauri::async_runtime::block_on(evaluate_force_sweep(ipc.clone(), Some(cad.clone()), None)).unwrap();
+        let gen = tauri::async_runtime::block_on(evaluate_force_sweep(ipc.clone(), None, Some(Default::default()))).unwrap();
+        let imp = tauri::async_runtime::block_on(evaluate_force_sweep(ipc.clone(), Some(cad.clone()), Some(Default::default()))).unwrap();
         assert!(
             (gen.mean_thrust_n - imp.mean_thrust_n).abs() <= 1e-6 * gen.mean_thrust_n.abs().max(1.0),
             "generated {} vs imported {}",

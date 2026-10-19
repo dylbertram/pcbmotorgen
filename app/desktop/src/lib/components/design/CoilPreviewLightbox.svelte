@@ -115,6 +115,7 @@
   // instead of reaching the modal's top edge.
   let toolbarHeight = $state(0);
   let terminalPanelOpen = $derived(view.terminalPanelOpen);
+  let sidePanel = $state<"layers" | "display" | "terminals" | "driver" | null>(null);
 
   // Scroll lock for the lightbox (Kata xy31): while the modal is open the
   // page behind it must never scroll. Two layers:
@@ -210,8 +211,8 @@
 
         <!-- Right rail: hangs from the bottom of the top toolbar down to the
              status bar, so the Layers and Display panels pull out under it. -->
-        <div class="absolute bottom-0 right-0 z-20 w-11" style:top={`${toolbarHeight}px`}>
-          <PreviewSideRail {config} {view} layers={importedGeometry ? importedGeometry.layer_z_mm.map((_, idx) => ({ idx })) : uniqueLayers} phases={importedGeometry ? [] : uniquePhases}
+        <div class="absolute bottom-0 right-0 z-30 w-11" style:top={`${toolbarHeight}px`}>
+          <PreviewSideRail bind:open={sidePanel} {config} {view} layers={importedGeometry ? importedGeometry.layer_z_mm.map((_, idx) => ({ idx })) : uniqueLayers} phases={importedGeometry ? [] : uniquePhases}
             {terminalTool} {onStartTerminals} terminalsDisabled={!onGeometryChange}
            geometry={terminalGeometry ?? importedGeometry} selection={importedGeometry ? selection : undefined} assignmentDisabled={!importedGeometry || !onGeometryChange || measure.mode || !!terminalTool?.active || view.oneSection}
           coils={importedGeometry ? uniquePhases.map((phase) => ({ name: phase.name, colorIdx: phase.colorIdx })) : []}
@@ -222,7 +223,8 @@
 
         <!-- Bare zoom buttons: no background, with the same 12px gap on the
              right as the position box has at the bottom. -->
-        <div class="absolute z-20 top-[32%] sm:top-auto sm:bottom-3 {terminalPanelOpen ? 'hidden sm:block' : ''}" style:right={terminalPanelOpen ? "calc(15rem + 3.5rem)" : "3.5rem"}>
+        <div class="absolute z-20 {sidePanel ? 'hidden sm:block sm:top-[var(--dock-top)] lg:top-auto lg:bottom-3' : 'top-[32%] sm:top-auto sm:bottom-3'}"
+          style:--dock-top={`${toolbarHeight + 12}px`} style:right={sidePanel ? "calc(15rem + 3.5rem)" : "3.5rem"}>
           <CoilPreviewControls
             zoomLabel={gestures.zoomLabel}
             canZoomIn={gestures.canZoomIn}

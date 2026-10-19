@@ -59,6 +59,75 @@ test("voltage updates driver results even when the force sweep fails", async ({ 
   await expect(results).toContainText("10.20 V usable");
 });
 
+test("a rejected new model clears the previous sweep and driver Kf", async ({ page }) => {
+  await page.route(/\/src\/lib\/ipc\/physics\.ts(?:\?t=\d+)?$/, (route) => route.fulfill({
+    contentType: "application/javascript",
+    body: `import * as original from '/src/lib/ipc/physics.ts?original';
+      export * from '/src/lib/ipc/physics.ts?original';
+      let calls = 0;
+      export async function evaluateForceSweep(...args) {
+        if (calls++ === 0) return original.evaluateForceSweep(...args);
+        throw new Error('Copper layer is below the first magnetic/conducting stack surface');
+      }
+      export async function analyzeDrive(config, settings, kf, cad) {
+        globalThis.__placementDriverInputs ??= [];
+        globalThis.__placementDriverInputs.push({ voltage: config.supply_voltage_v, kf });
+        return original.analyzeDrive(config, settings, kf, cad);
+      }`,
+  }));
+  await gotoDesignApp(page);
+  await page.getByRole("combobox", { name: "Winding connection", exact: true }).selectOption("2");
+  await page.getByRole("tab", { name: /^Simulate/i }).click();
+  const plot = page.getByRole("img", { name: "Thrust sweep plot", exact: true });
+  await expect(plot.locator("polyline")).toHaveCount(1);
+  const voltage = page.getByRole("spinbutton", { name: "Bus voltage (V)", exact: true });
+  await voltage.fill("12"); await voltage.press("Enter");
+  await expect(page.getByText("Computation error: Copper layer is below the first magnetic/conducting stack surface")).toBeVisible();
+  await expect(plot.locator("polyline")).toHaveCount(0);
+  await expect.poll(() => page.evaluate(() => (window as unknown as {
+    __placementDriverInputs: { voltage: number; kf: number | null }[];
+  }).__placementDriverInputs?.at(-1))).toEqual({ voltage: 12, kf: null });
+});
+
+test("backplane-only edits invalidate an active simulation, including nested material edits", async ({ page }) => {
+  await page.route(/\/src\/lib\/stores\/config\.svelte\.ts(?:\?t=\d+)?$/, (route) => route.fulfill({
+    contentType: "application/javascript",
+    body: `import * as original from '/src/lib/stores/config.svelte.ts?original';
+      export * from '/src/lib/stores/config.svelte.ts?original';
+      export class ConfigStore extends original.ConfigStore {
+        constructor(...args) { super(...args); globalThis.__activeSimulationConfig = this; }
+      }`,
+  }));
+  await page.route(/\/src\/lib\/ipc\/physics\.ts(?:\?t=\d+)?$/, (route) => route.fulfill({
+    contentType: "application/javascript",
+    body: `import * as original from '/src/lib/ipc/physics.ts?original';
+      export * from '/src/lib/ipc/physics.ts?original';
+      export async function evaluateForceSweep(config, ...args) {
+        globalThis.__forceBackplaneInputs ??= [];
+        globalThis.__forceBackplaneInputs.push(config.backplane == null ? null : JSON.parse(JSON.stringify(config.backplane)));
+        return original.evaluateForceSweep(config, ...args);
+      }`,
+  }));
+  await gotoDesignApp(page);
+  await page.getByRole("combobox", { name: "Winding connection", exact: true }).selectOption("2");
+  await page.getByRole("tab", { name: /^Simulate/i }).click();
+  await expect(page.getByRole("img", { name: "Thrust sweep plot", exact: true }).locator("polyline")).toHaveCount(1);
+  await page.evaluate(() => {
+    const state = window as unknown as { __activeSimulationConfig: { backplane: unknown } };
+    state.__activeSimulationConfig.backplane = { layers: [{ material: "flex_ferrite", thickness_m: 0.0002 }], housing: null };
+  });
+  await expect.poll(() => page.evaluate(() => (window as unknown as {
+    __forceBackplaneInputs: { layers: { thickness_m: number }[] }[];
+  }).__forceBackplaneInputs?.at(-1)?.layers?.[0]?.thickness_m)).toBe(0.0002);
+  await page.evaluate(() => {
+    const state = window as unknown as { __activeSimulationConfig: { backplane: { layers: { mu_r?: number }[] } } };
+    state.__activeSimulationConfig.backplane.layers[0].mu_r = 90;
+  });
+  await expect.poll(() => page.evaluate(() => (window as unknown as {
+    __forceBackplaneInputs: { layers: { mu_r?: number }[] }[];
+  }).__forceBackplaneInputs?.at(-1)?.layers?.[0]?.mu_r)).toBe(90);
+});
+
 test("select drivers and add validated custom parameters in a modal", async ({ page }) => {
   await gotoDesignApp(page);
   await page.getByRole("tab", { name: /^Simulate/i }).click();

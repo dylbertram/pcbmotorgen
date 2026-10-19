@@ -104,13 +104,66 @@ or incomplete batch, even if some child output files exist.
 
 The wide-band retry discussed in the historical evidence was cancelled by
 the user. It has no accepted result and is not automatically resumed by any
-of these tools. App UI work and browser tests recorded in the evidence notes
-are separate from this portable-tooling commit; they are not prerequisites
-for the offline Python checks or CLI reference tools.
+of these tools. App UI work and browser tests were excluded from the initial
+tooling commit `1d314df`. The application-transfer follow-up includes the
+remaining local command guards, reference UI, stale-result handling and their
+regression test sources. They are not prerequisites for offline Python checks.
+
+## Application transfer follow-up
+
+The initial tooling commit omitted command-layer guards even though the force
+library validator was present. The follow-up includes these sources together:
+
+- `app/desktop/src-tauri/src/commands/physics.rs`: force sweeps require explicit
+  drive settings; imported driver analysis validates copper placement before
+  using a backplane. Tests cover both rejection paths and matching error text.
+- `app/desktop/src-tauri/src/main.rs`: periodic reference command registration.
+- `app/desktop/src/lib/ipc/physics.ts` and `types/periodicReference.ts`: explicit
+  drive/reference IPC and result types.
+- `app/desktop/src/DocumentEditor.svelte`: failed results cannot retain an old
+  sweep/Kf; backplane edits invalidate active results.
+- `app/desktop/src/lib/components/design/`: reference panel, scope warnings and
+  associated preview/control changes.
+- `app/desktop/src/lib/ipc/{cadMapping,periodicReference}.test.ts` and
+  `app/desktop/e2e/{coil-layers,driver-simulation,periodic-reference}.spec.ts`:
+  regression test sources for the transferred application behavior.
+
+The follow-up was checked for source completeness and whitespace only. Its
+Rust/application/browser tests were **not rerun**: the attempted fresh build
+exhausted the container's memory, and no further builds or solver runs were
+started. Historical application test results are not verification of a new
+machine or this follow-up checkout. Run those tests on a sufficiently provisioned
+host before relying on application/backplane results.
+
+## macOS transfer status
+
+A separate macOS report supplied after `1d314df` refers to
+`scripts/solvers/install_macos.sh`, macOS process-identity/cleanup changes, and
+`scripts/solvers/results/macos-arm64-free-space-2026-10-19.json`. Those actual
+files/changes were not present in this working copy or the fetched remote when
+the application-transfer follow-up was prepared. They must be committed and
+transferred from the agent/machine that created them. The report alone does not
+supply an executable installer, pinned archive hash, raw results or complete
+test implementation. No placeholder installer or invented result index is
+included here. Do not run the reported macOS commands until that source is
+available, or treat the historical Linux results as ARM/macOS qualification.
+
+## Future winding/finite-field coupling
+
+The winding oracle and finite project solver do not yet share a coupled-field
+request. Their coordinate origins differ: the winding fixture places PCB top at
+z=0 and its first magnet at x=0, y=board_width/2; `project_static.py` places PCB
+bottom at z=0 and centres the array at the explicit pose. A future coupling must
+translate conductor points by `[cx-(count-1)*pitch/2, cy-board_width/2,
+pcb_thickness]`, with lengths in metres and `pitch` the magnet centre spacing.
+Apply the selected mover displacement once. Translation does not change signed
+dL; imported physical depths remain unchanged relative to the PCB. This is a
+required coordinate conversion, not evidence of validated winding/material
+response.
 
 ## Verification of the committed subset
 
-Before committing, an index-only copy of the repository was checked without
+Before committing `1d314df`, an index-only copy was checked without
 the unstaged UI changes or root user examples. On the existing Debian host:
 
 - Solver helper suite: 131 passed.

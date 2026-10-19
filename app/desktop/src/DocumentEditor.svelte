@@ -342,11 +342,11 @@
       if (!isCurrentSimulation(generation)) return;
 
       const [s, f, h] = results;
-      // Apply each successful result independently. A failed calculation does
-      // not erase the last good value from the other simulation panels.
-      if (s.status === "fulfilled") sweep = s.value;
-      if (f.status === "fulfilled") friction = f.value;
-      if (h.status === "fulfilled") height = h.value;
+      // Failed panels must not show values from another input/model or feed
+      // an old Kf to driver analysis. Independent successful panels remain.
+      sweep = s.status === "fulfilled" ? s.value : null;
+      friction = f.status === "fulfilled" ? f.value : null;
+      height = h.status === "fulfilled" ? h.value : null;
 
       const reasons = results
         .filter(
@@ -361,6 +361,7 @@
       error = reasons.length ? reasons.join("  ·  ") : null;
     } catch (e) {
       if (!isCurrentSimulation(generation)) return;
+      clearSimulationResults();
       error = e instanceof Error ? e.message : String(e);
     } finally {
       if (isCurrentSimulation(generation)) loading = false;
@@ -414,6 +415,7 @@
       config.drive.winding_temp_c,
       config.drive.via_plating_m,
     ];
+    void JSON.stringify(config.backplane);
     void valid;
     void geometryKey(projects.cadGeometry);
 

@@ -1,6 +1,45 @@
 import { test, expect } from "@playwright/test";
 import { gotoDesignApp } from "./helpers";
 
+test("zoom controls clear every open side panel", async ({ page }, testInfo) => {
+  await gotoDesignApp(page);
+  await page.getByRole("button", { name: "Expand coil preview" }).click();
+  const dialog = page.getByRole("dialog", { name: "Coil Preview", exact: true });
+  const zoom = dialog.getByRole("group", { name: "Zoom controls" });
+  for (const size of [{ width: 1280, height: 800 }, { width: 640, height: 480 }, { width: 390, height: 844 }]) {
+    await page.setViewportSize(size);
+    const resting = (await zoom.boundingBox())!;
+    for (const [trigger, name] of [["Layers", "Coil preview layers"], ["Display", "Coil preview display"], ["Set coil terminals", "Coil terminals"], ["Driver settings", "Preview driver settings"]]) {
+      await dialog.getByRole("button", { name: trigger, exact: true }).click();
+      const panel = dialog.getByRole("dialog", { name, exact: true });
+      await expect(panel).toBeVisible();
+      if (size.width < 640) {
+        // The narrow drawing has no space for a second floating dock.
+        await expect(zoom).toBeHidden();
+      } else {
+        await expect(zoom).toBeVisible();
+        await expect.poll(async () => {
+          const z = (await zoom.boundingBox())!;
+          const p = (await panel.boundingBox())!;
+          return z.x + z.width <= p.x;
+        }).toBe(true);
+        // The zoom buttons remain usable without closing the panel.
+        await dialog.getByRole("button", { name: "Zoom in", exact: true }).click();
+      }
+      // The last field stays clickable after scrolling, even in a short window.
+      const last = panel.locator("button, input").last();
+      await last.scrollIntoViewIfNeeded();
+      await last.click({ trial: true });
+      if (trigger === "Layers") await page.screenshot({ path: testInfo.outputPath(`panel-clearance-${size.width}.png`) });
+      await dialog.getByRole("button", { name: trigger, exact: true }).click();
+      await expect(panel).toHaveCount(0);
+      await expect(zoom).toBeVisible();
+      const restored = (await zoom.boundingBox())!;
+      expect(restored.x + restored.width).toBeCloseTo(resting.x + resting.width, 0);
+    }
+  }
+});
+
 test("inline motor preview is read-only and pans with the primary drag", async ({ page }) => {
   await gotoDesignApp(page);
   const inline = page.getByRole("img", { name: "Coil preview", exact: true });

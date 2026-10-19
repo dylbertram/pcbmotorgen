@@ -29,7 +29,10 @@
     phases = [], showMotorControls = false, hasPolePitchData = false,
     hasBandWidthData = false, hasPoleRegionData = false, poleRegionPhases = [],
     geometry, selection, assignmentDisabled = false, terminalTool, onStartTerminals,
-    terminalsDisabled = false, dismissOnOutsideClick = true, showViewMode = false, config }: {
+    terminalsDisabled = false, dismissOnOutsideClick = true, showViewMode = false, config,
+    open = $bindable<PanelId | null>(null) }: {
+    /** Lets the viewer keep floating controls clear of every open panel. */
+    open?: PanelId | null;
     /** Shared motor settings, supplied by the expanded coil preview. */
     config?: ConfigStore;
     view: CoilPreviewViewState;
@@ -64,7 +67,6 @@
   } = $props();
 
   type PanelId = "layers" | "display" | "terminals" | "driver";
-  let open = $state<PanelId | null>(null);
   let railEl: HTMLDivElement | null = $state(null);
   const triggers: Record<PanelId, HTMLButtonElement | null> = { layers: null, display: null, terminals: null, driver: null };
   const panelClass = "absolute bottom-0 right-full top-0 z-30 flex w-60 max-w-[calc(100vw-4rem)] flex-col overflow-hidden border-l border-slate-700 bg-slate-900 text-slate-200 shadow-xl shadow-black/40";

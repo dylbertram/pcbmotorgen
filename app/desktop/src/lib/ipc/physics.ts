@@ -24,6 +24,7 @@ import type {
   CadGeometry,
 } from "../types";
 import { isTauriAvailable } from "./core";
+import type { PeriodicStaticReference } from "../types/periodicReference";
 import {
   mockCoils,
   mockForceSweep,
@@ -68,6 +69,7 @@ export async function evaluateForceSweep(
 ): Promise<ForceSweepResult> {
   assertCadMapping(cadGeometry, config);
   if (cadGeometry?.terminal_connection === "delta") throw new Error("Imported delta force analysis is not available. Select Star (wye) coil terminals.");
+  if (!drive) throw new Error("Force analysis requires explicit drive settings matching driver analysis.");
   if (!isTauriAvailable()) return mockForceSweep(config);
   return await invoke<ForceSweepResult>("evaluate_force_sweep", { config, cadGeometry, drive });
 }
@@ -77,6 +79,16 @@ export async function computeHeightStack(
 ): Promise<HeightStackResultDto> {
   if (!isTauriAvailable()) return mockHeightStack(config);
   return await invoke<HeightStackResultDto>("compute_height_stack", { config });
+}
+
+/** No mock fallback: a reference result must come from the real solver. */
+export async function periodicBackplaneReference(
+  config: LinearMotorConfig,
+): Promise<PeriodicStaticReference> {
+  if (!isTauriAvailable()) {
+    throw new Error("The periodic reference requires the desktop app. Browser previews do not run this solver.");
+  }
+  return await invoke<PeriodicStaticReference>("periodic_backplane_reference", { config });
 }
 
 export async function computeFriction(

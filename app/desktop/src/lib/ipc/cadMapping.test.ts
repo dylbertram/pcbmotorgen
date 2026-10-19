@@ -21,6 +21,16 @@ function geometry(): CadGeometry {
 }
 
 describe("import mapping IPC gates", () => {
+  it("rejects implicit force copper and sends the same explicit settings to force and drive", async () => {
+    const config = new ConfigStore();
+    const ipc = config.toIpc();
+    await expect(evaluateForceSweep(ipc)).rejects.toThrow("explicit drive settings");
+    expect(invoke).not.toHaveBeenCalled();
+    const drive = { ...config.drive, inner_copper_oz: 1, outer_copper_oz: 3, winding_temp_c: 90 };
+    await evaluateForceSweep(ipc, null, drive);
+    await analyzeDrive(ipc, drive, null, null);
+    for (const [, args] of vi.mocked(invoke).mock.calls) expect(args).toMatchObject({ drive });
+  });
   it("does not apply star equations to an imported delta winding", async () => {
     const config = new ConfigStore(); config.phases = 1;
     const g = geometry(); g.terminal_connection = "delta";
