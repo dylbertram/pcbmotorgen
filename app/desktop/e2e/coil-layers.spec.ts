@@ -145,7 +145,18 @@ test("an outside click keeps the coil preview panel open; toolbar toggles close 
   await expect(display).toHaveCount(0);
 });
 
-test("the isometric view draws copper planes and via spans", async ({ page }, testInfo) => {
+test("the Threlte 3D view renders copper and supports orbit, zoom and visibility", async ({ page }, testInfo) => {
+  const errors: string[] = [];
+  page.on("pageerror", error => errors.push(error.message));
+  // Count actual GPU draws, not just the geometry metadata on the wrapper.
+  await page.addInitScript(() => {
+    const draw = WebGL2RenderingContext.prototype.drawElements;
+    WebGL2RenderingContext.prototype.drawElements = function (...args) {
+      const canvas = this.canvas as HTMLCanvasElement;
+      canvas.dataset.draws = String(Number(canvas.dataset.draws ?? 0) + 1);
+      return draw.apply(this, args);
+    };
+  });
   await gotoDesignApp(page);
   await page.getByRole("button", { name: "Expand coil preview" }).click();
   const dialog = page.getByRole("dialog", { name: "Coil Preview", exact: true });
@@ -156,6 +167,9 @@ test("the isometric view draws copper planes and via spans", async ({ page }, te
 
   const iso = dialog.getByTestId("coil-iso");
   await expect(iso).toBeVisible();
+  const canvas = iso.locator("canvas");
+  await expect(canvas).toBeVisible();
+  await expect.poll(async () => Number(await canvas.getAttribute("data-draws"))).toBeGreaterThan(0);
   await expect(iso).toHaveAttribute("data-layers", /[1-9]/);
   await expect(iso).toHaveAttribute("data-segments", /[1-9]/);
   // Generated geometry carries via spans between its copper planes.
@@ -165,10 +179,39 @@ test("the isometric view draws copper planes and via spans", async ({ page }, te
   await expect.poll(async () => Number(await iso.getAttribute("data-segments"))).toBeLessThan(allSegments);
   await display.getByRole("checkbox", { name: "Show layer 0", exact: true }).check();
   await expect(iso).toHaveAttribute("data-segments", String(allSegments));
+  await display.getByRole("checkbox", { name: "Show vias", exact: true }).uncheck();
+  await expect(iso).toHaveAttribute("data-vias", "0");
+  await display.getByRole("checkbox", { name: "Show vias", exact: true }).check();
+  await display.getByRole("radio", { name: "Centerlines" }).check();
+  await expect(iso).toHaveAttribute("data-trace-mode", "centerlines");
+  await display.getByRole("radio", { name: "Traces", exact: true }).check();
+  await display.getByRole("button", { name: "Close display panel" }).click();
+  // Orbit and zoom must change the rendered pixels, not the old 2D gestures.
+  const before = await canvas.screenshot();
+  const box = (await canvas.boundingBox())!;
+  await page.mouse.move(box.x + box.width * 0.4, box.y + box.height * 0.45);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width * 0.55, box.y + box.height * 0.6, { steps: 8 });
+  await page.mouse.up();
+  await expect.poll(async () => (await canvas.screenshot()).equals(before)).toBe(false);
+  const orbited = await canvas.screenshot();
+  await iso.getByRole("button", { name: "Zoom in 3D", exact: true }).click();
+  await expect.poll(async () => (await canvas.screenshot()).equals(orbited)).toBe(false);
+  const zoomed = await canvas.screenshot();
+  await page.mouse.move(box.x + box.width * 0.4, box.y + box.height * 0.45);
+  await page.mouse.wheel(0, -160);
+  await expect.poll(async () => (await canvas.screenshot()).equals(zoomed)).toBe(false);
+  const scrolled = await canvas.screenshot();
+  await page.mouse.down({ button: "right" });
+  await page.mouse.move(box.x + box.width * 0.45, box.y + box.height * 0.5, { steps: 5 });
+  await page.mouse.up({ button: "right" });
+  await expect.poll(async () => (await canvas.screenshot()).equals(scrolled)).toBe(false);
+  await iso.getByRole("button", { name: "Reset 3D view", exact: true }).click();
   await page.screenshot({ path: testInfo.outputPath("coil-iso.png") });
-  await expect(dialog.locator("canvas")).toHaveCount(0);
+  expect(errors).toEqual([]);
 
   // Returning to top-down restores the canvas renderer.
+  await dialog.getByRole("button", { name: "Display", exact: true }).click();
   await display.getByRole("radio", { name: "Top-down", exact: true }).check();
   await expect(dialog.getByTestId("coil-iso")).toHaveCount(0);
   await expect(dialog.locator("canvas")).toBeVisible();
