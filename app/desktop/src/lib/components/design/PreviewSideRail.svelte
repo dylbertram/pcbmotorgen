@@ -15,9 +15,9 @@
    */
   import { fly } from "svelte/transition";
   import { onDestroy } from "svelte";
-  import { Layers, SlidersHorizontal, X, Plug, CircuitBoard, Ruler } from "@lucide/svelte";
+  import { Layers, SlidersHorizontal, X, Plug, CircuitBoard, Ruler, Route, Magnet } from "@lucide/svelte";
   import type { Snippet } from "svelte";
-  import type { PreviewPanelId } from "./previewPanels";
+  import { DESIGN_PANELS, isDesignPanel, type DesignPanelId, type PreviewPanelId } from "./previewPanels";
   import CoilTerminalPanel from "./CoilTerminalPanel.svelte";
   import type { CoilTerminalTool } from "../../utils/coilTerminalTool.svelte";
   import CoilPreviewVisibilityPanel from "./CoilPreviewVisibilityPanel.svelte";
@@ -41,7 +41,7 @@
     designSettings, designOnly = false, open = $bindable<PreviewPanelId | null>(null), active = true }: {
     designOnly?: boolean;
     active?: boolean;
-    designSettings?: Snippet;
+    designSettings?: Snippet<[DesignPanelId]>;
     open?: PreviewPanelId | null;
     /** Shared motor settings, supplied by the expanded coil preview. */
     config?: ConfigStore;
@@ -81,14 +81,10 @@
 
   const rippleCheck = $derived(drive?.checks.find((check) => check.id === "ripple"));
   let railEl: HTMLDivElement | null = $state(null);
-  const triggers: Record<PreviewPanelId, HTMLButtonElement | null> = { design: null, layers: null, display: null, terminals: null, driver: null };
+  const triggers: Partial<Record<PreviewPanelId, HTMLButtonElement | null>> = {};
   const panelClass = "absolute bottom-0 right-full top-0 z-30 flex w-60 max-w-[calc(100vw-6rem)] flex-col overflow-hidden border-l border-slate-700 bg-slate-900 text-slate-200 shadow-xl shadow-black/40";
-  const designSections = [
-    { id: "design-constraints-heading", label: "Constraints" },
-    { id: "backplane-heading", label: "Stackup" },
-    { id: "topology-board-heading", label: "Routing" },
-    { id: "magnets-heading", label: "Magnets" },
-  ];
+  const designIcons = { constraints: Ruler, stackup: Layers, routing: Route, magnets: Magnet };
+  const activeDesignPanel = $derived(DESIGN_PANELS.find(({ id }) => id === open));
   onDestroy(() => { if (!designOnly) { terminalTool?.cancel(); view.terminalPanelOpen = false; } });
   // An outside request (the Simulation tab's ends alert) sets
   // `view.terminalPanelOpen`; mirror it into the local panel state.
@@ -110,7 +106,7 @@
   }
   function handleKeydown(event: KeyboardEvent) {
     if (!active || !open || event.key !== "Escape") return;
-    if (designOnly !== (open === "design")) return;
+    if (designOnly !== isDesignPanel(open)) return;
     const target = event.target as Element | null;
     const modal = target?.closest('[aria-modal="true"]');
     // Portaled dialogs and menus own Escape before the underlying drawer.
@@ -137,11 +133,14 @@
 <div bind:this={railEl} class="relative h-full w-11">
   <div role="toolbar" aria-label={designOnly ? "Design side tools" : "Preview side tools"} aria-orientation="vertical" class="flex h-full w-full flex-col items-center gap-2 overflow-y-auto {designOnly ? 'border-r' : 'border-l'} border-slate-700 bg-slate-900 py-2">
     {#if designSettings}
-      <button type="button" bind:this={triggers.design} aria-label="Design settings" aria-expanded={open === "design"} onclick={() => toggle("design")}
+      {#each DESIGN_PANELS as panel (panel.id)}
+      {@const Icon = designIcons[panel.id]}
+      <button type="button" bind:this={triggers[panel.id]} aria-label={panel.label} aria-expanded={open === panel.id} onclick={() => toggle(panel.id)}
         class="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-transparent text-slate-300 hover:bg-slate-800 aria-expanded:border-emerald-500 aria-expanded:text-emerald-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
-        title="Constraints, stackup, routing and magnets">
-        <Ruler size={16} aria-hidden="true" />
+        title={panel.label}>
+        <Icon size={16} aria-hidden="true" />
       </button>
+      {/each}
     {/if}
     {#if !designOnly}<button type="button" bind:this={triggers.layers} aria-label="Layers" aria-expanded={open === "layers"} onclick={() => toggle("layers")}
       class="flex h-8 w-8 items-center justify-center rounded-md border border-transparent text-slate-300 hover:bg-slate-800 aria-expanded:border-emerald-500 aria-expanded:text-emerald-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
@@ -169,19 +168,13 @@
     {/if}
   </div>
 
-  {#if open === "design" && designSettings}
-    <div role="dialog" aria-label="Preview design settings" aria-modal="false" class="absolute bottom-0 left-full top-0 z-30 flex w-[400px] max-w-[calc(100vw-8.25rem)] flex-col overflow-hidden border-r border-slate-700 bg-slate-900 text-slate-200 shadow-[12px_0_20px_-8px_rgba(0,0,0,0.4)] [clip-path:inset(0_-32px_0_0)]" transition:fly={{ x: -16, duration: 140 }}>
+  {#if activeDesignPanel && designSettings}
+    <div role="dialog" aria-label={activeDesignPanel.label} aria-modal="false" class="absolute bottom-0 left-full top-0 z-30 flex w-[400px] max-w-[calc(100vw-8.25rem)] flex-col overflow-hidden border-r border-slate-700 bg-slate-900 text-slate-200 shadow-[12px_0_20px_-8px_rgba(0,0,0,0.4)] [clip-path:inset(0_-32px_0_0)]" transition:fly={{ x: -16, duration: 140 }}>
       <header class="flex shrink-0 items-center justify-between border-b border-slate-700 px-3 py-2">
-        <h3 class="text-sm font-semibold">Design settings</h3>
-        <button type="button" aria-label="Close design settings panel" onclick={close} class="rounded p-1 text-slate-400 hover:bg-slate-800"><X size={16} aria-hidden="true" /></button>
+        <div class="flex items-center"><h3 class="text-sm font-semibold">{activeDesignPanel.label}</h3>{#if activeDesignPanel.id === "stackup"}<HelpTag label="About the backplane model" tip="Fundamental-field model with saturation and eddy currents. Infinite layers; ignores edges, hysteresis and core losses." />{/if}</div>
+        <button type="button" aria-label={`Close ${activeDesignPanel.label.toLowerCase()} panel`} onclick={close} class="rounded p-1 text-slate-400 hover:bg-slate-800"><X size={16} aria-hidden="true" /></button>
       </header>
-      <nav aria-label="Design settings sections" class="flex shrink-0 flex-wrap gap-1 border-b border-slate-700 p-2">
-        {#each designSections as section (section.id)}
-          <button type="button" onclick={() => railEl?.querySelector(`#${section.id}`)?.scrollIntoView({ block: "start" })}
-            class="rounded px-2 py-1 text-xs text-slate-400 hover:bg-slate-800 hover:text-slate-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400">{section.label}</button>
-        {/each}
-      </nav>
-      <div class="min-h-0 flex-1">{@render designSettings()}</div>
+      <div class="min-h-0 flex-1">{#key activeDesignPanel.id}{@render designSettings(activeDesignPanel.id)}{/key}</div>
     </div>
   {/if}
 

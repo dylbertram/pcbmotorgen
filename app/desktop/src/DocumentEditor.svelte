@@ -40,7 +40,7 @@
   import ProjectNotification from "./lib/components/ui/ProjectNotification.svelte";
   import ScrollArea from "./lib/components/ui/ScrollArea.svelte";
   import CoilPreview from "./lib/components/design/CoilPreview.svelte";
-  import type { PreviewPanelId } from "./lib/components/design/previewPanels";
+  import type { DesignPanelId, PreviewPanelId } from "./lib/components/design/previewPanels";
   import DesignTab from "./lib/components/layout/DesignTab.svelte";
   import SimulateTab from "./lib/components/layout/SimulateTab.svelte";
   import KicadDialog from "./lib/components/layout/KicadDialog.svelte";
@@ -90,7 +90,7 @@
   let drive = $state<DriveAnalysis | null>(untrack(() => session.runtime.drive));
   let driveError = $state<string | null>(null);
   let coilPreviewExpanded = $state(false);
-  let previewPanel = $state<PreviewPanelId | null>("design");
+  let previewPanel = $state<PreviewPanelId | null>("constraints");
   let coilPreview: CoilPreview | undefined = $state();
   let drivePending = $state(false);
   let loading = $state(false);
@@ -573,8 +573,8 @@
   });
 </script>
 
-{#snippet motorSettings()}
-  <DesignTab {config} {motion} {measuredTrace} routingDimensions={activeCoils?.routing_dimensions ?? null}
+{#snippet motorSettings(section: DesignPanelId)}
+  <DesignTab {section} {config} {motion} {measuredTrace} routingDimensions={activeCoils?.routing_dimensions ?? null}
     cadGeometry={projects.cadGeometry} onGeometryChange={(geometry) => projects.setCadGeometry(geometry)}
     onImportCad={() => (cadImportDialogOpen = true)} onUseGenerated={() => projects.setCadGeometry(null)}
     backplaneAnalysis={height?.backplane_analysis ?? null} driveBackplane={drive?.backplane ?? null} />
@@ -699,7 +699,7 @@
             <ScrollArea id="simulation-scroll" class="h-full" viewportClass="p-4" aria-label="Simulation workspace">
               <SimulateTab
                 onOpenPreview={() => (coilPreviewExpanded = true)}
-                onConfigureWinding={() => { selectTab("design"); coilPreview?.showDesignSettings(); }}
+                onConfigureWinding={() => { selectTab("design"); coilPreview?.showDesignSettings("routing"); }}
                 {config}
                 active={active && activeTab === "simulate"}
                 {sweep}

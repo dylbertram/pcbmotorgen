@@ -15,6 +15,7 @@
   import Formula from "../ui/Formula.svelte";
   import ScrollArea from "../ui/ScrollArea.svelte";
   import electricalPitchSvg from "../../assets/electrical-pitch.svg";
+  import type { DesignPanelId } from "../design/previewPanels";
 
   let {
     config,
@@ -27,6 +28,7 @@
     onGeometryChange,
     backplaneAnalysis = null,
     driveBackplane = null,
+    section = "constraints",
   }: {
     config: ConfigStore;
     motion: MotionStore;
@@ -38,6 +40,7 @@
     onGeometryChange?: (geometry: CadGeometry) => void;
     backplaneAnalysis?: BackplaneAnalysis | null;
     driveBackplane?: DriveBackplane | null;
+    section?: DesignPanelId;
   } = $props();
   const stripBounds = $derived(stripBoundsDomainMm(config, motion));
 </script>
@@ -46,20 +49,15 @@
   id="design-settings-scroll"
   class="h-full"
   viewportClass="p-3"
-  aria-label="Design settings"
+  aria-label={`${section} settings`}
 >
   <div class="design-settings space-y-3">
     <!-- Travel inputs, live assembly geometry and derived sizing readouts. -->
+    {#if section === "constraints"}
     <section
-      class="rounded-md border border-slate-700 bg-slate-800/40 px-3 py-2.5"
-      aria-labelledby="design-constraints-heading"
+      id="design-constraints-heading"
+      aria-label="Design constraints"
     >
-      <h2
-        id="design-constraints-heading"
-        class="mb-2 text-sm font-semibold text-slate-200"
-      >
-        Design constraints
-      </h2>
       <div class="grid gap-x-3 gap-y-2.5">
         <label
           class="min-w-0"
@@ -135,22 +133,19 @@
       </div>
       <ConstraintReadouts {config} measuredTraceLengthMm={measuredTrace?.traceLengthMm ?? null} {routingDimensions} />
     </section>
+    <ValidationWarning {config} />
+    {:else if section === "stackup"}
 
     <BackplanePanel {config} {backplaneAnalysis} {driveBackplane} />
+    {:else if section === "routing"}
 
     <!-- Topology (routing pattern + parameters + generator load) and the
          board/winding fields share one panel so winding geometry can be
          reviewed and edited side by side. -->
     <section
-      class="rounded-md border border-slate-700 bg-slate-800/40 px-3 py-2.5"
-      aria-labelledby="topology-board-heading"
+      id="topology-board-heading"
+      aria-label="Routing"
     >
-      <h2
-        id="topology-board-heading"
-        class="mb-2.5 text-sm font-semibold text-slate-200"
-      >
-        Topology &amp; board
-      </h2>
       <div class="space-y-3">
         <TopologySelector {config} cadGeometryActive={cadGeometry !== null} cadSourceFileName={cadGeometry?.source_file_name} {onImportCad} {onUseGenerated} />
         {#if cadGeometry}
@@ -198,8 +193,9 @@
       </div>
     </section>
 
-    <MagnetsPanel {config} />
-    <ValidationWarning {config} />
+    {:else if section === "magnets"}
+      <MagnetsPanel {config} />
+    {/if}
   </div>
 </ScrollArea>
 

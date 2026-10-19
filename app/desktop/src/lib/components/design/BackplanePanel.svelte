@@ -135,18 +135,9 @@
 </script>
 
 <section
-  class="rounded-md border border-slate-700 bg-slate-800/40 px-3 py-2.5"
-  aria-labelledby="backplane-heading"
+  id="backplane-heading"
+  aria-label="Stackup"
 >
-  <h2
-    id="backplane-heading"
-    class="mb-2 text-sm font-semibold text-slate-200"
-  >
-    Stackup<HelpTag
-      label="About the backplane model"
-      tip="Fundamental-field model with saturation and eddy currents. Infinite layers; ignores edges, hysteresis and core losses."
-    />
-  </h2>
 
   <div class="stackup-fields mb-2 grid items-center gap-3">
     <div class="space-y-2.5">

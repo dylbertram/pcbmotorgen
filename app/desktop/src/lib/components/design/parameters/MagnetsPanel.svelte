@@ -3,19 +3,12 @@
   import MagnetGradeHelper from "../MagnetGradeHelper.svelte";
   import NumberField from "../../ui/NumberField.svelte";
   import HelpTag from "../../ui/HelpTag.svelte";
-  import Separator from "../../ui/Separator.svelte";
 
   let { config }: { config: ConfigStore } = $props();
 </script>
 
-<section aria-labelledby="magnets-heading" class="overflow-hidden rounded-md border border-slate-700 bg-slate-800/30">
-  <header class="px-3 py-2">
-    <h3 id="magnets-heading" class="text-sm font-semibold text-slate-200">Magnets</h3>
-  </header>
-
-  <Separator />
-
-  <div class="px-3 pb-3 pt-2.5">
+<section id="magnets-heading" aria-label="Magnets">
+  <div>
     <div class="magnet-fields grid gap-x-3 gap-y-2.5">
       <label class="min-w-0">
         <span class="flex items-center justify-between gap-2">
