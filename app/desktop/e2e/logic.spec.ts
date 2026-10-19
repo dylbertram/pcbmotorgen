@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { ASIDE, eventually, gotoDesignApp } from "./helpers";
+import { ASIDE, eventually, gotoDesignApp, openCoilPreview } from "./helpers";
 
 /**
  * Guards the frontend plumbing of the "traces follow the magnet pattern"
@@ -66,9 +66,7 @@ test.describe("routing dimensions -> preview overlays", () => {
       expect(await inlineCanvas.getAttribute("data-band-widths")).toBe("0");
     });
 
-    await page
-      .locator(`${ASIDE} button[aria-label='Expand coil preview']`)
-      .click();
+    await openCoilPreview(page);
     const dialog = page.getByRole("dialog", { name: "Coil Preview", exact: true });
     const modalCanvas = dialog.locator("canvas[data-pole-pitch]");
     await dialog.getByRole("button", { name: "Layers", exact: true }).click();
@@ -111,9 +109,7 @@ test.describe("routing dimensions -> preview overlays", () => {
       expect(await inlineCanvas.getAttribute("data-pole-regions")).toBe("0");
     });
 
-    await page
-      .locator(`${ASIDE} button[aria-label='Expand coil preview']`)
-      .click();
+    await openCoilPreview(page);
     const dialog = page.getByRole("dialog", { name: "Coil Preview", exact: true });
     const modalCanvas = dialog.locator("canvas[data-pole-regions]");
     await dialog.getByRole("button", { name: "Layers", exact: true }).click();

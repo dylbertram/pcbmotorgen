@@ -9,7 +9,7 @@
   preventScroll stays disabled. Escape first cancels an active edit command.
 -->
 <script lang="ts">
-  import { X, Maximize2 } from "@lucide/svelte";
+  import { X } from "@lucide/svelte";
   import type { ConfigStore } from "../../stores/config.svelte";
   import type { MotionStore } from "../../stores/motion.svelte";
   import { Dialog, DropdownMenu } from "bits-ui";
@@ -46,7 +46,6 @@
     expanded = $bindable(false),
     embedded = false,
     active = true,
-    onExpand,
     designSettings,
     sidePanel = $bindable<PreviewPanelId | null>(null),
     height = PREVIEW_H,
@@ -83,7 +82,6 @@
     expanded?: boolean;
     embedded?: boolean;
     active?: boolean;
-    onExpand?: () => void;
     designSettings?: Snippet;
     sidePanel?: PreviewPanelId | null;
     height?: number;
@@ -134,9 +132,10 @@
   // instead of reaching the modal's top edge.
   let toolbarHeight = $state(0);
   let terminalPanelOpen = $derived(view.terminalPanelOpen);
-  const panelWidth = $derived(sidePanel === "design" ? 400 : sidePanel ? 240 : 0);
+  const panelWidth = $derived(sidePanel && sidePanel !== "design" ? 240 : 0);
   let frameWidth = $state(PREVIEW_W);
-  const dockWidth = $derived(Math.min(panelWidth, Math.max(0, frameWidth - 96)));
+  const dockWidth = $derived(Math.min(panelWidth, Math.max(0, frameWidth - 132)));
+  const leftDockWidth = $derived(designSettings ? 44 + (sidePanel === "design" ? Math.min(400, Math.max(0, frameWidth - 132)) : 0) : 0);
 
   // Scroll lock for the lightbox (Kata xy31): while the modal is open the
   // page behind it must never scroll. Two layers:
@@ -168,13 +167,6 @@
 
 {#if embedded}
   <section aria-label="Coil design workspace" inert={!active} aria-hidden={!active || undefined} class="flex h-full min-h-0 flex-col overflow-hidden bg-slate-900">
-    <header class="flex shrink-0 items-center justify-between gap-2 border-b border-slate-700 px-3 py-2">
-      <h2 class="text-sm font-semibold text-slate-200">Coil Preview</h2>
-      <div class="flex items-center gap-3">
-        <span class="hidden text-xs text-slate-400 sm:inline">{stats}</span>
-        <button type="button" aria-label="Expand coil preview" onclick={onExpand} class="rounded border border-slate-700 bg-slate-800 p-1 text-slate-300 hover:text-emerald-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400"><Maximize2 size={16} aria-hidden="true" /></button>
-      </div>
-    </header>
     {@render workspace()}
   </section>
 {:else}
@@ -255,10 +247,16 @@
           {/if}
         </div>
 
+        {#if designSettings}
+          <div class="absolute bottom-0 left-0 z-20 w-11" style:top={`${toolbarHeight}px`}>
+            <PreviewSideRail designOnly {designSettings} bind:open={sidePanel} {active} {view} {terminalTool} layers={[]} label="Design settings" displayLabel="Design settings" dismissOnOutsideClick={false} />
+          </div>
+        {/if}
+
         <!-- Right rail: hangs from the bottom of the top toolbar down to the
              status bar, so the Layers and Display panels pull out under it. -->
         <div class="absolute bottom-0 right-0 z-30 w-11" style:top={`${toolbarHeight}px`}>
-          <PreviewSideRail {config} {drive} {driveError} {drivePending} {view} {designSettings} bind:open={sidePanel} {active} layers={importedGeometry ? importedGeometry.layer_z_mm.map((_, idx) => ({ idx })) : uniqueLayers} phases={importedGeometry ? [] : uniquePhases}
+          <PreviewSideRail {config} {drive} {driveError} {drivePending} {view} bind:open={sidePanel} {active} layers={importedGeometry ? importedGeometry.layer_z_mm.map((_, idx) => ({ idx })) : uniqueLayers} phases={importedGeometry ? [] : uniquePhases}
             {terminalTool} {onStartTerminals} terminalsDisabled={!onGeometryChange || view.viewMode === "iso"}
            geometry={terminalGeometry ?? importedGeometry} selection={importedGeometry ? selection : undefined} assignmentDisabled={view.viewMode === "iso" || !importedGeometry || !onGeometryChange || measure.mode || !!terminalTool?.active || view.oneSection}
           coils={importedGeometry ? uniquePhases.map((phase) => ({ name: phase.name, colorIdx: phase.colorIdx })) : []}
@@ -289,7 +287,7 @@
              moves inside the lightbox. The phase-waveform popover is anchored
              directly above this box at the same width, so it cannot be moved. -->
         {#if view.viewMode === "top"}
-        <div class="absolute bottom-3 left-2 z-20 flex w-[min(420px,calc(100%-4rem))] flex-col gap-2 {sidePanel ? 'max-sm:hidden' : ''}" style:max-width={`calc(100% - ${dockWidth + 60}px)`}>
+        <div class="absolute bottom-3 z-20 flex w-[min(420px,calc(100%-4rem))] flex-col gap-2 {sidePanel ? 'max-sm:hidden' : ''}" style:left={`${leftDockWidth + 8}px`} style:max-width={`calc(100% - ${leftDockWidth + dockWidth + 60}px)`}>
           {#if terminalPanelOpen}
             <div class="rounded-md border border-slate-700 bg-slate-900/95 p-3">
               <PreviewLayerSlider {view} layers={importedGeometry ? importedGeometry.layer_z_mm.map((_, idx) => ({ idx })) : uniqueLayers} onSelect={(layer) => { if (layer !== null && terminalTool?.active) terminalTool.chooseLayer(layer); view.phaseVisibility = []; }} />
@@ -312,8 +310,9 @@
         {/if}
       </div>
 
-      <div class="z-30 flex shrink-0 items-center justify-between gap-3 border-t border-slate-700 bg-slate-900 px-3 py-2 text-[10px] text-slate-400" role="group" aria-label="Preview status">
+      <div class="z-30 flex shrink-0 flex-wrap items-center justify-between gap-x-3 gap-y-1 border-t border-slate-700 bg-slate-900 px-3 py-2 text-[10px] text-slate-400" role="group" aria-label="Preview status">
         <span class="min-w-0 flex-1 font-mono">Position: {motion.clampedPositionMm.toFixed(1)} mm · Mover extent: {moverBounds.startMm.toFixed(1)} – {moverBounds.endMm.toFixed(1)} mm</span>
+        {#if embedded}<span class="ml-auto shrink-0 text-right" aria-label="Coil geometry summary">{stats}</span>{/if}
         {#if !embedded}<DropdownMenu.Root>
           <DropdownMenu.Trigger class="shrink-0 rounded border border-slate-700 px-2 py-1 text-xs hover:text-emerald-300" aria-label="Display state">Display ▾</DropdownMenu.Trigger>
           <DropdownMenu.Portal><DropdownMenu.Content preventScroll={false} class="z-[150] rounded border border-slate-700 bg-slate-900 p-1 text-xs text-slate-200" side="top" sideOffset={8}>

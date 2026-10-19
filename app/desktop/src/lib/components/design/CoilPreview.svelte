@@ -210,8 +210,13 @@
    *  rows, pole regions) so the camera never clips an annotation. */
   function worldTransformFor(zoom: number): WorldTransform {
     const drawerWidth = sidePanel === "design" ? 400 : sidePanel ? 240 : 0;
-    const inset = interactive ? 44 + Math.min(drawerWidth, Math.max(0, viewportWidth - 96)) : 0;
+    const leftInset = interactive && designSettings ? 44 + (sidePanel === "design" ? Math.min(drawerWidth, Math.max(0, viewportWidth - 132)) : 0) : 0;
+    const inset = interactive ? leftInset + 44 + (sidePanel && sidePanel !== "design" ? Math.min(drawerWidth, Math.max(0, viewportWidth - 132)) : 0) : 0;
     const fitWidth = W * Math.max(0.15, 1 - inset / Math.max(viewportWidth, 1));
+    const fit = (bounds: typeof overlayFitBounds) => {
+      const transform = fitWorldToView(bounds, fitWidth, H, PAD, zoom);
+      return { ...transform, tx: transform.tx + W * leftInset / Math.max(viewportWidth, 1) };
+    };
     // A command focuses the selected coil, not the unrelated magnet array.
     if (terminalTool.active && terminalTool.coil) {
       const points = terminalTool.candidates.map((p) => p.position);
@@ -221,10 +226,10 @@
         const minX = Math.min(...xs), maxX = Math.max(...xs);
         const minY = Math.min(...ys), maxY = Math.max(...ys);
         const pad = Math.max(maxX - minX, maxY - minY, 0.001) * 0.08;
-        return fitWorldToView({ minX: minX - pad, minY: minY - pad, maxX: maxX + pad, maxY: maxY + pad }, fitWidth, H, PAD, zoom);
+        return fit({ minX: minX - pad, minY: minY - pad, maxX: maxX + pad, maxY: maxY + pad });
       }
     }
-    return fitWorldToView(overlayFitBounds, fitWidth, H, PAD, zoom);
+    return fit(overlayFitBounds);
   }
 
   // All pan/pinch/zoom state, cursor maths, touch/pointer coordination and
@@ -403,7 +408,7 @@
   // -------------------------------------------------------------------
   // Frame + backing-store sizing. A ResizeObserver keeps the canvas backing
   // store in lockstep with the rendered CSS box (dpr-capped at 2×); writing
-  // `frameSize` re-triggers the draw effect below.
+  // `frameRevision` re-triggers the draw effect below.
   //
   // One ResizeObserver follows the active frame, either the embedded
   // workspace or expanded viewer. Sizing writes happen in its callback;
@@ -413,7 +418,7 @@
   let canvasRef: HTMLCanvasElement | undefined = $state();
   let modalFrameRef: HTMLDivElement | undefined = $state();
   let modalCanvasRef: HTMLCanvasElement | undefined = $state();
-  let frameSize = $state(0); // frame CSS-pixel width, measured by the RO
+  let frameRevision = $state(0);
 
   // The pair that is currently visible: the inline canvas while collapsed,
   // the modal canvas while expanded. The draw effect paints only this pair.
@@ -427,14 +432,15 @@
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
     // All sizing happens inside the RO callbacks only (no state writes in the
     // effect body). observe() guarantees an initial delivery before paint, so
-    // the backing store + `frameSize` (which re-triggers the draw effect) are
+    // the backing store + `frameRevision` (which re-triggers the draw effect) are
     // always set before the first render is presented.
     const observer = new ResizeObserver(() => {
+      if (frame.clientWidth <= 0 || frame.clientHeight <= 0) return;
       if (canvas) {
         canvas.width = Math.round(frame.clientWidth * dpr);
         canvas.height = Math.round(frame.clientHeight * dpr);
       }
-      frameSize = frame.clientWidth;
+      frameRevision += 1;
       viewportWidth = frame.clientWidth;
       viewportHeight = frame.clientHeight;
     });
@@ -462,6 +468,10 @@
   $effect(() => {
     const frame = activeFrame;
     const canvas = activeCanvas;
+    // Keep resize tracking even while hidden. Otherwise the zero-width guard
+    // drops this dependency and a same-size return leaves a cleared canvas.
+    void frameRevision;
+    if (!active) return;
     if (!frame || !canvas) return;
     if (frame.clientWidth <= 0) return;
     void worldTransform;
@@ -483,7 +493,6 @@
     void bandRows;
     void overlayFitBounds;
     void g;
-    void frameSize;
     void expanded;
     renderer.draw(frame, canvas, {
       coils,
@@ -581,7 +590,6 @@
       {active}
       {designSettings}
       bind:sidePanel
-      onExpand={() => (expanded = true)}
       bind:expanded
       height={H}
       {config}

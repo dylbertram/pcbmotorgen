@@ -649,17 +649,15 @@
         </div>
       {/if}
 
-      <!-- Scroll viewports fill the space between the workflow and footer
-           dividers. Insets belong inside them, so content scrolls to the edges. -->
+      <!-- Scroll viewports fill the space below the workflow divider.
+           Insets belong inside them, so content scrolls to the edges. -->
       <div
         inert={externalDialogOpen}
         aria-hidden={externalDialogOpen || undefined}
         class="grid min-h-0 flex-1 {activeTab === 'design' && designType === 'sensor' ? 'items-start lg:grid-cols-[minmax(360px,0.9fr)_minmax(0,1.35fr)] lg:grid-rows-[minmax(0,1fr)] lg:items-stretch' : 'grid-cols-1 grid-rows-[minmax(0,1fr)] items-stretch'}"
       >
-        <!-- The desktop layout locks the page height: both columns stretch to the
-             row (viewport minus header/footer) and scroll independently inside
-             themselves, so the footer is always visible and the page never
-             scrolls. Below lg the columns stack and the page scrolls normally. -->
+        <!-- Desktop sensor columns stretch to the remaining viewport height
+             and scroll independently. Below lg the sensor columns stack. -->
         {#if designType === "sensor"}<aside
           class="relative min-w-0 min-h-0 lg:h-full {activeTab !== 'design' ? 'hidden' : ''}"
           aria-label="Coil preview panel"
@@ -675,7 +673,7 @@
                toggles the hidden attribute instead. Hidden Simulation content is
                still lifecycle-gated: its IPC effects only run while this tab is
                active. Each panel fills the column and scrolls internally; the
-               page height is locked so the footer always stays visible. -->
+               page height is locked so the workspace fills the viewport. -->
           <Tabs.Content
             value="design"
             id="panel-design"
@@ -746,11 +744,6 @@
         />
       {/if}
 
-      <footer
-        class="shrink-0 border-t border-slate-800 px-6 py-3 text-xs text-slate-500"
-      >
-        {designType === "sensor" ? "Inductive position sensor" : "PCB linear motor"}
-      </footer>
     </Tabs.Root>
   </BitsConfig>
 </main>

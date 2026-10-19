@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { gotoDesignApp } from "./helpers";
+import { gotoDesignApp, openCoilPreview } from "./helpers";
 
 // Exercise the real dialog, store and preview with a deterministic IPC boundary.
 // Parsing and coil assignments themselves are covered by Rust DXF fixtures.
@@ -49,7 +49,7 @@ async function openTerminalTool(page: Page, { layered = false } = {}) {
   await dialog.getByLabel("Coil for source layer holes").fill("A");
   await expectImportCoil(page, "holes", false);
   await dialog.getByRole("button", { name: "Open with this geometry" }).click();
-  await page.getByRole("button", { name: "Expand coil preview" }).click();
+  await openCoilPreview(page);
   const tools = page.getByRole("toolbar", { name: "Coil preview tools" });
   await page.getByRole("toolbar", { name: "Preview side tools" }).getByRole("button", { name: "Set coil terminals", exact: true }).click();
   const command = page.getByRole("region", { name: "Set coil terminals", exact: true });
@@ -134,14 +134,14 @@ test("phase assignment stays in import without conductor-role controls or review
   await dialog.getByRole("button", { name: "Open with this geometry" }).click();
   await expect(page.getByRole("checkbox", { name: "Imported motor mapping reviewed" })).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "Imported coil phases" })).toHaveCount(0);
-  await page.getByRole("button", { name: "Expand coil preview" }).click();
+  await openCoilPreview(page);
   await expect(page.getByRole("button", { name: /^Mark (active|end-turn)$/ })).toHaveCount(0);
 });
 
 test("imported geometry renders in the isometric view", async ({ page }) => {
   const dialog = await openImport(page);
   await dialog.getByRole("button", { name: "Open with this geometry" }).click();
-  await page.getByRole("button", { name: "Expand coil preview" }).click();
+  await openCoilPreview(page);
   const modal = page.getByRole("dialog", { name: "Coil Preview", exact: true });
   await modal.getByRole("button", { name: "Display", exact: true }).click();
   const display = page.getByRole("dialog", { name: "Coil preview display", exact: true });
@@ -187,7 +187,7 @@ test("terminal defaults are selected automatically, overrides infer the other en
   await tools.getByRole("button", { name: "Simplify lines", exact: true }).click();
   await expect(summary).toContainText("L0, X 2 mm");
   await page.getByRole("button", { name: "Close coil preview" }).click();
-  await page.getByRole("button", { name: "Expand coil preview" }).click();
+  await openCoilPreview(page);
   const terminalToggle = page.getByRole("button", { name: "Set coil terminals", exact: true });
   if (await terminalToggle.getAttribute("aria-expanded") !== "true") await terminalToggle.click();
   await expect(summary).toContainText("L0, X 0 mm");
@@ -244,7 +244,7 @@ test("ambiguous linked coils require manual picks instead of unsafe defaults", a
   await page.addInitScript(() => { (window as any).__cadAmbiguous = true; });
   const dialog = await openImport(page);
   await dialog.getByRole("button", { name: "Open with this geometry" }).click();
-  await page.getByRole("button", { name: "Expand coil preview" }).click();
+  await openCoilPreview(page);
   await page.getByRole("button", { name: "Set coil terminals", exact: true }).click();
   const command = page.getByRole("region", { name: "Set coil terminals", exact: true });
   await command.getByRole("button", { name: "Select driver end for coil A", exact: true }).click();
@@ -286,7 +286,7 @@ test("terminal panel configures multiple phases, switches topology and temporari
   await expect(modal.getByRole("img", { name: /Coil A Driver end,/ })).toHaveCount(0);
   await page.getByRole("checkbox", { name: "Show terminal arrows", exact: true }).check();
   await page.getByRole("button", { name: "Close coil preview" }).click();
-  await page.getByRole("button", { name: "Expand coil preview" }).click();
+  await openCoilPreview(page);
   await expect(modal.getByRole("img", { name: "Coil A Driver end, L0, X 2 mm, Y 0 mm", exact: true })).toBeVisible();
 });
 
@@ -435,7 +435,7 @@ test("shared editing tools measure and edit CAD drafts, then keep those edits in
   await tools.getByRole("button", { name: "Simplify lines", exact: true }).click();
   await expect(summary).toContainText("2 lines");
   await dialog.getByRole("button", { name: "Open with this geometry" }).click();
-  await page.getByRole("button", { name: "Expand coil preview" }).click();
+  await openCoilPreview(page);
   const motor = page.getByRole("dialog", { name: "Coil Preview", exact: true });
   const motorTools = motor.getByRole("toolbar", { name: "Coil preview tools" });
   expect(await motorTools.getByRole("button").evaluateAll(buttons => buttons.map(button => button.getAttribute("aria-label")).filter(Boolean))).toEqual(toolNames);
@@ -465,7 +465,7 @@ test("shared editing tools measure and edit CAD drafts, then keep those edits in
   await layers.getByRole("checkbox", { name: "Coil A", exact: true }).check();
   await layers.getByRole("button", { name: "Close layers panel" }).click();
   await motor.getByRole("button", { name: "Close coil preview" }).click();
-  await page.getByRole("button", { name: "Expand coil preview" }).click();
+  await openCoilPreview(page);
   await expect(motor.getByRole("img", { name: "Coil A Driver end, L0, X 0 mm, Y 0 mm", exact: true })).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath("shared-motor-editor.png") });
 });
@@ -621,7 +621,7 @@ test("imported motor preview simplifies saved geometry and supports undo beside 
   await expectImportCoil(page, "holes", false);
   await dialog.getByRole("button", { name: "Open with this geometry" }).click();
   await expect(dialog).toBeHidden();
-  await page.getByRole("button", { name: "Expand coil preview" }).click();
+  await openCoilPreview(page);
   const tools = page.getByRole("toolbar", { name: "Coil preview tools" });
   await tools.getByRole("button", { name: "Simplify lines", exact: true }).click();
   await expect(tools.getByRole("status").filter({ hasText: "merged" })).toContainText("2 line(s) merged");
@@ -703,7 +703,7 @@ test("outside clicks dismiss context menus and submenus while selecting in CAD a
   for (const viewer of ["cad", "motor"]) {
     if (viewer === "motor") {
       await cad.getByRole("button", { name: "Open with this geometry" }).click();
-      await page.getByRole("button", { name: "Expand coil preview" }).click();
+      await openCoilPreview(page);
       await page.getByRole("button", { name: "Close design settings panel" }).click();
     }
     const dialog = viewer === "cad" ? cad : page.getByRole("dialog", { name: "Coil Preview", exact: true });
@@ -790,7 +790,7 @@ test("nested motor layers move selections on mobile and toggle only their own co
   await page.setViewportSize({ width: 390, height: 844 });
   const dialog = await openImport(page);
   await dialog.getByRole("button", { name: "Open with this geometry" }).click();
-  await page.getByRole("button", { name: "Expand coil preview" }).click();
+  await openCoilPreview(page);
   const motor = page.getByRole("dialog", { name: "Coil Preview", exact: true });
   await motor.getByRole("button", { name: "Close design settings panel" }).click();
   await clickTrace(page, .5, 0);
@@ -894,7 +894,7 @@ test("chain assignments persist into the motor preview and selection tools work 
   await expect(tools).toContainText("2 selected");
   await newCoil(page, "D");
   await dialog.getByRole("button", { name: "Open with this geometry" }).click();
-  await page.getByRole("button", { name: "Expand coil preview" }).click();
+  await openCoilPreview(page);
   const modalTools = page.getByRole("group", { name: "Segment selection tools" });
   await modalTools.getByRole("button", { name: "Chain", exact: true }).click();
   await clickTrace(page, .5, 0); await clickTrace(page, 1.5, 0);
@@ -904,7 +904,7 @@ test("chain assignments persist into the motor preview and selection tools work 
   await expect(page.getByRole("option", { name: /Segment 1, coil E, layer 1/ })).toHaveCount(1);
   await page.screenshot({ path: testInfo.outputPath("coil-segment-selection.png") });
   await page.getByRole("button", { name: "Close coil preview" }).click();
-  await page.getByRole("button", { name: "Expand coil preview" }).click();
+  await openCoilPreview(page);
   await page.getByRole("group", { name: "Segment selection tools" }).getByRole("button", { name: "Select", exact: true }).click();
   await expect(page.getByRole("option", { name: /Segment 1, coil E, layer 1/ })).toHaveCount(1);
 });
@@ -924,7 +924,7 @@ test("default click and drag selection works in CAD and motor viewers without a 
   await dragBox(page, [-.1, -.1], [1.1, .1]);
   await expect(tools).toContainText("1 selected");
   await dialog.getByRole("button", { name: "Open with this geometry" }).click();
-  await page.getByRole("button", { name: "Expand coil preview" }).click();
+  await openCoilPreview(page);
   const motor = page.getByRole("dialog", { name: "Coil Preview", exact: true });
   const motorTools = motor.getByRole("group", { name: "Segment selection tools" });
   await dragBox(page, [-.1, -.1], [1.1, .1]);
@@ -948,7 +948,7 @@ test("touch drag selects, two fingers pan, and three-finger pinch zooms without 
   for (const viewer of ["cad", "motor"]) {
   if (viewer === "motor") {
     await dialog.getByRole("button", { name: "Open with this geometry" }).click();
-    await page.getByRole("button", { name: "Expand coil preview" }).click();
+    await openCoilPreview(page);
     await page.getByRole("button", { name: "Close design settings panel" }).click();
   }
   const activeDialog = viewer === "cad" ? dialog : page.getByRole("dialog", { name: "Coil Preview", exact: true });
@@ -1059,7 +1059,7 @@ test("reimport waits for confirmation before discarding segment assignments", as
 
 test("generated motor geometry becomes editable only after confirmation", async ({ page }) => {
   await gotoDesignApp(page);
-  await page.getByRole("button", { name: "Expand coil preview" }).click();
+  await openCoilPreview(page);
   const tools = page.getByRole("toolbar", { name: "Coil preview tools" });
   await tools.getByRole("button", { name: "Edit segments", exact: true }).click();
   await expect(tools.getByRole("button", { name: "Edit segments", exact: true })).toBeEnabled();
@@ -1080,10 +1080,11 @@ test("routing source shows the imported filename in its trigger and dropdown aft
   await source.click();
   await expect(page.getByRole("option", { name: "coil-leads.dxf", exact: true })).toBeVisible();
   await page.keyboard.press("Escape");
-  await page.getByRole("button", { name: "Expand coil preview" }).click();
+  await openCoilPreview(page);
   const tools = page.getByRole("toolbar", { name: "Coil preview tools" });
   await tools.getByRole("button", { name: "Simplify lines", exact: true }).click();
   await page.getByRole("button", { name: "Close coil preview" }).click();
+  await page.getByRole("tab", { name: /^Design/i }).click();
   await page.getByRole("button", { name: "Design settings", exact: true }).click();
   await expect(source).toContainText("coil-leads.dxf");
 });

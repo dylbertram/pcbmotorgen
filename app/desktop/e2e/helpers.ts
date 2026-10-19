@@ -15,6 +15,12 @@ export async function gotoDesignApp(page: Page): Promise<void> {
   await expect(dialog).toBeHidden();
 }
 
+/** The expanded viewer is now opened from Simulate, not the Design canvas. */
+export async function openCoilPreview(page: Page): Promise<void> {
+  await page.getByRole("tab", { name: /^Simulate/i }).click();
+  await page.getByRole("button", { name: "Open coil preview", exact: true }).click();
+}
+
 /**
  * Geometry of an element relative to the viewport, as integers.
  * Returns null when the element is hidden/not attached.

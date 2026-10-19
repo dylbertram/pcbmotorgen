@@ -1,15 +1,34 @@
 import { test, expect } from "@playwright/test";
-import { gotoDesignApp } from "./helpers";
+import { gotoDesignApp, openCoilPreview } from "./helpers";
 
-test("Design is a full-size preview with all settings in the right drawer", async ({ page }, testInfo) => {
+test("Design fills the workspace with settings on the left and preview tools on the right", async ({ page }, testInfo) => {
   await gotoDesignApp(page);
   const workspace = page.getByRole("region", { name: "Coil design workspace", exact: true });
   const panel = page.locator("#panel-design");
   await expect(workspace).toBeVisible();
+  await expect(workspace.getByRole("heading", { name: "Coil Preview", exact: true })).toHaveCount(0);
+  await expect(workspace.getByRole("button", { name: "Expand coil preview", exact: true })).toHaveCount(0);
+  const status = workspace.getByRole("group", { name: "Preview status", exact: true });
+  const summary = status.getByLabel("Coil geometry summary", { exact: true });
+  await expect(summary).toHaveText("3 phases · 4 layers · 12 coil groups");
+  const summaryBounds = (await summary.boundingBox())!;
+  const statusBounds = (await status.boundingBox())!;
+  expect(statusBounds.x + statusBounds.width - summaryBounds.x - summaryBounds.width).toBe(12);
   expect(await workspace.boundingBox()).toEqual(await panel.boundingBox());
   await expect(page.locator("aside[aria-label='Coil preview panel']")).toHaveCount(0);
   const settings = page.getByRole("dialog", { name: "Preview design settings", exact: true });
   await expect(settings).toBeVisible();
+  const leftRail = workspace.getByRole("toolbar", { name: "Design side tools", exact: true });
+  const rightRail = workspace.getByRole("toolbar", { name: "Preview side tools", exact: true });
+  await expect(leftRail.getByRole("button", { name: "Design settings", exact: true })).toBeVisible();
+  await expect(rightRail.getByRole("button", { name: "Design settings", exact: true })).toHaveCount(0);
+  const leftBounds = (await leftRail.boundingBox())!;
+  await expect.poll(async () => (await settings.boundingBox())!.x).toBe(leftBounds.x + leftBounds.width);
+  expect(leftBounds.x).toBe(0);
+  const rightBounds = (await rightRail.boundingBox())!;
+  expect(rightBounds.x + rightBounds.width).toBe(page.viewportSize()!.width);
+  await expect(page.locator("footer")).toHaveCount(0);
+  expect((await workspace.boundingBox())!.y + (await workspace.boundingBox())!.height).toBe(page.viewportSize()!.height);
   for (const heading of ["design-constraints-heading", "backplane-heading", "topology-board-heading", "magnets-heading"]) {
     await expect(settings.locator(`#${heading}`)).toHaveCount(1);
   }
@@ -29,6 +48,27 @@ test("Design is a full-size preview with all settings in the right drawer", asyn
   expect(magnetHeading.y + magnetHeading.height).toBeLessThan(viewport.y + viewport.height);
 });
 
+test("returning from Simulate repaints actual canvas pixels without interaction", async ({ page }) => {
+  await gotoDesignApp(page);
+  const canvas = page.locator("#panel-design canvas");
+  const paintedPixels = () => canvas.evaluate((node: HTMLCanvasElement) => {
+    const pixels = node.getContext("2d")!.getImageData(0, 0, node.width, node.height).data;
+    let painted = 0;
+    for (let i = 3; i < pixels.length; i += 4) if (pixels[i]) painted++;
+    return painted;
+  });
+  await expect.poll(paintedPixels).toBeGreaterThan(100);
+  for (let cycle = 0; cycle < 3; cycle++) {
+    const revision = Number(await canvas.getAttribute("data-revision"));
+    await page.getByRole("tab", { name: /^Simulate/i }).click();
+    await expect(canvas).toBeHidden();
+    await page.getByRole("tab", { name: /^Design/i }).click();
+    await expect(canvas).toBeVisible();
+    await expect.poll(() => canvas.getAttribute("data-revision").then(Number)).toBeGreaterThan(revision);
+    await expect.poll(paintedPixels).toBeGreaterThan(100);
+  }
+});
+
 test("design edits survive drawer changes and the expanded modal", async ({ page }) => {
   await gotoDesignApp(page);
   await page.getByRole("combobox", { name: "Winding connection", exact: true }).selectOption("2");
@@ -41,10 +81,11 @@ test("design edits survive drawer changes and the expanded modal", async ({ page
   await expect(driver.getByRole("region", { name: "Preview driver simulation results" })).toContainText("Current ripple");
   await page.getByRole("button", { name: "Design settings", exact: true }).click();
   await expect(travel).toHaveValue("100");
-  await page.getByRole("button", { name: "Expand coil preview", exact: true }).click();
+  await openCoilPreview(page);
   const modal = page.getByRole("dialog", { name: "Coil Preview", exact: true });
   await expect(modal.getByRole("spinbutton", { name: "Desired travel (center-to-center)", exact: true })).toHaveValue("100");
   await modal.getByRole("button", { name: "Close coil preview", exact: true }).click();
+  await page.getByRole("tab", { name: /^Design/i }).click();
   await expect(travel).toHaveValue("100");
   await expect(page.locator("#panel-design canvas[data-segments]")).toBeVisible();
 });

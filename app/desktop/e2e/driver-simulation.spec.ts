@@ -1,10 +1,10 @@
 import { test, expect } from "@playwright/test";
-import { gotoDesignApp } from "./helpers";
+import { gotoDesignApp, openCoilPreview } from "./helpers";
 
 test("coil preview driver inductor stays synchronized with simulation", async ({ page }) => {
   await gotoDesignApp(page);
   await page.getByRole("combobox", { name: "Winding connection", exact: true }).selectOption("2");
-  await page.getByRole("button", { name: "Expand coil preview", exact: true }).click();
+  await openCoilPreview(page);
   const preview = page.getByRole("dialog", { name: "Coil Preview", exact: true });
   await preview.getByRole("button", { name: "Driver settings", exact: true }).click();
   const panel = page.getByRole("dialog", { name: "Preview driver settings", exact: true });
@@ -37,7 +37,7 @@ test("coil preview driver inductor stays synchronized with simulation", async ({
   await expect(results).not.toContainText("series per phase");
 
   await page.getByRole("tab", { name: /^Design/i }).click();
-  await page.getByRole("button", { name: "Expand coil preview", exact: true }).click();
+  await openCoilPreview(page);
   await preview.getByRole("button", { name: "Driver settings", exact: true }).click();
   await expect(inductor).toHaveValue("0");
   await expect(driverSelector).toHaveValue("DRV8313");
