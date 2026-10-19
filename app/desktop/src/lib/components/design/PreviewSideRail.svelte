@@ -14,7 +14,9 @@
    */
   import { fly } from "svelte/transition";
   import { onDestroy } from "svelte";
-  import { Layers, SlidersHorizontal, X, Plug, CircuitBoard } from "@lucide/svelte";
+  import { Layers, SlidersHorizontal, X, Plug, CircuitBoard, Ruler } from "@lucide/svelte";
+  import type { Snippet } from "svelte";
+  import type { PreviewPanelId } from "./previewPanels";
   import CoilTerminalPanel from "./CoilTerminalPanel.svelte";
   import type { CoilTerminalTool } from "../../utils/coilTerminalTool.svelte";
   import CoilPreviewVisibilityPanel from "./CoilPreviewVisibilityPanel.svelte";
@@ -34,7 +36,11 @@
     hasBandWidthData = false, hasPoleRegionData = false, poleRegionPhases = [],
     geometry, selection, assignmentDisabled = false, terminalTool, onStartTerminals,
     terminalsDisabled = false, dismissOnOutsideClick = true, showViewMode = false, config,
-    drive = null, driveError = null, drivePending = false }: {
+    drive = null, driveError = null, drivePending = false,
+    designSettings, open = $bindable<PreviewPanelId | null>(null), active = true }: {
+    active?: boolean;
+    designSettings?: Snippet;
+    open?: PreviewPanelId | null;
     /** Shared motor settings, supplied by the expanded coil preview. */
     config?: ConfigStore;
     drive?: DriveAnalysis | null;
@@ -71,12 +77,16 @@
     showViewMode?: boolean;
   } = $props();
 
-  type PanelId = "layers" | "display" | "terminals" | "driver";
-  let open = $state<PanelId | null>(null);
   const rippleCheck = $derived(drive?.checks.find((check) => check.id === "ripple"));
   let railEl: HTMLDivElement | null = $state(null);
-  const triggers: Record<PanelId, HTMLButtonElement | null> = { layers: null, display: null, terminals: null, driver: null };
-  const panelClass = "absolute bottom-0 right-full top-0 z-30 flex w-60 max-w-[calc(100vw-4rem)] flex-col overflow-hidden border-l border-slate-700 bg-slate-900 text-slate-200 shadow-xl shadow-black/40";
+  const triggers: Record<PreviewPanelId, HTMLButtonElement | null> = { design: null, layers: null, display: null, terminals: null, driver: null };
+  const panelClass = "absolute bottom-0 right-full top-0 z-30 flex w-60 max-w-[calc(100vw-6rem)] flex-col overflow-hidden border-l border-slate-700 bg-slate-900 text-slate-200 shadow-xl shadow-black/40";
+  const designSections = [
+    { id: "design-constraints-heading", label: "Constraints" },
+    { id: "backplane-heading", label: "Stackup" },
+    { id: "topology-board-heading", label: "Routing" },
+    { id: "magnets-heading", label: "Magnets" },
+  ];
   onDestroy(() => { terminalTool?.cancel(); view.terminalPanelOpen = false; });
   // An outside request (the Simulation tab's ends alert) sets
   // `view.terminalPanelOpen`; mirror it into the local panel state.
@@ -84,7 +94,7 @@
     if (view.terminalPanelOpen && open !== "terminals") open = "terminals";
   });
 
-  function toggle(panel: PanelId) {
+  function toggle(panel: PreviewPanelId) {
     if (open === "terminals") terminalTool?.cancel();
     open = open === panel ? null : panel;
     view.terminalPanelOpen = open === "terminals";
@@ -97,13 +107,18 @@
     if (panel) triggers[panel]?.focus();
   }
   function handleKeydown(event: KeyboardEvent) {
-    if (!open || event.key !== "Escape") return;
+    if (!active || !open || event.key !== "Escape") return;
+    const target = event.target as Element | null;
+    const modal = target?.closest('[aria-modal="true"]');
+    // Portaled dialogs and menus own Escape before the underlying drawer.
+    if (modal && !modal.contains(railEl)) return;
+    if (target?.closest('[role="menu"], [role="listbox"]') && !railEl?.contains(target)) return;
     event.preventDefault();
     event.stopPropagation();
     close();
   }
   function handlePointerDown(event: PointerEvent) {
-    if (!open || open === "terminals" || !dismissOnOutsideClick) return;
+    if (!active || !open || open === "terminals" || !dismissOnOutsideClick) return;
     // Menus and popovers opened from the panel are portaled to the body, so they
     // are outside the rail. bits-ui tags those floating layers, and clicks in
     // them must not dismiss the panel.
@@ -117,7 +132,14 @@
 <svelte:document onpointerdown={handlePointerDown} />
 
 <div bind:this={railEl} class="relative h-full w-11">
-  <div role="toolbar" aria-label="Preview side tools" aria-orientation="vertical" class="flex h-full w-full flex-col items-center gap-2 border-l border-slate-700 bg-slate-900 py-2">
+  <div role="toolbar" aria-label="Preview side tools" aria-orientation="vertical" class="flex h-full w-full flex-col items-center gap-2 overflow-y-auto border-l border-slate-700 bg-slate-900 py-2">
+    {#if designSettings}
+      <button type="button" bind:this={triggers.design} aria-label="Design settings" aria-expanded={open === "design"} onclick={() => toggle("design")}
+        class="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-transparent text-slate-300 hover:bg-slate-800 aria-expanded:border-emerald-500 aria-expanded:text-emerald-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
+        title="Constraints, stackup, routing and magnets">
+        <Ruler size={16} aria-hidden="true" />
+      </button>
+    {/if}
     <button type="button" bind:this={triggers.layers} aria-label="Layers" aria-expanded={open === "layers"} onclick={() => toggle("layers")}
       class="flex h-8 w-8 items-center justify-center rounded-md border border-transparent text-slate-300 hover:bg-slate-800 aria-expanded:border-emerald-500 aria-expanded:text-emerald-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
       title="Show the coil, phase and layer tree.">
@@ -142,6 +164,22 @@
       </button>
     {/if}
   </div>
+
+  {#if open === "design" && designSettings}
+    <div role="dialog" aria-label="Preview design settings" aria-modal="false" class="absolute bottom-0 right-full top-0 z-30 flex w-[400px] max-w-[calc(100vw-6rem)] flex-col overflow-hidden border-l border-slate-700 bg-slate-900 text-slate-200 shadow-xl shadow-black/40" transition:fly={{ x: 16, duration: 140 }}>
+      <header class="flex shrink-0 items-center justify-between border-b border-slate-700 px-3 py-2">
+        <h3 class="text-sm font-semibold">Design settings</h3>
+        <button type="button" aria-label="Close design settings panel" onclick={close} class="rounded p-1 text-slate-400 hover:bg-slate-800"><X size={16} aria-hidden="true" /></button>
+      </header>
+      <nav aria-label="Design settings sections" class="flex shrink-0 flex-wrap gap-1 border-b border-slate-700 p-2">
+        {#each designSections as section (section.id)}
+          <button type="button" onclick={() => railEl?.querySelector(`#${section.id}`)?.scrollIntoView({ block: "start" })}
+            class="rounded px-2 py-1 text-xs text-slate-400 hover:bg-slate-800 hover:text-slate-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400">{section.label}</button>
+        {/each}
+      </nav>
+      <div class="min-h-0 flex-1">{@render designSettings()}</div>
+    </div>
+  {/if}
 
   {#if open === "terminals" && geometry && terminalTool && onStartTerminals}
     <div role="dialog" aria-label="Coil terminals" aria-modal="false" class={`${panelClass} ${showMotorControls ? 'max-sm:bottom-20' : ''}`} transition:fly={{ x: 16, duration: 140 }}>

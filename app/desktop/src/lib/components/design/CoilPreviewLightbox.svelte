@@ -1,5 +1,5 @@
 <!--
-  Expanded motor preview. The frame, editing toolbar, overlays, terminal
+  Shared embedded and expanded motor workspace. The frame, toolbar, overlays, terminal
   controls, and Layers popover are shared with CAD import. CoilPreview owns
   the canvas renderer, camera, measure state, and presentation state so the
   inline and expanded previews stay synchronized.
@@ -9,11 +9,13 @@
   preventScroll stays disabled. Escape first cancels an active edit command.
 -->
 <script lang="ts">
-  import { X } from "@lucide/svelte";
+  import { X, Maximize2 } from "@lucide/svelte";
   import type { ConfigStore } from "../../stores/config.svelte";
   import type { MotionStore } from "../../stores/motion.svelte";
   import { Dialog, DropdownMenu } from "bits-ui";
   import { onDestroy } from "svelte";
+  import type { Snippet } from "svelte";
+  import type { PreviewPanelId } from "./previewPanels";
   import type { CadGeometry } from "../../types";
   import type { WorldTransform } from "../../chart";
   import type { CoilTerminalTool } from "../../utils/coilTerminalTool.svelte";
@@ -42,6 +44,11 @@
 
   let {
     expanded = $bindable(false),
+    embedded = false,
+    active = true,
+    onExpand,
+    designSettings,
+    sidePanel = $bindable<PreviewPanelId | null>(null),
     height = PREVIEW_H,
     config,
     drive = null,
@@ -74,6 +81,11 @@
   }: {
     /** Dialog open state, bound to the parent's `expanded` rune. */
     expanded?: boolean;
+    embedded?: boolean;
+    active?: boolean;
+    onExpand?: () => void;
+    designSettings?: Snippet;
+    sidePanel?: PreviewPanelId | null;
     height?: number;
     config: ConfigStore;
     drive?: DriveAnalysis | null;
@@ -122,6 +134,9 @@
   // instead of reaching the modal's top edge.
   let toolbarHeight = $state(0);
   let terminalPanelOpen = $derived(view.terminalPanelOpen);
+  const panelWidth = $derived(sidePanel === "design" ? 400 : sidePanel ? 240 : 0);
+  let frameWidth = $state(PREVIEW_W);
+  const dockWidth = $derived(Math.min(panelWidth, Math.max(0, frameWidth - 96)));
 
   // Scroll lock for the lightbox (Kata xy31): while the modal is open the
   // page behind it must never scroll. Two layers:
@@ -139,7 +154,7 @@
   // delayed reset restores a snapshot taken after this lock had already
   // written — the page stays overflow:hidden after close (kata 1jfa).
   $effect(() => {
-    if (!expanded) return;
+    if (!expanded || embedded) return;
     const backdrop = backdropRef;
     if (!backdrop) return;
     const detachGuard = attachBackdropScrollGuard(backdrop, modalPanelRef);
@@ -151,6 +166,18 @@
   });
 </script>
 
+{#if embedded}
+  <section aria-label="Coil design workspace" inert={!active} aria-hidden={!active || undefined} class="flex h-full min-h-0 flex-col overflow-hidden bg-slate-900">
+    <header class="flex shrink-0 items-center justify-between gap-2 border-b border-slate-700 px-3 py-2">
+      <h2 class="text-sm font-semibold text-slate-200">Coil Preview</h2>
+      <div class="flex items-center gap-3">
+        <span class="hidden text-xs text-slate-400 sm:inline">{stats}</span>
+        <button type="button" aria-label="Expand coil preview" onclick={onExpand} class="rounded border border-slate-700 bg-slate-800 p-1 text-slate-300 hover:text-emerald-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400"><Maximize2 size={16} aria-hidden="true" /></button>
+      </div>
+    </header>
+    {@render workspace()}
+  </section>
+{:else}
 <Dialog.Root bind:open={expanded}>
   <Dialog.Portal>
     <Dialog.Overlay
@@ -159,6 +186,8 @@
     />
     <Dialog.Content
       bind:ref={modalPanelRef}
+      inert={!active}
+      aria-hidden={!active || undefined}
       preventScroll={false}
       onEscapeKeydown={(event) => { if (terminalTool?.active) { event.preventDefault(); terminalTool.cancel(); } else if (selection.selected.length || selection.anchor) { event.preventDefault(); selection.clear(); } }}
       aria-label="Coil Preview — expanded"
@@ -181,6 +210,14 @@
         </div>
       </header>
 
+      {@render workspace()}
+    </Dialog.Content>
+  </Dialog.Portal>
+</Dialog.Root>
+{/if}
+
+{#snippet workspace()}
+
       <!-- Workspace: the drawing fills it and every dock sits flush inside it,
            so the toolbar meets the header and the rail has no top or bottom gap. -->
       <div class="relative min-h-0 flex-1">
@@ -189,18 +226,18 @@
              mirroring the inline pair). All gestures delegate to the same
              utility instance. -->
         <div class="absolute inset-0">
-          <PreviewFrame bind:frame={modalFrameRef} {gestures} {measure} navigationEnabled={view.viewMode === "top"} interactive={view.viewMode === "top" && (terminalTool?.active ?? false)}
-            label="Coil preview — expanded">
+          <PreviewFrame bind:frame={modalFrameRef} bind:width={frameWidth} {gestures} {measure} navigationEnabled={view.viewMode === "top"} interactive={view.viewMode === "top" && (terminalTool?.active ?? false)}
+            label={embedded ? "Coil preview" : "Coil preview — expanded"}>
             {#if view.viewMode === "iso"}
               <CoilPreviewIsoView geometry={terminalGeometry ?? importedGeometry} {view} isVisible={isTerminalVisible} />
             {:else}
             <canvas bind:this={modalCanvasRef} class="block h-full w-full"
             ></canvas>
             {#if importedGeometry}
-              <GeometryEditingOverlay geometry={importedGeometry} {selection} {terminalTool} renderTerminals={!terminalGeometry} showTerminals={view.showTerminals} markerRightInset={terminalPanelOpen ? 284 : 44} transform={worldTransform} panX={gestures.panX} panY={gestures.panY} width={W} height={H} worldScale={1e-3} isVisible={isTerminalVisible} disabled={!onGeometryChange || measure.mode || view.oneSection} />
+              <GeometryEditingOverlay geometry={importedGeometry} {selection} {terminalTool} renderTerminals={!terminalGeometry} showTerminals={view.showTerminals} markerRightInset={dockWidth + 44} transform={worldTransform} panX={gestures.panX} panY={gestures.panY} width={W} height={H} worldScale={1e-3} isVisible={isTerminalVisible} disabled={!onGeometryChange || measure.mode || view.oneSection} />
             {/if}
             {#if terminalGeometry}
-              <CoilTerminalOverlay geometry={terminalGeometry} tool={terminalTool} transform={worldTransform} panX={gestures.panX} panY={gestures.panY} width={W} height={H} worldScale={1e-3} isVisible={isTerminalVisible} showMarkers={view.showTerminals} rightInset={terminalPanelOpen ? 284 : 44} />
+              <CoilTerminalOverlay geometry={terminalGeometry} tool={terminalTool} transform={worldTransform} panX={gestures.panX} panY={gestures.panY} width={W} height={H} worldScale={1e-3} isVisible={isTerminalVisible} showMarkers={view.showTerminals} rightInset={dockWidth + 44} />
             {/if}
             <PreviewMeasureOverlay {measure} transform={worldTransform} panX={gestures.panX} panY={gestures.panY} width={W} height={H} />
             {/if}
@@ -213,14 +250,15 @@
           {#if view.viewMode === "top"}
           <GeometryEditingToolbar label="Coil preview tools" geometry={onGeometryChange ? importedGeometry : null}
             {selection} {measure} {terminalTool} {onSimplify} {onUndoSimplify} {simplifyNotice} borderless
-             onActivateSelection={activateSelection} onPrepareGeometry={onStartSegmentEditing} />
+            disabled={!active}
+            onActivateSelection={activateSelection} onPrepareGeometry={onStartSegmentEditing} />
           {/if}
         </div>
 
         <!-- Right rail: hangs from the bottom of the top toolbar down to the
              status bar, so the Layers and Display panels pull out under it. -->
         <div class="absolute bottom-0 right-0 z-20 w-11" style:top={`${toolbarHeight}px`}>
-          <PreviewSideRail {config} {drive} {driveError} {drivePending} {view} layers={importedGeometry ? importedGeometry.layer_z_mm.map((_, idx) => ({ idx })) : uniqueLayers} phases={importedGeometry ? [] : uniquePhases}
+          <PreviewSideRail {config} {drive} {driveError} {drivePending} {view} {designSettings} bind:open={sidePanel} {active} layers={importedGeometry ? importedGeometry.layer_z_mm.map((_, idx) => ({ idx })) : uniqueLayers} phases={importedGeometry ? [] : uniquePhases}
             {terminalTool} {onStartTerminals} terminalsDisabled={!onGeometryChange || view.viewMode === "iso"}
            geometry={terminalGeometry ?? importedGeometry} selection={importedGeometry ? selection : undefined} assignmentDisabled={view.viewMode === "iso" || !importedGeometry || !onGeometryChange || measure.mode || !!terminalTool?.active || view.oneSection}
           coils={importedGeometry ? uniquePhases.map((phase) => ({ name: phase.name, colorIdx: phase.colorIdx })) : []}
@@ -232,7 +270,7 @@
         <!-- Bare zoom buttons: no background, with the same 12px gap on the
              right as the position box has at the bottom. -->
         {#if view.viewMode === "top"}
-        <div class="absolute z-20 top-[32%] sm:top-auto sm:bottom-3 {terminalPanelOpen ? 'hidden sm:block' : ''}" style:right={terminalPanelOpen ? "calc(15rem + 3.5rem)" : "3.5rem"}>
+        <div class="absolute z-20 top-[32%] sm:top-auto sm:bottom-3 {sidePanel ? 'max-sm:hidden' : ''}" style:right={`calc(${dockWidth}px + 3.5rem)`}>
           <CoilPreviewControls
             zoomLabel={gestures.zoomLabel}
             canZoomIn={gestures.canZoomIn}
@@ -250,13 +288,13 @@
              moves inside the lightbox. The phase-waveform popover is anchored
              directly above this box at the same width, so it cannot be moved. -->
         {#if view.viewMode === "top"}
-        <div class="absolute bottom-3 left-2 z-20 flex w-[min(420px,calc(100%-4rem))] flex-col gap-2">
+        <div class="absolute bottom-3 left-2 z-20 flex w-[min(420px,calc(100%-4rem))] flex-col gap-2 {sidePanel ? 'max-sm:hidden' : ''}" style:max-width={`calc(100% - ${dockWidth + 60}px)`}>
           {#if terminalPanelOpen}
             <div class="rounded-md border border-slate-700 bg-slate-900/95 p-3">
               <PreviewLayerSlider {view} layers={importedGeometry ? importedGeometry.layer_z_mm.map((_, idx) => ({ idx })) : uniqueLayers} onSelect={(layer) => { if (layer !== null && terminalTool?.active) terminalTool.chooseLayer(layer); view.phaseVisibility = []; }} />
             </div>
           {:else}
-          {#if view.showWaveform}
+          {#if !embedded && view.showWaveform}
             <div role="dialog" aria-label="Phase waveform"
               class="relative">
               <button type="button" aria-label="Close phase waveform"
@@ -275,14 +313,12 @@
 
       <div class="z-30 flex shrink-0 items-center justify-between gap-3 border-t border-slate-700 bg-slate-900 px-3 py-2 text-[10px] text-slate-400" role="group" aria-label="Preview status">
         <span class="min-w-0 flex-1 font-mono">Position: {motion.clampedPositionMm.toFixed(1)} mm · Mover extent: {moverBounds.startMm.toFixed(1)} – {moverBounds.endMm.toFixed(1)} mm</span>
-        <DropdownMenu.Root>
+        {#if !embedded}<DropdownMenu.Root>
           <DropdownMenu.Trigger class="shrink-0 rounded border border-slate-700 px-2 py-1 text-xs hover:text-emerald-300" aria-label="Display state">Display ▾</DropdownMenu.Trigger>
           <DropdownMenu.Portal><DropdownMenu.Content preventScroll={false} class="z-[150] rounded border border-slate-700 bg-slate-900 p-1 text-xs text-slate-200" side="top" sideOffset={8}>
             <DropdownMenu.CheckboxItem bind:checked={view.showWaveform} class="cursor-default rounded px-3 py-2 outline-none data-[highlighted]:bg-slate-800">{view.showWaveform ? "✓ " : ""}Show phase waveform</DropdownMenu.CheckboxItem>
           </DropdownMenu.Content></DropdownMenu.Portal>
-        </DropdownMenu.Root>
+        </DropdownMenu.Root>{/if}
       </div>
 
-    </Dialog.Content>
-  </Dialog.Portal>
-</Dialog.Root>
+{/snippet}

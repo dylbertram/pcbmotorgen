@@ -32,7 +32,7 @@
       Traces &amp; board
     </h4>
 
-    <div class="grid gap-x-3 gap-y-2.5 sm:grid-cols-2">
+    <div class="trace-fields grid gap-x-3 gap-y-2.5">
       {#each sizingFields as field (field.key)}
         <label class="min-w-0">
           <span class="flex items-center justify-between gap-2">
@@ -75,3 +75,9 @@
     </ViaSizingGuide>
   </div>
 </div>
+
+<style>
+  @container (min-width: 560px) {
+    .trace-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
+</style>

@@ -15,15 +15,15 @@ test.describe("Design constraints restructure", () => {
     const constraints = designConstraintsPanel(page);
     const stackup = page.locator("section[aria-labelledby='backplane-heading']");
     await expect(constraints.getByRole("img", { name: "Three-quarter isometric view of the assembly" })).toBeVisible();
-    await expect(constraints.getByLabel("Mover position (mm)", { exact: true })).toBeVisible();
+    await expect(page.locator("#panel-design").getByLabel("Mover position (mm)", { exact: true })).toBeVisible();
     await expect(stackup.getByRole("img", { name: /Front-on orthographic/ })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Design reflection", exact: true })).toHaveCount(0);
     await expect(page.getByRole("heading", { name: "Design dimensions", exact: true })).toHaveCount(0);
     await expect(constraints.getByRole("img", { name: /Per-phase holding force/ })).toHaveCount(0);
     await expect(constraints.getByText("Band margin", { exact: true })).toBeVisible();
 
-    const inline = page.locator("aside[aria-label='Coil preview panel']");
-    await expect(inline.getByRole("group", { name: "Coil terminal markers" })).toHaveCount(0);
+    const inline = page.locator("#panel-design");
+    await expect(inline.getByRole("group", { name: "Coil terminal markers" })).toBeVisible();
     await inline.getByRole("button", { name: "Expand coil preview" }).click();
     const dialog = page.getByRole("dialog");
     await expect(dialog.getByRole("img", { name: /Per-phase holding force/ })).toBeVisible();
@@ -111,14 +111,14 @@ test.describe("Design constraints restructure", () => {
       page.locator("details", { hasText: "Stackup" }),
     ).toHaveCount(0);
 
-    // The old driver toggle is gone. Position now lives with the isometric view.
+    // Section navigation lives in the drawer; position stays over the canvas.
     await expect(
-      page.getByRole("button", { name: "Magnets", exact: true }),
-    ).toHaveCount(0);
+      page.getByRole("navigation", { name: "Design settings sections" }).getByRole("button", { name: "Magnets", exact: true }),
+    ).toBeVisible();
     await expect(
       page.getByRole("button", { name: "Traces", exact: true }),
     ).toHaveCount(0);
-    await expect(driver.getByRole("slider", { name: "Mover position slider (mm)" })).toBeVisible();
+    await expect(page.locator("#panel-design").getByRole("slider", { name: "Mover position slider (mm)" })).toBeVisible();
 
     await expect(numberField(page, "PCB thickness (mm)")).toBeEnabled();
     await expect(numberField(page, "Air gap (mm)")).toBeEnabled();

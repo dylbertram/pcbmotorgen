@@ -78,7 +78,7 @@ test.describe("coil preview modal scroll lock @interaction @desktop", () => {
     expect(inlineOverflow).toEqual({ root: "hidden", body: "hidden" });
 
     const before = await page.evaluate(() => ({
-      aside: document.querySelector("aside[aria-label='Coil preview panel'] [data-scroll-area-viewport]")?.scrollTop ?? -1,
+      aside: document.querySelector("#design-settings-scroll [data-scroll-area-viewport]")?.scrollTop ?? -1,
       document: document.scrollingElement?.scrollTop ?? -1,
     }));
 
@@ -92,12 +92,15 @@ test.describe("coil preview modal scroll lock @interaction @desktop", () => {
     expect(await wheelWasPrevented(page)).toBe(true);
 
     const after = await page.evaluate(() => ({
-      aside: document.querySelector("aside[aria-label='Coil preview panel'] [data-scroll-area-viewport]")?.scrollTop ?? -1,
+      aside: document.querySelector("#design-settings-scroll [data-scroll-area-viewport]")?.scrollTop ?? -1,
       document: document.scrollingElement?.scrollTop ?? -1,
     }));
     expect(after).toEqual(before);
 
-    // Closing releases the inline lock.
+    // Escape closes the active drawer first, then the expanded viewer.
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("dialog", { name: "Preview design settings", exact: true })).toHaveCount(0);
+    await expect(page.locator(LIGHTBOX)).toBeVisible();
     await page.keyboard.press("Escape");
     await expect(page.locator(LIGHTBOX)).toBeHidden();
     const released = await page.evaluate(() => ({
@@ -129,7 +132,7 @@ test.describe("coil preview modal scroll lock @interaction @desktop", () => {
     // invariant is "the background does not move while the modal is open",
     // not "the background sits at scrollTop 0".
     const asideBefore = await page.evaluate(
-      () => document.querySelector("aside[aria-label='Coil preview panel'] [data-scroll-area-viewport]")?.scrollTop ?? -1,
+      () => document.querySelector("#design-settings-scroll [data-scroll-area-viewport]")?.scrollTop ?? -1,
     );
 
     // Wheel over the header, not the canvas gesture surface.
@@ -142,25 +145,24 @@ test.describe("coil preview modal scroll lock @interaction @desktop", () => {
 
     // The reflection column behind the modal never moves either.
     const asideScroll = await page.evaluate(
-      () => document.querySelector("aside[aria-label='Coil preview panel'] [data-scroll-area-viewport]")?.scrollTop ?? -1,
+      () => document.querySelector("#design-settings-scroll [data-scroll-area-viewport]")?.scrollTop ?? -1,
     );
     expect(asideScroll).toBe(asideBefore);
   });
 
-  test("below-lg: wheel on the backdrop is prevented, document never scrolls, and closing restores scrolling", async ({
+  test("below-lg: backdrop wheel is prevented and the fixed workspace stays in place", async ({
     page,
   }) => {
-    // Narrow viewport: columns stack and the PAGE is the background scroller.
+    // Narrow viewport: the design workspace stays fixed; only the drawer scrolls.
     await page.setViewportSize({ width: 900, height: 700 });
     await openLightbox(page);
 
-    // The background document must actually be scrollable here, or the
-    // assertions below would pass vacuously.
+    // Full-tab design must not create a page-level scroller on small screens.
     const scrollable = await page.evaluate(() => {
       const el = document.scrollingElement;
       return el ? el.scrollHeight > el.clientHeight : false;
     });
-    expect(scrollable).toBe(true);
+    expect(scrollable).toBe(false);
 
     const before = await page.evaluate(
       () => document.scrollingElement?.scrollTop ?? -1,
@@ -178,8 +180,8 @@ test.describe("coil preview modal scroll lock @interaction @desktop", () => {
     );
     expect(after).toBe(before);
 
-    // Close: lock releases and the background scrolls normally again
-    // (catches a stuck overflow:hidden).
+    // Close the drawer, then the modal. The temporary document lock releases.
+    await page.keyboard.press("Escape");
     await page.keyboard.press("Escape");
     await expect(page.locator(LIGHTBOX)).toBeHidden();
     const inlineOverflow = await page.evaluate(() => ({
@@ -195,6 +197,6 @@ test.describe("coil preview modal scroll lock @interaction @desktop", () => {
     const unlocked = await page.evaluate(
       () => document.scrollingElement?.scrollTop ?? -1,
     );
-    expect(unlocked).toBeGreaterThan(0);
+    expect(unlocked).toBe(0);
   });
 });

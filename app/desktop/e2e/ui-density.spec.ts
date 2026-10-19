@@ -1,7 +1,7 @@
 import { test, expect } from "@playwright/test";
 import { ASIDE, designConstraintsPanel, gotoDesignApp } from "./helpers";
 
-test("design balances the columns and keeps winding details on demand", async ({ page }, testInfo) => {
+test("design settings stay in the drawer and keep winding details on demand", async ({ page }, testInfo) => {
   await page.emulateMedia({ colorScheme: "dark" });
   await gotoDesignApp(page);
   const preview = page.locator(ASIDE);

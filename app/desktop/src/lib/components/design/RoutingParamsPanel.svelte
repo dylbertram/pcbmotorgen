@@ -28,7 +28,7 @@
   {#if config.routing_param_defs.length === 0}
     <p class="text-xs text-slate-400">No pattern settings.</p>
   {:else}
-    <div class="grid gap-x-3 gap-y-1.5 sm:grid-cols-2" role="list">
+    <div class="routing-fields grid gap-x-3 gap-y-2" role="list">
       {#each config.routing_param_defs as def (def.key)}
         <label class="min-w-0">
           <span class="flex items-center justify-between gap-2">
@@ -77,3 +77,9 @@
     </div>
   {/if}
 </div>
+
+<style>
+  @container (min-width: 560px) {
+    .routing-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
+</style>
