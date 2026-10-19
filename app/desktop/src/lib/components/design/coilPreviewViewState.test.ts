@@ -2,6 +2,14 @@ import { describe, expect, it } from "vitest";
 import { CoilPreviewViewState } from "./coilPreviewViewState.svelte";
 
 describe("nested coil/layer visibility", () => {
+  it("defaults to physical Z height and keeps its display scale independent of visibility", () => {
+    const view = new CoilPreviewViewState();
+    expect(view.zScale).toBe(1);
+    view.zScale = 10;
+    view.toggleLayer(0);
+    expect(view.zScale).toBe(10);
+  });
+
   it("defaults to visible and hides only the chosen coil/layer", () => {
     const view = new CoilPreviewViewState();
     expect(view.isCoilLayerVisible("A", 0)).toBe(true);

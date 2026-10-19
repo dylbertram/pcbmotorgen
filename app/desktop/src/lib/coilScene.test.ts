@@ -17,8 +17,12 @@ describe("Threlte coil geometry", () => {
     const g = fixture();
     const original = JSON.stringify(g);
     const scene = buildCoilScene(g)!;
-    expect(scene.paths[0].points[0].y).toBe(-5);
-    expect(scene.paths[1].points[0].y).toBe(5);
+    expect(scene.paths[0].points[0].y).toBe(-0.8);
+    expect(scene.paths[1].points[0].y).toBe(0.8);
+    // Default Z-to-XY proportions match the original millimetre geometry.
+    const zSpan = scene.paths[1].points[0].y - scene.paths[0].points[0].y;
+    const xSpan = scene.paths[0].points[1].x - scene.paths[0].points[0].x;
+    expect(zSpan / xSpan).toBeCloseTo(1.6 / 10);
     expect(scene.vias[0].points[0]).toEqual(scene.paths[0].points[1]);
     expect(scene.vias[0].points[1]).toEqual(scene.paths[1].points[1]);
     expect(JSON.stringify(g)).toBe(original);
@@ -48,7 +52,7 @@ describe("Threlte coil geometry", () => {
     g.coil_terminals = { A: { input: { position: { x: 0, y: 0 }, layer: 0 }, output: { position: { x: 10, y: 0 }, layer: 1 } } };
     const scene = buildCoilScene(g)!;
     expect(scene.paths[2].points[0]).toEqual(scene.paths[1].points[0]);
-    expect(scene.terminals.map(t => t.point.y)).toEqual([-5, 5]);
+    expect(scene.terminals.map(t => t.point.y)).toEqual([-0.8, 0.8]);
     expect(scene.nets).toEqual(["A", "B"]);
   });
 

@@ -15,7 +15,7 @@ test("3D reports unavailable WebGL and can return to top-down", async ({ page })
   await dialog.getByRole("button", { name: "Display", exact: true }).click();
   const display = page.getByRole("dialog", { name: "Coil preview display", exact: true });
   await display.getByRole("radio", { name: "3D", exact: true }).check();
-  await expect(dialog.getByRole("status")).toContainText("3D rendering is unavailable");
+  await expect(dialog.getByRole("status").filter({ hasText: "3D rendering is unavailable" })).toBeVisible();
   await display.getByRole("radio", { name: "Top-down", exact: true }).check();
   await expect(dialog.locator("canvas")).toBeVisible();
   await expect(dialog.getByTestId("coil-iso")).toHaveCount(0);

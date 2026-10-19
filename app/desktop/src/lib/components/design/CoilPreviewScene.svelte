@@ -7,7 +7,7 @@
   import { PHASE_COLORS } from "./coilPreviewCanvas";
   import CoilCopperBatch from "./CoilCopperBatch.svelte";
 
-  let { scene, paths, vias, terminals, traceMode, reset, command }: {
+  let { scene, paths, vias, terminals, traceMode, reset, command, zScale }: {
     scene: CoilScene;
     paths: CopperPath[];
     vias: CoilScene["vias"];
@@ -15,6 +15,7 @@
     traceMode: "traces" | "centerlines";
     reset: number;
     command: { id: number; zoom: number };
+    zScale: number;
   } = $props();
   const { size, invalidate } = useThrelte();
   let camera = $state.raw<OrthographicCamera>();
@@ -45,11 +46,11 @@
 {#key scene}
 <Bounds animate={false} margin={1.25}>
 {#each batches as batch (batch.net)}
-  <CoilCopperBatch paths={batch.paths} width={scene.width} color={batch.color} centerlines={traceMode === "centerlines"} />
+  <CoilCopperBatch paths={batch.paths} width={scene.width} color={batch.color} {zScale} centerlines={traceMode === "centerlines"} />
 {/each}
-<CoilCopperBatch paths={vias} width={scene.width * 1.6} color="#fbbf24" />
+<CoilCopperBatch paths={vias} width={scene.width * 1.6} color="#fbbf24" {zScale} />
 {#each terminals as terminal (terminal.key)}
-  <T.Mesh position={[terminal.point.x, terminal.point.y, terminal.point.z]}>
+  <T.Mesh position={[terminal.point.x, terminal.point.y * zScale, terminal.point.z]}>
     <T.SphereGeometry args={[Math.max(scene.width, 0.045), 12, 8]} />
     <T.MeshBasicMaterial color="#34d399" />
   </T.Mesh>
