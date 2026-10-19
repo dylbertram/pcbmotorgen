@@ -25,6 +25,7 @@
   import HelpTag from "../ui/HelpTag.svelte";
   import PeriodicReferencePanel from "./PeriodicReferencePanel.svelte";
   import TravelStackupView from "./TravelStackupView.svelte";
+  import PeriodicReferencePanel from "./PeriodicReferencePanel.svelte";
 
   /**
    * Backplane and housing below the PCB (t707). Every edit replaces
@@ -332,7 +333,12 @@
   {#if backplane && backplaneAnalysis}
     <div class="mt-3 border-t border-slate-700/70 pt-2.5">
       <p class="mb-1.5 text-[10px] uppercase tracking-wider text-slate-500">
-        Last simulation, may be out of date
+        Analytical screening estimates from the last run; may lag recent edits
+      </p>
+      <p class="mb-2 text-[11px] leading-relaxed text-amber-200" role="note">
+        Infinite flat layers, not the finite housing shape. Edges, slots and current return
+        paths need a 3D solve. Near-knee saturation, drag and operating speed need independent
+        validation before choosing material thickness or bearing loads.
       </p>
       <p class="mb-2 text-[11px] leading-relaxed text-amber-200" role="note">
         Infinite flat layers, not the finite housing shape. Edges, slots and current return
