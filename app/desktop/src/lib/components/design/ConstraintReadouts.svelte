@@ -127,22 +127,22 @@
         <span class="truncate">Active copper region</span>
         <HelpTag label="About active copper length" tip="Copper length needed to cover the mover throughout its travel." equation={String.raw`L_{\mathrm{active}} = L_{\mathrm{mover}} + d`} />
       </dt>
-      <dd class="font-mono text-xs text-sky-200">{config.active_area_length_mm.toFixed(1)} mm</dd>
+      <dd class="font-mono text-xs text-emerald-300">{config.active_area_length_mm.toFixed(1)} mm</dd>
     </div>
     <div class="min-w-0">
       <dt class="truncate text-[10px] text-slate-500">Mover span</dt>
-      <dd class="font-mono text-xs text-sky-200">{config.mover_span_mm.toFixed(1)} mm</dd>
+      <dd class="font-mono text-xs text-emerald-300">{config.mover_span_mm.toFixed(1)} mm</dd>
     </div>
     <div class="min-w-0">
       <dt class="truncate text-[10px] text-slate-500">Pole pitch</dt>
-      <dd class="font-mono text-xs text-sky-200">{config.pole_pitch_mm.toFixed(2)} mm</dd>
+      <dd class="font-mono text-xs text-emerald-300">{config.pole_pitch_mm.toFixed(2)} mm</dd>
     </div>
     <div class="min-w-0">
       <dt class="flex min-w-0 items-center gap-0.5 text-[10px] text-slate-500">
         <span class="truncate">Magnet gap (auto)</span>
         <HelpTag label="About magnet gap" tip="Space between adjacent magnets, set by pole pitch and magnet length." equation={String.raw`g_m = \tau_p - W_m`} />
       </dt>
-      <dd class="font-mono text-xs text-sky-200">{config.magnet_gap_mm.toFixed(1)} mm</dd>
+      <dd class="font-mono text-xs text-emerald-300">{config.magnet_gap_mm.toFixed(1)} mm</dd>
     </div>
     <div class="min-w-0">
       <dt class="flex items-center text-[10px] text-slate-500">Band margin<HelpTag label="About band margin" tip="Available width minus bundle width. A negative value means the bundle does not fit." equation={String.raw`M = W_{\mathrm{available}} - W_{\mathrm{bundle}}`} image={windingBandSvg} imageAlt="Conductor bundle width and the remaining band margin." /></dt>
@@ -150,16 +150,15 @@
     </div>
   </dl>
 
-  <!-- Routing-payload metrics. Payload-derived values are shown like the
-       measured trace (emerald); an em-dash means the metric is unavailable. -->
+  <!-- All normal dimensions use the same value color; warnings retain their tone. -->
   <details class="mt-3 border-t border-slate-700/60 pt-2">
     <summary class="cursor-pointer text-xs text-slate-400 hover:text-slate-200">Winding dimensions</summary>
     <dl class="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-3">
       <div>
         <dt class="flex items-center text-[10px] text-slate-400">Phase-band pitch<HelpTag label="About phase-band pitch" tip="Band spacing for the Vernier winding. Not the physical slot pitch. Here m is phase count and r is spacing ratio." equation={String.raw`\tau_b = \frac{\tau_p}{m}\,r`} /></dt>
-        <dd class="font-mono text-xs text-sky-200">{phaseBandPitchMm.toFixed(2)} mm</dd>
+        <dd class="font-mono text-xs text-emerald-300">{phaseBandPitchMm.toFixed(2)} mm</dd>
       </div>
-      <div><dt class="text-[10px] text-slate-400">Rest offset</dt><dd class="font-mono text-xs text-sky-200">{restOffsetMm.toFixed(2)} mm</dd></div>
+      <div><dt class="text-[10px] text-slate-400">Rest offset</dt><dd class="font-mono text-xs text-emerald-300">{restOffsetMm.toFixed(2)} mm</dd></div>
     </dl>
     <div class="mt-3 space-y-3">
     <div>

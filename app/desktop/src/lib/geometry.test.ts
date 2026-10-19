@@ -5,6 +5,7 @@ import {
   isoProject,
   isoCenter,
   isoBoxPath,
+  isoVisibleFaces,
 } from "./geometry";
 
 describe("phaseBandPitchMm / restOffsetMm", () => {
@@ -60,5 +61,17 @@ describe("isoBoxPath", () => {
     expect(moves).toBe(12);
     expect(lines).toBe(12);
     expect(corners).toHaveLength(8);
+  });
+});
+
+describe("isoVisibleFaces", () => {
+  it("includes only the front, left and top faces, excluding the hidden rear-bottom corner", () => {
+    const corners: [number, number][] = Array.from({ length: 8 }, (_, i) => [i, i + 10]);
+    expect(isoVisibleFaces(corners)).toEqual({
+      end: "0,10 3,13 7,17 4,14",
+      front: "3,13 2,12 6,16 7,17",
+      top: "4,14 5,15 6,16 7,17",
+    });
+    expect(Object.values(isoVisibleFaces(corners)).join(" ")).not.toContain("1,11");
   });
 });
