@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { ASIDE, designConstraintsPanel, gotoDesignApp } from "./helpers";
+import { ASIDE, designConstraintsPanel, gotoDesignApp, openCoilPreview } from "./helpers";
 
 test("design settings stay in the drawer and keep winding details on demand", async ({ page }, testInfo) => {
   await page.emulateMedia({ colorScheme: "dark" });
@@ -74,7 +74,7 @@ test("driver inductance help explains the circuit without crowding the panel", a
   await page.emulateMedia({ colorScheme: "dark" });
   await gotoDesignApp(page);
   await page.getByRole("combobox", { name: "Winding connection", exact: true }).selectOption("2");
-  await page.getByRole("button", { name: "Expand coil preview" }).click();
+  await openCoilPreview(page);
   const modal = page.getByRole("dialog", { name: "Coil Preview", exact: true });
   await modal.getByRole("button", { name: "Driver settings", exact: true }).click();
   const panel = page.getByRole("dialog", { name: "Preview driver settings", exact: true });

@@ -1,6 +1,7 @@
 <script lang="ts">
   /**
-   * Shared right-side dock for the coiled preview and CAD import viewers.
+   * Shared preview dock. Design settings use a dedicated left rail; drawing
+   * tools stay on the right, including in the CAD import viewer.
    *
     * Each toggle pulls a panel out from the rail: the
    * Layers panel (coil/phase/layer tree plus diagnostics overlays) and the
@@ -37,7 +38,8 @@
     geometry, selection, assignmentDisabled = false, terminalTool, onStartTerminals,
     terminalsDisabled = false, dismissOnOutsideClick = true, showViewMode = false, config,
     drive = null, driveError = null, drivePending = false,
-    designSettings, open = $bindable<PreviewPanelId | null>(null), active = true }: {
+    designSettings, designOnly = false, open = $bindable<PreviewPanelId | null>(null), active = true }: {
+    designOnly?: boolean;
     active?: boolean;
     designSettings?: Snippet;
     open?: PreviewPanelId | null;
@@ -87,11 +89,11 @@
     { id: "topology-board-heading", label: "Routing" },
     { id: "magnets-heading", label: "Magnets" },
   ];
-  onDestroy(() => { terminalTool?.cancel(); view.terminalPanelOpen = false; });
+  onDestroy(() => { if (!designOnly) { terminalTool?.cancel(); view.terminalPanelOpen = false; } });
   // An outside request (the Simulation tab's ends alert) sets
   // `view.terminalPanelOpen`; mirror it into the local panel state.
   $effect(() => {
-    if (view.terminalPanelOpen && open !== "terminals") open = "terminals";
+    if (!designOnly && view.terminalPanelOpen && open !== "terminals") open = "terminals";
   });
 
   function toggle(panel: PreviewPanelId) {
@@ -108,6 +110,7 @@
   }
   function handleKeydown(event: KeyboardEvent) {
     if (!active || !open || event.key !== "Escape") return;
+    if (designOnly !== (open === "design")) return;
     const target = event.target as Element | null;
     const modal = target?.closest('[aria-modal="true"]');
     // Portaled dialogs and menus own Escape before the underlying drawer.
@@ -132,7 +135,7 @@
 <svelte:document onpointerdown={handlePointerDown} />
 
 <div bind:this={railEl} class="relative h-full w-11">
-  <div role="toolbar" aria-label="Preview side tools" aria-orientation="vertical" class="flex h-full w-full flex-col items-center gap-2 overflow-y-auto border-l border-slate-700 bg-slate-900 py-2">
+  <div role="toolbar" aria-label={designOnly ? "Design side tools" : "Preview side tools"} aria-orientation="vertical" class="flex h-full w-full flex-col items-center gap-2 overflow-y-auto {designOnly ? 'border-r' : 'border-l'} border-slate-700 bg-slate-900 py-2">
     {#if designSettings}
       <button type="button" bind:this={triggers.design} aria-label="Design settings" aria-expanded={open === "design"} onclick={() => toggle("design")}
         class="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-transparent text-slate-300 hover:bg-slate-800 aria-expanded:border-emerald-500 aria-expanded:text-emerald-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
@@ -140,7 +143,7 @@
         <Ruler size={16} aria-hidden="true" />
       </button>
     {/if}
-    <button type="button" bind:this={triggers.layers} aria-label="Layers" aria-expanded={open === "layers"} onclick={() => toggle("layers")}
+    {#if !designOnly}<button type="button" bind:this={triggers.layers} aria-label="Layers" aria-expanded={open === "layers"} onclick={() => toggle("layers")}
       class="flex h-8 w-8 items-center justify-center rounded-md border border-transparent text-slate-300 hover:bg-slate-800 aria-expanded:border-emerald-500 aria-expanded:text-emerald-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
       title="Show the coil, phase and layer tree.">
       <Layers size={16} aria-hidden="true" />
@@ -163,10 +166,11 @@
         <CircuitBoard size={16} aria-hidden="true" />
       </button>
     {/if}
+    {/if}
   </div>
 
   {#if open === "design" && designSettings}
-    <div role="dialog" aria-label="Preview design settings" aria-modal="false" class="absolute bottom-0 right-full top-0 z-30 flex w-[400px] max-w-[calc(100vw-6rem)] flex-col overflow-hidden border-l border-slate-700 bg-slate-900 text-slate-200 shadow-xl shadow-black/40" transition:fly={{ x: 16, duration: 140 }}>
+    <div role="dialog" aria-label="Preview design settings" aria-modal="false" class="absolute bottom-0 left-full top-0 z-30 flex w-[400px] max-w-[calc(100vw-8.25rem)] flex-col overflow-hidden border-r border-slate-700 bg-slate-900 text-slate-200 shadow-[12px_0_20px_-8px_rgba(0,0,0,0.4)] [clip-path:inset(0_-32px_0_0)]" transition:fly={{ x: -16, duration: 140 }}>
       <header class="flex shrink-0 items-center justify-between border-b border-slate-700 px-3 py-2">
         <h3 class="text-sm font-semibold">Design settings</h3>
         <button type="button" aria-label="Close design settings panel" onclick={close} class="rounded p-1 text-slate-400 hover:bg-slate-800"><X size={16} aria-hidden="true" /></button>
@@ -181,6 +185,7 @@
     </div>
   {/if}
 
+  {#if !designOnly}
   {#if open === "terminals" && geometry && terminalTool && onStartTerminals}
     <div role="dialog" aria-label="Coil terminals" aria-modal="false" class={`${panelClass} ${showMotorControls ? 'max-sm:bottom-20' : ''}`} transition:fly={{ x: 16, duration: 140 }}>
       <header class="flex shrink-0 items-center justify-between border-b border-slate-700 px-3 py-2">
@@ -264,5 +269,6 @@
         <CoilPreviewDisplayPanel {view} uniqueLayers={layers} {showViewMode} />
       </div>
     </div>
+  {/if}
   {/if}
 </div>

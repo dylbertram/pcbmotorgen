@@ -2,23 +2,22 @@ import { test, expect } from "@playwright/test";
 import { DESIGN_SCROLL, gotoDesignApp } from "./helpers";
 
 test.describe("Workspace layout geometry", () => {
-  test("Design fills the area between workflow and footer dividers", async ({ page }) => {
+  test("Design fills the area below the workflow divider", async ({ page }) => {
     await page.setViewportSize({ width: page.viewportSize()!.width, height: 600 });
     await gotoDesignApp(page);
     const workspace = page.getByRole("region", { name: "Coil design workspace", exact: true });
     const nav = (await page.getByRole("navigation", { name: "Design workflows" }).boundingBox())!;
-    const footer = (await page.locator("footer").boundingBox())!;
     const bounds = (await workspace.boundingBox())!;
     expect(bounds.x).toBe(0);
     expect(bounds.width).toBe(page.viewportSize()!.width);
     expect(Math.abs(bounds.y - (nav.y + nav.height))).toBeLessThanOrEqual(1);
-    expect(Math.abs(bounds.y + bounds.height - footer.y)).toBeLessThanOrEqual(1);
+    expect(Math.abs(bounds.y + bounds.height - page.viewportSize()!.height)).toBeLessThanOrEqual(1);
     const drawing = (await workspace.getByRole("img", { name: "Coil preview", exact: true }).boundingBox())!;
     expect(drawing.width).toBe(bounds.width);
     expect(drawing.height).toBeGreaterThan(300);
   });
 
-  test("settings scroll without moving the canvas or footer", async ({ page }) => {
+  test("settings scroll without moving the canvas or page", async ({ page }) => {
     await page.setViewportSize({ width: page.viewportSize()!.width, height: 600 });
     await gotoDesignApp(page);
     const drawing = page.getByRole("img", { name: "Coil preview", exact: true });
@@ -28,8 +27,7 @@ test.describe("Workspace layout geometry", () => {
     await viewport.evaluate((el) => { el.scrollTop = el.scrollHeight; });
     expect(await drawing.boundingBox()).toEqual(before);
     expect(await page.evaluate(() => window.scrollY)).toBe(0);
-    const footer = (await page.locator("footer").boundingBox())!;
-    expect(footer.y + footer.height).toBeLessThanOrEqual(page.viewportSize()!.height);
+    await expect(page.locator("footer")).toHaveCount(0);
   });
 
   test("simulation keeps equal side insets and a full-height scroll viewport", async ({ page }, testInfo) => {
@@ -37,7 +35,6 @@ test.describe("Workspace layout geometry", () => {
     await page.getByRole("tab", { name: /^Simulate/i }).click();
     const viewport = page.locator("#simulation-scroll [data-scroll-area-viewport]");
     const nav = (await page.getByRole("navigation", { name: "Design workflows" }).boundingBox())!;
-    const footer = (await page.locator("footer").boundingBox())!;
     const diagrams = (await page.getByRole("region", { name: "Simulation diagrams" }).boundingBox())!;
     const settings = (await page.locator("#panel-simulate aside").boundingBox())!;
     const width = page.viewportSize()!.width;
@@ -49,28 +46,27 @@ test.describe("Workspace layout geometry", () => {
       expect(bounds.x).toBe(0);
       expect(Math.abs(bounds.width - width)).toBeLessThanOrEqual(1);
       expect(Math.abs(bounds.y - (nav.y + nav.height))).toBeLessThanOrEqual(1);
-      expect(Math.abs(bounds.y + bounds.height - footer.y)).toBeLessThanOrEqual(1);
+      expect(Math.abs(bounds.y + bounds.height - page.viewportSize()!.height)).toBeLessThanOrEqual(1);
     }
     await page.screenshot({ path: testInfo.outputPath("simulation-scroll-bottom.png") });
     await viewport.evaluate((el) => { el.scrollTop = 0; });
     await page.screenshot({ path: testInfo.outputPath("simulation-insets.png") });
   });
 
-  test("sensor settings still fill the space between the dividers", async ({ page }) => {
+  test("sensor settings still fill the space below the workflow divider", async ({ page }) => {
     await page.setViewportSize({ width: page.viewportSize()!.width, height: 600 });
     await page.goto("/");
     await page.getByRole("button", { name: "New coil file", exact: true }).first().click();
     await page.getByRole("dialog", { name: "New coil file", exact: true }).getByRole("button", { name: /^Sensor coil/ }).click();
     const viewport = page.locator("#sensor-settings-scroll [data-scroll-area-viewport]");
     const nav = (await page.getByRole("navigation", { name: "Design workflows" }).boundingBox())!;
-    const footer = (await page.locator("footer").boundingBox())!;
     await expect(viewport).toBeVisible();
     expect(await viewport.evaluate((el) => el.scrollHeight - el.clientHeight)).toBeGreaterThan(0);
     for (const position of [0, 160, Infinity]) {
       await viewport.evaluate((el, position) => { el.scrollTop = Number.isFinite(position) ? position : el.scrollHeight; }, position);
       const bounds = (await viewport.boundingBox())!;
       expect(Math.abs(bounds.y - (nav.y + nav.height))).toBeLessThanOrEqual(1);
-      expect(Math.abs(bounds.y + bounds.height - footer.y)).toBeLessThanOrEqual(1);
+      expect(Math.abs(bounds.y + bounds.height - page.viewportSize()!.height)).toBeLessThanOrEqual(1);
     }
   });
 

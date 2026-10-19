@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { gotoDesignApp } from "./helpers";
+import { gotoDesignApp, openCoilPreview } from "./helpers";
 
 test("embedded motor workspace has editing tools and pans with the middle drag", async ({ page }) => {
   await gotoDesignApp(page);
@@ -22,7 +22,7 @@ test("embedded motor workspace has editing tools and pans with the middle drag",
   await expect.poll(async () => Number(await canvas.getAttribute("data-revision"))).toBeGreaterThan(revision);
   await expect(page.getByRole("dialog", { name: "Coil Preview", exact: true })).toHaveCount(0);
   await expect(inline).toHaveCSS("cursor", "grab");
-  await page.getByRole("button", { name: "Expand coil preview" }).click();
+  await openCoilPreview(page);
   await expect(page.getByRole("dialog", { name: "Coil Preview", exact: true })).toBeVisible();
 });
 
@@ -39,7 +39,7 @@ test("copper width is zoom-independent in world units; centerlines remain thin",
     };
   });
   await gotoDesignApp(page);
-  await page.getByRole("button", { name: "Expand coil preview" }).click();
+  await openCoilPreview(page);
   const dialog = page.getByRole("dialog", { name: "Coil Preview", exact: true });
   const canvas = dialog.locator("canvas");
   await expect(canvas).toHaveAttribute("data-trace-mode", "traces");
@@ -61,7 +61,7 @@ test("copper width is zoom-independent in world units; centerlines remain thin",
 
 test("the side rail docks the Layers and Display panels without resizing the viewer", async ({ page }) => {
   await gotoDesignApp(page);
-  await page.getByRole("button", { name: "Expand coil preview" }).click();
+  await openCoilPreview(page);
   const dialog = page.getByRole("dialog", { name: "Coil Preview", exact: true });
   const layers = page.getByRole("dialog", { name: "Coil preview layers", exact: true });
   const display = page.getByRole("dialog", { name: "Coil preview display", exact: true });
@@ -110,7 +110,7 @@ test("the side rail docks the Layers and Display panels without resizing the vie
   await toolbar.getByRole("button", { name: "Toggle measure tool" }).click();
   await expect(toolbar.getByRole("button", { name: "Toggle measure tool" })).toHaveAttribute("aria-pressed", "true");
   await page.keyboard.press("Escape");
-  await page.getByRole("button", { name: "Expand coil preview" }).click();
+  await openCoilPreview(page);
   await dialog.getByRole("button", { name: "Display", exact: true }).click();
   await expect(display.getByRole("checkbox", { name: "Show vias", exact: true })).not.toBeChecked();
   await expect(display.getByRole("radio", { name: "Centerlines" })).toBeChecked();
@@ -121,7 +121,7 @@ test("the side rail docks the Layers and Display panels without resizing the vie
 
 test("an outside click keeps the coil preview panel open; toolbar toggles close it", async ({ page }) => {
   await gotoDesignApp(page);
-  await page.getByRole("button", { name: "Expand coil preview" }).click();
+  await openCoilPreview(page);
   const dialog = page.getByRole("dialog", { name: "Coil Preview", exact: true });
   const layers = page.getByRole("dialog", { name: "Coil preview layers", exact: true });
   const display = page.getByRole("dialog", { name: "Coil preview display", exact: true });
@@ -159,7 +159,7 @@ test("the Threlte 3D view renders copper and supports orbit, zoom and visibility
     };
   });
   await gotoDesignApp(page);
-  await page.getByRole("button", { name: "Expand coil preview" }).click();
+  await openCoilPreview(page);
   const dialog = page.getByRole("dialog", { name: "Coil Preview", exact: true });
   await dialog.getByRole("button", { name: "Display", exact: true }).click();
   const display = page.getByRole("dialog", { name: "Coil preview display", exact: true });
@@ -228,7 +228,7 @@ test("overlay visibility and phase selection do not change the camera", async ({
     };
   });
   await gotoDesignApp(page);
-  await page.getByRole("button", { name: "Expand coil preview" }).click();
+  await openCoilPreview(page);
   const dialog = page.getByRole("dialog", { name: "Coil Preview", exact: true });
   const canvas = dialog.locator("canvas");
   await dialog.getByRole("button", { name: "Zoom in", exact: true }).click();
@@ -257,7 +257,7 @@ test("overlay visibility and phase selection do not change the camera", async ({
 
 test("full-modal drawing contains docked controls and bottom display menu", async ({ page }) => {
   await gotoDesignApp(page);
-  await page.getByRole("button", { name: "Expand coil preview" }).click();
+  await openCoilPreview(page);
   const dialog = page.getByRole("dialog", { name: "Coil Preview", exact: true });
   await dialog.getByRole("button", { name: "Close design settings panel" }).click();
   for (const size of [{ width: 1280, height: 800 }, { width: 390, height: 844 }]) {
@@ -293,7 +293,7 @@ test("full-modal drawing contains docked controls and bottom display menu", asyn
 
 test("the modal toolbar and zoom controls are bare, the position box is outlined, and the waveform pops above it", async ({ page }) => {
   await gotoDesignApp(page);
-  await page.getByRole("button", { name: "Expand coil preview" }).click();
+  await openCoilPreview(page);
   const dialog = page.getByRole("dialog", { name: "Coil Preview", exact: true });
   await dialog.getByRole("button", { name: "Close design settings panel" }).click();
   for (const size of [{ width: 1280, height: 800 }, { width: 390, height: 844 }]) {
@@ -367,7 +367,7 @@ test("the modal toolbar and zoom controls are bare, the position box is outlined
 
 test("phase waveform visibility preserves mover controls and survives reopening", async ({ page }) => {
   await gotoDesignApp(page);
-  await page.getByRole("button", { name: "Expand coil preview" }).click();
+  await openCoilPreview(page);
   const dialog = page.getByRole("dialog", { name: "Coil Preview", exact: true });
   await dialog.getByRole("button", { name: "Layers", exact: true }).click();
   const panel = page.getByRole("dialog", { name: "Coil preview layers", exact: true });
@@ -384,7 +384,7 @@ test("phase waveform visibility preserves mover controls and survives reopening"
   await expect(position).toHaveValue(value);
   await expect(slider).toBeVisible();
   await page.getByRole("button", { name: "Close coil preview" }).click();
-  await page.getByRole("button", { name: "Expand coil preview" }).click();
+  await openCoilPreview(page);
   await expect(toggle).not.toBeChecked();
   await expect(waveform).toHaveCount(0);
   await toggle.check();

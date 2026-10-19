@@ -1,5 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
-import { ASIDE, gotoDesignApp } from "./helpers";
+import { ASIDE, gotoDesignApp, openCoilPreview } from "./helpers";
 
 /**
  * Modal scroll-lock regression suite (Kata xy31).
@@ -19,8 +19,7 @@ import { ASIDE, gotoDesignApp } from "./helpers";
  * document overflow lock are exercised exactly as a user's trackpad would.
  */
 
-/** The coil preview lightbox dialog (open via the ⤢ button). */
-const EXPAND_BUTTON = "button[aria-label='Expand coil preview']";
+/** The coil preview lightbox opened from Simulate. */
 const LIGHTBOX = "[role='dialog'][aria-label='Coil Preview — expanded']";
 
 /**
@@ -60,7 +59,7 @@ async function wheelWasPrevented(page: Page): Promise<boolean> {
 
 async function openLightbox(page: Page) {
   await gotoDesignApp(page);
-  await page.locator(EXPAND_BUTTON).click();
+  await openCoilPreview(page);
   await expect(page.locator(LIGHTBOX)).toBeVisible();
 }
 
