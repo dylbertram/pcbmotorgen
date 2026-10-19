@@ -47,7 +47,7 @@ test("assembly and dimension stay inside the drawing for tall magnets and both t
   await height.press("Enter");
   const constraints = designConstraintsPanel(page);
   const diagram = constraints.getByRole("img", { name: "Three-quarter isometric view of the assembly" });
-  const slider = constraints.getByRole("slider", { name: "Mover position slider (mm)" });
+  const slider = page.locator("#panel-design").getByRole("slider", { name: "Mover position slider (mm)" });
   for (const key of ["Home", "End"]) {
     await slider.focus();
     await slider.press(key);

@@ -30,10 +30,9 @@ export class CoilPreviewViewState {
   /** Pole-pitch ruler toggle. Kept even when no sidecar data exists (the
    *  toggle row simply is not rendered then). */
   showPolePitch = $state(true);
-  /** Band-width diagnostics toggle. */
-  showBandWidths = $state(true);
-  /** Pole-region zone toggle. Default on, like the other overlays. */
-  showPoleRegions = $state(true);
+  /** Detailed diagnostics are opt-in so they do not obscure the working drawing. */
+  showBandWidths = $state(false);
+  showPoleRegions = $state(false);
   /** Pole-region phase-picker selection; "" = "All phases". Independent of
    *  the per-phase trace visibility toggles. */
   poleRegionPhase = $state("");

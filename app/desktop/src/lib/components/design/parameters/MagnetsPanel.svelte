@@ -16,7 +16,7 @@
   <Separator />
 
   <div class="px-3 pb-3 pt-2.5">
-    <div class="grid gap-x-3 gap-y-2.5 sm:grid-cols-2">
+    <div class="magnet-fields grid gap-x-3 gap-y-2.5">
       <label class="min-w-0">
         <span class="flex items-center justify-between gap-2">
           <span class="min-w-0 truncate text-xs text-slate-300">Magnet count</span>
@@ -100,9 +100,16 @@
         </span>
       </label>
 
-      <div class="sm:col-span-2">
+      <div class="magnet-grade">
         <MagnetGradeHelper {config} />
       </div>
     </div>
   </div>
 </section>
+
+<style>
+  @container (min-width: 560px) {
+    .magnet-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .magnet-grade { grid-column: span 2; }
+  }
+</style>

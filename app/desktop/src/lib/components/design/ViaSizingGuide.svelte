@@ -54,4 +54,8 @@
     .via-inputs :global(label) { flex-wrap: wrap; }
     .via-inputs :global(label > span:first-child) { flex-basis: 100%; }
   }
+  @container (max-width: 420px) {
+    .via-inputs :global(label) { flex-wrap: wrap; }
+    .via-inputs :global(label > span:first-child) { flex-basis: 100%; }
+  }
 </style>
