@@ -221,7 +221,9 @@
           <PreviewFrame bind:frame={modalFrameRef} bind:width={frameWidth} {gestures} {measure} navigationEnabled={view.viewMode === "top"} interactive={view.viewMode === "top" && (terminalTool?.active ?? false)}
             label={embedded ? "Coil preview" : "Coil preview — expanded"}>
             {#if view.viewMode === "iso"}
-              <CoilPreviewIsoView geometry={terminalGeometry ?? importedGeometry} {view} isVisible={isTerminalVisible} />
+              <div class="absolute inset-y-0" style:left={`${leftDockWidth}px`} style:right={`${dockWidth + 44}px`}>
+                <CoilPreviewIsoView geometry={terminalGeometry ?? importedGeometry} {view} isVisible={isTerminalVisible} />
+              </div>
             {:else}
             <canvas bind:this={modalCanvasRef} class="block h-full w-full"
             ></canvas>
