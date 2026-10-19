@@ -176,8 +176,9 @@ Expand the coil preview, open **Display**, and select **3D**. The Threlte viewer
 supports generated and imported geometry. Drag to orbit, right-drag to pan, and
 scroll or pinch to zoom. **Reset 3D view** fits the copper back into the viewer.
 Layer, coil, via, terminal, and trace/centerline settings also apply in 3D.
-Copper-plane separation is exaggerated 10× for readability; saved coordinates
-and exports are unchanged. Return to **Top-down** to edit or measure geometry.
+Z height defaults to the physical 1× scale. Use the vertical slider on the left
+to magnify it up to 20×; saved coordinates and exports are unchanged.
+Return to **Top-down** to edit or measure geometry.
 If WebGL is unavailable, the viewer reports it and Top-down remains usable.
 
 ### Set coil IN and OUT

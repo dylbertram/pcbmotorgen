@@ -2,9 +2,6 @@ import { Box3, Vector3, ArcCurve } from "three";
 import { sampleSpline } from "./curvePaths";
 import type { CadGeometry, CadPoint, CadRouteCurve } from "./types";
 
-/** Display separation only. Saved/exported elevations are never changed. */
-export const COIL_Z_EXAGGERATION = 10;
-
 export interface CopperPath {
   key: string;
   net: string;
@@ -32,7 +29,7 @@ export function sampleCopperArc({ start: a, mid: b, end: c }: CadRouteCurve): Ca
 export function buildCoilScene(geometry: CadGeometry | null) {
   if (!geometry || geometry.layer_z_mm.length === 0) return null;
   const g = geometry;
-  const at = (p: CadPoint, layer: number) => new Vector3(p.x, (g.layer_z_mm[layer] ?? 0) * COIL_Z_EXAGGERATION, -p.y);
+  const at = (p: CadPoint, layer: number) => new Vector3(p.x, g.layer_z_mm[layer] ?? 0, -p.y);
   const paths: CopperPath[] = [
     ...g.routing.segments.map((s, i) => ({ key: `segment-${i}`, net: s.net, layer: s.layer, points: [at(s.start, s.layer), at(s.end, s.layer)] })),
     ...g.routing.curves.map((c, i) => ({ key: `arc-${i}`, net: c.net, layer: c.layer, points: sampleCopperArc(c).map(p => at(p, c.layer)) })),
