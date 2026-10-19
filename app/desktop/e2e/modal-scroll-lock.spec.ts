@@ -78,7 +78,7 @@ test.describe("coil preview modal scroll lock @interaction @desktop", () => {
     expect(inlineOverflow).toEqual({ root: "hidden", body: "hidden" });
 
     const before = await page.evaluate(() => ({
-      aside: document.querySelector("aside")?.scrollTop ?? -1,
+      aside: document.querySelector("aside[aria-label='Coil preview panel'] [data-scroll-area-viewport]")?.scrollTop ?? -1,
       document: document.scrollingElement?.scrollTop ?? -1,
     }));
 
@@ -92,7 +92,7 @@ test.describe("coil preview modal scroll lock @interaction @desktop", () => {
     expect(await wheelWasPrevented(page)).toBe(true);
 
     const after = await page.evaluate(() => ({
-      aside: document.querySelector("aside")?.scrollTop ?? -1,
+      aside: document.querySelector("aside[aria-label='Coil preview panel'] [data-scroll-area-viewport]")?.scrollTop ?? -1,
       document: document.scrollingElement?.scrollTop ?? -1,
     }));
     expect(after).toEqual(before);
@@ -129,7 +129,7 @@ test.describe("coil preview modal scroll lock @interaction @desktop", () => {
     // invariant is "the background does not move while the modal is open",
     // not "the background sits at scrollTop 0".
     const asideBefore = await page.evaluate(
-      () => document.querySelector("aside")?.scrollTop ?? -1,
+      () => document.querySelector("aside[aria-label='Coil preview panel'] [data-scroll-area-viewport]")?.scrollTop ?? -1,
     );
 
     // Wheel over the header, not the canvas gesture surface.
@@ -142,7 +142,7 @@ test.describe("coil preview modal scroll lock @interaction @desktop", () => {
 
     // The reflection column behind the modal never moves either.
     const asideScroll = await page.evaluate(
-      () => document.querySelector("aside")?.scrollTop ?? -1,
+      () => document.querySelector("aside[aria-label='Coil preview panel'] [data-scroll-area-viewport]")?.scrollTop ?? -1,
     );
     expect(asideScroll).toBe(asideBefore);
   });

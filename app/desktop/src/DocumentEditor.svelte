@@ -638,19 +638,20 @@
         </div>
       {/if}
 
-       <!-- The coil preview stays mounted beside every workflow panel. -->
+      <!-- Scroll viewports fill the space between the workflow and footer
+           dividers. Insets belong inside them, so content scrolls to the edges. -->
       <div
-        class="grid min-h-0 flex-1 items-start gap-3 px-4 pb-4 {activeTab === 'design' ? 'lg:grid-cols-[minmax(360px,0.9fr)_minmax(0,1.35fr)]' : 'lg:grid-cols-1'} lg:grid-rows-[minmax(0,1fr)] lg:items-stretch lg:pb-0 lg:pr-0"
+        class="grid min-h-0 flex-1 items-start {activeTab === 'design' ? 'lg:grid-cols-[minmax(360px,0.9fr)_minmax(0,1.35fr)]' : 'lg:grid-cols-1'} lg:grid-rows-[minmax(0,1fr)] lg:items-stretch"
       >
         <!-- The desktop layout locks the page height: both columns stretch to the
              row (viewport minus header/footer) and scroll independently inside
              themselves, so the footer is always visible and the page never
              scrolls. Below lg the columns stack and the page scrolls normally. -->
         <aside
-        class="relative min-w-0 min-h-0 lg:h-full lg:pt-4 lg:pb-4 lg:pr-2 {activeTab !== 'design' ? 'hidden' : ''}"
+          class="relative min-w-0 min-h-0 lg:h-full {activeTab !== 'design' ? 'hidden' : ''}"
           aria-label="Coil preview panel"
         >
-          <ScrollArea class="h-full min-h-0">
+          <ScrollArea class="h-full min-h-0" viewportClass="p-4 lg:pr-2">
             {#if designType === "sensor"}
               <SensorPreview store={sensorStore} camera={session.camera} previewView={session.previewView} />
             {:else}
@@ -675,36 +676,40 @@
           <Tabs.Content
             value="design"
             id="panel-design"
-            class="h-full p-4 lg:pr-0"
+            class="h-full"
           >
             <div hidden={designType !== "motor"} class="h-full">
                <DesignTab {config} {motion} {measuredTrace} routingDimensions={activeCoils?.routing_dimensions ?? null} cadGeometry={projects.cadGeometry} onGeometryChange={(geometry) => projects.setCadGeometry(geometry)} onImportCad={() => (cadImportDialogOpen = true)} onUseGenerated={() => projects.setCadGeometry(null)} />
             </div>
-            <div hidden={designType !== "sensor"} class="h-full overflow-y-auto">
-              <SensorTab store={sensorStore} />
+            <div hidden={designType !== "sensor"} class="h-full">
+              <ScrollArea id="sensor-settings-scroll" class="h-full" viewportClass="p-4 lg:pl-2" aria-label="Sensor settings">
+                <SensorTab store={sensorStore} />
+              </ScrollArea>
             </div>
           </Tabs.Content>
 
           <Tabs.Content
             value="simulate"
             id="panel-simulate"
-            class="h-full overflow-y-auto p-4 lg:pr-0"
+            class="h-full"
           >
-            <SimulateTab
-              onOpenPreview={() => (coilPreviewExpanded = true)}
-              onConfigureWinding={() => selectTab("design")}
-              {config}
-              active={active && activeTab === "simulate"}
-              {sweep}
-              {friction}
-              {height}
-              {drive}
-              {driveError}
-              {error}
-              cadGeometry={projects.cadGeometry}
-              onSelectEnds={selectCoilEnds}
-              onUseInferredEnds={useInferredEnds}
-            />
+            <ScrollArea id="simulation-scroll" class="h-full" viewportClass="p-4" aria-label="Simulation workspace">
+              <SimulateTab
+                onOpenPreview={() => (coilPreviewExpanded = true)}
+                onConfigureWinding={() => selectTab("design")}
+                {config}
+                active={active && activeTab === "simulate"}
+                {sweep}
+                {friction}
+                {height}
+                {drive}
+                {driveError}
+                {error}
+                cadGeometry={projects.cadGeometry}
+                onSelectEnds={selectCoilEnds}
+                onUseInferredEnds={useInferredEnds}
+              />
+            </ScrollArea>
           </Tabs.Content>
         </div>
       </div>
