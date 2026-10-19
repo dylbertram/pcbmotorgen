@@ -10,7 +10,7 @@
 
 <section aria-labelledby="magnets-heading" class="overflow-hidden rounded-md border border-slate-700 bg-slate-800/30">
   <header class="px-3 py-2">
-    <h3 id="magnets-heading" class="text-xs font-semibold uppercase tracking-wider text-slate-200">Magnets</h3>
+    <h3 id="magnets-heading" class="text-sm font-semibold text-slate-200">Magnets</h3>
   </header>
 
   <Separator />
@@ -37,15 +37,7 @@
       <label class="min-w-0">
         <span class="flex items-center justify-between gap-2">
           <span class="min-w-0 truncate text-xs text-slate-300"
-            >X Length (mm)<HelpTag label="About X Length">
-              Along-travel length. Sets the pole fill factor
-              <span class="italic">k</span> =
-              <span class="italic">W<sub>m</sub></span>/<span class="italic">τ<sub>p</sub></span>
-              (0.75 is the default optimum); the inter-magnet gap follows as
-              <span class="italic">τ<sub>p</sub></span> −
-              <span class="italic">W<sub>m</sub></span>, zero at
-              <span class="italic">k</span> = 1.00.
-            </HelpTag></span
+            >X length (mm)<HelpTag label="About X Length" tip="Magnet length along travel. The default fill factor is 0.75; higher values leave less gap." equation={String.raw`k = \frac{W_m}{\tau_p},\qquad g_m = \tau_p - W_m`} /></span
           >
           <NumberField
             id="magnet-width"
@@ -72,10 +64,10 @@
       <label class="min-w-0">
         <span class="flex items-center justify-between gap-2">
           <span class="min-w-0 truncate text-xs text-slate-300"
-            >Y Width (mm)<HelpTag tip="Across-stator width; defines the active conductor length." /></span
+            >Y width (mm)<HelpTag label="About magnet width" tip="Width across the stator. Sets the active conductor length." /></span
           >
           <NumberField
-            id="magnet-width"
+            id="magnet-cross-width"
             value={config.magnet_cross_width_mm}
             min={0.1}
             max={40}
@@ -90,8 +82,9 @@
       <label class="min-w-0">
         <span class="flex items-center justify-between gap-2">
           <span class="min-w-0 truncate text-xs text-slate-300"
-            >Z Thickness (mm)<HelpTag
-              tip="Magnetisation-axis thickness. Coreless (no iron core): aim for at least {(config.pole_pitch_mm * 0.5).toFixed(1)} mm (0.5 × pole pitch)."
+            >Z thickness (mm)<HelpTag label="About magnet thickness"
+              tip="Thickness along magnetisation. For a coreless motor, aim for at least {(config.pole_pitch_mm * 0.5).toFixed(1)} mm."
+              equation={String.raw`h_m \gtrsim \frac{\tau_p}{2}`}
             /></span
           >
           <NumberField

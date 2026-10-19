@@ -23,6 +23,8 @@
   import type { CadGeometry, DriveAnalysis } from "../../types";
   import DriverSelector from "../simulate/DriverSelector.svelte";
   import { formatSi } from "../../format";
+  import HelpTag from "../ui/HelpTag.svelte";
+  import seriesInductorSvg from "../../assets/series-inductor.svg";
   import type { CadSelectionTool } from "../../utils/cadSelectionTool.svelte";
   import type { ConfigStore } from "../../stores/config.svelte";
   import NumberField from "../ui/NumberField.svelte";
@@ -163,13 +165,12 @@
         <fieldset class="space-y-2">
           <legend class="text-xs font-semibold text-slate-200">Driver inductor</legend>
           <label class="flex items-center justify-between gap-2 text-xs text-slate-300">
-            Per phase (µH)
+            <span>Per phase (µH)<HelpTag label="About series inductance" tip="One external inductor per driver output. Applies to every phase; 0 means none. Not part of PCB geometry." equation={String.raw`V_L = L\frac{\mathrm{d}i}{\mathrm{d}t}`} image={seriesInductorSvg} imageAlt="Each driver output connects through an added inductor to a PCB winding." /></span>
             <NumberField value={config.drive.series_inductance_h * 1e6} min={0} step={1}
               ariaLabel="Series inductor per phase (µH)" class="w-20 shrink-0 px-2 py-1 text-xs font-mono text-emerald-200"
               onCommit={(v) => { if (config) config.drive = { ...config.drive, series_inductance_h: v * 1e-6 }; }} />
           </label>
           <p class="text-[11px] text-slate-400">Adding inductance can reduce PWM current ripple, but needs more voltage at speed.</p>
-          <p class="text-[11px] text-slate-400">An external series inductor at each driver end. The same value applies to every phase. Use 0 for none. Included in driver simulation, not PCB geometry.</p>
         </fieldset>
         <div class="mt-4 border-t border-slate-700 pt-3"><DriverSelector {config} /></div>
         <section aria-label="Preview driver simulation results" aria-busy={drivePending} class="mt-4 space-y-2 border-t border-slate-700 pt-3">
@@ -180,16 +181,16 @@
             <p role="alert" class="text-[11px] text-rose-300">{driveError}</p>
           {:else if drive}
             <p class="text-[11px] text-slate-400">{drive.driver_name} · {formatSi(drive.pwm_hz, "Hz")} PWM</p>
-            <dl class="space-y-2 text-[11px]">
-              <div><dt class="text-slate-400">Current ripple, peak-to-peak</dt><dd class="font-mono text-slate-100">{formatSi(drive.ripple_pp_a, "A")}</dd></div>
-              <div><dt class="text-slate-400">Effective phase inductance</dt><dd class="font-mono text-slate-100">{formatSi(drive.effective_inductance_h, "H")}</dd></div>
-              <div><dt class="text-slate-400">Additional inductance for ripple limit</dt><dd class="font-mono text-slate-100">{formatSi(drive.added_inductance_h, "H")} per phase</dd></div>
-              <div><dt class="text-slate-400">PWM for ripple limit</dt><dd class="font-mono text-slate-100">≥ {formatSi(drive.min_pwm_hz, "Hz")}</dd></div>
+            <dl class="space-y-2 text-xs">
+              <div class="flex flex-wrap justify-between gap-1"><dt class="text-slate-400">Current ripple<HelpTag label="About current ripple" tip="Peak-to-peak current variation caused by PWM switching." equation={String.raw`\Delta I_{\mathrm{pp}} = I_{\max} - I_{\min}`} /></dt><dd class="font-mono text-slate-100">{formatSi(drive.ripple_pp_a, "A")}</dd></div>
+              <div class="flex flex-wrap justify-between gap-1"><dt class="text-slate-400">Effective phase inductance<HelpTag label="About effective inductance" tip="Winding inductance plus the external series inductor." equation={String.raw`L_{\mathrm{eff}} = L_{\mathrm{winding}} + L_{\mathrm{series}}`} /></dt><dd class="font-mono text-slate-100">{formatSi(drive.effective_inductance_h, "H")}</dd></div>
+              <div class="flex flex-wrap justify-between gap-1"><dt class="text-slate-400">Additional L needed<HelpTag label="About additional inductance" tip="Extra inductance still needed per phase to meet the ripple limit at this PWM frequency." /></dt><dd class="font-mono text-slate-100">{formatSi(drive.added_inductance_h, "H")}</dd></div>
+              <div class="flex flex-wrap justify-between gap-1"><dt class="text-slate-400">Minimum PWM<HelpTag label="About minimum PWM" tip="Switching frequency needed to meet the ripple limit with this total inductance." /></dt><dd class="font-mono text-slate-100">{formatSi(drive.min_pwm_hz, "Hz")}</dd></div>
             </dl>
             {#if rippleCheck}
-              <p class="text-[11px] {rippleCheck.status === 'pass' ? 'text-emerald-300' : rippleCheck.status === 'unknown' ? 'text-slate-400' : 'text-amber-300'}">Ripple check: {rippleCheck.status}. {rippleCheck.detail}</p>
+              <p class="text-xs {rippleCheck.status === 'pass' ? 'text-emerald-300' : rippleCheck.status === 'unknown' ? 'text-slate-400' : 'text-amber-300'}">Ripple check: {rippleCheck.status}<HelpTag label="Ripple check details" tip={rippleCheck.detail} /></p>
             {/if}
-            <p class="text-[11px] text-slate-500">Updates when the driver or inductance changes. Full checks are in Simulate.</p>
+            <p class="text-[11px] text-slate-500">Full checks in Simulate.</p>
           {:else}
             <p role="status" class="text-[11px] text-slate-400">Driver results unavailable. Check the design and coil connections in Simulate.</p>
           {/if}

@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 288 138" role="img" aria-label="Three driver outputs, each connected through an external inductor to a motor winding">
+  <rect width="288" height="138" rx="8" fill="#0f172a"/>
+  <g fill="none" stroke="#94a3b8" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="12" y="30" width="48" height="90" rx="5" fill="#1e293b"/>
+    <path d="M60 48h25m0 0c0-12 12-12 12 0c0-12 12-12 12 0c0-12 12-12 12 0c0-12 12-12 12 0h27m-100 28h25m0 0c0-12 12-12 12 0c0-12 12-12 12 0c0-12 12-12 12 0c0-12 12-12 12 0h27m-100 28h25m0 0c0-12 12-12 12 0c0-12 12-12 12 0c0-12 12-12 12 0c0-12 12-12 12 0h27" stroke="#34d399"/>
+    <path d="M160 48h16m0 0c0-9 9-9 9 0c0-9 9-9 9 0c0-9 9-9 9 0c0-9 9-9 9 0h28m-80 28h16m0 0c0-9 9-9 9 0c0-9 9-9 9 0c0-9 9-9 9 0c0-9 9-9 9 0h28m-80 28h16m0 0c0-9 9-9 9 0c0-9 9-9 9 0c0-9 9-9 9 0c0-9 9-9 9 0h28"/>
+    <circle cx="246" cy="48" r="3"/><circle cx="246" cy="76" r="3"/><circle cx="246" cy="104" r="3"/>
+    <path d="M20 26v-6m8 6v-6m8 6v-6m8 6v-6m8 6v-6M20 124v6m8-6v6m8-6v6m8-6v6m8-6v6"/>
+  </g>
+  <g fill="#e2e8f0" font-family="sans-serif" font-size="10" text-anchor="middle"><text x="36" y="79">Driver</text><text x="109" y="18" fill="#6ee7b7">Added L</text><text x="205" y="18">PCB winding</text></g>
+</svg>

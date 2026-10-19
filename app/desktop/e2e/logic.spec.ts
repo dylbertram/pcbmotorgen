@@ -62,8 +62,8 @@ test.describe("routing dimensions -> preview overlays", () => {
     await expect(inlineCanvas).toBeVisible();
 
     await eventually(async () => {
-      expect(await inlineCanvas.getAttribute("data-pole-pitch")).toBe("1");
-      expect(Number(await inlineCanvas.getAttribute("data-band-widths"))).toBeGreaterThan(0);
+      expect(await inlineCanvas.getAttribute("data-pole-pitch")).toBe("0");
+      expect(await inlineCanvas.getAttribute("data-band-widths")).toBe("0");
     });
 
     await page
@@ -81,6 +81,7 @@ test.describe("routing dimensions -> preview overlays", () => {
     });
 
     await expect(modalCanvas).toBeVisible();
+    await expect(modalCanvas).toHaveAttribute("data-pole-pitch", "1");
     await expect(polePitch).toBeChecked();
     await expect(bandWidths).toBeChecked();
 
@@ -106,7 +107,7 @@ test.describe("routing dimensions -> preview overlays", () => {
     const inlineCanvas = preview.locator("canvas[data-pole-regions]");
     await expect(inlineCanvas).toBeVisible();
     await eventually(async () => {
-      expect(Number(await inlineCanvas.getAttribute("data-pole-regions"))).toBeGreaterThan(0);
+      expect(await inlineCanvas.getAttribute("data-pole-regions")).toBe("0");
     });
 
     await page

@@ -2,17 +2,18 @@
   import type { ConfigStore } from "../../../stores/config.svelte";
   import NumberField from "../../ui/NumberField.svelte";
   import Separator from "../../ui/Separator.svelte";
+  import HelpTag from "../../ui/HelpTag.svelte";
 
   let { config }: { config: ConfigStore } = $props();
 </script>
 
 <section aria-labelledby="drive-targets-heading" class="overflow-hidden rounded-md border border-slate-700 bg-slate-800/30">
-  <h3 id="drive-targets-heading" class="px-3 py-2 text-xs font-semibold uppercase tracking-wider text-slate-200">Drive &amp; Force Targets</h3>
+  <h3 id="drive-targets-heading" class="px-3 py-2 text-sm font-semibold text-slate-200">Drive &amp; force targets</h3>
 
   <Separator />
 
   <div class="px-3 pb-3 pt-2.5">
-    <div class="grid gap-x-3 gap-y-2 sm:grid-cols-2">
+    <div class="grid gap-y-2">
       <label class="min-w-0">
         <span class="flex items-center justify-between gap-2">
           <span class="min-w-0 truncate text-xs text-slate-300">Phase current (A)</span>
@@ -60,7 +61,7 @@
 
       <label class="min-w-0">
         <span class="flex items-center justify-between gap-2">
-          <span class="min-w-0 truncate text-xs text-slate-300">Friction (N)</span>
+          <span class="min-w-0 text-xs text-slate-300">Friction (N)<HelpTag label="About friction estimate" tip="Estimated mechanical resistance to motion. Net force must exceed it to move the load." equation={String.raw`F_{\mathrm{net}} = F_{\mathrm{motor}} - F_{\mathrm{friction}}`} /></span>
           <NumberField
             id="friction-estimate"
             value={config.friction_n}

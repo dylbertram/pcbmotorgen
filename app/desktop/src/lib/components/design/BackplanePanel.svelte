@@ -140,18 +140,18 @@
 >
   <h2
     id="backplane-heading"
-    class="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-200"
+    class="mb-2 text-sm font-semibold text-slate-200"
   >
     Stackup<HelpTag
       label="About the backplane model"
-      tip="Planar layered model of the magnet fundamental. Saturation uses one effective permeability per layer; eddy currents use the layers' conductivity at the PWM frequency and at the mover speed. Boundaries are infinite planes, so edges are ignored. Core and hysteresis losses are not modelled."
+      tip="Fundamental-field model with saturation and eddy currents. Infinite layers; ignores edges, hysteresis and core losses."
     />
   </h2>
 
-  <div class="mb-3 grid gap-3 sm:grid-cols-[minmax(0,1fr)_180px] items-start">
+  <div class="mb-2 grid gap-3 sm:grid-cols-[minmax(0,1fr)_160px] items-center">
     <div class="space-y-2.5">
       <label class="flex items-center justify-between gap-2 text-xs text-slate-300">
-        <span>Air gap (mm)</span>
+        <span>Air gap (mm)<HelpTag label="About air gap" tip="Clearance from the top of the PCB to the magnets. A smaller gap increases field strength." /></span>
         <NumberField id="air-gap" value={config.air_gap_mm} min={0} step={0.05} ariaLabel="Air gap (mm)" class={fieldClass} onCommit={(value) => (config.air_gap_mm = value)} />
       </label>
       <label class="flex items-center justify-between gap-2 text-xs text-slate-300">
@@ -159,18 +159,15 @@
         <NumberField id="pcb-thickness" value={config.pcb_thickness_mm} min={0.1} step={0.1} ariaLabel="PCB thickness (mm)" class={fieldClass} onCommit={(value) => (config.pcb_thickness_mm = value)} />
       </label>
     </div>
-    <TravelStackupView {config} />
+    <div class="mx-auto w-full max-w-[160px]"><TravelStackupView {config} /></div>
   </div>
 
   {#if !backplane}
-    <p class="mb-2 text-[11px] leading-relaxed text-slate-400">
-      No backplane is set, so the field model is unchanged.
-    </p>
     <button type="button" class={buttonClass} onclick={addBackplane}>Add backplane</button>
   {:else}
     <div class="space-y-2">
       <p class="text-[11px] leading-relaxed text-slate-400">
-        Layer 1 touches the PCB. Order runs from the PCB downward.
+        Layers run downward from the PCB.
       </p>
 
       <ol class="space-y-1.5" aria-label="Backplane layers, from the PCB downward">
@@ -259,8 +256,7 @@
       </ol>
       {#if hasFlexSheet}
         <p class="text-[11px] leading-relaxed text-slate-400">
-          Enter the ferrite thickness of a sheet only. Datasheet totals include adhesive and
-          cover film. Put datasheet μr and Bsat in the fields above.
+          Use ferrite thickness only, excluding adhesive and cover film.
         </p>
       {/if}
 
@@ -330,10 +326,7 @@
           role="status"
           class="rounded border border-amber-500/40 bg-amber-500/10 px-2 py-1.5 text-[11px] leading-relaxed text-amber-200"
         >
-          Silicon steel is selected with PWM at {(config.drive.pwm_hz / 1e3).toFixed(1)} kHz,
-          above {SILICON_STEEL_PWM_LIMIT_HZ / 1e3} kHz. Eddy and core losses rise steeply here
-          are only partly modelled. Consider sintered MnZn or NiZn ferrite, or soft magnetic
-          composite (SMC).
+          Silicon steel losses rise above {SILICON_STEEL_PWM_LIMIT_HZ / 1e3} kHz PWM and are only partly modelled. Consider ferrite or SMC.
         </p>
       {/if}
 
@@ -346,7 +339,7 @@
   {#if backplane && backplaneAnalysis}
     <div class="mt-3 border-t border-slate-700/70 pt-2.5">
       <p class="mb-1.5 text-[10px] uppercase tracking-wider text-slate-500">
-        From the last simulation run; may lag recent edits
+        Last simulation, may be out of date
       </p>
       <dl class="grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
         <dt class="text-slate-400">Image strength R</dt>

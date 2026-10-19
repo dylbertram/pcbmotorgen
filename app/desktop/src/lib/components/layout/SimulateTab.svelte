@@ -31,6 +31,7 @@
     onConfigureWinding,
     onSelectEnds,
     onUseInferredEnds,
+    onOpenPreview,
   }: {
     config: ConfigStore;
     active: boolean;
@@ -45,20 +46,18 @@
     /** Open the coil-ends panel for the active copper. */
     onSelectEnds?: () => void;
     onUseInferredEnds?: () => void;
+    onOpenPreview?: () => void;
   } = $props();
 
   let coilEnds = $derived(cadGeometry ? inferMissingCoilEnds(cadGeometry) : null);
 </script>
 
-<div class="grid gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
-  <section class="min-w-0 space-y-4" aria-label="Simulation diagrams">
-    <div class="rounded-lg border border-slate-700 bg-slate-800/40 px-4 py-3">
-      <h2 class="text-sm font-semibold text-slate-100">Performance iteration</h2>
-      <p class="mt-1 text-xs text-slate-400">
-        Adjust the design, then use these plots and budgets to compare the next iteration.
-        Automated adjustment tips are planned for a later iteration.
-      </p>
-    </div>
+<div class="mb-3 flex items-center justify-between gap-3">
+  <h2 class="text-sm font-semibold text-slate-100">Simulation</h2>
+  {#if onOpenPreview}<button type="button" onclick={onOpenPreview} class="rounded border border-slate-600 px-3 py-1 text-xs text-slate-200 hover:bg-slate-800">Open coil preview</button>{/if}
+</div>
+<div class="grid items-start gap-3 lg:grid-cols-[minmax(0,1fr)_340px]">
+  <section class="simulation-main min-w-0 space-y-4" aria-label="Simulation diagrams">
     {#if cadGeometry}
       {#if coilEnds && coilEnds.unresolved.length}
         <div class="rounded-md border border-rose-500/60 bg-rose-500/10 px-3 py-2.5 text-xs text-rose-100" role="alert">
@@ -97,8 +96,10 @@
         Computation error: {error}
       </div>
     {/if}
-    <FluxDiagram {config} {active} />
-    <ForceSweepPlot result={sweep} />
+    <div class="simulation-plots">
+      <FluxDiagram {config} {active} />
+      <ForceSweepPlot result={sweep} />
+    </div>
     <DriverSuitability analysis={drive} error={driveError} onConfigureWinding={usesDeltaConnection(config.toIpc(), !!cadGeometry && !unmappedCoils(cadGeometry).length) ? onConfigureWinding : undefined} />
   </section>
 
@@ -117,3 +118,11 @@
     </div>
   </aside>
 </div>
+
+<style>
+  .simulation-main { container-type: inline-size; }
+  .simulation-plots { display: grid; gap: 1rem; align-items: start; }
+  @container (min-width: 960px) {
+    .simulation-plots { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
+</style>
