@@ -92,7 +92,7 @@
   <div class="flex flex-wrap items-center gap-2">
     <h3
       id="routing-source-heading"
-      class="text-[11px] font-semibold uppercase tracking-wider text-slate-300"
+      class="text-xs font-medium text-slate-300"
     >
       Routing source
     </h3>
@@ -166,7 +166,7 @@
   <div class="flex flex-wrap items-center gap-2">
     <label
       for="num-layers"
-      class="text-[11px] font-semibold uppercase tracking-wider text-slate-300"
+      class="text-xs font-medium text-slate-300"
     >
       Copper layers
     </label>
@@ -210,9 +210,11 @@
         </Select.Content>
       </Select.Portal>
     </Select.Root>
-    <span class="min-w-0 flex-1 text-[10px] text-slate-500" role="note">
+    {#if Object.values(config.patternLayerRange).some((value) => value !== null)}
+    <span class="min-w-0 flex-1 text-[11px] text-slate-400" role="note">
       {layerRangeLabel}
     </span>
+    {/if}
   </div>
 
   <RoutingParamsPanel {config} />

@@ -17,18 +17,18 @@
   // (layer 1 touches the PCB, so it sits highest), PCB, air gap, magnet.
   // ====================================================================
   const ORTHO_W = 180;
-  const ORTHO_H = 220;
+  const ORTHO_H = 160;
   const ORTHO_PAD_L = 8;
-  const ORTHO_PAD_R = 36; // reserved for the height-dimension labels
-  const ORTHO_PAD_T = 12;
+  const ORTHO_PAD_R = 54; // reserved for the height-dimension labels
+  const ORTHO_PAD_T = 20;
   const ORTHO_PAD_B = 16;
   const RECT_W = ORTHO_W - ORTHO_PAD_L - ORTHO_PAD_R;
   const DIM_X = ORTHO_W - 4;
   const BASE_Y = ORTHO_H - ORTHO_PAD_B;
   // Segments shorter than this get no text inside.
-  const MIN_INSIDE_LABEL_PX = 8;
+  const MIN_INSIDE_LABEL_PX = 14;
   // Right-side labels are pushed apart by at least this much.
-  const MIN_DIM_LABEL_GAP_PX = 9;
+  const MIN_DIM_LABEL_GAP_PX = 13;
 
   type SegmentKind = "housing" | "housing-gap" | "layer" | "pcb" | "air-gap" | "magnet";
 
@@ -48,12 +48,12 @@
 
   const SEGMENT_STYLE: Record<SegmentKind, { fill: string; stroke: string; text: string }> = {
     // One neutral fill for every backplane layer; the material name is drawn inside.
-    layer: { fill: "#334155", stroke: "#64748b", text: "fill-slate-100" },
-    housing: { fill: "rgba(56,189,248,0.18)", stroke: "#38bdf8", text: "fill-sky-100" },
-    pcb: { fill: "#1e293b", stroke: "#475569", text: "fill-slate-300" },
+    layer: { fill: "rgb(var(--slate-700))", stroke: "#64748b", text: "fill-slate-100" },
+    housing: { fill: "rgba(56,189,248,0.18)", stroke: "#38bdf8", text: "fill-slate-100" },
+    pcb: { fill: "rgb(var(--slate-800))", stroke: "#475569", text: "fill-slate-200" },
     "air-gap": { fill: "rgba(100,116,139,0.15)", stroke: "#475569", text: "" },
     "housing-gap": { fill: "rgba(100,116,139,0.15)", stroke: "#475569", text: "" },
-    magnet: { fill: "rgba(16,185,129,0.45)", stroke: "#10b981", text: "fill-emerald-200" },
+    magnet: { fill: "rgba(16,185,129,0.45)", stroke: "#10b981", text: "fill-slate-100" },
   };
 
   /** Parts from the bottom up. Zero-thickness gaps are left out. */
@@ -152,7 +152,7 @@
             fill={look.fill} stroke={look.stroke} stroke-width="0.6" />
       {#if seg.inside && h >= MIN_INSIDE_LABEL_PX}
         <text x={ORTHO_PAD_L + RECT_W / 2} y={seg.top + h / 2 + 2.5} text-anchor="middle"
-              class={look.text} style="font-size:7px">{seg.inside}</text>
+               class={look.text} style="font-size:10px">{seg.inside}</text>
       {/if}
     {/each}
 
@@ -165,12 +165,12 @@
     </g>
     {#each segments as seg, i (seg.key)}
       <text x={DIM_X - 4} y={dimLabelY[i]} text-anchor="end"
-            class="fill-slate-300" style="font-size:7px">
+             class="fill-slate-300" style="font-size:10px">
         {fmtMm(seg.mm)} mm
       </text>
     {/each}
     <text x={DIM_X - 4} y={ORTHO_PAD_T - 3} text-anchor="end"
-          class="fill-slate-200 font-semibold" style="font-size:7px">
+           class="fill-slate-200 font-semibold" style="font-size:10px">
       Total: {fmtMm(totalMm)} mm
     </text>
   </svg>

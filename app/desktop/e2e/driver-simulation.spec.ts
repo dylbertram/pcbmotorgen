@@ -13,7 +13,7 @@ test("coil preview driver inductor stays synchronized with simulation", async ({
   await expect(panel).toContainText("Adding inductance can reduce PWM current ripple");
   const previewResults = panel.getByRole("region", { name: "Preview driver simulation results" });
   await expect(previewResults).toContainText("DRV8316");
-  const ripple = previewResults.locator("dt", { hasText: "Current ripple, peak-to-peak" }).locator("+ dd");
+  const ripple = previewResults.locator("dt", { hasText: "Current ripple" }).locator("+ dd");
   const initialRipple = await ripple.textContent();
   const inductor = preview.getByRole("spinbutton", { name: "Series inductor per phase (µH)", exact: true });
   await expect(inductor).toHaveValue("0");
@@ -21,7 +21,7 @@ test("coil preview driver inductor stays synchronized with simulation", async ({
   await inductor.press("Enter");
   await expect(ripple).not.toHaveText(initialRipple!);
   await expect(previewResults).toContainText("Effective phase inductance");
-  await expect(previewResults).toContainText("Additional inductance for ripple limit");
+  await expect(previewResults).toContainText("Additional L needed");
   await preview.getByRole("button", { name: "Close coil preview", exact: true }).click();
 
   await page.getByRole("tab", { name: /^Simulate/i }).click();

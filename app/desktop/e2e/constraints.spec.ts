@@ -159,17 +159,17 @@ test.describe("Design constraints restructure", () => {
     await gotoDesignApp(page);
 
     await expect(
-      page.locator("#panel-design").getByText("Drive & Force Targets", { exact: true }),
+      page.locator("#panel-design").getByText("Drive & force targets", { exact: true }),
     ).toHaveCount(0);
     await expect(
-      page.locator("#panel-simulate").getByText("Drive & Force Targets", { exact: true }),
+      page.locator("#panel-simulate").getByText("Drive & force targets", { exact: true }),
     ).toHaveCount(1);
 
     await page.getByRole("tab", { name: /^Simulate/i }).click();
     await expect(
-      page.locator("#panel-simulate").getByText("Drive & Force Targets", { exact: true }),
+      page.locator("#panel-simulate").getByText("Drive & force targets", { exact: true }),
     ).toBeVisible();
-    const targets = page.getByRole("region", { name: "Drive & Force Targets" });
+    const targets = page.getByRole("region", { name: "Drive & force targets" });
     await expect(targets.locator("summary")).toHaveCount(0);
     await targets.getByRole("heading").click();
     await expect(targets.getByRole("spinbutton", { name: "Phase current (A)", exact: true })).toBeVisible();

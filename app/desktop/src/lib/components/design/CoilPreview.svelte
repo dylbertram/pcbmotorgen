@@ -325,10 +325,10 @@
         g.magnetTop,
         0.003,
       ),
-      // Keep the camera independent of overlay visibility and phase selection.
-      poleRuler,
-      bandRows,
-      poleRegionZones,
+      // Fit diagnostics only in the expanded viewer; the small preview is geometry-only.
+      expanded ? poleRuler : null,
+      expanded ? bandRows : [],
+      expanded ? poleRegionZones : [],
       g.boardRect.y,
       g.boardRect.y + g.boardRect.h,
     );
@@ -512,9 +512,9 @@
       viaDrillMm: config.min_via_drill_mm,
       viaAnnularRingMm: config.min_via_annular_ring_mm,
       poleRuler,
-      showPolePitch: view.showPolePitch,
-      bandRows: visibleBandRows,
-      poleRegions: view.showPoleRegions ? visiblePoleRegionZones : [],
+      showPolePitch: expanded && view.showPolePitch,
+      bandRows: expanded ? visibleBandRows : [],
+      poleRegions: expanded && view.showPoleRegions ? visiblePoleRegionZones : [],
       measure: null,
     });
   });
@@ -570,7 +570,7 @@
   {#if coils && coils.phases.length > 0}
     <p class="mt-2 text-xs text-slate-500">
       <span class="text-slate-600"
-        >{view.viewMode === "iso" ? "Drag to orbit. Scroll or pinch to zoom. Editing is available in Top-down." : "Drag to pan. Pinch or Ctrl-scroll to zoom. Open the expanded viewer to edit."}</span
+        >{view.viewMode === "iso" ? "Drag to orbit · Scroll or pinch to zoom · Switch to Top-down to edit" : "Drag to pan · Pinch or Ctrl-scroll to zoom · Expand to edit"}</span
       >
     </p>
   {/if}
