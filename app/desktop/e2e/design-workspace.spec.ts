@@ -1,55 +1,100 @@
 import { test, expect } from "@playwright/test";
 import { gotoDesignApp, openCoilPreview } from "./helpers";
 
-test("Design fills the workspace with settings on the left and preview tools on the right", async ({ page }, testInfo) => {
+const sections = [
+  { name: "Constraints", heading: "design-constraints-heading" },
+  { name: "Stackup", heading: "backplane-heading" },
+  { name: "Routing", heading: "topology-board-heading" },
+  { name: "Magnets", heading: "magnets-heading" },
+];
+
+test("each design section has its own left-side button and panel", async ({ page }, testInfo) => {
   await gotoDesignApp(page);
   const workspace = page.getByRole("region", { name: "Coil design workspace", exact: true });
-  const panel = page.locator("#panel-design");
-  await expect(workspace).toBeVisible();
+  const left = workspace.getByRole("toolbar", { name: "Design side tools", exact: true });
+  const right = workspace.getByRole("toolbar", { name: "Preview side tools", exact: true });
+  await expect(left.getByRole("button")).toHaveCount(4);
+  await expect(page.getByRole("button", { name: "Design settings", exact: true })).toHaveCount(0);
   await expect(workspace.getByRole("heading", { name: "Coil Preview", exact: true })).toHaveCount(0);
-  await expect(workspace.getByRole("button", { name: "Expand coil preview", exact: true })).toHaveCount(0);
-  const status = workspace.getByRole("group", { name: "Preview status", exact: true });
-  const summary = status.getByLabel("Coil geometry summary", { exact: true });
-  await expect(summary).toHaveText("3 phases · 4 layers · 12 coil groups");
-  const summaryBounds = (await summary.boundingBox())!;
-  const statusBounds = (await status.boundingBox())!;
-  expect(statusBounds.x + statusBounds.width - summaryBounds.x - summaryBounds.width).toBe(12);
-  expect(await workspace.boundingBox()).toEqual(await panel.boundingBox());
-  await expect(page.locator("aside[aria-label='Coil preview panel']")).toHaveCount(0);
-  const settings = page.getByRole("dialog", { name: "Preview design settings", exact: true });
-  await expect(settings).toBeVisible();
-  const leftRail = workspace.getByRole("toolbar", { name: "Design side tools", exact: true });
-  const rightRail = workspace.getByRole("toolbar", { name: "Preview side tools", exact: true });
-  await expect(leftRail.getByRole("button", { name: "Design settings", exact: true })).toBeVisible();
-  await expect(rightRail.getByRole("button", { name: "Design settings", exact: true })).toHaveCount(0);
-  const leftBounds = (await leftRail.boundingBox())!;
-  await expect.poll(async () => (await settings.boundingBox())!.x).toBe(leftBounds.x + leftBounds.width);
-  expect(leftBounds.x).toBe(0);
-  const rightBounds = (await rightRail.boundingBox())!;
-  expect(rightBounds.x + rightBounds.width).toBe(page.viewportSize()!.width);
+  await expect(page.getByRole("button", { name: "Expand coil preview", exact: true })).toHaveCount(0);
   await expect(page.locator("footer")).toHaveCount(0);
-  expect((await workspace.boundingBox())!.y + (await workspace.boundingBox())!.height).toBe(page.viewportSize()!.height);
-  for (const heading of ["design-constraints-heading", "backplane-heading", "topology-board-heading", "magnets-heading"]) {
-    await expect(settings.locator(`#${heading}`)).toHaveCount(1);
+  await expect(workspace.getByLabel("Coil geometry summary")).toHaveText("3 phases · 4 layers · 12 coil groups");
+  const drawing = workspace.getByRole("img", { name: "Coil preview", exact: true });
+  const drawingBounds = await drawing.boundingBox();
+
+  for (const section of sections) {
+    const trigger = left.getByRole("button", { name: section.name, exact: true });
+    if (await trigger.getAttribute("aria-expanded") !== "true") await trigger.click();
+    const panel = workspace.getByRole("dialog", { name: section.name, exact: true });
+    await expect(panel).toBeVisible();
+    await expect(trigger).toHaveAttribute("aria-expanded", "true");
+    await expect(right.getByRole("button", { name: section.name, exact: true })).toHaveCount(0);
+    const content = panel.locator(`#${section.heading}`);
+    await expect(content).toBeVisible();
+    await expect(content).toHaveCSS("border-top-width", "0px");
+    await expect(content).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+    await expect(content).toHaveCSS("padding", "0px");
+    await expect(content.getByRole("heading", { name: /^(Design constraints|Topology & board|Stackup|Magnets)$/ })).toHaveCount(0);
+    await expect(panel.getByRole("heading", { name: section.name, exact: true })).toHaveCount(1);
+    for (const other of sections.filter((other) => other !== section)) {
+      await expect(workspace.getByRole("dialog", { name: other.name, exact: true })).toHaveCount(0);
+      await expect(panel.locator(`#${other.heading}`)).toHaveCount(0);
+    }
+    const railBounds = (await left.boundingBox())!;
+    await expect.poll(async () => (await panel.boundingBox())!.x).toBe(railBounds.x + railBounds.width);
+    expect(await drawing.boundingBox()).toEqual(drawingBounds);
+    await page.screenshot({ path: testInfo.outputPath(`${section.name.toLowerCase()}.png`) });
   }
-  const canvas = workspace.locator("canvas[data-segments]");
-  await expect.poll(async () => Number(await canvas.getAttribute("data-segments"))).toBeGreaterThan(0);
-  await page.screenshot({ path: testInfo.outputPath("workspace-settings.png") });
-  await settings.getByRole("button", { name: "Close design settings panel" }).click();
-  await expect(settings).toHaveCount(0);
-  await expect(workspace.getByRole("toolbar", { name: "Preview side tools" })).toBeVisible();
-  await page.screenshot({ path: testInfo.outputPath("workspace-canvas.png") });
-  await workspace.getByRole("button", { name: "Design settings", exact: true }).click();
-  await expect(settings).toBeVisible();
-  await settings.getByRole("navigation", { name: "Design settings sections" }).getByRole("button", { name: "Magnets", exact: true }).click();
-  const magnetHeading = (await settings.locator("#magnets-heading").boundingBox())!;
-  const viewport = (await settings.locator("[data-scroll-area-viewport]").boundingBox())!;
-  expect(magnetHeading.y).toBeGreaterThanOrEqual(viewport.y);
-  expect(magnetHeading.y + magnetHeading.height).toBeLessThan(viewport.y + viewport.height);
+  const magnets = workspace.getByRole("dialog", { name: "Magnets", exact: true });
+  await magnets.getByRole("button", { name: "Close magnets panel", exact: true }).click();
+  await expect(magnets).toHaveCount(0);
+  await expect(left.getByRole("button", { name: "Magnets", exact: true })).toBeFocused();
 });
 
-test("returning from Simulate repaints actual canvas pixels without interaction", async ({ page }) => {
+test("edits survive panel changes, workflow changes and the expanded viewer", async ({ page }) => {
   await gotoDesignApp(page);
+  const left = page.getByRole("toolbar", { name: "Design side tools", exact: true });
+  const travel = page.getByRole("spinbutton", { name: "Desired travel (center-to-center)", exact: true });
+  await travel.fill("100");
+  await travel.press("Enter");
+  await left.getByRole("button", { name: "Magnets", exact: true }).click();
+  const count = page.getByRole("spinbutton", { name: "Magnet count", exact: true });
+  await count.fill("14");
+  await count.press("Enter");
+  await left.getByRole("button", { name: "Routing", exact: true }).click();
+  await page.getByRole("combobox", { name: "Winding connection", exact: true }).selectOption("2");
+  await page.getByRole("button", { name: "Driver settings", exact: true }).click();
+  await expect(page.getByRole("dialog", { name: "Routing", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("region", { name: "Preview driver simulation results" })).toContainText("Current ripple");
+  await left.getByRole("button", { name: "Constraints", exact: true }).click();
+  await expect(travel).toHaveValue("100");
+  await openCoilPreview(page);
+  const modal = page.getByRole("dialog", { name: "Coil Preview", exact: true });
+  await expect(modal.getByRole("dialog", { name: "Constraints", exact: true })).toBeVisible();
+  await modal.getByRole("button", { name: "Magnets", exact: true }).click();
+  await expect(modal.getByRole("spinbutton", { name: "Magnet count", exact: true })).toHaveValue("14");
+  await modal.getByRole("button", { name: "Close coil preview", exact: true }).click();
+  await page.getByRole("tab", { name: /^Design/i }).click();
+  await expect(page.getByRole("dialog", { name: "Magnets", exact: true })).toBeVisible();
+  await expect(count).toHaveValue("14");
+});
+
+test("Escape closes only the selected panel and returns focus to its button", async ({ page }) => {
+  await gotoDesignApp(page);
+  const left = page.getByRole("toolbar", { name: "Design side tools", exact: true });
+  for (const section of sections) {
+    const trigger = left.getByRole("button", { name: section.name, exact: true });
+    if (await trigger.getAttribute("aria-expanded") !== "true") await trigger.click();
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("dialog", { name: section.name, exact: true })).toHaveCount(0);
+    await expect(trigger).toBeFocused();
+    await expect(trigger).toHaveAttribute("aria-expanded", "false");
+  }
+});
+
+test("returning from Simulate repaints canvas pixels and preserves the selected panel", async ({ page }) => {
+  await gotoDesignApp(page);
+  await page.getByRole("button", { name: "Stackup", exact: true }).click();
   const canvas = page.locator("#panel-design canvas");
   const paintedPixels = () => canvas.evaluate((node: HTMLCanvasElement) => {
     const pixels = node.getContext("2d")!.getImageData(0, 0, node.width, node.height).data;
@@ -61,44 +106,26 @@ test("returning from Simulate repaints actual canvas pixels without interaction"
   for (let cycle = 0; cycle < 3; cycle++) {
     const revision = Number(await canvas.getAttribute("data-revision"));
     await page.getByRole("tab", { name: /^Simulate/i }).click();
-    await expect(canvas).toBeHidden();
     await page.getByRole("tab", { name: /^Design/i }).click();
-    await expect(canvas).toBeVisible();
+    await expect(page.getByRole("dialog", { name: "Stackup", exact: true })).toBeVisible();
     await expect.poll(() => canvas.getAttribute("data-revision").then(Number)).toBeGreaterThan(revision);
     await expect.poll(paintedPixels).toBeGreaterThan(100);
   }
 });
 
-test("design edits survive drawer changes and the expanded modal", async ({ page }) => {
-  await gotoDesignApp(page);
-  await page.getByRole("combobox", { name: "Winding connection", exact: true }).selectOption("2");
-  const travel = page.getByRole("spinbutton", { name: "Desired travel (center-to-center)", exact: true });
-  await travel.fill("100");
-  await travel.press("Enter");
-  await page.getByRole("button", { name: "Driver settings", exact: true }).click();
-  const driver = page.getByRole("dialog", { name: "Preview driver settings", exact: true });
-  await expect(driver.getByRole("combobox", { name: "Driver to evaluate" })).toBeVisible();
-  await expect(driver.getByRole("region", { name: "Preview driver simulation results" })).toContainText("Current ripple");
-  await page.getByRole("button", { name: "Design settings", exact: true }).click();
-  await expect(travel).toHaveValue("100");
-  await openCoilPreview(page);
-  const modal = page.getByRole("dialog", { name: "Coil Preview", exact: true });
-  await expect(modal.getByRole("spinbutton", { name: "Desired travel (center-to-center)", exact: true })).toHaveValue("100");
-  await modal.getByRole("button", { name: "Close coil preview", exact: true }).click();
-  await page.getByRole("tab", { name: /^Design/i }).click();
-  await expect(travel).toHaveValue("100");
-  await expect(page.locator("#panel-design canvas[data-segments]")).toBeVisible();
-});
-
-test("mobile keeps the canvas fixed while the design drawer scrolls", async ({ page }, testInfo) => {
+test("all four panels fit mobile without moving or overflowing the canvas", async ({ page }, testInfo) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await gotoDesignApp(page);
-  const viewport = page.locator("#design-settings-scroll [data-scroll-area-viewport]");
-  await expect(viewport).toBeVisible();
-  expect(await viewport.evaluate((el) => el.scrollHeight > el.clientHeight)).toBe(true);
-  await viewport.evaluate((el) => { el.scrollTop = el.scrollHeight; });
-  await expect(page.getByRole("spinbutton", { name: "Magnet count", exact: true })).toBeVisible();
-  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
-  expect(await page.evaluate(() => document.documentElement.scrollHeight)).toBeLessThanOrEqual(844);
-  await page.screenshot({ path: testInfo.outputPath("workspace-mobile.png") });
+  const left = page.getByRole("toolbar", { name: "Design side tools", exact: true });
+  for (const section of sections) {
+    const trigger = left.getByRole("button", { name: section.name, exact: true });
+    if (await trigger.getAttribute("aria-expanded") !== "true") await trigger.click();
+    const panel = page.getByRole("dialog", { name: section.name, exact: true });
+    await expect(panel).toBeVisible();
+    const viewport = panel.locator("[data-scroll-area-viewport]");
+    await viewport.evaluate((el) => { el.scrollTop = el.scrollHeight; });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+    expect(await page.evaluate(() => document.documentElement.scrollHeight)).toBeLessThanOrEqual(844);
+    await page.screenshot({ path: testInfo.outputPath(`${section.name.toLowerCase()}-mobile.png`) });
+  }
 });

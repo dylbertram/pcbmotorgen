@@ -15,7 +15,7 @@
   import { Dialog, DropdownMenu } from "bits-ui";
   import { onDestroy } from "svelte";
   import type { Snippet } from "svelte";
-  import type { PreviewPanelId } from "./previewPanels";
+  import { isDesignPanel, type DesignPanelId, type PreviewPanelId } from "./previewPanels";
   import type { CadGeometry } from "../../types";
   import type { WorldTransform } from "../../chart";
   import type { CoilTerminalTool } from "../../utils/coilTerminalTool.svelte";
@@ -82,7 +82,7 @@
     expanded?: boolean;
     embedded?: boolean;
     active?: boolean;
-    designSettings?: Snippet;
+    designSettings?: Snippet<[DesignPanelId]>;
     sidePanel?: PreviewPanelId | null;
     height?: number;
     config: ConfigStore;
@@ -132,10 +132,10 @@
   // instead of reaching the modal's top edge.
   let toolbarHeight = $state(0);
   let terminalPanelOpen = $derived(view.terminalPanelOpen);
-  const panelWidth = $derived(sidePanel && sidePanel !== "design" ? 240 : 0);
+  const panelWidth = $derived(sidePanel && !isDesignPanel(sidePanel) ? 240 : 0);
   let frameWidth = $state(PREVIEW_W);
   const dockWidth = $derived(Math.min(panelWidth, Math.max(0, frameWidth - 132)));
-  const leftDockWidth = $derived(designSettings ? 44 + (sidePanel === "design" ? Math.min(400, Math.max(0, frameWidth - 132)) : 0) : 0);
+  const leftDockWidth = $derived(designSettings ? 44 + (isDesignPanel(sidePanel) ? Math.min(400, Math.max(0, frameWidth - 132)) : 0) : 0);
 
   // Scroll lock for the lightbox (Kata xy31): while the modal is open the
   // page behind it must never scroll. Two layers:

@@ -35,7 +35,7 @@
   import { confirm } from "@tauri-apps/plugin-dialog";
   import { untrack } from "svelte";
   import type { Snippet } from "svelte";
-  import type { PreviewPanelId } from "./previewPanels";
+  import { isDesignPanel, type DesignPanelId, type PreviewPanelId } from "./previewPanels";
   import type { PreviewCamera } from "../../utils/coilPreviewGestures.svelte";
   import { editableCoilGeometry } from "../../ipc/dxf";
   import type { ConfigStore } from "../../stores/config.svelte";
@@ -96,10 +96,10 @@
     onGeometryChange,
     camera,
     view = new CoilPreviewViewState(),
-  }: { config: ConfigStore; coils: CoilPathDto | null; motion: MotionStore; expanded?: boolean; workspace?: boolean; active?: boolean; designSettings?: Snippet; sidePanel?: PreviewPanelId | null; drive?: DriveAnalysis | null; driveError?: string | null; drivePending?: boolean; importedGeometry?: CadGeometry | null; onGeometryChange?: (geometry: CadGeometry) => void; camera?: PreviewCamera; view?: CoilPreviewViewState } =
+  }: { config: ConfigStore; coils: CoilPathDto | null; motion: MotionStore; expanded?: boolean; workspace?: boolean; active?: boolean; designSettings?: Snippet<[DesignPanelId]>; sidePanel?: PreviewPanelId | null; drive?: DriveAnalysis | null; driveError?: string | null; drivePending?: boolean; importedGeometry?: CadGeometry | null; onGeometryChange?: (geometry: CadGeometry) => void; camera?: PreviewCamera; view?: CoilPreviewViewState } =
     $props();
 
-  export function showDesignSettings(): void { sidePanel = "design"; }
+  export function showDesignSettings(section: DesignPanelId = "constraints"): void { sidePanel = section; }
 
   const simplifyTool = new CadSimplifyTool({ getGeometry: () => importedGeometry, onChange: (geometry) => onGeometryChange?.(geometry) });
   let canUndoSimplify = $derived(simplifyTool.canUndo);
@@ -209,9 +209,9 @@
    *  `routing_dimensions` overlay geometry (pole-pitch ruler, band-width
    *  rows, pole regions) so the camera never clips an annotation. */
   function worldTransformFor(zoom: number): WorldTransform {
-    const drawerWidth = sidePanel === "design" ? 400 : sidePanel ? 240 : 0;
-    const leftInset = interactive && designSettings ? 44 + (sidePanel === "design" ? Math.min(drawerWidth, Math.max(0, viewportWidth - 132)) : 0) : 0;
-    const inset = interactive ? leftInset + 44 + (sidePanel && sidePanel !== "design" ? Math.min(drawerWidth, Math.max(0, viewportWidth - 132)) : 0) : 0;
+    const drawerWidth = isDesignPanel(sidePanel) ? 400 : sidePanel ? 240 : 0;
+    const leftInset = interactive && designSettings ? 44 + (isDesignPanel(sidePanel) ? Math.min(drawerWidth, Math.max(0, viewportWidth - 132)) : 0) : 0;
+    const inset = interactive ? leftInset + 44 + (sidePanel && !isDesignPanel(sidePanel) ? Math.min(drawerWidth, Math.max(0, viewportWidth - 132)) : 0) : 0;
     const fitWidth = W * Math.max(0.15, 1 - inset / Math.max(viewportWidth, 1));
     const fit = (bounds: typeof overlayFitBounds) => {
       const transform = fitWorldToView(bounds, fitWidth, H, PAD, zoom);
