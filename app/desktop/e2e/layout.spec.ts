@@ -159,6 +159,6 @@ test.describe("Design tab layout geometry", () => {
       right: document.querySelector("#design-settings-scroll [data-scroll-area-viewport]")!.scrollTop,
     }));
     expect(afterRight.right).toBeGreaterThan(0);
-    expect(afterRight.left).toBe(200);
+    expect(afterRight.left).toBe(afterLeft.left);
   }, { tag: ["@visual", "@desktop"] });
 });

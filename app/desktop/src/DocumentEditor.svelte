@@ -40,6 +40,8 @@
   import ProjectNotification from "./lib/components/ui/ProjectNotification.svelte";
   import ScrollArea from "./lib/components/ui/ScrollArea.svelte";
   import CoilPreview from "./lib/components/design/CoilPreview.svelte";
+  import BackplanePanel from "./lib/components/design/BackplanePanel.svelte";
+  import MagnetsPanel from "./lib/components/design/parameters/MagnetsPanel.svelte";
   import DesignTab from "./lib/components/layout/DesignTab.svelte";
   import SimulateTab from "./lib/components/layout/SimulateTab.svelte";
   import KicadDialog from "./lib/components/layout/KicadDialog.svelte";
@@ -638,14 +640,14 @@
 
        <!-- The coil preview stays mounted beside every workflow panel. -->
       <div
-        class="grid min-h-0 flex-1 items-start gap-4 px-4 pb-4 lg:grid-cols-[minmax(360px,0.9fr)_minmax(0,1.35fr)] lg:grid-rows-[minmax(0,1fr)] lg:items-stretch lg:pb-0 lg:pr-0"
+        class="grid min-h-0 flex-1 items-start gap-3 px-4 pb-4 {activeTab === 'design' ? 'lg:grid-cols-[minmax(360px,0.9fr)_minmax(0,1.35fr)]' : 'lg:grid-cols-1'} lg:grid-rows-[minmax(0,1fr)] lg:items-stretch lg:pb-0 lg:pr-0"
       >
         <!-- The desktop layout locks the page height: both columns stretch to the
              row (viewport minus header/footer) and scroll independently inside
              themselves, so the footer is always visible and the page never
              scrolls. Below lg the columns stack and the page scrolls normally. -->
         <aside
-        class="relative min-w-0 min-h-0 lg:h-full lg:pt-4 lg:pb-4 lg:pr-2"
+        class="relative min-w-0 min-h-0 lg:h-full lg:pt-4 lg:pb-4 lg:pr-2 {activeTab !== 'design' ? 'hidden' : ''}"
           aria-label="Coil preview panel"
         >
           <ScrollArea class="h-full min-h-0">
@@ -654,8 +656,10 @@
             {:else}
               <!-- Traces view lives here in the Design tab so layout and geometry can
                    be inspected side by side; the Simulation tab keeps its own copy. -->
-              <div>
+              <div class="space-y-3">
                 <CoilPreview {config} coils={activeCoils} {motion} bind:expanded={coilPreviewExpanded} {drive} {driveError} {drivePending} camera={session.camera} view={session.previewView} importedGeometry={projects.cadGeometry} onGeometryChange={(geometry) => projects.setCadGeometry(geometry)} />
+                <BackplanePanel {config} backplaneAnalysis={height?.backplane_analysis ?? null} driveBackplane={drive?.backplane ?? null} />
+                <MagnetsPanel {config} />
               </div>
             {/if}
           </ScrollArea>
@@ -674,7 +678,7 @@
             class="h-full p-4 lg:pr-0"
           >
             <div hidden={designType !== "motor"} class="h-full">
-               <DesignTab {config} {motion} {measuredTrace} routingDimensions={activeCoils?.routing_dimensions ?? null} cadGeometry={projects.cadGeometry} onGeometryChange={(geometry) => projects.setCadGeometry(geometry)} onImportCad={() => (cadImportDialogOpen = true)} onUseGenerated={() => projects.setCadGeometry(null)} backplaneAnalysis={height?.backplane_analysis ?? null} driveBackplane={drive?.backplane ?? null} />
+               <DesignTab {config} {motion} {measuredTrace} routingDimensions={activeCoils?.routing_dimensions ?? null} cadGeometry={projects.cadGeometry} onGeometryChange={(geometry) => projects.setCadGeometry(geometry)} onImportCad={() => (cadImportDialogOpen = true)} onUseGenerated={() => projects.setCadGeometry(null)} />
             </div>
             <div hidden={designType !== "sensor"} class="h-full overflow-y-auto">
               <SensorTab store={sensorStore} />
@@ -687,6 +691,7 @@
             class="h-full overflow-y-auto p-4 lg:pr-0"
           >
             <SimulateTab
+              onOpenPreview={() => (coilPreviewExpanded = true)}
               onConfigureWinding={() => selectTab("design")}
               {config}
               active={active && activeTab === "simulate"}
@@ -732,7 +737,7 @@
       <footer
         class="shrink-0 border-t border-slate-800 px-6 py-3 text-xs text-slate-500"
       >
-        Motor physics and routing plus an independent two-layer induction sensor workflow.
+        {designType === "sensor" ? "Inductive position sensor" : "PCB linear motor"}
       </footer>
     </Tabs.Root>
   </BitsConfig>

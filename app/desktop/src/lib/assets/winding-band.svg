@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 288 112" role="img" aria-label="A conductor bundle occupies part of the available band width; the remaining width is its margin">
+  <rect width="288" height="112" rx="8" fill="#0f172a"/>
+  <rect x="35" y="28" width="216" height="46" rx="3" fill="#1e293b" stroke="#64748b"/>
+  <g stroke="#34d399" stroke-width="5"><path d="M60 29v44M76 29v44M92 29v44M108 29v44M124 29v44M140 29v44M156 29v44M172 29v44M188 29v44M204 29v44"/></g>
+  <g fill="none" stroke="#cbd5e1"><path d="M35 22v-8m216 8v-8M35 18h216M58 80v12m148-12v12M58 87h148M210 48h35m-35-4v8m35-8v8"/></g>
+  <g font-family="sans-serif" font-size="10" text-anchor="middle" fill="#e2e8f0"><text x="143" y="11">Available width</text><text x="132" y="105">Bundle width</text><text x="231" y="68">Margin</text></g>
+</svg>

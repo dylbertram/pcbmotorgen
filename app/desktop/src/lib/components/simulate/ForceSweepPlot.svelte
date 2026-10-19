@@ -46,7 +46,7 @@
 
 <div class="rounded-lg bg-slate-800/40 border border-slate-700 p-4">
   <div class="flex items-center justify-between mb-2">
-    <h3 class="text-sm font-semibold text-slate-200">Thrust vs. Position Sweep</h3>
+    <h3 class="text-sm font-semibold text-slate-200">Thrust vs. position</h3>
     {#if result}
       <span class="text-xs text-slate-400">
         {commutationLabel(result.commutation)} · I={result.current_a.toFixed(2)} A · n={result.n_positions}
@@ -70,7 +70,7 @@
       <line x1={PAD_L} y1={PAD_T} x2={PAD_L} y2={H - PAD_B} stroke="#475569" stroke-width="1" />
       <line x1={PAD_L} y1={H - PAD_B} x2={W - PAD_R} y2={H - PAD_B} stroke="#475569" stroke-width="1" />
       <text x={W / 2} y={H - 4} text-anchor="middle" class="fill-slate-400" style="font-size:11px">Mover position (mm)</text>
-      <text x={14} y={H / 2} text-anchor="middle" transform="rotate(-90 14 {H / 2})" class="fill-slate-400" style="font-size:11px">Thrust F_x (N)</text>
+      <text x={14} y={H / 2} text-anchor="middle" transform="rotate(-90 14 {H / 2})" class="fill-slate-400" style="font-size:11px">Thrust (N)</text>
 
       <!-- thrust polyline -->
       <polyline points={plot.linePts} fill="none" stroke="#10b981" stroke-width="1.6" />

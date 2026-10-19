@@ -2,6 +2,8 @@
   import type { CheckStatus, DriveAnalysis, DriveCheck } from "../../types";
   import { formatSi } from "../../format";
   import VoltageEnvelopePlot from "./VoltageEnvelopePlot.svelte";
+  import HelpTag from "../ui/HelpTag.svelte";
+  import Formula from "../ui/Formula.svelte";
 
   let {
     analysis,
@@ -42,10 +44,10 @@
     return {
       total,
       segments: [
-        { key: "copper", label: "Copper I·R", value: copper, color: "bg-amber-400", width: pct(copper) },
-        { key: "fet", label: "Driver FETs", value: fet, color: "bg-slate-400", width: pct(fet) },
-        { key: "emf", label: "Back-EMF", value: emf, color: "bg-sky-400", width: pct(emf) },
-        { key: "reactive", label: "Inductive ωL·I", value: reactive, color: "bg-violet-400", width: pct(reactive) },
+        { key: "copper", label: "Copper", tex: String.raw`IR`, value: copper, color: "bg-amber-400", width: pct(copper) },
+        { key: "fet", label: "Driver FETs", tex: "", value: fet, color: "bg-slate-400", width: pct(fet) },
+        { key: "emf", label: "Back-EMF", tex: "", value: emf, color: "bg-sky-400", width: pct(emf) },
+        { key: "reactive", label: "Inductive", tex: String.raw`\omega L I`, value: reactive, color: "bg-violet-400", width: pct(reactive) },
       ],
       usable: pct(a.available_voltage_v),
       bus: pct(a.bus_voltage_v),
@@ -117,7 +119,7 @@
         {#each budget.segments as seg (seg.key)}
           <li class="flex items-center gap-1.5">
             <span class="h-2.5 w-2.5 rounded-sm {seg.color}" aria-hidden="true"></span>
-            {seg.label} <span class="font-mono text-slate-200">{seg.value.toFixed(2)} V</span>
+            {seg.label} {#if seg.tex}<Formula tex={seg.tex} />{/if} <span class="font-mono text-slate-200">{seg.value.toFixed(2)} V</span>
           </li>
         {/each}
         <li class="flex items-center gap-1.5"><span class="h-3 border-l-2 border-dashed border-emerald-300" aria-hidden="true"></span>usable</li>
@@ -137,7 +139,7 @@
               </span>
               <div class="min-w-0 flex-1">
                 <div class="flex flex-wrap items-baseline justify-between gap-x-3">
-                  <span class="text-xs text-slate-200">{c.label}</span>
+                  <span class="text-xs text-slate-200">{c.label}{#if c.status === "pass"}<HelpTag label={`${c.label} details`} tip={c.detail} />{/if}</span>
                   {#if c.status !== "unknown"}
                     <span class="font-mono text-xs text-slate-300">
                       {formatCheck(c, c.value)}
@@ -145,7 +147,7 @@
                     </span>
                   {/if}
                 </div>
-                {#if c.status !== "unknown"}
+                {#if c.status !== "unknown" && c.status !== "pass"}
                   <div class="relative mt-1 h-1 rounded-full bg-slate-700/70" aria-hidden="true">
                     <div
                       class="h-1 rounded-full {c.status === 'pass' ? 'bg-emerald-400' : c.status === 'warn' ? 'bg-amber-400' : 'bg-rose-400'}"
@@ -154,7 +156,7 @@
                     <div class="absolute top-[-2px] h-2 w-px bg-slate-300" style:left="80%"></div>
                   </div>
                 {/if}
-                <p class="mt-1 text-[11px] leading-snug text-slate-400">{c.detail}</p>
+                {#if c.status !== "pass"}<p class="mt-1 text-xs leading-snug text-slate-400">{c.detail}</p>{/if}
               </div>
             </div>
           </li>
@@ -188,7 +190,7 @@
           <div>
             <dt class="text-slate-400">Copper loss</dt>
             <dd class="font-mono text-slate-100">{formatSi(analysis.copper_loss_w, "W")}</dd>
-            <dd class="text-[11px] text-slate-500">τ = L/R {formatSi(analysis.time_constant_s, "s")}</dd>
+            <dd class="text-[11px] text-slate-500"><Formula tex={String.raw`\tau = \frac{L}{R}`} /> = {formatSi(analysis.time_constant_s, "s")}</dd>
           </div>
         </dl>
       </div>

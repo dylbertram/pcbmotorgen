@@ -35,8 +35,8 @@
   // (the braid floors whole periods, so it is shorter than the nominal
   // domain).
   // ====================================================================
-  const ISO_W = 220;
-  const ISO_H = 220;
+  const ISO_W = 360;
+  const ISO_H = 130;
   const ISO_PAD = 14;
 
   let boardLengthMm = $derived(
@@ -123,13 +123,10 @@
 </script>
 
 <div class="min-w-0">
-  <div class="text-[10px] uppercase tracking-wider text-slate-500 mb-1">3/4 view</div>
-  <svg viewBox="0 0 {ISO_W} {ISO_H}" class="w-full h-auto"
+  <svg viewBox="0 0 {ISO_W} {ISO_H}" class="h-36 w-full"
        role="img" aria-label="Three-quarter isometric view of the assembly">
     <!-- Stator (PCB) wireframe box: MEASURED routed-trace extent -->
     <path d={isoStatorBox.d} fill="#1e293b" fill-opacity="0.35" stroke="#94a3b8" stroke-width="1" />
-    <text x={isoStatorBox.corners[0][0] - 4} y={isoStatorBox.corners[0][1] + 12} text-anchor="end"
-          class="fill-slate-400" style="font-size:9px">PCB {boardLengthMm.toFixed(0)} mm</text>
 
     <!-- Dimension line: routed-trace span (measured from the payload) -->
     <g class="text-slate-400" stroke="currentColor" stroke-width="0.7">
@@ -143,9 +140,6 @@
 
     <!-- Copper active-region outline on the PCB top face -->
     <path d={isoActiveBox.d} fill="none" stroke="#34d399" stroke-width="0.8" stroke-dasharray="3 2" />
-    <text x={(isoActiveBox.corners[0][0] + isoActiveBox.corners[1][0]) / 2}
-          y={(isoActiveBox.corners[0][1] + isoActiveBox.corners[1][1]) / 2 - 3} text-anchor="middle"
-          class="fill-emerald-300" style="font-size:8px">active copper {config.active_area_length_mm.toFixed(0)} mm</text>
 
     <!-- Magnet array wireframe box (positioned by the mover-position field) -->
     <path d={isoMagnetBox.d} fill="#065f46" fill-opacity="0.35" stroke="#10b981" stroke-width="1" />

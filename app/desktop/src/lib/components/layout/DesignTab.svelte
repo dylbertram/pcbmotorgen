@@ -1,18 +1,17 @@
 <script lang="ts">
   import type { ConfigStore } from "../../stores/config.svelte";
-  import type { BackplaneAnalysis, CadGeometry, DriveBackplane, RoutingDimensionsDto } from "../../types";
+  import type { CadGeometry, RoutingDimensionsDto } from "../../types";
   import type { MotionStore } from "../../stores/motion.svelte";
   import { stripBoundsDomainMm, type TraceMeasure } from "../../previewGeometry";
   import TravelIsoView from "../design/TravelIsoView.svelte";
   import MoverPositionControls from "../design/MoverPositionControls.svelte";
   import ConstraintReadouts from "../design/ConstraintReadouts.svelte";
-  import BackplanePanel from "../design/BackplanePanel.svelte";
   import TopologySelector from "../design/TopologySelector.svelte";
   import TracesBoardPanel from "../design/parameters/TracesBoardPanel.svelte";
-  import MagnetsPanel from "../design/parameters/MagnetsPanel.svelte";
   import ValidationWarning from "../design/ValidationWarning.svelte";
   import NumberField from "../ui/NumberField.svelte";
   import HelpTag from "../ui/HelpTag.svelte";
+  import Formula from "../ui/Formula.svelte";
   import ScrollArea from "../ui/ScrollArea.svelte";
   import electricalPitchSvg from "../../assets/electrical-pitch.svg";
 
@@ -25,8 +24,6 @@
     onImportCad,
     onUseGenerated,
     onGeometryChange,
-    backplaneAnalysis = null,
-    driveBackplane = null,
   }: {
     config: ConfigStore;
     motion: MotionStore;
@@ -36,10 +33,6 @@
     onImportCad: () => void;
     onUseGenerated: () => void;
     onGeometryChange?: (geometry: CadGeometry) => void;
-    /** Backplane results from the last simulation run, if any. */
-    backplaneAnalysis?: BackplaneAnalysis | null;
-    /** Backplane results at the drive's operating point, if analysed. */
-    driveBackplane?: DriveBackplane | null;
   } = $props();
   const stripBounds = $derived(stripBoundsDomainMm(config, motion));
 </script>
@@ -57,7 +50,7 @@
     >
       <h2
         id="design-constraints-heading"
-        class="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-200"
+        class="mb-2 text-sm font-semibold text-slate-200"
       >
         Design constraints
       </h2>
@@ -67,8 +60,10 @@
         >
           <span class="flex items-center justify-between gap-2">
             <span class="min-w-0 truncate text-xs text-slate-300"
-              >Desired travel (center-to-center)<HelpTag
-                tip="Center-to-center travel you want; active-area length follows (mover span + travel)."
+              >Travel (mm)<HelpTag
+                label="About desired travel"
+                tip="Center-to-center travel. The copper must cover the mover span plus this distance."
+                equation={String.raw`L_{\mathrm{active}} = L_{\mathrm{mover}} + d`}
               /></span
             >
             <NumberField
@@ -103,15 +98,13 @@
         <label class="min-w-0">
           <span class="flex items-center justify-between gap-2">
             <span class="min-w-0 truncate text-xs text-slate-300"
-              >Electrical pitch <span class="italic">P<sub>e</sub></span> (mm)<HelpTag
+              >Electrical pitch <Formula tex="P_e" /> (mm)<HelpTag
                 label="About electrical pitch"
                 image={electricalPitchSvg}
-                imageAlt="Diagram: one electrical cycle spans two alternating poles N and S; the pole pitch is half of it."
-              >
-                Length of one full electrical cycle: two alternating poles. Pole
-                pitch <span class="italic">τ<sub>p</sub></span> =
-                <span class="italic">P<sub>e</sub></span> ÷ 2.
-              </HelpTag></span
+                imageAlt="One electrical cycle spans a north and south pole."
+                tip="One electrical cycle spans two alternating poles."
+                equation={String.raw`\tau_p = \frac{P_e}{2}`}
+              /></span
             >
             <NumberField
               id="electrical-pitch"
@@ -129,16 +122,14 @@
         </label>
 
       </div>
-      <div class="mt-3 grid items-center gap-3 sm:grid-cols-2">
-        <div class="mx-auto w-full max-w-xs">
+      <div class="mt-2">
+        <div class="w-full">
           <TravelIsoView {config} {measuredTrace} stripStartMm={stripBounds.startMm} stripEndMm={stripBounds.endMm} />
         </div>
-        <MoverPositionControls {config} {motion} showWaveform={false} />
+        <MoverPositionControls {config} {motion} showWaveform={false} compact />
       </div>
       <ConstraintReadouts {config} measuredTraceLengthMm={measuredTrace?.traceLengthMm ?? null} {routingDimensions} />
     </section>
-
-    <BackplanePanel {config} {backplaneAnalysis} {driveBackplane} />
 
     <!-- Topology (routing pattern + parameters + generator load) and the
          board/winding fields share one panel so winding geometry can be
@@ -149,9 +140,9 @@
     >
       <h2
         id="topology-board-heading"
-        class="mb-2.5 text-xs font-semibold uppercase tracking-wider text-slate-200"
+        class="mb-2.5 text-sm font-semibold text-slate-200"
       >
-        Topology &amp; Board
+        Topology &amp; board
       </h2>
       <div class="space-y-3">
         <TopologySelector {config} cadGeometryActive={cadGeometry !== null} cadSourceFileName={cadGeometry?.source_file_name} {onImportCad} {onUseGenerated} />
@@ -173,7 +164,7 @@
               </span>
             </div>
             <p class="mt-2 text-[11px] leading-relaxed text-slate-400">
-              The DXF centerlines are active. Trace width, clearance and via dimensions remain editable below. Generator settings are hidden because they do not describe these paths. Choose a generator in Routing source to return to generated geometry.
+               Imported paths are active. Edit trace and via sizes below, or choose a generator to replace them.
             </p>
             <dl class="mt-3 grid grid-cols-3 gap-2 border-t border-slate-700/70 pt-2">
               <div>
@@ -200,7 +191,6 @@
       </div>
     </section>
 
-    <MagnetsPanel {config} />
     <ValidationWarning {config} />
   </div>
 </ScrollArea>
