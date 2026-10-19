@@ -15,7 +15,7 @@
   import { Dialog, DropdownMenu } from "bits-ui";
   import { onDestroy } from "svelte";
   import type { Snippet } from "svelte";
-  import { isDesignPanel, type DesignPanelId, type PreviewPanelId } from "./previewPanels";
+  import { isDesignPanel, isLeftPanel, type DesignPanelId, type PreviewPanelId } from "./previewPanels";
   import type { CadGeometry } from "../../types";
   import type { WorldTransform } from "../../chart";
   import type { CoilTerminalTool } from "../../utils/coilTerminalTool.svelte";
@@ -132,10 +132,10 @@
   // instead of reaching the modal's top edge.
   let toolbarHeight = $state(0);
   let terminalPanelOpen = $derived(view.terminalPanelOpen);
-  const panelWidth = $derived(sidePanel && !isDesignPanel(sidePanel) ? 240 : 0);
+  const panelWidth = $derived(sidePanel && !isLeftPanel(sidePanel) ? 240 : 0);
   let frameWidth = $state(PREVIEW_W);
   const dockWidth = $derived(Math.min(panelWidth, Math.max(0, frameWidth - 132)));
-  const leftDockWidth = $derived(designSettings ? 44 + (isDesignPanel(sidePanel) ? Math.min(400, Math.max(0, frameWidth - 132)) : 0) : 0);
+  const leftDockWidth = $derived(designSettings ? 44 + (isLeftPanel(sidePanel) ? Math.min(isDesignPanel(sidePanel) ? 400 : 240, Math.max(0, frameWidth - 132)) : 0) : 0);
 
   // Scroll lock for the lightbox (Kata xy31): while the modal is open the
   // page behind it must never scroll. Two layers:
@@ -251,14 +251,17 @@
 
         {#if designSettings}
           <div class="absolute bottom-0 left-0 z-20 w-11" style:top={`${toolbarHeight}px`}>
-            <PreviewSideRail designOnly {designSettings} bind:open={sidePanel} {active} {view} {terminalTool} layers={[]} label="Design settings" displayLabel="Design settings" dismissOnOutsideClick={false} />
+            <PreviewSideRail designOnly {designSettings} bind:open={sidePanel} {active} {view} {config} {drive} {driveError} {drivePending}
+              {terminalTool} {onStartTerminals} terminalsDisabled={!onGeometryChange || view.viewMode === "iso"}
+              geometry={terminalGeometry ?? importedGeometry} selection={importedGeometry ? selection : undefined}
+              showMotorControls={true} layers={[]} label="Design settings" displayLabel="Design settings" dismissOnOutsideClick={false} />
           </div>
         {/if}
 
         <!-- Right rail: hangs from the bottom of the top toolbar down to the
              status bar, so the Layers and Display panels pull out under it. -->
-        <div class="absolute bottom-0 right-0 z-30 w-11" style:top={`${toolbarHeight}px`}>
-          <PreviewSideRail {config} {drive} {driveError} {drivePending} {view} bind:open={sidePanel} {active} layers={importedGeometry ? importedGeometry.layer_z_mm.map((_, idx) => ({ idx })) : uniqueLayers} phases={importedGeometry ? [] : uniquePhases}
+        <div class="absolute bottom-0 right-0 z-20 w-11" style:top={`${toolbarHeight}px`}>
+          <PreviewSideRail drawingOnly={!!designSettings} {config} {drive} {driveError} {drivePending} {view} bind:open={sidePanel} {active} layers={importedGeometry ? importedGeometry.layer_z_mm.map((_, idx) => ({ idx })) : uniqueLayers} phases={importedGeometry ? [] : uniquePhases}
             {terminalTool} {onStartTerminals} terminalsDisabled={!onGeometryChange || view.viewMode === "iso"}
            geometry={terminalGeometry ?? importedGeometry} selection={importedGeometry ? selection : undefined} assignmentDisabled={view.viewMode === "iso" || !importedGeometry || !onGeometryChange || measure.mode || !!terminalTool?.active || view.oneSection}
           coils={importedGeometry ? uniquePhases.map((phase) => ({ name: phase.name, colorIdx: phase.colorIdx })) : []}

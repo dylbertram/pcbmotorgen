@@ -11,3 +11,7 @@ export type PreviewPanelId = DesignPanelId | "layers" | "display" | "terminals" 
 export function isDesignPanel(panel: PreviewPanelId | null): panel is DesignPanelId {
   return DESIGN_PANELS.some(({ id }) => id === panel);
 }
+
+export function isLeftPanel(panel: PreviewPanelId | null): boolean {
+  return isDesignPanel(panel) || panel === "terminals" || panel === "driver";
+}

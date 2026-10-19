@@ -1,7 +1,7 @@
 <script lang="ts">
   /**
-   * Shared preview dock. Design settings use a dedicated left rail; drawing
-   * tools stay on the right, including in the CAD import viewer.
+   * Motor settings, coil ends and driver controls use the left rail; Layers
+   * and Display stay on the right. CAD import retains its single right rail.
    *
     * Each toggle pulls a panel out from the rail: the
    * Layers panel (coil/phase/layer tree plus diagnostics overlays) and the
@@ -17,7 +17,7 @@
   import { onDestroy } from "svelte";
   import { Layers, SlidersHorizontal, X, Plug, CircuitBoard, Ruler, Route, Magnet } from "@lucide/svelte";
   import type { Snippet } from "svelte";
-  import { DESIGN_PANELS, isDesignPanel, type DesignPanelId, type PreviewPanelId } from "./previewPanels";
+  import { DESIGN_PANELS, isDesignPanel, isLeftPanel, type DesignPanelId, type PreviewPanelId } from "./previewPanels";
   import CoilTerminalPanel from "./CoilTerminalPanel.svelte";
   import type { CoilTerminalTool } from "../../utils/coilTerminalTool.svelte";
   import CoilPreviewVisibilityPanel from "./CoilPreviewVisibilityPanel.svelte";
@@ -38,8 +38,9 @@
     geometry, selection, assignmentDisabled = false, terminalTool, onStartTerminals,
     terminalsDisabled = false, dismissOnOutsideClick = true, showViewMode = false, config,
     drive = null, driveError = null, drivePending = false,
-    designSettings, designOnly = false, open = $bindable<PreviewPanelId | null>(null), active = true }: {
+    designSettings, designOnly = false, drawingOnly = false, open = $bindable<PreviewPanelId | null>(null), active = true }: {
     designOnly?: boolean;
+    drawingOnly?: boolean;
     active?: boolean;
     designSettings?: Snippet<[DesignPanelId]>;
     open?: PreviewPanelId | null;
@@ -82,14 +83,14 @@
   const rippleCheck = $derived(drive?.checks.find((check) => check.id === "ripple"));
   let railEl: HTMLDivElement | null = $state(null);
   const triggers: Partial<Record<PreviewPanelId, HTMLButtonElement | null>> = {};
-  const panelClass = "absolute bottom-0 right-full top-0 z-30 flex w-60 max-w-[calc(100vw-6rem)] flex-col overflow-hidden border-l border-slate-700 bg-slate-900 text-slate-200 shadow-xl shadow-black/40";
+  const panelClass = $derived(`absolute bottom-0 top-0 z-30 flex w-60 flex-col overflow-hidden border-slate-700 bg-slate-900 text-slate-200 ${designOnly ? 'left-full max-w-[calc(100vw-8.25rem)] border-r shadow-[12px_0_20px_-8px_rgba(0,0,0,0.4)] [clip-path:inset(0_-32px_0_0)]' : 'right-full max-w-[calc(100vw-6rem)] border-l shadow-xl shadow-black/40'}`);
   const designIcons = { constraints: Ruler, stackup: Layers, routing: Route, magnets: Magnet };
   const activeDesignPanel = $derived(DESIGN_PANELS.find(({ id }) => id === open));
-  onDestroy(() => { if (!designOnly) { terminalTool?.cancel(); view.terminalPanelOpen = false; } });
+  onDestroy(() => { if (!drawingOnly) { terminalTool?.cancel(); view.terminalPanelOpen = false; } });
   // An outside request (the Simulation tab's ends alert) sets
   // `view.terminalPanelOpen`; mirror it into the local panel state.
   $effect(() => {
-    if (!designOnly && view.terminalPanelOpen && open !== "terminals") open = "terminals";
+    if (!drawingOnly && view.terminalPanelOpen && open !== "terminals") open = "terminals";
   });
 
   function toggle(panel: PreviewPanelId) {
@@ -106,7 +107,7 @@
   }
   function handleKeydown(event: KeyboardEvent) {
     if (!active || !open || event.key !== "Escape") return;
-    if (designOnly !== isDesignPanel(open)) return;
+    if (designOnly ? !isLeftPanel(open) : drawingOnly ? isLeftPanel(open) : isDesignPanel(open)) return;
     const target = event.target as Element | null;
     const modal = target?.closest('[aria-modal="true"]');
     // Portaled dialogs and menus own Escape before the underlying drawer.
@@ -152,6 +153,8 @@
       title="Show display options: traces, copper layers and vias.">
       <SlidersHorizontal size={16} aria-hidden="true" />
     </button>
+    {/if}
+    {#if !drawingOnly}
     {#if geometry && terminalTool && onStartTerminals}
       <button type="button" bind:this={triggers.terminals} aria-label="Set coil terminals" aria-expanded={open === "terminals"} disabled={terminalsDisabled} onclick={() => toggle("terminals")}
         class="flex h-8 w-8 items-center justify-center rounded-md border border-transparent text-slate-300 hover:bg-slate-800 aria-expanded:border-emerald-500 aria-expanded:text-emerald-300 disabled:opacity-40 focus-visible:ring-2 focus-visible:ring-emerald-500" title="Select the driver end of each coil.">
@@ -178,9 +181,9 @@
     </div>
   {/if}
 
-  {#if !designOnly}
+  {#if !drawingOnly}
   {#if open === "terminals" && geometry && terminalTool && onStartTerminals}
-    <div role="dialog" aria-label="Coil terminals" aria-modal="false" class={`${panelClass} ${showMotorControls ? 'max-sm:bottom-20' : ''}`} transition:fly={{ x: 16, duration: 140 }}>
+    <div role="dialog" aria-label="Coil terminals" aria-modal="false" class={`${panelClass} ${showMotorControls ? 'max-sm:bottom-20' : ''}`} transition:fly={{ x: designOnly ? -16 : 16, duration: 140 }}>
       <header class="flex shrink-0 items-center justify-between border-b border-slate-700 px-3 py-2">
         <h3 class="text-sm font-semibold">Coil ends</h3>
         <button type="button" aria-label="Close terminals panel" onclick={close} class="rounded p-1 text-slate-400 hover:bg-slate-800"><X size={16} aria-hidden="true" /></button>
@@ -192,7 +195,7 @@
   {/if}
 
   {#if open === "driver" && config}
-    <div role="dialog" aria-label="Preview driver settings" aria-modal="false" class={panelClass} transition:fly={{ x: 16, duration: 140 }}>
+    <div role="dialog" aria-label="Preview driver settings" aria-modal="false" class={panelClass} transition:fly={{ x: designOnly ? -16 : 16, duration: 140 }}>
       <header class="flex shrink-0 items-center justify-between border-b border-slate-700 px-3 py-2">
         <h3 class="text-sm font-semibold">Driver</h3>
         <button type="button" aria-label="Close driver panel" onclick={close} class="rounded p-1 text-slate-400 hover:bg-slate-800"><X size={16} aria-hidden="true" /></button>
@@ -235,6 +238,8 @@
     </div>
   {/if}
 
+  {/if}
+  {#if !designOnly}
   {#if open === "layers"}
     <div role="dialog" aria-label={label} aria-modal="false" class={panelClass} transition:fly={{ x: 16, duration: 140 }}>
       <header class="flex shrink-0 items-center justify-between border-b border-slate-700 px-3 py-2">

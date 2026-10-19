@@ -35,7 +35,7 @@
   import { confirm } from "@tauri-apps/plugin-dialog";
   import { untrack } from "svelte";
   import type { Snippet } from "svelte";
-  import { isDesignPanel, type DesignPanelId, type PreviewPanelId } from "./previewPanels";
+  import { isDesignPanel, isLeftPanel, type DesignPanelId, type PreviewPanelId } from "./previewPanels";
   import type { PreviewCamera } from "../../utils/coilPreviewGestures.svelte";
   import { editableCoilGeometry } from "../../ipc/dxf";
   import type { ConfigStore } from "../../stores/config.svelte";
@@ -210,8 +210,8 @@
    *  rows, pole regions) so the camera never clips an annotation. */
   function worldTransformFor(zoom: number): WorldTransform {
     const drawerWidth = isDesignPanel(sidePanel) ? 400 : sidePanel ? 240 : 0;
-    const leftInset = interactive && designSettings ? 44 + (isDesignPanel(sidePanel) ? Math.min(drawerWidth, Math.max(0, viewportWidth - 132)) : 0) : 0;
-    const inset = interactive ? leftInset + 44 + (sidePanel && !isDesignPanel(sidePanel) ? Math.min(drawerWidth, Math.max(0, viewportWidth - 132)) : 0) : 0;
+    const leftInset = interactive && designSettings ? 44 + (isLeftPanel(sidePanel) ? Math.min(drawerWidth, Math.max(0, viewportWidth - 132)) : 0) : 0;
+    const inset = interactive ? leftInset + 44 + (sidePanel && !isLeftPanel(sidePanel) ? Math.min(drawerWidth, Math.max(0, viewportWidth - 132)) : 0) : 0;
     const fitWidth = W * Math.max(0.15, 1 - inset / Math.max(viewportWidth, 1));
     const fit = (bounds: typeof overlayFitBounds) => {
       const transform = fitWorldToView(bounds, fitWidth, H, PAD, zoom);

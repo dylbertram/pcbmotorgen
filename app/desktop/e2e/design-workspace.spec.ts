@@ -13,7 +13,7 @@ test("each design section has its own left-side button and panel", async ({ page
   const workspace = page.getByRole("region", { name: "Coil design workspace", exact: true });
   const left = workspace.getByRole("toolbar", { name: "Design side tools", exact: true });
   const right = workspace.getByRole("toolbar", { name: "Preview side tools", exact: true });
-  await expect(left.getByRole("button")).toHaveCount(4);
+  await expect(left.getByRole("button")).toHaveCount(6);
   await expect(page.getByRole("button", { name: "Design settings", exact: true })).toHaveCount(0);
   await expect(workspace.getByRole("heading", { name: "Coil Preview", exact: true })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Expand coil preview", exact: true })).toHaveCount(0);
@@ -49,6 +49,43 @@ test("each design section has its own left-side button and panel", async ({ page
   await magnets.getByRole("button", { name: "Close magnets panel", exact: true }).click();
   await expect(magnets).toHaveCount(0);
   await expect(left.getByRole("button", { name: "Magnets", exact: true })).toBeFocused();
+});
+
+test("coil ends and driver controls dock on the left in both viewers", async ({ page }, testInfo) => {
+  await gotoDesignApp(page);
+  for (const expanded of [false, true]) {
+    if (expanded) await openCoilPreview(page);
+    const workspace = expanded
+      ? page.getByRole("dialog", { name: "Coil Preview", exact: true })
+      : page.getByRole("region", { name: "Coil design workspace", exact: true });
+    const left = workspace.getByRole("toolbar", { name: "Design side tools", exact: true });
+    const right = workspace.getByRole("toolbar", { name: "Preview side tools", exact: true });
+    await expect(right.getByRole("button")).toHaveCount(2);
+    for (const item of [
+      { button: "Set coil terminals", dialog: "Coil terminals", close: "Close terminals panel" },
+      { button: "Driver settings", dialog: "Preview driver settings", close: "Close driver panel" },
+    ]) {
+      await expect(right.getByRole("button", { name: item.button, exact: true })).toHaveCount(0);
+      const trigger = left.getByRole("button", { name: item.button, exact: true });
+      await trigger.click();
+      const panel = workspace.getByRole("dialog", { name: item.dialog, exact: true });
+      await expect(panel).toBeVisible();
+      const railBounds = (await left.boundingBox())!;
+      await expect.poll(async () => (await panel.boundingBox())!.x).toBe(railBounds.x + railBounds.width);
+      if (item.button === "Driver settings") {
+        await expect(panel.getByRole("combobox", { name: "Driver to evaluate" })).toBeVisible();
+      } else {
+        await expect(panel.getByRole("region", { name: "Set coil terminals", exact: true })).toBeVisible();
+      }
+      await page.screenshot({ path: testInfo.outputPath(`${expanded ? "expanded" : "embedded"}-${item.button === "Driver settings" ? "driver" : "ends"}.png`) });
+      await panel.getByRole("button", { name: item.close, exact: true }).click();
+      await expect(trigger).toBeFocused();
+      await trigger.click();
+      await page.keyboard.press("Escape");
+      await expect(panel).toHaveCount(0);
+      await expect(trigger).toBeFocused();
+    }
+  }
 });
 
 test("edits survive panel changes, workflow changes and the expanded viewer", async ({ page }) => {
@@ -113,19 +150,26 @@ test("returning from Simulate repaints canvas pixels and preserves the selected 
   }
 });
 
-test("all four panels fit mobile without moving or overflowing the canvas", async ({ page }, testInfo) => {
+test("all six left panels fit mobile without moving or overflowing the canvas", async ({ page }, testInfo) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await gotoDesignApp(page);
   const left = page.getByRole("toolbar", { name: "Design side tools", exact: true });
-  for (const section of sections) {
-    const trigger = left.getByRole("button", { name: section.name, exact: true });
+  for (const section of [
+    ...sections.map(({ name }) => ({ button: name, dialog: name })),
+    { button: "Set coil terminals", dialog: "Coil terminals" },
+    { button: "Driver settings", dialog: "Preview driver settings" },
+  ]) {
+    const trigger = left.getByRole("button", { name: section.button, exact: true });
     if (await trigger.getAttribute("aria-expanded") !== "true") await trigger.click();
-    const panel = page.getByRole("dialog", { name: section.name, exact: true });
+    const panel = page.getByRole("dialog", { name: section.dialog, exact: true });
     await expect(panel).toBeVisible();
     const viewport = panel.locator("[data-scroll-area-viewport]");
-    await viewport.evaluate((el) => { el.scrollTop = el.scrollHeight; });
+    if (await viewport.count()) await viewport.evaluate((el) => { el.scrollTop = el.scrollHeight; });
+    const bounds = (await panel.boundingBox())!;
+    await expect.poll(async () => (await panel.boundingBox())!.x).toBe(44);
+    expect(bounds.width).toBeLessThanOrEqual(258);
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
     expect(await page.evaluate(() => document.documentElement.scrollHeight)).toBeLessThanOrEqual(844);
-    await page.screenshot({ path: testInfo.outputPath(`${section.name.toLowerCase()}-mobile.png`) });
+    await page.screenshot({ path: testInfo.outputPath(`${section.dialog.toLowerCase().replaceAll(" ", "-")}-mobile.png`) });
   }
 });
