@@ -1,0 +1,49 @@
+{
+  "scope": "linear free-space cuboid only",
+  "magpylib": "5.2.3",
+  "runs": {
+    "coarse": {
+      "mesh_m": 0.0004,
+      "air_radius_m": 0.03,
+      "relative_field_norm_error": 0.015105835743902273,
+      "mesh_seconds": 4.665258170993184,
+      "solve_seconds": 53.296047220996115,
+      "sha256": {
+        "cuboid.geo": "62c28aed5ff8e85aaf000e067f2447746917eb85f0d5106e9c4950ef3629b8ef",
+        "cuboid.pro": "f7be20f8613a7c2aa5d7b33b2ed640293178e53db20d93bdb08662027010296e",
+        "cuboid.msh": "7777a9dd9e667d7b4ca8ba1a4e27644b08f87ec92f13cc825831700ce26db7e5"
+      }
+    },
+    "fine": {
+      "mesh_m": 0.0003,
+      "air_radius_m": 0.03,
+      "relative_field_norm_error": 0.01652516180829015,
+      "mesh_seconds": 6.4747417100006714,
+      "solve_seconds": 84.79221442299604,
+      "sha256": {
+        "cuboid.geo": "62c28aed5ff8e85aaf000e067f2447746917eb85f0d5106e9c4950ef3629b8ef",
+        "cuboid.pro": "f7be20f8613a7c2aa5d7b33b2ed640293178e53db20d93bdb08662027010296e",
+        "cuboid.msh": "715ee5427a80ef56497bee38da39dadd1af5f328048165e992e67d6109ce7f03"
+      }
+    },
+    "domain": {
+      "mesh_m": 0.0003,
+      "air_radius_m": 0.045,
+      "relative_field_norm_error": 0.008336133607236956,
+      "mesh_seconds": 8.316210750999744,
+      "solve_seconds": 178.1199640279956,
+      "sha256": {
+        "cuboid.geo": "62c28aed5ff8e85aaf000e067f2447746917eb85f0d5106e9c4950ef3629b8ef",
+        "cuboid.pro": "f7be20f8613a7c2aa5d7b33b2ed640293178e53db20d93bdb08662027010296e",
+        "cuboid.msh": "4707a03de90b10a35b05af011a2005bc505988b344732f28f74bfe1a3057b961"
+      }
+    }
+  },
+  "versions": {
+    "gmsh": "4.13.1",
+    "getdp": "3.5.0"
+  },
+  "mesh_relative_change": 0.018538528657564647,
+  "domain_relative_change": 0.016784289487017243,
+  "failures": []
+}

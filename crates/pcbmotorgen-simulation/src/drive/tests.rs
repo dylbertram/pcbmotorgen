@@ -10,9 +10,9 @@ fn signed_branch_currents_obey_kirchhoff_and_power_balance() {
         net: "branched".into(), node_count: 4, node_x: vec![0.0; 4],
         terminal_key: vec![0, 1, 2, 3], terminal: vec![0], star: vec![2, 3],
         active_length_m: 0.0,
-        edges: vec![Edge { a: 0, b: 1, kind: EdgeKind::Via },
-                    Edge { a: 1, b: 2, kind: EdgeKind::Via },
-                    Edge { a: 3, b: 1, kind: EdgeKind::Via }],
+        edges: vec![Edge { a: 0, b: 1, kind: EdgeKind::Via { layers: [0,1], position_m: [0.,0.] } },
+                    Edge { a: 1, b: 2, kind: EdgeKind::Via { layers: [1,2], position_m: [0.,0.] } },
+                    Edge { a: 3, b: 1, kind: EdgeKind::Via { layers: [3,1], position_m: [0.,0.] } }],
     };
     let resistances = [1.0, 2.0, 2.0];
     let solved = solve_network(&net, &resistances);
@@ -110,18 +110,59 @@ fn curved_copper_is_integrated_and_endpoint_order_is_not_current_direction() {
 
 #[test]
 fn routed_force_respects_imported_depths_and_rejects_mismatched_coils() {
-    use crate::magnetic::force_eval::ForceEvaluator;
+    use crate::magnetic::force_eval::{ForceEvaluator, CommutationMode};
     let hints = DriveGeometryHints { layer_z_m: vec![0.0002, -0.003], ..Default::default() };
-    let (mut evaluator, coils) = ForceEvaluator::default().with_routed_currents(
+    let (mut evaluator, coils) = ForceEvaluator::new(3, 20, CommutationMode::PhaseAOnly, 0.0).with_routed_currents(
         &two_strand_fixture(), &sim(), &DriveSettings::default(), &hints,
     ).unwrap();
     let samples = evaluator.routed_conductor_samples().unwrap();
     assert!(samples[0].iter().any(|s| s.midpoint_3d[2] == 0.0002));
     assert!(samples[0].iter().any(|s| s.midpoint_3d[2] == -0.003));
     assert!(samples[0].iter().all(|s| s.dl_3d.iter().all(|v| v.is_finite())));
+    assert!(evaluator.excitation_currents_at(&sim(), &coils, 0.0).is_err());
     assert!(evaluator.evaluate(&sim(), &[]).is_err());
     assert!(evaluator.evaluate_at(&sim(), &[], 0.0).is_err());
     assert!(!coils.is_empty());
+    let mut wrong_name = coils.clone();
+    wrong_name[0].phase_name = "not the solved network".into();
+    assert!(evaluator.evaluate(&sim(), &wrong_name).is_err());
+    assert!(evaluator.evaluate_at(&sim(), &wrong_name, 0.0).is_err());
+    let mut wrong_index = coils.clone();
+    wrong_index[0].phase_idx += 1;
+    assert!(evaluator.evaluate_at(&sim(), &wrong_index, 0.0).is_err());
+    let mut extra = coils.clone();
+    extra.push(coils[0].clone());
+    assert!(evaluator.evaluate(&sim(), &extra).is_err());
+    assert!(evaluator.evaluate_at(&sim(), &coils, 0.0).is_ok());
+    assert_eq!(evaluator.excitation_currents_at(&sim(), &coils, 0.0).unwrap(), vec![sim().max_current_a]);
+    assert!(evaluator.excitation_currents_at(&sim(), &coils, f64::NAN).is_err());
+    assert!(evaluator.excitation_currents_at(&sim(), &wrong_name, 0.0).is_err());
+    let mut invalid_current = sim(); invalid_current.max_current_a = f64::NAN;
+    assert!(evaluator.excitation_currents_at(&invalid_current, &coils, 0.0).is_err());
+}
+
+#[test]
+fn force_and_driver_use_the_same_inner_outer_copper_split() {
+    use crate::magnetic::force_eval::{ForceEvaluator, CommutationMode};
+    let mut config = sim();
+    config.num_layers = 4;
+    let mut routing = RoutingResult::default();
+    routing.segments = vec![seg(0.0, 0.0, 100.0, 0.0, 0, "A"), seg(0.0, 3.0, 100.0, 3.0, 1, "A")];
+    let hints = DriveGeometryHints { layer_z_m: vec![0.0, -0.0004, -0.0008, -0.0016], ..Default::default() };
+    for (outer, inner, expected) in [(1.0, 1.0, 0.5), (3.0, 1.0, 0.75), (1.0, 3.0, 0.25)] {
+        let settings = DriveSettings { outer_copper_oz: outer, inner_copper_oz: inner, ..Default::default() };
+        let (evaluator, _) = ForceEvaluator::new(3, 4, CommutationMode::PhaseAOnly, 0.0)
+            .with_routed_currents(&routing, &config, &settings, &hints).unwrap();
+        let samples = &evaluator.routed_conductor_samples().unwrap()[0];
+        let outer_share: f64 = samples.iter().filter(|s| s.midpoint_3d[2] == 0.0).map(|s| s.dl_3d[0] / 0.1).sum();
+        let inner_share: f64 = samples.iter().filter(|s| s.midpoint_3d[2] == -0.0004).map(|s| s.dl_3d[0] / 0.1).sum();
+        assert!((outer_share - expected).abs() < 1e-9);
+        assert!((inner_share - (1.0 - expected)).abs() < 1e-9);
+        let analysis = analyze_drive_with(&config, &routing, &settings, None, &hints);
+        assert!((analysis.phases[0].max_trace_share - outer_share.max(inner_share)).abs() < 1e-9);
+        let r_unit = rho_cu_at(settings.winding_temp_c) * 0.1 / (config.min_trace_m * oz_to_m(1.0));
+        assert!((analysis.phase_resistance_ohm - r_unit / (outer + inner)).abs() < 1e-9);
+    }
 }
 
 fn seg(x0: f64, y0: f64, x1: f64, y1: f64, layer: u32, net: &str) -> RouteSegment {
@@ -145,6 +186,95 @@ fn two_strand_fixture() -> RoutingResult {
         r.vias.push(Via { position: Point::new(100.0, y), from_layer: 0, to_layer: 1, net: "A".into() });
     }
     r
+}
+
+#[test]
+fn through_barrel_intervals_sum_to_one_physical_barrel() {
+    let mut config = sim();
+    config.num_layers = 4;
+    config.pcb_thickness_m = 0.0016;
+    let mut routing = RoutingResult::default();
+    for layer in 0..4 { routing.segments.push(seg(0.0, 0.0, 10.0, 0.0, layer, "A")); }
+    routing.vias.push(Via { position: Point::new(10.0, 0.0), from_layer: 0, to_layer: 3, net: "A".into() });
+    let hints = DriveGeometryHints {
+        layer_z_m: vec![0.0, -0.0002, -0.0010, -0.0016],
+        terminals: std::collections::BTreeMap::from([("A".into(), vec![TerminalPair {
+            input: TerminalPoint { layer: 0, position: Point::new(0.0, 0.0) },
+            output: TerminalPoint { layer: 3, position: Point::new(0.0, 0.0) },
+        }])]),
+    };
+    let networks = extract_phase_networks_with_terminals(&routing, &hints.terminals);
+    let spans: Vec<_> = networks[0].edges.iter().filter_map(|edge| {
+        if let EdgeKind::Via { layers, position_m } = edge.kind {
+            assert_eq!(position_m, [0.01, 0.0]); Some(layers)
+        } else { None }
+    }).collect();
+    assert_eq!(spans, vec![[0, 1], [1, 2], [2, 3]]);
+    let length: f64 = spans.iter().map(|layers| hints.via_length_m(&config, *layers)).sum();
+    assert!((length - config.pcb_thickness_m).abs() < 1e-15);
+    let settings = DriveSettings::default();
+    let analysis = analyze_drive_with(&config, &routing, &settings, None, &hints);
+    let full_barrel = via_resistance_ohm(config.min_via_drill_m, settings.via_plating_m, 0.0016, rho_cu_at(settings.winding_temp_c));
+    assert!(analysis.notes.iter().any(|note| note.contains("via-barrel inductance")));
+    assert!((analysis.phases[0].via_resistance_ohm / full_barrel - 1.0).abs() < 1e-9);
+    // The two inner-layer traces are open stubs, not extra current returns.
+    let trace = rho_cu_at(settings.winding_temp_c) * 0.020 / (config.min_trace_m * oz_to_m(settings.outer_copper_oz));
+    assert!((analysis.phases[0].resistance_hot_ohm / (trace + full_barrel) - 1.0).abs() < 1e-9);
+}
+
+#[test]
+fn via_force_uses_signed_current_and_imported_vertical_depth() {
+    use crate::magnetic::force_eval::{ForceEvaluator, CommutationMode};
+    let config = sim();
+    let settings = DriveSettings::default();
+    let hints = DriveGeometryHints { layer_z_m: vec![0.0002, -0.003], ..Default::default() };
+    let mut routing = two_strand_fixture();
+    for reverse in [false, true] {
+        if reverse {
+            for segment in &mut routing.segments { std::mem::swap(&mut segment.start, &mut segment.end); }
+            for via in &mut routing.vias { std::mem::swap(&mut via.from_layer, &mut via.to_layer); }
+        }
+        let (evaluator, _) = ForceEvaluator::new(3, 20, CommutationMode::PhaseAOnly, 0.0)
+            .with_routed_currents(&routing, &config, &settings, &hints).unwrap();
+        let samples = &evaluator.routed_conductor_samples().unwrap()[0];
+        let vertical: Vec<_> = samples.iter().filter(|s| s.dl_3d[2].abs() > 1e-15).collect();
+        assert_eq!(vertical.len(), 40);
+        assert!(vertical.iter().all(|s| s.midpoint_3d[2] < 0.0002 && s.midpoint_3d[2] > -0.003));
+        let signed_dz: f64 = vertical.iter().map(|s| s.dl_3d[2]).sum();
+        assert!((signed_dz + 0.0032).abs() < 1e-12);
+        // Independent constant transverse B_y=2 T gives winding F_x=-I*dz*B_y.
+        let winding_fx: f64 = samples.iter().map(|s| -2.0 * s.dl_3d[2]).sum();
+        assert!((winding_fx - 0.0064).abs() < 1e-12);
+        let analysis = analyze_drive_with(&config, &routing, &settings, None, &hints);
+        let single_barrel = via_resistance_ohm(config.min_via_drill_m, settings.via_plating_m, 0.0032, rho_cu_at(settings.winding_temp_c));
+        assert!((analysis.phases[0].via_resistance_ohm / (single_barrel / 2.0) - 1.0).abs() < 1e-9);
+    }
+}
+
+#[test]
+fn imported_copper_below_responding_stack_is_rejected_without_moving_geometry() {
+    use crate::backplane::{BackplaneLayer, BackplaneStack, HousingMaterial, HousingSpec, LayerMaterial};
+    use crate::magnetic::force_eval::ForceEvaluator;
+    let mut config = sim(); config.pcb_thickness_m = 0.0008;
+    let routing = two_strand_fixture();
+    let hints = DriveGeometryHints { layer_z_m: vec![0.0, -0.0048], ..Default::default() };
+    assert!(validate_copper_placement(&config, &routing, &hints).is_ok());
+    config.backplane = Some(BackplaneStack { layers: vec![BackplaneLayer::new(LayerMaterial::FlexFerrite, 0.0002)], housing: None });
+    let error = validate_copper_placement(&config, &routing, &hints).unwrap_err().to_string();
+    assert!(error.contains("below the first magnetic/conducting stack surface"));
+    assert!(ForceEvaluator::default().with_routed_currents(&routing, &config, &Default::default(), &hints).is_err());
+    assert_eq!(hints.layer_z_m, vec![0.0, -0.0048]);
+    // A matching physical PCB extent is valid, including bottom copper at the surface.
+    config.pcb_thickness_m = 0.0048;
+    assert!(validate_copper_placement(&config, &routing, &hints).is_ok());
+    // Nonmagnetic spacers/air above the first responding surface are allowed.
+    config.pcb_thickness_m = 0.0008;
+    config.backplane = Some(BackplaneStack { layers: vec![BackplaneLayer::new(LayerMaterial::Fr4, 0.005), BackplaneLayer::new(LayerMaterial::FlexFerrite, 0.0002)], housing: None });
+    assert!(validate_copper_placement(&config, &routing, &hints).is_ok());
+    config.backplane = Some(BackplaneStack { layers: vec![], housing: Some(HousingSpec { material: HousingMaterial::Aluminum6061, thickness_m: 0.001, gap_m: 0.005 }) });
+    assert!(validate_copper_placement(&config, &routing, &hints).is_ok());
+    config.backplane.as_mut().unwrap().housing.as_mut().unwrap().gap_m = 0.0001;
+    assert!(validate_copper_placement(&config, &routing, &hints).is_err());
 }
 
 #[test]

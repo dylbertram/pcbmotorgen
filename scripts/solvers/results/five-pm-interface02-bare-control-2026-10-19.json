@@ -1,0 +1,14 @@
+{
+  "status": "passed-bare-field-map-only-not-mover-force",
+  "scope": "Actual five-PM supplied-project geometry with separate 0.2mm magnet-interface mesh, original 0.8mm near mesh, 0.1mm stack/gap mesh, 10mm far mesh, 60mm air radius, quarter scalar quadratic elements and Z stretch 4. No material stack solve was requested.",
+  "summary_sha256": "8c90cfb60b9aa1bce1be9de1cb3fd86caded820b9ee14edf3e61e767779d156f",
+  "bare_self_force_audit_sha256": "4557de0da9e506a6f58235362ba0d8be16ae9ecb62a7d38a3ef1e69407f213ac",
+  "bare_field_map_audit_sha256": "fb4f34373dc471161ed0674b31fd7bdfa08f5619a13fd59004848947ffc5df8d",
+  "raw_probe_archive_sha256": "46d0255a3a4f209564577ae7a4ad1a070160bd7984b0022339141a99e2c47967",
+  "solve_seconds": 504.351837063994,
+  "clearances_m": [0.0001, 0.0002, 0.0003],
+  "bare_field_map_vector_relative_errors": [0.028700300384499652, 0.018099479456469666, 0.012930056428183637],
+  "unchanged_field_map_gate": 0.05,
+  "bare_mover_self_force_z_n": [0.6443167231561748, 0.5153286131863524, 0.44983104386724215],
+  "conclusion": "All three near-PM map planes now pass analytical source-field equivalence, but near-interface self-force remains substantial. There is no stack force from this bare-only job and no manufactured relative material-force qualification. Further field resolution/force extraction work is required; no bare floor is subtracted."
+}

@@ -1,0 +1,15 @@
+{
+  "status": "failed-coarse-raw-field-force-controls",
+  "scope": "Stricter separate-body force audit of the already archived coarse single-PM quarter GetDP field. Exact stress integration removes its surface midpoint quadrature error but not its FEM field error. Earlier full/quarter symmetry parity is a narrower independent check and remains valid.",
+  "exact_stress_audit_sha256": "fa628d6afced2e93a399f120d4bcc78a0dedd691a07445a679ac98bb65409291",
+  "independent_midpoint_64_128_audit_sha256": "adc252987dc12f7860907f257500a2bc80dbc367c483ee8f2e3a935230de0d11",
+  "maximum_full_face_area_relative_error": 2.6645352591003757e-15,
+  "clearances_m": [0.0001, 0.0002, 0.0003],
+  "bare_mover_force_z_n": [-0.02208787699051984, -0.041631614300814745, -0.03546843800026156],
+  "stack_stator_force_z_n": [1.4808378467262453, 1.5012811507561108, 1.5070610438982432],
+  "stack_mover_force_z_n": [-1.4993663134285378, -1.543495421523679, -1.5452322525166606],
+  "direct_action_reaction_errors_n": [0.018528466702292468, 0.04221427076756812, 0.038171208618417385],
+  "unchanged_action_reaction_limits_n": [0.029987326268570758, 0.03086990843047358, 0.030904645050333215],
+  "failed_controls": ["mover bare self-force floor", "mover force path", "0.2 mm direct action/reaction", "0.3 mm direct action/reaction"],
+  "conclusion": "Refine the FEM field. Do not subtract the failed bare self-force floor, loosen the 2% gates or define mover force by negating stator force."
+}

@@ -13,8 +13,9 @@
 //! `copper_layers` is optional and defaults to 2. It sets `num_layers`, the
 //! copper sheet count of the layered inductance factor. `active_area_length_mm`
 //! defaults to the magnet span, so the whole winding sits under the magnets.
-//! `freqs_hz` and `speeds_m_s` are optional. `linear: true` raises every
-//! layer's Bsat to the override limit, for comparison with linear FEM runs.
+//! `freqs_hz` and `speeds_m_s` are optional. `linear: true` uses an unreachable
+//! knee for a numerical linear reference, not a permitted material override.
+//! Magnetic housings are rejected in this mode rather than left nonlinear.
 //!
 //! and writes one JSON object per case to stdout with the [`BackplaneAnalysis`]
 //! for that geometry plus `field_ratio_2d`: Bz at the PCB top under a magnet
@@ -29,7 +30,7 @@
 
 use std::io::Read;
 
-use pcbmotorgen_simulation::backplane::{BackplaneStack, MAX_BSAT_T};
+use pcbmotorgen_simulation::backplane::BackplaneStack;
 use pcbmotorgen_simulation::units::mm;
 use pcbmotorgen_simulation::{MagnetArray, SimulationInput};
 use serde::Deserialize;
@@ -54,10 +55,29 @@ struct Geometry {
     speeds_m_s: Vec<f64>,
     #[serde(default)]
     linear: bool,
+    #[serde(default)]
+    periodic_reference: bool,
 }
 
 fn default_copper_layers() -> u32 {
     2
+}
+
+fn linear_reference(mut stack: BackplaneStack) -> BackplaneStack {
+    // The user override cap (3 T) can still saturate a 0.1/0.2 mm sheet.
+    // This example-only limit disables the knee without changing production
+    // validation or initial permeability. Keep it finite for JSON output.
+    for layer in &mut stack.layers {
+        layer.bsat_t = Some(1e100);
+    }
+    assert!(
+        stack
+            .housing
+            .as_ref()
+            .map_or(true, |h| h.material.bsat_t().is_none()),
+        "linear reference does not support a magnetic housing"
+    );
+    stack
 }
 
 #[derive(Deserialize)]
@@ -115,11 +135,18 @@ fn main() {
     for case in &input.cases {
         let mut stack = case.stack.clone();
         if g.linear {
-            for l in &mut stack.layers {
-                l.bsat_t = Some(MAX_BSAT_T);
-            }
+            stack = linear_reference(stack);
         }
         let analysis = stack.analyze(&sim);
+        let periodic = if g.periodic_reference {
+            Some(
+                stack
+                    .periodic_static_reference(&sim)
+                    .expect("periodic static reference failed"),
+            )
+        } else {
+            None
+        };
         let solved = stack.solve(&sim);
         let b1 = centre_bz(&sim, Some(&stack));
         let coil: Vec<_> = g
@@ -142,6 +169,8 @@ fn main() {
             .collect();
         let out = serde_json::json!({
             "name": case.name,
+            "linear_reference": g.linear,
+            "periodic_static_reference": periodic,
             "analysis": analysis,
             "field_ratio_2d": b1 / b0,
             "magnet_area_m2": sim.magnet_count as f64 * sim.magnet_dims_m[0] * sim.magnet_dims_m[1],
@@ -167,5 +196,30 @@ mod tests {
         assert_eq!(g.copper_layers, 2);
         assert_eq!(sim_for(&g).num_layers, 2);
         assert_eq!(sim_for(&g).active_area_length_m, mm(30.0));
+    }
+
+    #[test]
+    fn linear_reference_really_stays_linear_for_overloaded_thin_sheets() {
+        use pcbmotorgen_simulation::backplane::{BackplaneLayer, LayerMaterial};
+
+        let g: Geometry = serde_json::from_str(
+            r#"{ "pole_pitch_mm": 6, "magnet_width_mm": 5, "magnet_cross_width_mm": 1000,
+                 "magnet_height_mm": 3, "magnet_count": 5, "remanence_t": 1.34,
+                 "air_gap_mm": 0.5, "pcb_thickness_mm": 0.8 }"#,
+        )
+        .unwrap();
+        for thickness in [0.1, 0.2] {
+            let stack = linear_reference(BackplaneStack {
+                layers: vec![BackplaneLayer::new(
+                    LayerMaterial::FlexFerrite,
+                    mm(thickness),
+                )],
+                housing: None,
+            });
+            let analysis = stack.analyze(&sim_for(&g));
+            assert!((analysis.layer_states[0].mu_effective - 130.0).abs() < 1e-9);
+            assert!((analysis.layer_states[0].mu_incremental - 130.0).abs() < 1e-9);
+            assert_eq!(analysis.image_strength, analysis.linear_image_strength);
+        }
     }
 }

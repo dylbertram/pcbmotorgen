@@ -25,11 +25,11 @@ fn mnzn(t_mm: f64) -> BackplaneStack {
     stack(vec![layer(LayerMaterial::MnZnFerrite, t_mm)], None)
 }
 
-/// `s` with every layer's Bsat raised to the override limit, so nothing in
-/// it saturates under the default magnets.
+/// Numerical linear reference only; the production override cap can still
+/// saturate thin sheets. This does not relax material validation.
 fn linear(mut s: BackplaneStack) -> BackplaneStack {
     for l in &mut s.layers {
-        l.bsat_t = Some(MAX_BSAT_T);
+        l.bsat_t = Some(1e100);
     }
     s
 }
@@ -61,6 +61,76 @@ fn version_two() -> (SimulationInput, BackplaneStack) {
         housing(HousingMaterial::Aluminum6061, 1.0, 0.1),
     );
     (sim, stack)
+}
+
+#[test]
+fn unresolved_normal_saturation_is_visible_even_when_mean_flux_fits() {
+    let s = SimulationInput {
+        pcb_thickness_m: mm(0.8),
+        ..benchmark()
+    };
+    for st in [
+        stack(vec![layer(LayerMaterial::FlexFerrite, 5.0)], None),
+        mnzn(2.0),
+        mnzn(2.8),
+    ] {
+        let a = st.analyze(&s);
+        assert!(
+            a.warnings
+                .iter()
+                .any(|w| w.contains("normal-face saturation") && w.contains("not resolved")),
+            "{:?}",
+            a.warnings
+        );
+    }
+    let mut weak = s;
+    weak.magnet_remanence_t = 0.001;
+    assert!(!mnzn(2.0)
+        .analyze(&weak)
+        .warnings
+        .iter()
+        .any(|w| w.contains("normal-face")));
+}
+
+#[test]
+fn saturated_backplane_warns_that_pwm_inductance_is_not_a_minimum() {
+    let (mut s, mut st) = version_two();
+    st.housing = None;
+    let analysis = st.analyze(&s);
+    assert!(analysis.warnings.iter().any(|w| {
+        w.contains("mover position and coil phase")
+            && w.contains("not the minimum")
+            && w.contains("PWM ripple limit")
+    }));
+    assert!(!analysis.warnings.iter().any(|w| w.contains("Eddy-current")));
+    assert!(!linear(st.clone())
+        .analyze(&s)
+        .warnings
+        .iter()
+        .any(|w| w.contains("Coil inductance varies")));
+
+    s.magnet_remanence_t = 0.001;
+    assert!(!st
+        .analyze(&s)
+        .warnings
+        .iter()
+        .any(|w| w.contains("Coil inductance varies")));
+}
+
+#[test]
+fn conductive_housing_reports_validation_boundary() {
+    let (s, st) = version_two();
+    assert!(st
+        .analyze(&s)
+        .warnings
+        .iter()
+        .any(|w| w.contains("screening estimates") && w.contains("current return paths")));
+    let fr4 = stack(vec![layer(LayerMaterial::Fr4, 1.0)], None);
+    assert!(!fr4
+        .analyze(&s)
+        .warnings
+        .iter()
+        .any(|w| w.contains("Eddy-current")));
 }
 
 fn k() -> f64 {
@@ -238,8 +308,12 @@ fn non_magnetic_material_only_adds_height() {
         assert_eq!(a.inductance_factor, 1.0);
         assert_eq!(a.attraction_n, 0.0);
         assert_eq!(a.housing_peak_b_t, 0.0);
-        assert!(a.warnings.is_empty());
     }
+    assert!(fr4.warnings.is_empty());
+    assert!(al
+        .warnings
+        .iter()
+        .any(|w| w.contains("screening estimates")));
     assert!((fr4.stack_thickness_m - mm(1.6)).abs() < 1e-12);
 }
 

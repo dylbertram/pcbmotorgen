@@ -93,7 +93,9 @@ end
 
 if case.previous then mi_setprevious(out .. "\\" .. case.previous .. ".ans", 1) end
 mi_saveas(out .. "\\" .. case.name .. ".fem")
-mi_analyze(1)
+-- Optional third argument exposes the solver progress/error window in Xvfb.
+-- Numerical inputs are unchanged; normal automated runs keep it hidden.
+mi_analyze(arg3 == "show" and 0 or 1)
 mi_loadsolution()
 
 h = openfile(out .. "\\" .. case.name .. ".out", "w")

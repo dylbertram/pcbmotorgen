@@ -1,0 +1,19 @@
+{
+  "status": "passed-periodic-nonlinear-motion-numerics-and-raw-traces-only",
+  "scope": "Reversible vector two-slope BH, 1mm flex plate at 20m/s with periodic 12mm wavelength, 1mm Al wall and 0.1mm wall gap. No independent nonlinear moving FEM, finite housing current closure, hysteresis or hardware qualification. Do not multiply periodic densities by a real motor area.",
+  "completed_study_sha256": "9149b525b6c87039d20a6fe0ee89ed4b0e80238dce68608b46f95140c4643704",
+  "forward_raw_trace_audit_sha256": "d57cf122874d5da4c26a94021d428589bbc6052e662fad1e1b82dd6d778e42a1",
+  "reverse_raw_trace_audit_sha256": "da7951d70782116c1faea0a5d97742da42fd35be1039b9c9ca0383f24b1f6c2b",
+  "independent_refinements": ["512 to 1024 time steps per period", "8 to 16 plate depth cells", "3 to 5 modes per phase", "128 to 256 angular samples", "16 to 32 wall cells", "4 to 8 gap cells"],
+  "maximum_refinement_relative_change": 0.0015488108588008753,
+  "unchanged_refinement_gate": 0.02,
+  "zero_reverse_slow_controls_passed": true,
+  "reverse_loss_relative_error": 2.6645352591003757e-15,
+  "reverse_force_symmetry_relative_error": 3.552713678800501e-15,
+  "sampled_quadrature_fraction_crossing_knee": 0.21875,
+  "sampled_min_b_t": 0.1540526099494907,
+  "sampled_peak_b_t": 0.5283694883494798,
+  "maximum_recomputed_raw_trace_equation_residual": 5.361446157675368e-14,
+  "maximum_raw_trace_drag_joule_relative_error": 1.1425513632645767e-05,
+  "maximum_raw_trace_source_work_joule_relative_error": 6.889881837279788e-06
+}

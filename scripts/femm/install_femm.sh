@@ -8,6 +8,13 @@
 # msvcp90) comes from the vcredist bundled in that installer and is copied next
 # to femm.exe. Re-running is safe; finished steps are skipped.
 set -euo pipefail
+. /etc/os-release
+[[ ${VERSION_CODENAME:-} == bookworm && $(uname -m) == x86_64 ]] || {
+    echo 'This user-prefix Wine/FEMM installer requires Debian 12 x86_64.' >&2; exit 1;
+}
+for tool in apt-get dpkg cc curl sha256sum; do
+    command -v "$tool" >/dev/null || { echo "Required host tool not found: $tool" >&2; exit 1; }
+done
 
 OPT=${FEMM_OPT:-$HOME/.local/opt}
 APT_DIR=$OPT/apt
@@ -34,18 +41,25 @@ fetch_debs() {
     local root=$1; shift
     local deb_dir=$APT_DIR/debs-$(basename "$root")
     mkdir -p "$deb_dir" "$root"
-    local pkgs
-    pkgs=$(apt-get -s install --no-install-recommends "$@" 2>/dev/null | awk '/^Inst/ {print $2}')
-    (cd "$deb_dir" && apt-get download $pkgs >/dev/null)
+    local pkgs=() simulation
+    # Include requested packages even when apt considers them installed on the
+    # host: this private prefix still needs their executable/library files.
+    simulation=$(apt-get -s install --no-install-recommends "$@")
+    mapfile -t pkgs < <({ printf '%s\n' "$@"; awk '/^Inst/ {print $2}' <<< "$simulation"; } | sort -u)
+    (cd "$deb_dir" && apt-get download "${pkgs[@]}" >/dev/null)
     for f in "$deb_dir"/*.deb; do dpkg -x "$f" "$root"; done
+    (cd "$deb_dir" && sha256sum ./*.deb > sha256.txt)
 }
 
 if [ ! -x "$WINE_ROOT/usr/lib/wine/wine64" ]; then
     apt-get update >/dev/null 2>&1 || true
-    fetch_debs "$WINE_ROOT" wine64 wine xvfb xauth
+    fetch_debs "$WINE_ROOT" wine64 wine libwine xvfb xauth x11-xkb-utils
     # Debian's wineserver is a wrapper that hard-codes /usr/lib/wine.
     mv "$WINE_ROOT/usr/lib/wine/wineserver" "$WINE_ROOT/usr/lib/wine/wineserver.debian-wrapper"
     ln -s wineserver64 "$WINE_ROOT/usr/lib/wine/wineserver"
+fi
+if ! command -v xdpyinfo >/dev/null && [ ! -x "$WINE_ROOT/usr/bin/xdpyinfo" ]; then
+    fetch_debs "$WINE_ROOT" x11-utils
 fi
 if [ ! -x "$TOOLS_ROOT/usr/bin/innoextract" ]; then
     apt-get update >/dev/null 2>&1 || true

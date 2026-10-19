@@ -1,0 +1,27 @@
+{
+  "status": "passed-periodic-small-signal-only",
+  "scope": "DC-biased differential-tensor AC at 100 kHz for a periodic 0.2 mm flex layer and 1 mm Al wall with 0.1 mm gap. Not finite current return paths, arbitrary amplitude/PWM, hysteresis or exterior E/Poynting qualification.",
+  "full_audit_sha256": "e0050c7dc91cc880cf053db54c37abacdddadba6eef41b0941e7fd3cdb053faa",
+  "frequency_hz": 100000,
+  "geometry_m": {"pole_pitch": 0.006, "pcb_thickness": 0.0008, "magnet_gap": 0.0005, "magnet_width": 0.005, "magnet_height": 0.003},
+  "magnet_remanence_t": 1.34,
+  "layer_mu_initial": 130,
+  "layer_saturation_polarization_t": 0.25,
+  "layer_conductivity_s_m": 0,
+  "wall_conductivity_s_m": 25000000,
+  "coil_scope": "Two isolated 20 micrometre sinusoidal sheets at the PCB faces, not a routed winding",
+  "material_provenance": "Provisional ideal two-slope model inputs, not measured frequency-dependent material data",
+  "independent_levels": ["layer depth", "spatial modes", "angular samples", "wall depth", "gap depth", "FEMM near mesh", "FEMM far air", "FEMM source strips"],
+  "original_inputs_outputs_sources_and_completed_receipts_verified": true,
+  "maximum_independent_refinement_loss_relative_change": 0.000746706864591884,
+  "maximum_independent_FEMM_agreement_loss_relative_error": 0.001524462111681557,
+  "maximum_added_complex_factor_error_as_fraction_of_its_predeclared_gate": 0.20926569836947653,
+  "refinement_gate": "2% of added reactive/resistive factor and loss, with fixed 0.001 real / 1e-5 imaginary absolute floors",
+  "comparison_gate": "5% of added reactive/resistive factor and loss, with the same absolute floors",
+  "physics_sha256": {
+    "spectral_biased_ac.py": "821929bbdff839fc10d974d897da26d48c67c1f7036648b65a86d6acef78ef40",
+    "spectral_incremental.py": "0cdec41acbece40b6b481cbe9db43975c017d022e88d2343341a44e6dfa08f02",
+    "spectral_plate.py": "0af82b8e36946656a94a9a0726aca4f39aa49ea282dfb53e1d9c4af66eb486b0",
+    "vector_harmonic_screen.py": "b762c965ba81bc6ec398f59665fd45f67007fec7829906e46ff3f1e8f1bd8aaa"
+  }
+}

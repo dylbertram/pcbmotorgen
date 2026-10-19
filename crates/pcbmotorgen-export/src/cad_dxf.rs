@@ -1380,6 +1380,71 @@ mod tests {
     use super::*;
 
     #[test]
+    #[ignore = "Requires PCB_MOTOR_DXF_PATH pointing to a user drawing"]
+    fn user_dxf_import_and_exchange_preserve_copper() {
+        let path = std::env::var("PCB_MOTOR_DXF_PATH").expect("PCB_MOTOR_DXF_PATH is required");
+        let original = std::fs::read(&path).unwrap();
+        let text = std::str::from_utf8(&original).unwrap();
+        let options = CadImportOptions {
+            units_to_mm: 1.0,
+            z_tolerance_mm: 0.01,
+            default_trace_width_mm: 0.4,
+            legacy_layer_count: std::env::var("PCB_MOTOR_DXF_LAYERS")
+                .map(|value| value.parse().unwrap())
+                .unwrap_or(2),
+            legacy_pcb_thickness_mm: 0.8,
+            prefer_detected_units: true,
+        };
+        let imported = import_3d_dxf(text, options).unwrap();
+        let geometry = &imported.geometry;
+        validate_geometry(geometry).unwrap();
+        assert!(!geometry.routing.segments.is_empty() || !geometry.routing.curves.is_empty()
+            || !geometry.routing.splines.is_empty());
+        let exported = cad_geometry_to_3d_dxf(geometry).unwrap();
+        let restored = import_3d_dxf(&exported, options).unwrap().geometry;
+        assert_eq!(geometry.routing.segments.len(), restored.routing.segments.len());
+        assert_eq!(geometry.routing.curves.len(), restored.routing.curves.len());
+        assert_eq!(geometry.routing.splines.len(), restored.routing.splines.len());
+        assert_eq!(geometry.routing.vias.len(), restored.routing.vias.len());
+        assert_eq!(geometry.layer_z_mm.len(), restored.layer_z_mm.len());
+        for (a, b) in geometry.layer_z_mm.iter().zip(&restored.layer_z_mm) {
+            assert!((a-b).abs() < 1e-6, "Layer elevation changed: {a} -> {b}");
+        }
+        let close = |a: Point, b: Point| {
+            assert!((a.x-b.x).abs() < 1e-6 && (a.y-b.y).abs() < 1e-6,
+                "Copper point changed: {a:?} -> {b:?}");
+        };
+        for (a, b) in geometry.routing.segments.iter().zip(&restored.routing.segments) {
+            close(a.start, b.start);
+            close(a.end, b.end);
+            assert_eq!(a.layer, b.layer);
+        }
+        for (a, b) in geometry.routing.curves.iter().zip(&restored.routing.curves) {
+            close(a.start, b.start);
+            close(a.mid, b.mid);
+            close(a.end, b.end);
+            assert_eq!(a.layer, b.layer);
+        }
+        for (a, b) in geometry.routing.vias.iter().zip(&restored.routing.vias) {
+            close(a.position, b.position);
+            assert_eq!((a.from_layer, a.to_layer), (b.from_layer, b.to_layer));
+        }
+        let (a, b) = (geometry.extent_mm(), restored.extent_mm());
+        assert_eq!(a.is_some(), b.is_some());
+        if let (Some(a), Some(b)) = (a, b) {
+            for axis in 0..2 {
+                assert!((a.0[axis]-b.0[axis]).abs() < 1e-6);
+                assert!((a.1[axis]-b.1[axis]).abs() < 1e-6);
+            }
+        }
+        assert_eq!(std::fs::read(&path).unwrap(), original, "Input DXF was modified");
+        println!("{path}: {} segments, {} curves, {} splines, {} vias, Z={:?}, warnings={:?}",
+            geometry.routing.segments.len(), geometry.routing.curves.len(),
+            geometry.routing.splines.len(), geometry.routing.vias.len(),
+            geometry.layer_z_mm, imported.warnings);
+    }
+
+    #[test]
     fn sensor_dxf_preserves_editable_splines_arcs_and_layer_transitions() {
         let sensor =
             pcbmotorgen_routing::generate_sensor(&pcbmotorgen_routing::SensorConfig::default())

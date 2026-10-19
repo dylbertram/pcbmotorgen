@@ -1,0 +1,17 @@
+{
+  "status": "failed-timeout-no-nonlinear-force-accepted",
+  "job": "project-star2-v1-quarter-q2-pilot",
+  "scope": "Actual star_2-layer.pmmotor version 1, explicitly chosen 36 by 12 mm footprint, centred pose, quadratic scalar GetDP quarter domain.",
+  "original_summary_sha256": "01ceba2c311df95012471f081fcf34a3b42474ce04f8801bbbf263ebf770954b",
+  "mesh_sha256": "5c4ab39b03f43b253bd2f795d6c78103a39957184f99012f9f5081faeae8f15e",
+  "stack_log_sha256": "2300875cc472ba8c93d1db17b2499139851e9d33feadb54b6fccbec8be750031",
+  "stack_command_receipt_sha256": "eaf5ff912020d8670b311f7f3083a64be713e120ac9b85ba4f1f71835725703e",
+  "stack_process_receipt_status": "timeout",
+  "stack_timeout_seconds": 1800,
+  "last_recorded_nonlinear_relative_residual": 1.0,
+  "unchanged_nonlinear_gate": 1e-9,
+  "bare_magpylib_field_relative_error": 0.002308462890229362,
+  "bare_solver_reported_dofs": 570453,
+  "bare_solver_reported_final_memory_mb": 3402.64,
+  "provenance_note": "Original partial summary is retained unchanged and still says running. The completed command receipt establishes timeout. Partial summaries and linear convergence alone are never accepted as nonlinear solve evidence."
+}

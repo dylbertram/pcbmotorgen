@@ -1,0 +1,14 @@
+{
+  "status": "passed-internal-periodic-trace-only",
+  "scope": "One reversible vector-BH nonlinear moving smoke case at 20 m/s, 1 mm flex, mu=130, saturation polarization=0.25 T. Not spatially qualified, independent nonlinear FEM, finite housing closure or hardware validation.",
+  "source_smoke_summary_sha256": "23d68d661ef9ff9581c634fa2a4c396bd4434c633e387b1f7e7997b9c3a58386",
+  "full_trace_audit_sha256": "519543578503adbdff11f476a98a217ddec93cafb80a0edcfe8f1047b583c031",
+  "raw_last_two_periods_npz_sha256": "ef202080dd9cb37b6e42955f92de7ce3ad35f3acd95d4fb88b0b2f8407aacd1f",
+  "max_recomputed_relative_equation_residual": 2.28441798797107e-14,
+  "sampled_quadrature_fraction_crossing_knee": 0.25,
+  "sampled_min_b_t": 0.16345250497476546,
+  "sampled_peak_b_t": 0.52370097203268,
+  "drag_joule_relative_error": 0.000056338987503457005,
+  "source_work_joule_relative_error": 0.0000230623829526877,
+  "periodic_settlement_relative_change": 4.2183855486739985e-15
+}

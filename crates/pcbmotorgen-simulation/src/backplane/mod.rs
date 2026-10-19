@@ -101,6 +101,9 @@
 use std::f64::consts::PI;
 
 use nalgebra::Complex;
+
+mod periodic;
+pub use periodic::{PeriodicStaticReference, PeriodicStaticRun};
 use serde::{Deserialize, Serialize};
 
 use crate::params::SimulationInput;
@@ -704,6 +707,7 @@ impl BackplaneStack {
                 s,
                 linear_image_strength,
                 image_strength,
+                lin_faces[i].normal * b0,
             );
         }
         if let (Some(h), Some(s)) = (&self.housing, &housing_state) {
@@ -718,7 +722,20 @@ impl BackplaneStack {
                 s,
                 linear_image_strength,
                 image_strength,
+                lin_faces[solved.free.len() - 1].normal * b0,
             );
+        }
+
+        if layer_states
+            .iter()
+            .chain(housing_state.iter())
+            .any(|s| s.mu_initial > 1.0 && s.bsat_t.map_or(false, |bsat| s.linear_peak_b_t > bsat))
+        {
+            warnings.push("Coil inductance varies with mover position and coil phase when the backplane or housing saturates. This screening estimate is not the minimum. Measure or solve the lowest inductance across travel before relying on the PWM ripple limit.".into());
+        }
+
+        if solved.conducts() {
+            warnings.push("Eddy-current results are screening estimates for infinite planar layers. FEMM checks cover linear 2D fields only, not finite housing edges, slots, current return paths or nonlinear motion. Drag, loss and drag-limited speed are not validated operating predictions. PWM impedance uses an approximate bias permeability, not a spatial differential-tensor solve; hysteresis and core loss are excluded.".into());
         }
 
         let peak = |s: &MagneticState| {
@@ -761,10 +778,16 @@ fn saturation_warning(
     s: &MagneticState,
     r_linear: f64,
     r_eff: f64,
+    linear_normal_b_t: f64,
 ) {
     let Some(bsat) = s.bsat_t.filter(|_| s.mu_initial > 1.0) else {
         return;
     };
+    if linear_normal_b_t > bsat {
+        warnings.push(format!(
+            "{what}: normal-face saturation is not resolved by this model. Reflection, Kf, attraction and coil inductance are uncertain; thick near-knee plates overpredicted attraction by up to 52% in the archived FEMM cases. Use nonlinear FEM before selecting thickness or bearing loads. Thickness suggestions are lower bounds, not a guarantee against saturation."
+        ));
+    }
     if s.saturated() {
         let fix = match (s.required_thickness_m, s.mnzn_thickness_m) {
             (Some(t), Some(m)) => format!(

@@ -35,8 +35,10 @@ fn snap(p: Point) -> (i64, i64) {
 pub enum EdgeKind {
     /// Trace polyline in metres, running from node `a` to node `b`.
     Trace { layer: u32, points: Vec<[f64; 2]>, length_m: f64 },
-    /// Plated via barrel between two copper layers.
-    Via,
+    /// Plated barrel interval from node `a`'s copper layer to node `b`'s.
+    /// A through barrel with intermediate taps has several intervals, not
+    /// several full-board-length resistors. Position is in metres.
+    Via { layers: [u32; 2], position_m: [f64; 2] },
 }
 
 #[derive(Debug, Clone)]
@@ -71,13 +73,13 @@ impl PhaseNetwork {
             .iter()
             .map(|e| match e.kind {
                 EdgeKind::Trace { length_m, .. } => length_m,
-                EdgeKind::Via => 0.0,
+                EdgeKind::Via { .. } => 0.0,
             })
             .sum()
     }
 
     pub fn via_count(&self) -> u32 {
-        self.edges.iter().filter(|e| matches!(e.kind, EdgeKind::Via)).count() as u32
+        self.edges.iter().filter(|e| matches!(e.kind, EdgeKind::Via { .. })).count() as u32
     }
 
     /// Copper layers used.
@@ -87,7 +89,7 @@ impl PhaseNetwork {
             .iter()
             .filter_map(|e| match e.kind {
                 EdgeKind::Trace { layer, .. } => Some(layer),
-                EdgeKind::Via => None,
+                EdgeKind::Via { .. } => None,
             })
             .collect();
         l.sort_unstable();
@@ -392,7 +394,10 @@ pub fn extract_phase_networks_with_terminals(
             // Deduplicate electrical connections, not the whole position, so
             // a 0-to-1 record cannot hide a separate 2-to-3 connection.
             if seen.insert((v.net.clone(), w[0], w[1])) {
-                b.edges.push(Edge { a: w[0], b: w[1], kind: EdgeKind::Via });
+                b.edges.push(Edge { a: w[0], b: w[1], kind: EdgeKind::Via {
+                    layers: [b.keys[w[0]].0, b.keys[w[1]].0],
+                    position_m: [v.position.x * MM_TO_M, v.position.y * MM_TO_M],
+                } });
             }
         }
     }
@@ -445,7 +450,7 @@ fn find_terminals(b: &Builder, pos: impl Fn(usize) -> (f64, f64)) -> (Vec<usize>
     for e in &b.edges {
         let w = match e.kind {
             EdgeKind::Trace { length_m, .. } => length_m,
-            EdgeKind::Via => 0.0,
+            EdgeKind::Via { .. } => 0.0,
         };
         adj[e.a].push((e.b, w));
         adj[e.b].push((e.a, w));

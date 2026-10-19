@@ -1,5 +1,11 @@
 # Magnetic solver research
 
+These are the original source reviews, not execution evidence. Subsequent
+headless Elmer/GetDP measurements, pinned installers, rejected jobs and numerical
+acceptance gates are in [the solver prototypes](../scripts/solvers/README.md).
+The finite static and weak-induction results do not qualify a nonlinear moving
+motor or a particular commercial ferrite sheet.
+
 This archive belongs in the t707 PR so it reaches main before the next solver
 branch is created. Keep the source-review notes with the reports, not just in a
 session or an untracked worktree.

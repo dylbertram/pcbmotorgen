@@ -501,22 +501,94 @@ mod analyze_drive_tests {
     #[test]
     #[ignore = "Exports real winding geometry for independent Magpylib validation"]
     fn export_magpylib_validation_fixture() {
-        let mut ipc = crate::ipc::ProjectConfigStateIpc::default().to_linear_motor_ipc();
-        ipc.routing_params.insert("connection".into(), 2.0);
+        let driver_reference = std::env::var("PCB_MOTOR_ORACLE_CASE").ok().as_deref() == Some("drv8311");
+        assert!(!driver_reference || std::env::var_os("PCB_MOTOR_PROJECT_PATH").is_none(), "DRV8311 fixture is a separate explicit generated case");
+        let (state, cad) = if let Ok(path) = std::env::var("PCB_MOTOR_PROJECT_PATH") {
+            let project: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
+            let index: usize = std::env::var("PCB_MOTOR_VERSION_INDEX").unwrap_or_else(|_| "0".into()).parse().unwrap();
+            let saved = &project["versions"][index]["state"];
+            (serde_json::from_value::<crate::ipc::ProjectConfigStateIpc>(saved["config"].clone()).unwrap(),
+             serde_json::from_value::<Option<pcbmotorgen_export::cad_dxf::CadGeometry>>(saved["cad_geometry"].clone()).unwrap())
+        } else {
+            let mut state = crate::ipc::ProjectConfigStateIpc::default();
+            state.drive.outer_copper_oz = 3.0;
+            state.drive.inner_copper_oz = 1.0;
+            (state, None)
+        };
+        let mut state = state;
+        if driver_reference { state.drive.inner_copper_oz = 3.0; }
+        let mut ipc = state.to_linear_motor_ipc();
+        if std::env::var_os("PCB_MOTOR_PROJECT_PATH").is_none() {
+            ipc.routing_params.insert("connection".into(), 2.0);
+        }
+        if driver_reference { ipc.min_trace_m = 0.0005; ipc.trace_width_m = 0.0005; }
         let core = ipc.to_core();
-        let routing = pcbmotorgen_routing::generate_routing_result(&core.routing_context(), &core.routing_pattern_id()).unwrap();
-        let sim = core.to_simulation();
+        let (routing, sim, hints) = if let Some(cad) = cad.as_ref() {
+            let board = crate::commands::cad_source::CadBoard::new(cad, &core).unwrap();
+            let sim = board.simulation_input(cad, &core);
+            (board.routing, sim, crate::commands::cad_source::CadBoard::drive_hints(cad))
+        } else {
+            (pcbmotorgen_routing::generate_routing_result(&core.routing_context(), &core.routing_pattern_id()).unwrap(),
+             core.to_simulation(), Default::default())
+        };
+        assert!(sim.backplane.is_none(), "Magpylib is a free-space oracle; use the FEMM harness for soft magnetic backplanes");
         let points = vec![0.0, 0.001, 0.003, 0.006, 0.012, 0.036, 0.06];
         let array = pcbmotorgen_simulation::magnetic::magnet_model::MagnetArray::new(&sim);
         let b = array.bfield_at_pcb_surface(&points, 0.0, 0.0);
-        let (mut evaluator, coils) = ForceEvaluator::new(9, 10, CoreCommutationMode::PhaseAOnly, 0.0)
-            .with_routed_currents(&routing, &sim, &pcbmotorgen_simulation::drive::DriveSettings::default(), &Default::default()).unwrap();
+        let meshing: usize = std::env::var("PCB_MOTOR_FORCE_MESH").unwrap_or_else(|_| "10".into()).parse().unwrap();
+        assert!((1..=512).contains(&meshing));
+        let (mut evaluator, coils) = ForceEvaluator::new(if driver_reference { 25 } else { 9 }, meshing,
+            if driver_reference { CoreCommutationMode::MaxThrust } else { CoreCommutationMode::PhaseAOnly }, 0.0)
+            .with_routed_currents(&routing, &sim, &state.drive, &hints).unwrap();
         let force = evaluator.evaluate(&sim, &coils).unwrap();
         let samples: Vec<_> = evaluator.routed_conductor_samples().unwrap()[0].iter()
             .map(|s| serde_json::json!({"point": s.midpoint_3d, "dl": s.dl_3d})).collect();
-        let out = serde_json::json!({"routing": routing, "sim": sim, "field_x_m": points, "rust_b_t": b,
+        let phase_samples: Vec<Vec<_>> = evaluator.routed_conductor_samples().unwrap().iter().map(|samples| samples.iter()
+            .map(|s| serde_json::json!({"point":s.midpoint_3d,"dl":s.dl_3d})).collect()).collect();
+        let excitation: Vec<_> = force.positions_m.iter().map(|&x| evaluator.excitation_currents_at(&sim, &coils, x).unwrap()).collect();
+        let driver_analysis = if driver_reference {
+            let kf = force.mean_thrust_n().abs() / force.current_a;
+            let mut driver_ipc = ipc.clone(); driver_ipc.supply_voltage_v = 5.0; driver_ipc.max_current_a = 1.1;
+            let mut settings = state.drive.clone(); settings.pwm_hz = 200e3;
+            settings.ripple_limit_fraction = 0.35; settings.voltage_headroom = 0.95;
+            let analysis = tauri::async_runtime::block_on(analyze_drive(driver_ipc, settings, Some(kf), None)).unwrap();
+            Some(serde_json::json!({"kf_n_per_a":kf,"thrust_n":analysis.thrust_n,"speed_voltage_v":analysis.speed_voltage_v,
+                "all_checks_passed":analysis.checks.iter().all(|check| check.status == pcbmotorgen_simulation::drive::CheckStatus::Pass)}))
+        } else { None };
+        use pcbmotorgen_simulation::drive::{extract_phase_networks_with_terminals, solve_network, EdgeKind};
+        let rho = pcbmotorgen_simulation::drive::rho_cu_at(state.drive.winding_temp_c);
+        let networks: Vec<_> = extract_phase_networks_with_terminals(&routing, &hints.terminals).iter().map(|net| {
+            let resistances: Vec<_> = net.edges.iter().map(|edge| match &edge.kind {
+                EdgeKind::Via { layers, .. } => pcbmotorgen_simulation::drive::via_resistance_ohm(sim.min_via_drill_m, state.drive.via_plating_m, hints.via_length_m(&sim, *layers), rho),
+                EdgeKind::Trace { layer, length_m, .. } => {
+                    let inner = sim.num_layers > 2 && *layer != 0 && *layer + 1 != sim.num_layers;
+                    let oz = if inner { state.drive.inner_copper_oz } else { state.drive.outer_copper_oz };
+                    rho * length_m / (sim.min_trace_m * pcbmotorgen_simulation::units::oz_to_m(oz))
+                }
+            }).collect();
+            let solution = solve_network(net, &resistances);
+            assert!(solution.connected);
+            serde_json::json!({"net": net.net, "node_count": net.node_count, "terminal": net.terminal, "star": net.star,
+                "edges": net.edges.iter().zip(resistances).map(|(e,r)| {
+                    let geometry = match &e.kind {
+                        EdgeKind::Trace { layer, points, .. } => serde_json::json!({"kind":"trace","layer":layer,"points_m":points}),
+                        EdgeKind::Via { layers, position_m } => serde_json::json!({"kind":"via","layers":layers,"position_m":position_m}),
+                    };
+                    serde_json::json!({"a":e.a,"b":e.b,"r_ohm":r,"geometry":geometry})
+                }).collect::<Vec<_>>(),
+                "rust_current_share":solution.current_share, "rust_resistance_ohm":solution.resistance_ohm})
+        }).collect();
+        let out = serde_json::json!({"routing": routing, "sim": sim, "drive": state.drive, "geometry_hints": {"layer_z_m": hints.layer_z_m}, "field_x_m": points, "rust_b_t": b,
+            "networks": networks, "force_subdivisions": evaluator.meshing,
+            "phase_samples":phase_samples,"excitation_currents_a":excitation,"driver_reference":driver_analysis,
             "phase_a_samples": samples, "force_positions_m": force.positions_m, "rust_force_x_n": force.force_x_n});
-        std::fs::write("magpylib-fixture.json", serde_json::to_vec(&out).unwrap()).unwrap();
+        let bytes = serde_json::to_vec(&out).unwrap();
+        if let Ok(path) = std::env::var("PCB_MOTOR_ORACLE_OUTPUT") {
+            let mut file = std::fs::OpenOptions::new().create_new(true).write(true).open(path).unwrap();
+            std::io::Write::write_all(&mut file, &bytes).unwrap();
+        } else {
+            std::fs::write("magpylib-fixture.json", bytes).unwrap();
+        }
     }
 
     #[test]
@@ -654,6 +726,10 @@ mod analyze_drive_tests {
             let sweep = tauri::async_runtime::block_on(evaluate_force_sweep(ipc.clone(), None, Some(force_settings))).unwrap();
             let kf = sweep.mean_thrust_n.abs() / sweep.current_a;
             eprintln!("width={width_mm} computed Kf={kf} N/A");
+            // Corrected physical barrel spans and signed vertical via force.
+            // Magpylib + independent R/current/dL reconstruction verifies this
+            // fixture with its exported excitation; controller PWM is unqualified.
+            assert!((kf - 0.5942095155).abs() < 1e-8, "DRV8311 Kf changed: {kf}");
             for copper in [3.0] {
                 for voltage in [5.0] {
                     for current in [1.1] {
@@ -666,6 +742,8 @@ mod analyze_drive_tests {
                         settings.ripple_limit_fraction = 0.35;
                         settings.voltage_headroom = 0.95;
                         let a = tauri::async_runtime::block_on(analyze_drive(ipc.clone(), settings, Some(kf), None)).unwrap();
+                        assert!((a.thrust_n.unwrap() - 0.6536304671).abs() < 1e-8);
+                        assert!((a.speed_voltage_v.unwrap() - 4.0956500486).abs() < 1e-8);
                         let electrical_pass = a.checks.iter().filter(|c| c.id != "thrust").all(|c| c.status == pcbmotorgen_simulation::drive::CheckStatus::Pass);
                         assert!(a.checks.iter().all(|c| c.status == pcbmotorgen_simulation::drive::CheckStatus::Pass), "reference driver checks: {:?}", a.checks);
                         eprintln!("trial width={width_mm} V={voltage} I={current} checks={:?}", a.checks.iter().map(|c| (&c.id, c.status, c.value, c.limit)).collect::<Vec<_>>());
