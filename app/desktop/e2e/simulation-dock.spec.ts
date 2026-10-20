@@ -24,6 +24,11 @@ test("Simulate opens four result tabs below the same live coil workspace", async
   expect(preview.y + preview.height).toBeLessThanOrEqual(results.y);
   const status = page.getByRole("group", { name: "Preview status", exact: true });
   const statusBounds = (await status.boundingBox())!;
+  const header = (await dock.getByRole("tablist").boundingBox())!;
+  const resizeStrip = (await dock.getByRole("separator").boundingBox())!;
+  expect(resizeStrip.y).toBe(header.y);
+  const chevron = (await dock.getByRole("button", { name: "Collapse simulation panel", exact: true }).locator("svg").boundingBox())!;
+  expect(Math.abs(chevron.y + chevron.height / 2 - header.y - header.height / 2)).toBeLessThanOrEqual(0.5);
   for (const tab of await dock.getByRole("tab").all()) {
     const bounds = (await tab.boundingBox())!;
     const label = (await tab.locator("span").boundingBox())!;
@@ -43,6 +48,10 @@ test("Simulate opens four result tabs below the same live coil workspace", async
   await page.screenshot({ path: testInfo.outputPath("simulation-summary.png") });
   await dock.getByRole("tab", { name: "Thrust vs. position", exact: true }).click();
   await expect(dock.getByRole("img", { name: "Thrust sweep plot", exact: true })).toBeVisible();
+  const plotBounds = (await dock.getByRole("img", { name: "Thrust sweep plot", exact: true }).boundingBox())!;
+  const metricBounds = (await dock.getByLabel("Thrust metrics", { exact: true }).boundingBox())!;
+  expect(metricBounds.x).toBeGreaterThanOrEqual(plotBounds.x + plotBounds.width);
+  expect(Math.abs(metricBounds.y - plotBounds.y)).toBeLessThanOrEqual(1);
   await page.screenshot({ path: testInfo.outputPath("simulation-thrust.png") });
   await expect(dock.getByRole("button", { name: "Close simulation panel", exact: true })).toHaveCount(0);
   const expandedHeight = (await dock.boundingBox())!.height;
@@ -77,6 +86,30 @@ test("Simulate opens four result tabs below the same live coil workspace", async
   await expect(dock).toBeHidden();
   await expect(page.getByRole("tab", { name: /^Design/i })).toHaveAttribute("aria-selected", "true");
   await expect(canvas).toHaveAttribute("data-test-instance", "retained");
+});
+
+test("driver results use bounded meters and horizontal subsections", async ({ page }, testInfo) => {
+  await gotoDesignApp(page);
+  await selectPanel(page, "Routing");
+  await page.getByRole("combobox", { name: "Winding connection", exact: true }).selectOption("2");
+  await page.getByRole("tab", { name: /^Simulate/i }).click();
+  const dock = page.getByRole("region", { name: "Simulation results", exact: true });
+  await dock.getByRole("tab", { name: "Driver suitability", exact: true }).click();
+  const voltage = dock.getByRole("region", { name: "Voltage and speed", exact: true });
+  const checks = dock.getByRole("region", { name: "Driver checks", exact: true });
+  await expect(voltage).toBeVisible();
+  await expect(checks).toBeVisible();
+  const voltageBounds = (await voltage.boundingBox())!;
+  const checkBounds = (await checks.boundingBox())!;
+  expect(checkBounds.x).toBeGreaterThan(voltageBounds.x);
+  expect(Math.abs(checkBounds.y - voltageBounds.y)).toBeLessThanOrEqual(1);
+  expect((await voltage.getByLabel("Voltage budget", { exact: true }).boundingBox())!.width).toBeLessThanOrEqual(384);
+  for (const meter of await checks.locator(".check-meter").all()) {
+    expect((await meter.boundingBox())!.width).toBeLessThanOrEqual(320);
+  }
+  await expect(dock.getByRole("region", { name: "Operating limits", exact: true })).toBeVisible();
+  await expect(dock.getByRole("region", { name: "Routed copper measurements", exact: true })).toBeVisible();
+  await page.screenshot({ path: testInfo.outputPath("simulation-driver.png") });
 });
 
 test("the results dock resizes with pointer and keyboard and remembers its height", async ({ page }) => {

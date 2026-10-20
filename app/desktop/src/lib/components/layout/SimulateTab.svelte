@@ -75,23 +75,23 @@
 </script>
 
 <section id={dockId} aria-label="Simulation results" hidden={!open}
-  class="min-h-0 shrink-0 border-t border-slate-700 bg-slate-900 {open ? 'flex flex-col' : 'hidden'}"
+  class="relative min-h-0 shrink-0 border-t border-slate-700 bg-slate-900 {open ? 'flex flex-col' : 'hidden'}"
   style:height={collapsed ? "auto" : `${panelHeight}px`}>
   {#if !collapsed}
   <!-- WAI-ARIA window splitter: a focusable separator is an interactive range widget. -->
   <!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions -->
   <div role="separator" aria-label="Resize simulation panel" aria-orientation="horizontal" aria-controls={dockId}
     aria-valuemin={Math.round(minHeight)} aria-valuemax={Math.round(maxHeight)} aria-valuenow={panelHeight} aria-valuetext={`${panelHeight} pixels high`} tabindex="0"
-    class="flex h-2 shrink-0 touch-none select-none items-center justify-center cursor-row-resize hover:bg-slate-800 focus-visible:bg-slate-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400"
+    class="absolute inset-x-0 top-0 z-10 flex h-2 touch-none select-none items-center justify-center cursor-row-resize hover:bg-slate-800 focus-visible:bg-slate-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400"
     onpointerdown={startResize} onpointermove={moveResize} onpointerup={endResize} onpointercancel={endResize} onlostpointercapture={() => { drag = null; }} onkeydown={resizeByKey}>
     <span aria-hidden="true" class="h-0.5 w-10 rounded-full bg-slate-600"></span>
   </div>
   {/if}
   <Tabs.Root value={collapsed ? "" : selected} onValueChange={(value) => { if (value) { selected = value; collapsed = false; } }} class="flex min-h-0 flex-1 flex-col">
-    <div class="flex shrink-0 items-stretch border-slate-700 {collapsed ? '' : 'border-b'}">
+    <div class="flex shrink-0 items-stretch border-slate-700 {collapsed ? 'h-9' : 'h-11 border-b'}">
       <Tabs.List aria-label="Simulation diagrams and results" class="flex min-w-0 flex-1 items-stretch overflow-x-auto px-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {#each results as result (result.id)}
-          <Tabs.Trigger value={result.id} onclick={() => { selected = result.id; collapsed = false; }} class="relative flex h-9 shrink-0 items-center justify-center whitespace-nowrap px-3 text-xs text-slate-400 after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 after:bg-transparent hover:text-slate-100 data-[state=active]:text-emerald-300 data-[state=active]:after:bg-emerald-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400"><span class="block leading-none">{result.label}</span></Tabs.Trigger>
+          <Tabs.Trigger value={result.id} onclick={() => { selected = result.id; collapsed = false; }} class="relative flex h-full shrink-0 items-center justify-center whitespace-nowrap px-3 text-xs text-slate-400 after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 after:bg-transparent hover:text-slate-100 data-[state=active]:text-emerald-300 data-[state=active]:after:bg-emerald-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400"><span class="block leading-none">{result.label}</span></Tabs.Trigger>
         {/each}
       </Tabs.List>
       <button type="button" aria-label={collapsed ? "Expand simulation panel" : "Collapse simulation panel"} aria-expanded={!collapsed} aria-controls={`${dockId}-content`} onclick={() => (collapsed = !collapsed)} class="flex w-11 shrink-0 items-center justify-center self-stretch text-slate-400 hover:bg-slate-800 hover:text-slate-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400">
