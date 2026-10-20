@@ -1,10 +1,11 @@
 import { test, expect } from "@playwright/test";
-import { gotoDesignApp, openCoilPreview } from "./helpers";
+import { gotoDesignApp } from "./helpers";
 
 const sections = [
   { name: "Constraints", heading: "design-constraints-heading" },
   { name: "Stackup", heading: "backplane-heading" },
   { name: "Routing", heading: "topology-board-heading" },
+  { name: "Drive & force targets", heading: "drive-targets-heading" },
   { name: "Magnets", heading: "magnets-heading" },
 ];
 
@@ -13,12 +14,12 @@ test("each design section has its own left-side button and panel", async ({ page
   const workspace = page.getByRole("region", { name: "Coil design workspace", exact: true });
   const left = workspace.getByRole("toolbar", { name: "Design side tools", exact: true });
   const right = workspace.getByRole("toolbar", { name: "Preview side tools", exact: true });
-  await expect(left.getByRole("button")).toHaveCount(6);
+  await expect(left.getByRole("button")).toHaveCount(7);
   await expect(page.getByRole("button", { name: "Design settings", exact: true })).toHaveCount(0);
   await expect(workspace.getByRole("heading", { name: "Coil Preview", exact: true })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Expand coil preview", exact: true })).toHaveCount(0);
   await expect(page.locator("footer")).toHaveCount(0);
-  await expect(workspace.getByLabel("Coil geometry summary")).toHaveText("3 phases · 4 layers · 12 coil groups");
+  await expect(page.getByLabel("Coil geometry summary")).toHaveText("3 phases · 4 layers · 12 coil groups");
   const drawing = workspace.getByRole("img", { name: "Coil preview", exact: true });
   const drawingBounds = await drawing.boundingBox();
 
@@ -51,13 +52,11 @@ test("each design section has its own left-side button and panel", async ({ page
   await expect(left.getByRole("button", { name: "Magnets", exact: true })).toBeFocused();
 });
 
-test("coil ends and driver controls dock on the left in both viewers", async ({ page }, testInfo) => {
+test("coil ends and driver controls dock on the left in both workflows", async ({ page }, testInfo) => {
   await gotoDesignApp(page);
-  for (const expanded of [false, true]) {
-    if (expanded) await openCoilPreview(page);
-    const workspace = expanded
-      ? page.getByRole("dialog", { name: "Coil Preview", exact: true })
-      : page.getByRole("region", { name: "Coil design workspace", exact: true });
+  for (const workflow of ["Design", "Simulate"]) {
+    await page.getByRole("tab", { name: new RegExp(`^${workflow}`, "i") }).click();
+    const workspace = page.getByRole("region", { name: "Coil design workspace", exact: true });
     const left = workspace.getByRole("toolbar", { name: "Design side tools", exact: true });
     const right = workspace.getByRole("toolbar", { name: "Preview side tools", exact: true });
     await expect(right.getByRole("button")).toHaveCount(2);
@@ -77,7 +76,7 @@ test("coil ends and driver controls dock on the left in both viewers", async ({ 
       } else {
         await expect(panel.getByRole("region", { name: "Set coil terminals", exact: true })).toBeVisible();
       }
-      await page.screenshot({ path: testInfo.outputPath(`${expanded ? "expanded" : "embedded"}-${item.button === "Driver settings" ? "driver" : "ends"}.png`) });
+      await page.screenshot({ path: testInfo.outputPath(`${workflow.toLowerCase()}-${item.button === "Driver settings" ? "driver" : "ends"}.png`) });
       await panel.getByRole("button", { name: item.close, exact: true }).click();
       await expect(trigger).toBeFocused();
       await trigger.click();
@@ -88,7 +87,7 @@ test("coil ends and driver controls dock on the left in both viewers", async ({ 
   }
 });
 
-test("edits survive panel changes, workflow changes and the expanded viewer", async ({ page }) => {
+test("edits survive panel changes and workflow changes", async ({ page }) => {
   await gotoDesignApp(page);
   const left = page.getByRole("toolbar", { name: "Design side tools", exact: true });
   const travel = page.getByRole("spinbutton", { name: "Desired travel (center-to-center)", exact: true });
@@ -105,12 +104,10 @@ test("edits survive panel changes, workflow changes and the expanded viewer", as
   await expect(page.getByRole("region", { name: "Preview driver simulation results" })).toContainText("Current ripple");
   await left.getByRole("button", { name: "Constraints", exact: true }).click();
   await expect(travel).toHaveValue("100");
-  await openCoilPreview(page);
-  const modal = page.getByRole("dialog", { name: "Coil Preview", exact: true });
-  await expect(modal.getByRole("dialog", { name: "Constraints", exact: true })).toBeVisible();
-  await modal.getByRole("button", { name: "Magnets", exact: true }).click();
-  await expect(modal.getByRole("spinbutton", { name: "Magnet count", exact: true })).toHaveValue("14");
-  await modal.getByRole("button", { name: "Close coil preview", exact: true }).click();
+  await page.getByRole("tab", { name: /^Simulate/i }).click();
+  await expect(page.getByRole("dialog", { name: "Constraints", exact: true })).toBeVisible();
+  await left.getByRole("button", { name: "Magnets", exact: true }).click();
+  await expect(count).toHaveValue("14");
   await page.getByRole("tab", { name: /^Design/i }).click();
   await expect(page.getByRole("dialog", { name: "Magnets", exact: true })).toBeVisible();
   await expect(count).toHaveValue("14");
@@ -150,7 +147,7 @@ test("returning from Simulate repaints canvas pixels and preserves the selected 
   }
 });
 
-test("all six left panels fit mobile without moving or overflowing the canvas", async ({ page }, testInfo) => {
+test("all seven left panels fit mobile without moving or overflowing the canvas", async ({ page }, testInfo) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await gotoDesignApp(page);
   const left = page.getByRole("toolbar", { name: "Design side tools", exact: true });

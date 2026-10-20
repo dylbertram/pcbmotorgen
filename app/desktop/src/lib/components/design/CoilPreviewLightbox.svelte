@@ -39,7 +39,7 @@
   import type { CoilPreviewViewState } from "./coilPreviewViewState.svelte";
   import { CadSelectionTool } from "../../utils/cadSelectionTool.svelte";
   import HoldingForceChart from "./HoldingForceChart.svelte";
-  import { stripBoundsDomainMm } from "../../previewGeometry";
+  import PreviewStatus from "./PreviewStatus.svelte";
   import type { DriveAnalysis } from "../../types";
 
   let {
@@ -121,7 +121,6 @@
   // modal's aspect ratio so canvas, overlays and gestures stay aligned.
   const W = PREVIEW_W;
   const H = $derived(height);
-  const moverBounds = $derived(stripBoundsDomainMm(config, motion));
   const selection = new CadSelectionTool({ getGeometry: () => importedGeometry, onChange: (geometry) => onGeometryChange?.(geometry) });
   function activateSelection() { terminalTool?.cancel(); measure.mode = false; view.oneSection = false; }
   onDestroy(() => terminalTool?.cancel());
@@ -315,15 +314,15 @@
         {/if}
       </div>
 
-      <div class="z-30 flex shrink-0 flex-wrap items-center justify-between gap-x-3 gap-y-1 border-t border-slate-700 bg-slate-900 px-3 py-2 text-[10px] text-slate-400" role="group" aria-label="Preview status">
-        <span class="min-w-0 flex-1 font-mono">Position: {motion.clampedPositionMm.toFixed(1)} mm · Mover extent: {moverBounds.startMm.toFixed(1)} – {moverBounds.endMm.toFixed(1)} mm</span>
-        {#if embedded}<span class="ml-auto shrink-0 text-right" aria-label="Coil geometry summary">{stats}</span>{/if}
-        {#if !embedded}<DropdownMenu.Root>
+      {#if !embedded}
+      <PreviewStatus {config} {motion} {stats} showSummary={false}>
+        <DropdownMenu.Root>
           <DropdownMenu.Trigger class="shrink-0 rounded border border-slate-700 px-2 py-1 text-xs hover:text-emerald-300" aria-label="Display state">Display ▾</DropdownMenu.Trigger>
           <DropdownMenu.Portal><DropdownMenu.Content preventScroll={false} class="z-[150] rounded border border-slate-700 bg-slate-900 p-1 text-xs text-slate-200" side="top" sideOffset={8}>
             <DropdownMenu.CheckboxItem bind:checked={view.showWaveform} class="cursor-default rounded px-3 py-2 outline-none data-[highlighted]:bg-slate-800">{view.showWaveform ? "✓ " : ""}Show phase waveform</DropdownMenu.CheckboxItem>
           </DropdownMenu.Content></DropdownMenu.Portal>
-        </DropdownMenu.Root>{/if}
-      </div>
+        </DropdownMenu.Root>
+      </PreviewStatus>
+      {/if}
 
 {/snippet}

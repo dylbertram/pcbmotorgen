@@ -37,13 +37,13 @@
 
 </script>
 
-<div class="space-y-4">
+<div class="metrics space-y-4">
   <h3 class="text-sm font-semibold text-slate-200 border-b border-slate-700 pb-1">
     Live metrics
   </h3>
 
   <!-- Primary thrust metrics -->
-  <div class="grid grid-cols-2 gap-2">
+  <div class="primary-metrics grid grid-cols-2 gap-2">
     <div>
       <div class="text-xs text-slate-400">Peak thrust</div>
       <div class="font-mono text-lg text-sky-300">{sweep ? sweep.peak_thrust_n.toFixed(3) : "—"} <span class="text-xs text-slate-500">N</span></div>
@@ -111,3 +111,10 @@
     Drive: {commutationLabel(config.commutation)} · {config.phases} phase · {config.max_current_a.toFixed(2)} A @ {config.supply_voltage_v.toFixed(1)} V
   </div>
 </div>
+
+<style>
+  .metrics { container-type: inline-size; }
+  @container (min-width: 680px) {
+    .primary-metrics { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  }
+</style>

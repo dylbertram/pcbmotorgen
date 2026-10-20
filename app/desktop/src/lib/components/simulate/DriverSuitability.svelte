@@ -9,7 +9,8 @@
     analysis,
     error = null,
     onConfigureWinding,
-  }: { analysis: DriveAnalysis | null; error?: string | null; onConfigureWinding?: () => void } = $props();
+    embedded = false,
+  }: { analysis: DriveAnalysis | null; error?: string | null; onConfigureWinding?: () => void; embedded?: boolean } = $props();
 
   const STATUS: Record<CheckStatus, { glyph: string; tone: string; label: string }> = {
     pass: { glyph: "✓", tone: "text-emerald-300 border-emerald-500/50 bg-emerald-500/10", label: "Pass" },
@@ -69,7 +70,7 @@
   const AT_LEAST = new Set(["thrust"]);
 </script>
 
-<section aria-labelledby="driver-suitability-heading" class="rounded-lg border border-slate-700 bg-slate-800/40 p-4">
+<section aria-labelledby="driver-suitability-heading" class={embedded ? "" : "rounded-lg border border-slate-700 bg-slate-800/40 p-4"}>
   <div class="flex flex-wrap items-baseline justify-between gap-2">
     <h3 id="driver-suitability-heading" class="text-sm font-semibold text-slate-200">Driver suitability</h3>
     {#if analysis}
