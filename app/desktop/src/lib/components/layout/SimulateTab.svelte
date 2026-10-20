@@ -1,12 +1,8 @@
 <script lang="ts">
+  import { Tabs } from "bits-ui";
+  import { ChevronDown, ChevronUp } from "@lucide/svelte";
   import type { ConfigStore } from "../../stores/config.svelte";
-  import type {
-    ForceSweepResult,
-    FrictionBudgetDto,
-    HeightStackResultDto,
-    DriveAnalysis,
-    CadGeometry,
-  } from "../../types";
+  import type { ForceSweepResult, FrictionBudgetDto, HeightStackResultDto, DriveAnalysis, CadGeometry } from "../../types";
   import { unmappedCoils } from "../../cadPhases";
   import { cadMappingProblems } from "../../cadMapping";
   import { inferMissingCoilEnds } from "../../cadTerminals";
@@ -14,27 +10,15 @@
   import FluxDiagram from "../simulate/FluxDiagram.svelte";
   import ForceSweepPlot from "../simulate/ForceSweepPlot.svelte";
   import MetricsPanel from "../simulate/MetricsPanel.svelte";
-  import DrivePanel from "../design/parameters/DrivePanel.svelte";
-  import DriveSettingsPanel from "../simulate/DriveSettingsPanel.svelte";
   import DriverSuitability from "../simulate/DriverSuitability.svelte";
 
-  let {
-    config,
-    active,
-    sweep,
-    friction,
-    height,
-    drive,
-    driveError = null,
-    error,
-    cadGeometry = null,
-    onConfigureWinding,
-    onSelectEnds,
-    onUseInferredEnds,
-    onOpenPreview,
-  }: {
+  let { config, active, open, availableHeight, sweep, friction, height, drive,
+    driveError = null, error, cadGeometry = null, onConfigureWinding,
+    onSelectEnds, onUseInferredEnds }: {
     config: ConfigStore;
     active: boolean;
+    open: boolean;
+    availableHeight: number;
     sweep: ForceSweepResult | null;
     friction: FrictionBudgetDto | null;
     height: HeightStackResultDto | null;
@@ -43,86 +27,123 @@
     error: string | null;
     cadGeometry?: CadGeometry | null;
     onConfigureWinding?: () => void;
-    /** Open the coil-ends panel for the active copper. */
     onSelectEnds?: () => void;
     onUseInferredEnds?: () => void;
-    onOpenPreview?: () => void;
   } = $props();
 
-  let coilEnds = $derived(cadGeometry ? inferMissingCoilEnds(cadGeometry) : null);
+  const results = [
+    { id: "flux", label: "Magnetic flux density" },
+    { id: "thrust", label: "Thrust vs. position" },
+    { id: "driver", label: "Driver suitability" },
+    { id: "summary", label: "Summary (live metrics)" },
+  ];
+  let selected = $state("flux");
+  let requestedHeight = $state(320);
+  let collapsed = $state(false);
+  const minHeight = $derived(Math.min(160, Math.max(80, availableHeight * 0.4)));
+  const maxHeight = $derived(Math.max(minHeight, availableHeight - 160));
+  const panelHeight = $derived(Math.round(Math.min(maxHeight, Math.max(minHeight, requestedHeight))));
+  const dockId = $props.id();
+  let drag: { pointer: number; y: number; height: number } | null = null;
+  const coilEnds = $derived(cadGeometry ? inferMissingCoilEnds(cadGeometry) : null);
+
+  function resize(value: number): void {
+    collapsed = false;
+    requestedHeight = Math.min(maxHeight, Math.max(minHeight, value));
+  }
+  function startResize(event: PointerEvent): void {
+    if (event.button !== 0) return;
+    event.preventDefault();
+    drag = { pointer: event.pointerId, y: event.clientY, height: panelHeight };
+    (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
+  }
+  function moveResize(event: PointerEvent): void {
+    if (drag?.pointer === event.pointerId) resize(drag.height + drag.y - event.clientY);
+  }
+  function endResize(event: PointerEvent): void {
+    if (drag?.pointer !== event.pointerId) return;
+    drag = null;
+    const target = event.currentTarget as HTMLElement;
+    if (target.hasPointerCapture(event.pointerId)) target.releasePointerCapture(event.pointerId);
+  }
+  function resizeByKey(event: KeyboardEvent): void {
+    const values: Record<string, number> = { ArrowUp: panelHeight + 24, ArrowDown: panelHeight - 24, Home: minHeight, End: maxHeight };
+    if (!(event.key in values)) return;
+    event.preventDefault();
+    resize(values[event.key]);
+  }
 </script>
 
-<div class="mb-3 flex items-center justify-between gap-3">
-  <h2 class="text-sm font-semibold text-slate-100">Simulation</h2>
-  {#if onOpenPreview}<button type="button" onclick={onOpenPreview} class="rounded border border-slate-600 px-3 py-1 text-xs text-slate-200 hover:bg-slate-800">Open coil preview</button>{/if}
-</div>
-<div class="grid items-start gap-3 lg:grid-cols-[minmax(0,1fr)_340px]">
-  <section class="simulation-main min-w-0 space-y-4" aria-label="Simulation diagrams">
-    {#if cadGeometry}
-      {#if coilEnds && coilEnds.unresolved.length}
-        <div class="rounded-md border border-rose-500/60 bg-rose-500/10 px-3 py-2.5 text-xs text-rose-100" role="alert">
-          <p class="font-semibold text-rose-200">Coil ends could not be inferred</p>
-          <p class="mt-1 text-rose-100/90">
-            Select the driver end and opposite end for {coilEnds.unresolved.join(", ")} in the coil preview to continue.
-          </p>
-          {#if onSelectEnds}
-            <button type="button" onclick={onSelectEnds} class="mt-2 rounded border border-rose-400/60 px-2 py-1 font-medium text-rose-100 hover:bg-rose-500/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-rose-300">Select coil ends</button>
-          {/if}
-        </div>
-      {:else if coilEnds && coilEnds.pending.length}
-        <div class="rounded-md border border-amber-500/50 bg-amber-500/10 px-3 py-2.5 text-xs text-amber-100" role="status" aria-label="Inferred coil ends">
-          <p class="font-semibold">Coil ends inferred</p>
-          <p class="mt-1">Use these ends, or review which end connects to the driver in the coil preview.</p>
-          <div class="mt-2 flex gap-2">
-            {#if onUseInferredEnds}<button type="button" onclick={onUseInferredEnds} class="rounded border border-amber-400/60 px-2 py-1 hover:bg-amber-500/20">Use inferred ends</button>{/if}
-            {#if onSelectEnds}<button type="button" onclick={onSelectEnds} class="rounded border border-slate-600 px-2 py-1 hover:bg-slate-800">Review</button>{/if}
-          </div>
-        </div>
-      {:else if cadMappingProblems(cadGeometry, config.phases, config.min_trace_mm).length}
-        <div class="rounded-md border border-amber-500/50 bg-amber-500/10 px-3 py-2 text-xs text-amber-100" role="alert">
-          <p>Update the imported geometry before simulating.</p>
-          <ul>{#each cadMappingProblems(cadGeometry, config.phases, config.min_trace_mm) as problem (problem)}<li>{problem}</li>{/each}</ul>
-        </div>
-      {:else}
-        <p class="text-xs text-slate-400" role="status">Thrust and driver results use the imported copper.</p>
-      {/if}
-    {/if}
-    {#if error}
-      <div
-        class="rounded-md border border-rose-500/60 bg-rose-500/10 px-4 py-2 text-sm text-rose-200"
-        role="alert"
-        aria-live="assertive"
-      >
-        Computation error: {error}
+<section id={dockId} aria-label="Simulation results" hidden={!open}
+  class="min-h-0 shrink-0 border-t border-slate-700 bg-slate-900 {open ? 'flex flex-col' : 'hidden'}"
+  style:height={collapsed ? "auto" : `${panelHeight}px`}>
+  {#if !collapsed}
+  <!-- WAI-ARIA window splitter: a focusable separator is an interactive range widget. -->
+  <!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions -->
+  <div role="separator" aria-label="Resize simulation panel" aria-orientation="horizontal" aria-controls={dockId}
+    aria-valuemin={Math.round(minHeight)} aria-valuemax={Math.round(maxHeight)} aria-valuenow={panelHeight} aria-valuetext={`${panelHeight} pixels high`} tabindex="0"
+    class="flex h-2 shrink-0 touch-none select-none items-center justify-center cursor-row-resize hover:bg-slate-800 focus-visible:bg-slate-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400"
+    onpointerdown={startResize} onpointermove={moveResize} onpointerup={endResize} onpointercancel={endResize} onlostpointercapture={() => { drag = null; }} onkeydown={resizeByKey}>
+    <span aria-hidden="true" class="h-0.5 w-10 rounded-full bg-slate-600"></span>
+  </div>
+  {/if}
+  <Tabs.Root value={collapsed ? "" : selected} onValueChange={(value) => { if (value) { selected = value; collapsed = false; } }} class="flex min-h-0 flex-1 flex-col">
+    <div class="flex shrink-0 items-stretch border-slate-700 {collapsed ? '' : 'border-b'}">
+      <Tabs.List aria-label="Simulation diagrams and results" class="flex min-w-0 flex-1 items-stretch overflow-x-auto px-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        {#each results as result (result.id)}
+          <Tabs.Trigger value={result.id} onclick={() => { selected = result.id; collapsed = false; }} class="relative flex h-9 shrink-0 items-center justify-center whitespace-nowrap px-3 text-xs text-slate-400 after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 after:bg-transparent hover:text-slate-100 data-[state=active]:text-emerald-300 data-[state=active]:after:bg-emerald-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400"><span class="block leading-none">{result.label}</span></Tabs.Trigger>
+        {/each}
+      </Tabs.List>
+      <button type="button" aria-label={collapsed ? "Expand simulation panel" : "Collapse simulation panel"} aria-expanded={!collapsed} aria-controls={`${dockId}-content`} onclick={() => (collapsed = !collapsed)} class="flex w-11 shrink-0 items-center justify-center self-stretch text-slate-400 hover:bg-slate-800 hover:text-slate-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400">
+        {#if collapsed}<ChevronUp size={16} aria-hidden="true" />{:else}<ChevronDown size={16} aria-hidden="true" />{/if}
+      </button>
+    </div>
+    <div id={`${dockId}-content`} hidden={collapsed} class="min-h-0 flex-1 flex-col {collapsed ? 'hidden' : 'flex'}">
+    <Tabs.Content value="flux" class="min-h-0 flex-1 overflow-auto p-3">
+      {@render warnings()}
+      <div class="h-full min-h-40"><FluxDiagram {config} active={active && open && !collapsed && selected === "flux"} embedded /></div>
+    </Tabs.Content>
+    <Tabs.Content value="thrust" class="min-h-0 flex-1 overflow-auto p-3">
+      {@render warnings()}
+      <div class="h-full min-h-40"><ForceSweepPlot result={sweep} embedded /></div>
+    </Tabs.Content>
+    <Tabs.Content value="driver" class="min-h-0 flex-1 overflow-auto p-3">
+      {@render warnings()}
+      <DriverSuitability embedded analysis={drive} error={driveError} onConfigureWinding={usesDeltaConnection(config.toIpc(), !!cadGeometry && !unmappedCoils(cadGeometry).length) ? onConfigureWinding : undefined} />
+    </Tabs.Content>
+    <Tabs.Content value="summary" class="min-h-0 flex-1 overflow-auto p-3">
+      {@render warnings()}
+      <MetricsPanel {config} {sweep} {friction} {height} />
+    </Tabs.Content>
+    </div>
+  </Tabs.Root>
+</section>
+
+{#snippet warnings()}
+  {#if cadGeometry}
+    {#if coilEnds && coilEnds.unresolved.length}
+      <div class="mb-3 rounded border border-rose-500/60 bg-rose-500/10 px-3 py-2 text-xs text-rose-200" role="alert">
+        <p class="font-semibold">Coil ends could not be inferred</p>
+        <p class="mt-1">Select the driver end and opposite end for {coilEnds.unresolved.join(", ")} to continue.</p>
+        {#if onSelectEnds}<button type="button" onclick={onSelectEnds} class="mt-2 rounded border border-rose-400/60 px-2 py-1 hover:bg-rose-500/20">Select coil ends</button>{/if}
       </div>
+    {:else if coilEnds && coilEnds.pending.length}
+      <div class="mb-3 rounded border border-amber-500/50 bg-amber-500/10 px-3 py-2 text-xs text-amber-200" role="status" aria-label="Inferred coil ends">
+        <p class="font-semibold">Coil ends inferred</p>
+        <p class="mt-1">Use these ends, or review which end connects to the driver.</p>
+        <div class="mt-2 flex gap-2">
+          {#if onUseInferredEnds}<button type="button" onclick={onUseInferredEnds} class="rounded border border-amber-400/60 px-2 py-1 hover:bg-amber-500/20">Use inferred ends</button>{/if}
+          {#if onSelectEnds}<button type="button" onclick={onSelectEnds} class="rounded border border-slate-600 px-2 py-1 hover:bg-slate-800">Review</button>{/if}
+        </div>
+      </div>
+    {:else if cadMappingProblems(cadGeometry, config.phases, config.min_trace_mm).length}
+      <div class="mb-3 rounded border border-amber-500/50 bg-amber-500/10 px-3 py-2 text-xs text-amber-200" role="alert">
+        <p>Update the imported geometry before simulating.</p>
+        <ul>{#each cadMappingProblems(cadGeometry, config.phases, config.min_trace_mm) as problem (problem)}<li>{problem}</li>{/each}</ul>
+      </div>
+    {:else}
+      <p class="mb-2 text-xs text-slate-400" role="status">Thrust and driver results use the imported copper.</p>
     {/if}
-    <div class="simulation-plots">
-      <FluxDiagram {config} {active} />
-      <ForceSweepPlot result={sweep} />
-    </div>
-    <DriverSuitability analysis={drive} error={driveError} onConfigureWinding={usesDeltaConnection(config.toIpc(), !!cadGeometry && !unmappedCoils(cadGeometry).length) ? onConfigureWinding : undefined} />
-  </section>
-
-  <!-- Side column: drive & force targets and the driver settings sit on top
-       so they stay visible while iterating; the metrics summary follows. -->
-  <aside class="min-w-0 space-y-4">
-    <DrivePanel {config} />
-    <DriveSettingsPanel {config} />
-    <div class="rounded-lg border border-slate-700 bg-slate-800/40 p-4">
-      <MetricsPanel
-        {config}
-        {sweep}
-        {friction}
-        {height}
-      />
-    </div>
-  </aside>
-</div>
-
-<style>
-  .simulation-main { container-type: inline-size; }
-  .simulation-plots { display: grid; gap: 1rem; align-items: start; }
-  @container (min-width: 960px) {
-    .simulation-plots { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  }
-</style>
+  {/if}
+  {#if error}<div class="mb-3 rounded border border-rose-500/60 bg-rose-500/10 px-3 py-2 text-xs text-rose-200" role="alert" aria-live="polite">Computation error: {error}</div>{/if}
+{/snippet}

@@ -48,6 +48,7 @@
   import {
     clientToVirtual,
     computePreviewGeometry,
+    computePreviewSummary,
     computeMagnets,
     computeUniqueLayers,
     computeUniquePhases,
@@ -274,11 +275,7 @@
   let uniqueLayers = $derived(computeUniqueLayers(coils));
 
   // Header stat line, shared verbatim by the inline card and the lightbox.
-  let stats = $derived(
-    coils
-      ? `${uniquePhases.length} phase${uniquePhases.length === 1 ? "" : "s"} · ${g.renderedLayerCount} layer${g.renderedLayerCount === 1 ? "" : "s"} · ${coils.phases.length} coil group${coils.phases.length === 1 ? "" : "s"}`
-      : "no coils yet",
-  );
+  let stats = $derived(computePreviewSummary(coils));
 
   let visibleSegments = $derived(
     computeVisibleSegments(coils, view.oneSection, oneSectionConductorCount),

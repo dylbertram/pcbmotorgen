@@ -10,6 +10,7 @@ import {
   computeFootprintBox,
   computeMagnets,
   computePreviewGeometry,
+  computePreviewSummary,
   computeUniqueLayers,
   computeUniquePhases,
   computeVisibleArcs,
@@ -42,6 +43,20 @@ import type { CoilPathDto, CoilSegmentDto, PhaseCoilDto, PoleRegionDto, PhaseBan
 
 /** Default-config-like magnet layout (12 poles, 6 mm pole pitch: P_e/2). */
 const CONFIG = { magnet_count: 12, magnet_width_mm: 4.5, magnet_gap_mm: 1.5 };
+
+describe("preview status summary", () => {
+  it("handles geometry that has not been generated", () => {
+    expect(computePreviewSummary(null)).toBe("no coils yet");
+  });
+  it("counts distinct phases and layers while preserving coil group count", () => {
+    expect(computePreviewSummary(braidLikeFixture())).toBe("3 phases · 2 layers · 6 coil groups");
+  });
+  it("uses singular labels for one phase, layer and group", () => {
+    const coils = braidLikeFixture();
+    coils.phases = coils.phases.slice(0, 1);
+    expect(computePreviewSummary(coils)).toBe("1 phase · 1 layer · 1 coil group");
+  });
+});
 
 /**
  * 3-phase × 2-layer serpentine fixture: segments span y 0..0.02 (board
