@@ -70,7 +70,7 @@
   const AT_LEAST = new Set(["thrust"]);
 </script>
 
-<section aria-labelledby="driver-suitability-heading" class={embedded ? "" : "rounded-lg border border-slate-700 bg-slate-800/40 p-4"}>
+<section aria-labelledby="driver-suitability-heading" class="driver-results {embedded ? 'embedded' : 'rounded-lg border border-slate-700 bg-slate-800/40 p-4'}">
   <div class="flex flex-wrap items-baseline justify-between gap-2">
     <h3 id="driver-suitability-heading" class="text-sm font-semibold text-slate-200">Driver suitability</h3>
     {#if analysis}
@@ -97,9 +97,10 @@
       {verdict.text}
     </p>
 
-    <!-- Voltage budget: where the bus voltage goes at the target speed. -->
-    <div class="mt-4">
-      <div class="flex items-baseline justify-between text-xs">
+    <div class="driver-layout">
+    <section class="result-section voltage-section" aria-label="Voltage and speed">
+      <h4 class="mb-3 text-xs font-semibold text-slate-300">Voltage &amp; speed</h4>
+      <div class="mb-2 flex flex-wrap items-baseline justify-between gap-1 text-xs">
         <span class="text-slate-300">
           Voltage budget at {analysis.speed_voltage_v !== null ? `${analysis.target_speed_m_s.toFixed(2)} m/s` : "standstill"}
         </span>
@@ -107,7 +108,7 @@
           {budget.total.toFixed(2)} V of {analysis.available_voltage_v.toFixed(2)} V usable
         </span>
       </div>
-      <div class="relative mt-1.5 h-6">
+      <div class="voltage-budget relative mt-1.5 h-6" aria-label="Voltage budget">
         <div class="flex h-full w-full overflow-hidden rounded-sm bg-slate-900 ring-1 ring-slate-700">
           {#each budget.segments as seg (seg.key)}
             <div class="{seg.color} h-full" style:width={seg.width} title="{seg.label}: {seg.value.toFixed(2)} V"></div>
@@ -116,7 +117,7 @@
         <div class="pointer-events-none absolute inset-y-[-3px] w-0 border-l-2 border-dashed border-emerald-300" style:left={budget.usable} aria-hidden="true"></div>
         <div class="pointer-events-none absolute inset-y-[-3px] w-0 border-l-2 border-slate-300" style:left={budget.bus} aria-hidden="true"></div>
       </div>
-      <ul class="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-400">
+      <ul class="mt-3 grid grid-cols-2 gap-x-3 gap-y-1 text-xs text-slate-400">
         {#each budget.segments as seg (seg.key)}
           <li class="flex items-center gap-1.5">
             <span class="h-2.5 w-2.5 rounded-sm {seg.color}" aria-hidden="true"></span>
@@ -126,11 +127,12 @@
         <li class="flex items-center gap-1.5"><span class="h-3 border-l-2 border-dashed border-emerald-300" aria-hidden="true"></span>usable</li>
         <li class="flex items-center gap-1.5"><span class="h-3 border-l-2 border-slate-300" aria-hidden="true"></span>bus</li>
       </ul>
-    </div>
+      <div class="mt-4"><VoltageEnvelopePlot {analysis} /></div>
+    </section>
 
-    <div class="mt-5 space-y-5">
-      <!-- Checks -->
-      <ul class="min-w-0 divide-y divide-slate-700/70 border-y border-slate-700/70" aria-label="Driver checks">
+    <section class="result-section checks-section" aria-label="Driver checks">
+      <h4 class="mb-1 text-xs font-semibold text-slate-300">Driver checks</h4>
+      <ul class="min-w-0 divide-y divide-slate-700/70" aria-label="Driver checks">
         {#each analysis.checks as c (c.id)}
           <li class="py-2.5">
             <div class="flex items-start gap-2.5">
@@ -149,7 +151,7 @@
                   {/if}
                 </div>
                 {#if c.status !== "unknown" && c.status !== "pass"}
-                  <div class="relative mt-1 h-1 rounded-full bg-slate-700/70" aria-hidden="true">
+                  <div class="check-meter relative mt-1 h-1 rounded-full bg-slate-700/70" aria-hidden="true">
                     <div
                       class="h-1 rounded-full {c.status === 'pass' ? 'bg-emerald-400' : c.status === 'warn' ? 'bg-amber-400' : 'bg-rose-400'}"
                       style:width="{fill(c) * 100}%"
@@ -163,11 +165,11 @@
           </li>
         {/each}
       </ul>
+    </section>
 
-      <div class="min-w-0 space-y-5">
-        <VoltageEnvelopePlot {analysis} />
-
-        <dl class="grid grid-cols-2 gap-x-4 gap-y-3 text-xs">
+    <section class="result-section limits-section" aria-label="Operating limits">
+      <h4 class="mb-3 text-xs font-semibold text-slate-300">Operating limits</h4>
+        <dl class="grid grid-cols-2 gap-x-4 gap-y-4 text-xs">
           <div>
             <dt class="text-slate-400">Highest continuous current</dt>
             <dd class="font-mono text-slate-100">{analysis.max_continuous_current_a.toFixed(2)} A</dd>
@@ -194,11 +196,10 @@
             <dd class="text-[11px] text-slate-500"><Formula tex={String.raw`\tau = \frac{L}{R}`} /> = {formatSi(analysis.time_constant_s, "s")}</dd>
           </div>
         </dl>
-      </div>
-    </div>
+    </section>
 
     <!-- Measured copper -->
-    <div class="mt-5">
+    <section class="result-section copper-section" aria-label="Routed copper measurements">
       <h4 class="text-xs font-semibold text-slate-300">Measured from the routed traces</h4>
       <div class="mt-2 overflow-x-auto">
         <table class="w-full whitespace-nowrap text-left text-xs">
@@ -238,10 +239,10 @@
         ({formatSi(analysis.phases[0]?.via_resistance_ohm ?? 0, "Ω")} of phase {analysis.phases[0]?.net ?? "A"}'s hot resistance).
         R hot is at the winding temperature.
       </p>
-    </div>
+    </section>
 
     <!-- Bench targets -->
-    <div class="mt-4 rounded-md border border-slate-700 bg-slate-900/50 px-3 py-2.5">
+    <section class="result-section prototype-section" aria-label="Prototype measurements">
       <h4 class="text-xs font-semibold text-slate-300">Check on the prototype</h4>
       <p class="mt-1 text-xs text-slate-400">
         Measure between two phase terminals on the unpowered board. Star wiring puts two phases in series.
@@ -256,12 +257,32 @@
           <dd class="whitespace-nowrap font-mono text-slate-100">{formatSi(analysis.line_inductance_h, "H")}</dd>
         </div>
       </dl>
-    </div>
+    </section>
 
     {#if analysis.notes.length}
-      <ul class="mt-3 list-disc space-y-0.5 pl-4 text-[11px] text-slate-500">
+      <section class="result-section notes-section" aria-label="Analysis notes">
+      <h4 class="mb-2 text-xs font-semibold text-slate-300">Analysis notes</h4>
+      <ul class="list-disc space-y-0.5 pl-4 text-[11px] text-slate-500">
         {#each analysis.notes as note (note)}<li>{note}</li>{/each}
       </ul>
+      </section>
     {/if}
+    </div>
   {/if}
 </section>
+
+<style>
+  .driver-results { container-type: inline-size; }
+  .driver-layout { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1.25rem; align-items: start; margin-top: 1rem; }
+  .result-section { min-width: 0; border-top: 1px solid rgb(var(--slate-700)); padding-top: 0.75rem; }
+  .voltage-budget { max-width: 24rem; }
+  .check-meter { max-width: 20rem; }
+  .notes-section { grid-column: 1 / -1; }
+  @container (min-width: 680px) {
+    .embedded .driver-layout { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
+  @container (min-width: 1080px) {
+    .embedded .driver-layout { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .embedded .copper-section { grid-column: span 2; }
+  }
+</style>
