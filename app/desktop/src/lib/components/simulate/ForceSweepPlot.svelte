@@ -13,8 +13,10 @@
 
   let { result, embedded = false }: { result: ForceSweepResult | null; embedded?: boolean } = $props();
 
-  const W = 760;
-  const H = 240;
+  let chartWidth = $state(760);
+  let chartHeight = $state(240);
+  const W = $derived(embedded ? Math.max(320, chartWidth) : 760);
+  const H = $derived(embedded ? Math.max(160, chartHeight) : 240);
   const PAD_L = 50;
   const PAD_R = 20;
   const PAD_T = 16;
@@ -44,8 +46,8 @@
   });
 </script>
 
-<div class={embedded ? "flex h-full min-h-0 flex-col" : "rounded-lg bg-slate-800/40 border border-slate-700 p-4"}>
-  <div class="flex items-center justify-between mb-2">
+<div class="thrust-panel {embedded ? 'embedded flex h-full min-h-0 flex-col' : 'rounded-lg bg-slate-800/40 border border-slate-700 p-4'}">
+  <div class="mb-2 flex shrink-0 flex-wrap items-center justify-between gap-2">
     <h3 class="text-sm font-semibold text-slate-200">Thrust vs. position</h3>
     {#if result}
       <span class="text-xs text-slate-400">
@@ -54,7 +56,9 @@
     {/if}
   </div>
 
-  <svg viewBox="0 0 {W} {H}" class={embedded ? "min-h-0 w-full flex-1" : "w-full h-auto"} role="img" aria-label="Thrust sweep plot">
+  <div class="thrust-layout">
+  <div class="plot-slot" bind:clientWidth={chartWidth} bind:clientHeight={chartHeight}>
+  <svg viewBox="0 0 {W} {H}" preserveAspectRatio="xMinYMin meet" class={embedded ? "block h-full min-h-0 w-full" : "block h-auto w-full"} role="img" aria-label="Thrust sweep plot">
     {#if plot}
       <!-- grid -->
       {#each plot.yTicks as t (t.v)}
@@ -84,25 +88,39 @@
       </text>
     {/if}
   </svg>
+  </div>
 
   {#if plot && result}
-    <div class="mt-2 grid grid-cols-4 gap-2 text-xs">
-      <div class="rounded bg-slate-800/60 border border-slate-700 px-2 py-1">
-        <span class="text-slate-400">Mean</span>
-        <span class="font-mono text-emerald-300 ml-1">{result.mean_thrust_n.toFixed(4)} N</span>
+    <dl aria-label="Thrust metrics" class="thrust-metrics text-xs">
+      <div>
+        <dt class="text-slate-400">Mean</dt>
+        <dd class="mt-1 font-mono text-base text-emerald-300">{result.mean_thrust_n.toFixed(4)} N</dd>
       </div>
-      <div class="rounded bg-slate-800/60 border border-slate-700 px-2 py-1">
-        <span class="text-slate-400">Peak</span>
-        <span class="font-mono text-sky-300 ml-1">{result.peak_thrust_n.toFixed(4)} N</span>
+      <div>
+        <dt class="text-slate-400">Peak</dt>
+        <dd class="mt-1 font-mono text-base text-sky-300">{result.peak_thrust_n.toFixed(4)} N</dd>
       </div>
-      <div class="rounded bg-slate-800/60 border border-slate-700 px-2 py-1">
-        <span class="text-slate-400">Min</span>
-        <span class="font-mono text-rose-300 ml-1">{result.min_thrust_n.toFixed(4)} N</span>
+      <div>
+        <dt class="text-slate-400">Min</dt>
+        <dd class="mt-1 font-mono text-base text-rose-300">{result.min_thrust_n.toFixed(4)} N</dd>
       </div>
-      <div class="rounded bg-slate-800/60 border border-slate-700 px-2 py-1">
-        <span class="text-slate-400">Ripple</span>
-        <span class="font-mono text-amber-300 ml-1">{result.ripple_pct.toFixed(1)}%</span>
+      <div>
+        <dt class="text-slate-400">Ripple</dt>
+        <dd class="mt-1 font-mono text-base text-amber-300">{result.ripple_pct.toFixed(1)}%</dd>
       </div>
-    </div>
+    </dl>
   {/if}
+  </div>
 </div>
+
+<style>
+  .thrust-panel { container-type: inline-size; }
+  .thrust-layout { display: grid; min-height: 0; gap: 1rem; }
+  .embedded .thrust-layout { flex: 1; grid-template-rows: minmax(160px, 1fr) auto; }
+  .plot-slot { min-width: 0; min-height: 0; }
+  .thrust-metrics { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.75rem 1rem; align-content: start; }
+  @container (min-width: 680px) {
+    .embedded .thrust-layout { grid-template-columns: minmax(0, 1fr) 12rem; grid-template-rows: minmax(0, 1fr); }
+    .embedded .thrust-metrics { grid-template-columns: minmax(0, 1fr); border-left: 1px solid rgb(var(--slate-700)); padding-left: 1rem; }
+  }
+</style>
