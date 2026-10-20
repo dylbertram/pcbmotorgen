@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { ConfigStore } from "../../../stores/config.svelte";
   import MagnetGradeHelper from "../MagnetGradeHelper.svelte";
+  import MagnetIsoView from "../MagnetIsoView.svelte";
   import NumberField from "../../ui/NumberField.svelte";
   import HelpTag from "../../ui/HelpTag.svelte";
 
@@ -93,6 +94,7 @@
         </span>
       </label>
 
+      <div class="magnet-grade"><MagnetIsoView {config} /></div>
       <div class="magnet-grade">
         <MagnetGradeHelper {config} />
       </div>

@@ -141,8 +141,6 @@
         <p>Update the imported geometry before simulating.</p>
         <ul>{#each cadMappingProblems(cadGeometry, config.phases, config.min_trace_mm) as problem (problem)}<li>{problem}</li>{/each}</ul>
       </div>
-    {:else}
-      <p class="mb-2 text-xs text-slate-400" role="status">Thrust and driver results use the imported copper.</p>
     {/if}
   {/if}
   {#if error}<div class="mb-3 rounded border border-rose-500/60 bg-rose-500/10 px-3 py-2 text-xs text-rose-200" role="alert" aria-live="polite">Computation error: {error}</div>{/if}
