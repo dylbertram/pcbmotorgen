@@ -3,6 +3,8 @@
   import type { BackplaneAnalysis, DriveBackplane, CadGeometry, RoutingDimensionsDto } from "../../types";
   import BackplanePanel from "../design/BackplanePanel.svelte";
   import MagnetsPanel from "../design/parameters/MagnetsPanel.svelte";
+  import DrivePanel from "../design/parameters/DrivePanel.svelte";
+  import CopperPanel from "../design/parameters/CopperPanel.svelte";
   import type { MotionStore } from "../../stores/motion.svelte";
   import { stripBoundsDomainMm, type TraceMeasure } from "../../previewGeometry";
   import TravelIsoView from "../design/TravelIsoView.svelte";
@@ -189,12 +191,15 @@
         <TracesBoardPanel {config} traceWidthMm={cadGeometry?.trace_width_mm}
           onTraceWidthChange={cadGeometry && onGeometryChange ? (width) => {
             if (cadGeometry) onGeometryChange?.({ ...cadGeometry, trace_width_mm: width });
-          } : undefined} />
+           } : undefined} />
+        <CopperPanel {config} />
       </div>
     </section>
 
     {:else if section === "magnets"}
       <MagnetsPanel {config} />
+    {:else if section === "drive"}
+      <DrivePanel {config} />
     {/if}
   </div>
 </ScrollArea>

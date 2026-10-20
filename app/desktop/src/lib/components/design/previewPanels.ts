@@ -3,6 +3,7 @@ export const DESIGN_PANELS = [
   { id: "stackup", label: "Stackup" },
   { id: "routing", label: "Routing" },
   { id: "magnets", label: "Magnets" },
+  { id: "drive", label: "Drive & force targets" },
 ] as const;
 
 export type DesignPanelId = (typeof DESIGN_PANELS)[number]["id"];

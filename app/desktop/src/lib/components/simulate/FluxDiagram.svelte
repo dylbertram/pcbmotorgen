@@ -15,7 +15,7 @@
   import HelpTag from "../ui/HelpTag.svelte";
   import Formula from "../ui/Formula.svelte";
 
-  let { config, active }: { config: ConfigStore; active: boolean } = $props();
+  let { config, active, embedded = false }: { config: ConfigStore; active: boolean; embedded?: boolean } = $props();
 
   // --- SVG canvas (matches CoilPreview width) -----------------------
   const W = 760;
@@ -212,7 +212,7 @@
   let magnetBars = $derived(computeMagnets(config));
 </script>
 
-<div class="rounded-lg bg-slate-800/40 border border-slate-700 p-4">
+<div class={embedded ? "flex h-full min-h-0 flex-col" : "rounded-lg bg-slate-800/40 border border-slate-700 p-4"}>
   <div class="flex items-center justify-between mb-2 flex-wrap gap-2">
     <h3 class="text-sm font-semibold text-slate-200">
       Magnetic flux density <Formula tex={String.raw`\mathbf{B}`} />
@@ -223,7 +223,7 @@
     </span>
   </div>
 
-  <svg viewBox="0 0 {W} {H}" class="w-full h-auto" role="img" aria-label="B-field flux density">
+  <svg viewBox="0 0 {W} {H}" class={embedded ? "min-h-0 w-full flex-1" : "w-full h-auto"} role="img" aria-label="B-field flux density">
     <defs><clipPath id={clipId}><rect x={PAD_L} y={PAD_T} width={W - PAD_L - PAD_R} height={H - PAD_T - PAD_B} /></clipPath></defs>
     <!-- Plot frame -->
     <rect

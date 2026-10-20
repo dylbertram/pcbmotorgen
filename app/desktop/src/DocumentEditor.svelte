@@ -26,7 +26,8 @@
   } from "./lib/types";
   import { TABS, type TabId } from "./lib/ui";
   import { DrcController } from "./lib/stores/drc.svelte";
-  import { measureTrace } from "./lib/previewGeometry";
+  import { measureTrace, computePreviewSummary } from "./lib/previewGeometry";
+  import PreviewStatus from "./lib/components/design/PreviewStatus.svelte";
   import { cadGeometryToPreview } from "./lib/cadPreview";
   import { saveTextToFile } from "./lib/files";
   import { geometryKey } from "./lib/cadPhases";
@@ -90,6 +91,8 @@
   let drive = $state<DriveAnalysis | null>(untrack(() => session.runtime.drive));
   let driveError = $state<string | null>(null);
   let coilPreviewExpanded = $state(false);
+  let motorWorkspaceHeight = $state(0);
+  let motorStatusHeight = $state(0);
   let previewPanel = $state<PreviewPanelId | null>("constraints");
   let coilPreview: CoilPreview | undefined = $state();
   let drivePending = $state(false);
@@ -299,7 +302,6 @@
     // Review starts from the inferred pairs, so closing the preview without
     // edits keeps those ends. Ambiguous coils still require manual selection.
     if (proposal && proposal.geometry !== projects.cadGeometry) projects.setCadGeometry(proposal.geometry);
-    selectTab("design");
     session.previewView.requestTerminals(proposal?.unresolved[0] ?? proposal?.pending[0]);
   }
 
@@ -665,41 +667,26 @@
           </ScrollArea>
         </aside>{/if}
 
-        <div class="min-w-0 min-h-0 h-full">
-          <!-- Workflow panels stay mounted so component-local controls retain
-               their state — Bits Tabs.Content never unmounts inactive panels, it
-               toggles the hidden attribute instead. Hidden Simulation content is
-               still lifecycle-gated: its IPC effects only run while this tab is
-               active. Each panel fills the column and scrolls internally; the
-               page height is locked so the workspace fills the viewport. -->
+        <div class="min-w-0 min-h-0 h-full" bind:clientHeight={motorWorkspaceHeight}>
+          {#if designType === "motor"}
+          <!-- Both workflow tabs share one mounted motor workspace. Simulate
+               adds a bottom dock instead of replacing the preview and rails. -->
           <Tabs.Content
-            value="design"
-            id="panel-design"
-            class="h-full"
+            value={activeTab}
+            id={`panel-${activeTab}`}
+            class="flex h-full min-h-0 flex-col"
           >
-            <div hidden={designType !== "motor"} class="h-full">
+            <div class="min-h-0 flex-1">
               <CoilPreview bind:this={coilPreview} workspace {config} coils={activeCoils} {motion}
-                active={active && (activeTab === "design" || coilPreviewExpanded) && !externalDialogOpen} designSettings={motorSettings}
+                active={active && !externalDialogOpen} designSettings={motorSettings}
                 bind:sidePanel={previewPanel} bind:expanded={coilPreviewExpanded} {drive} {driveError} {drivePending}
                 camera={session.camera} view={session.previewView} importedGeometry={projects.cadGeometry}
                 onGeometryChange={(geometry) => projects.setCadGeometry(geometry)} />
             </div>
-            <div hidden={designType !== "sensor"} class="h-full">
-              <ScrollArea id="sensor-settings-scroll" class="h-full" viewportClass="p-4 lg:pl-2" aria-label="Sensor settings">
-                <SensorTab store={sensorStore} />
-              </ScrollArea>
-            </div>
-          </Tabs.Content>
-
-          <Tabs.Content
-            value="simulate"
-            id="panel-simulate"
-            class="h-full"
-          >
-            <ScrollArea id="simulation-scroll" class="h-full" viewportClass="p-4" aria-label="Simulation workspace">
               <SimulateTab
-                onOpenPreview={() => (coilPreviewExpanded = true)}
-                onConfigureWinding={() => { selectTab("design"); coilPreview?.showDesignSettings("routing"); }}
+                open={activeTab === "simulate"}
+                availableHeight={Math.max(0, motorWorkspaceHeight - motorStatusHeight)}
+                onConfigureWinding={() => coilPreview?.showDesignSettings("routing")}
                 {config}
                 active={active && activeTab === "simulate"}
                 {sweep}
@@ -712,8 +699,17 @@
                 onSelectEnds={selectCoilEnds}
                 onUseInferredEnds={useInferredEnds}
               />
-            </ScrollArea>
+              <div class="shrink-0" bind:clientHeight={motorStatusHeight}>
+                <PreviewStatus {config} {motion} stats={computePreviewSummary(activeCoils)} />
+              </div>
           </Tabs.Content>
+          {:else}
+            <Tabs.Content value="design" id="panel-design" class="h-full">
+              <ScrollArea id="sensor-settings-scroll" class="h-full" viewportClass="p-4 lg:pl-2" aria-label="Sensor settings">
+                <SensorTab store={sensorStore} />
+              </ScrollArea>
+            </Tabs.Content>
+          {/if}
         </div>
       </div>
 

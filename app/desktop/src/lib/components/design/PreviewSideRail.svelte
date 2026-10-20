@@ -15,7 +15,7 @@
    */
   import { fly } from "svelte/transition";
   import { onDestroy } from "svelte";
-  import { Layers, SlidersHorizontal, X, Plug, CircuitBoard, Ruler, Route, Magnet } from "@lucide/svelte";
+  import { Layers, SlidersHorizontal, X, Plug, CircuitBoard, Ruler, Route, Magnet, Gauge } from "@lucide/svelte";
   import type { Snippet } from "svelte";
   import { DESIGN_PANELS, isDesignPanel, isLeftPanel, type DesignPanelId, type PreviewPanelId } from "./previewPanels";
   import CoilTerminalPanel from "./CoilTerminalPanel.svelte";
@@ -84,7 +84,7 @@
   let railEl: HTMLDivElement | null = $state(null);
   const triggers: Partial<Record<PreviewPanelId, HTMLButtonElement | null>> = {};
   const panelClass = $derived(`absolute bottom-0 top-0 z-30 flex w-60 flex-col overflow-hidden border-slate-700 bg-slate-900 text-slate-200 ${designOnly ? 'left-full max-w-[calc(100vw-8.25rem)] border-r shadow-[12px_0_20px_-8px_rgba(0,0,0,0.4)] [clip-path:inset(0_-32px_0_0)]' : 'right-full max-w-[calc(100vw-6rem)] border-l shadow-xl shadow-black/40'}`);
-  const designIcons = { constraints: Ruler, stackup: Layers, routing: Route, magnets: Magnet };
+  const designIcons = { constraints: Ruler, stackup: Layers, routing: Route, magnets: Magnet, drive: Gauge };
   const activeDesignPanel = $derived(DESIGN_PANELS.find(({ id }) => id === open));
   onDestroy(() => { if (!drawingOnly) { terminalTool?.cancel(); view.terminalPanelOpen = false; } });
   // An outside request (the Simulation tab's ends alert) sets

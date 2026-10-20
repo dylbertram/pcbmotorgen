@@ -1088,3 +1088,16 @@ test("routing source shows the imported filename in its trigger and dropdown aft
   await page.getByRole("button", { name: "Design settings", exact: true }).click();
   await expect(source).toContainText("coil-leads.dxf");
 });
+
+test("reviewing coil ends keeps the simulation results dock open", async ({ page }) => {
+  const imported = await openImport(page);
+  await imported.getByRole("button", { name: "Open with this geometry" }).click();
+  await page.getByRole("tab", { name: /^Simulate/i }).click();
+  const dock = page.getByRole("region", { name: "Simulation results", exact: true });
+  const notice = dock.getByRole("status", { name: "Inferred coil ends", exact: true });
+  await notice.getByRole("button", { name: "Review", exact: true }).click();
+  await expect(dock).toBeVisible();
+  await expect(page.getByRole("tab", { name: /^Simulate/i })).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByRole("dialog", { name: "Coil terminals", exact: true })).toBeVisible();
+  await expect(page.getByRole("toolbar", { name: "Design side tools", exact: true }).getByRole("button", { name: "Set coil terminals", exact: true })).toHaveAttribute("aria-expanded", "true");
+});

@@ -11,7 +11,7 @@
 
   const commutationLabel = (mode: CommutationMode): string => COMMUTATION_LABELS[mode];
 
-  let { result }: { result: ForceSweepResult | null } = $props();
+  let { result, embedded = false }: { result: ForceSweepResult | null; embedded?: boolean } = $props();
 
   const W = 760;
   const H = 240;
@@ -44,7 +44,7 @@
   });
 </script>
 
-<div class="rounded-lg bg-slate-800/40 border border-slate-700 p-4">
+<div class={embedded ? "flex h-full min-h-0 flex-col" : "rounded-lg bg-slate-800/40 border border-slate-700 p-4"}>
   <div class="flex items-center justify-between mb-2">
     <h3 class="text-sm font-semibold text-slate-200">Thrust vs. position</h3>
     {#if result}
@@ -54,7 +54,7 @@
     {/if}
   </div>
 
-  <svg viewBox="0 0 {W} {H}" class="w-full h-auto" role="img" aria-label="Thrust sweep plot">
+  <svg viewBox="0 0 {W} {H}" class={embedded ? "min-h-0 w-full flex-1" : "w-full h-auto"} role="img" aria-label="Thrust sweep plot">
     {#if plot}
       <!-- grid -->
       {#each plot.yTicks as t (t.v)}
