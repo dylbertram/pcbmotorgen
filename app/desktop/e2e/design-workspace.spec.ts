@@ -9,6 +9,46 @@ const sections = [
   { name: "Magnets", heading: "magnets-heading" },
 ];
 
+test("magnet visualizer uses true scale and copper heading sits below its divider", async ({ page }, testInfo) => {
+  await gotoDesignApp(page);
+  const tools = page.getByRole("toolbar", { name: "Design side tools", exact: true });
+  await tools.getByRole("button", { name: "Magnets", exact: true }).click();
+  const diagram = page.getByRole("img", { name: "Magnet array, three-quarter view at true scale", exact: true });
+  await expect(diagram).toBeVisible();
+  await expect(diagram.locator('[data-solid="magnet"]')).toHaveCount(12);
+  await expect(diagram.locator('[data-gap]')).toHaveText("Gap 1.5 mm");
+  const first = diagram.locator('[data-index="0"]');
+  const second = diagram.locator('[data-index="1"]');
+  expect(Number(await second.getAttribute("data-x-mm")) - Number(await first.getAttribute("data-length-mm"))).toBe(1.5);
+  const width = page.getByRole("spinbutton", { name: "X Length (mm), magnet length along the travel axis", exact: true });
+  await width.fill("5");
+  await width.press("Enter");
+  await expect(diagram.locator('[data-gap]')).toHaveText("Gap 1.0 mm");
+  await expect(first).toHaveAttribute("data-length-mm", "5");
+  await width.fill("4.5");
+  await width.press("Enter");
+  const count = page.getByRole("spinbutton", { name: "Magnet count", exact: true });
+  await count.fill("8");
+  await count.press("Enter");
+  await expect(diagram.locator('[data-solid="magnet"]')).toHaveCount(8);
+  const thickness = page.getByRole("spinbutton", { name: "Z Thickness (mm), magnetisation-axis thickness", exact: true });
+  await thickness.fill("4.5");
+  await thickness.press("Enter");
+  await expect(diagram.locator('[data-axis="Z"] text')).toHaveText("Z 4.5 mm");
+  const axisLength = async (axis: string) => diagram.locator(`[data-axis="${axis}"] line`).evaluate((line) => {
+    const value = (name: string) => Number(line.getAttribute(name));
+    return Math.hypot(value("x2") - value("x1"), value("y2") - value("y1"));
+  });
+  // The default X length and edited Z thickness are equal, so their projected edges must be equal.
+  expect(await axisLength("Z")).toBeCloseTo(await axisLength("X"), 5);
+  await page.screenshot({ path: testInfo.outputPath("magnet-visualizer.png") });
+  await tools.getByRole("button", { name: "Routing", exact: true }).click();
+  const copper = page.getByRole("region", { name: "Copper", exact: true });
+  const heading = copper.getByRole("heading", { name: "Copper", exact: true });
+  await heading.scrollIntoViewIfNeeded();
+  expect((await heading.boundingBox())!.y - (await copper.boundingBox())!.y).toBeGreaterThanOrEqual(12);
+});
+
 test("each design section has its own left-side button and panel", async ({ page }, testInfo) => {
   await gotoDesignApp(page);
   const workspace = page.getByRole("region", { name: "Coil design workspace", exact: true });
