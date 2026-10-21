@@ -32,8 +32,13 @@ def run(command, work, log):
     receipt = {"command": command, "status": "running", "timeout_seconds": timeout,
                "cleanup_scope": "owned-posix-process-group" if os.name=='posix' else "single-process-descendants-unqualified"}
     receipt_path = work / (log+".command.json")
-    receipt_path.write_text(json.dumps(receipt, indent=2)+"\n")
-    with (work / log).open('w') as output:
+    if (work / log).exists():
+        raise FileExistsError('Preserve solver evidence; use a new log name')
+    # Exclusive receipt creation reserves this job name even for simultaneous
+    # retries. A duplicate must not truncate an active/completed job's evidence.
+    with receipt_path.open('x') as reserved:
+        reserved.write(json.dumps(receipt, indent=2)+"\n")
+    with (work / log).open('x') as output:
         try:
             child_environment=os.environ.copy()
             child_environment['PCB_MOTOR_COMMAND_RECEIPT']=str(receipt_path.resolve())

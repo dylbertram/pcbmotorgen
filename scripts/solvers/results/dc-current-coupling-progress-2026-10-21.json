@@ -1,5 +1,5 @@
 {
-  "status": "zero-current-refinement-and-independent-formulation-passed-current-controls-pending",
+  "status": "full-material-current-source-cache-and-zero-current-controls-passed-coupled-matrix-running",
   "goal": "Qualify static DC winding-magnet-shield coupling from actual supported generated/imported geometry, then integrate only qualified capabilities.",
   "archive_root": "$HOME/.local/opt/solver-prototypes-macos",
   "current_branch": "simulation/add-femm-and-improve",
@@ -107,6 +107,18 @@
     "full_cache_v1": "Unaccepted SIGTRAP/native heap corruption after opening evaluations of57.823s and293.594s. Preserve dc-source-material-cache-degree8-v1-20261021 summary/log/failed receipt and macOS Python-2026-10-21-133808.ips.",
     "storage_repair": "Avoid Python MeshPoint-array evaluation of IntegrationRuleSpace. Validate exact DOF readback and native per-element integral moments; extract material moments using native IR test functions. Actual44160point storage control and thin-material degree8regression pass.",
     "retry": "degree8-v2 rejected after403.042s because source implementation changed during preparation; preserve failed receipt. Numerical gates passed with max opening change0.019168160950859665 and direct difference0.0006651192335648752; native storage error5.9294610389669935e-15. None overrides snapshot failure. degree8-v3 launched under900s process cap with1500s forecast allowance, based on measured403s prior runtime.",
+    "accepted_full_cache": {
+      "work": "dc-source-material-cache-degree8-v3-20261021",
+      "summary_sha256": "be6d1b6ac566a7575ca2258b7d67cfccf68a164e16b4e831b2e695f5cfd40ad7",
+      "seconds": 421.28741450002417,
+      "points": 44160,
+      "maximum_pointwise_opening_relative_change": 0.019168160950859665,
+      "maximum_direct_reference_relative_difference": 0.0006651192335648752,
+      "maximum_relative_storage_error": 5.9294610389669935e-15,
+      "scope": "Exact physical material quadrature only; immutable snapshots and whole receipt passed. Acceleration checked against direct finite-cell fields at64declared points; not an independent current solve or force-convergence claim."
+    },
+    "refined_material_preflight": "71070points, forecast1991.688s; passed2%/5%gates. Refined full cache launched under2400s cap.",
+    "degree10_preflight": "207360points, forecast5986.242s; passed2%/5%gates. Full degree10cache not yet launched.",
     "helper_verification": "343tests passed, zero skips,34.327s in dc-native-rule-repair-all-helpers-v1-20261021.log.",
     "remaining": "Whole accepted full-material cache, vacuum/linear/nonlinear current states, mover poses, source/force quadrature and mesh/domain refinement, independent magnetic formulation, supported geometry coverage and app integration."
   },
@@ -127,10 +139,54 @@
     "degree8_to10_force_relative_change": 7.883387403905941e-7,
     "domain004_to006_force_relative_change": 0.0029510095301395777,
     "force_floor_n": 1e-8,
+    "zero_current_pose_controls": {
+      "offset_x_m": [0.0001, -0.0001],
+      "plus100um_formulation_relative_difference": 0.011864867448685461,
+      "minus100um_formulation_relative_difference": 0.01260809372427105,
+      "reports": ["dc-zero-current-formulation-plus100um-v2-20261021.json", "dc-zero-current-formulation-minus100um-v2-20261021.json"],
+      "scope": "Explicit recorded lateral PM translations only. Original inputs and copper/backplane positions unchanged. Both formulations pass force balance and5%agreement; current-driven pose matrix and pose mesh/domain refinement remain pending.",
+      "preserved_failure": "vector-plus100um-v1 passed numerical controls but was rejected because implementation changed during solve. Duplicate v2 invocation refused existing work with exit2 but collided with old supervisor log names. Accepted clean pose states now use v3 whole jobs under the exclusive-log supervisor; v2 comparisons link those v3 states. Earlier artifacts preserved."
+    },
     "gates": "Unchanged2%refinement and5%independent-formulation force-vector agreement. Near-zero floor applies to absolute difference. Current-induced force must pass separately from total bias.",
     "reports": ["dc-zero-current-formulation-coarse-v1-20261021.json", "dc-zero-current-formulation-refined-v1-20261021.json", "dc-zero-current-vector-mesh-control-v1-20261021.json", "dc-zero-current-scalar-mesh-control-v1-20261021.json", "dc-zero-current-degree-control-v1-20261021.json", "dc-zero-current-domain-control-v1-20261021.json"],
     "helper_verification": "349tests pass with zero skips in33.210s, dc-scalar-and-force-comparison-helpers-v2-20261021.log.",
     "remaining": "These are zero-current controls only. Nonzero-current linear/nonlinear magnitude/polarity and mover-pose force matrices, their source/mesh/domain/quadrature/ref controls, supported geometry coverage and app integration remain unqualified."
+  },
+  "current_controls_in_progress": {
+    "vacuum_work": "dc-finite-current-vacuum-vector-v2-20261021",
+    "vacuum_summary_sha256": "ab07c3e09ab1ef32ef8d2cf4b199ecb8cfc14735a294e96678fcc6255e9fc13a",
+    "vacuum_currents_a": [0.0, 0.1, -0.1, 0.5, -0.5],
+    "vacuum_scope": "Passed vacuum/bare-source limit with exact linear polarity parity and combined stationary/PM balance. Does not qualify material coupling.",
+    "material_matrix": "Vector and scalar linear/nonlinear local solve/balance pilots completed at0,+/-0.1,+/-0.5loop A. Vector runtimes19.519s linear and114.660s nonlinear; scalar24.420s linear and236.186s nonlinear. Independent nonlinear comparison passes; initial linear comparison fails and prevents coupled capability acceptance.",
+    "nonlinear_formulation_comparison": {
+      "report": "dc-finite-current-nonlinear-formulation-v1-20261021.json",
+      "report_sha256": "8b9e5395083751bcc4a4926a99237421f11156d7792d00d28f59aea7a130cad5",
+      "maximum_total_force_relative_difference": 0.012407629944452783,
+      "maximum_current_induced_force_relative_difference": 0.0018513530848496844,
+      "scope": "One actual geometry/PM pose/material rule; shared prescribed finite-current source, independent magnetic unknowns. Mesh/domain/quadrature/pose controls for current-driven force remain pending."
+    },
+    "failed_linear_formulation_comparison": {
+      "report": "dc-finite-current-linear-formulation-v1-20261021.json",
+      "approximate_total_relative_difference": 0.2533,
+      "current_induced_relative_difference": 0.11107368470821526,
+      "gate": 0.05,
+      "action": "Preserve failed comparison. Vector order2 and scalar order3 matrices completed and agree below5%, but scalar order2-to3 refinement fails2%. Do not relax gates or substitute nonlinear agreement for the unconverged linear limit."
+    },
+    "higher_order_linear_controls": {
+      "formulation_report": "dc-finite-current-linear-order2-order3-formulation-v1-20261021.json",
+      "maximum_total_formulation_relative_difference": 0.011340399345460841,
+      "maximum_current_induced_formulation_relative_difference": 0.005006078434913227,
+      "failed_refinement_report": "dc-finite-current-linear-scalar-order-control-v1-20261021.json",
+      "maximum_total_scalar_order2_to3_relative_change": 0.1475731847754691,
+      "maximum_current_induced_scalar_order2_to3_relative_change": 0.06693673075575561,
+      "scope": "Higher-order magnetic formulations agree, but the2%linear refinement gate is not established. Continue physical mesh/basis controls with unchanged parameters and source."
+    },
+    "vector_works": ["dc-finite-current-linear-vector-v2-20261021", "dc-finite-current-nonlinear-vector-v2-20261021"],
+    "degree6_source_control": "Full degree6cache passed in251.877s under900s cap after672.771s forecast. Nonlinear vector degree6matrix running to compare current-induced forces against degree8. Degree10full-cache work remains unperformed, not silently counted.",
+    "preserved_input_failure": "vacuum-vector-v1 rejected before solve because runner compared reserialized Netgen file bytes. Corrected to require and reload the exact original mesh hash consumed by both accepted cache/bias jobs. Regression test rejects a different original mesh; no mesh-identity assumption based on counts.",
+    "evidence_safety": "Supervisor now reserves log/receipt names by exclusive creation. Duplicate invocations cannot truncate running/completed evidence. Regression tests cover active receipt, existing log and completed job.",
+    "helper_verification": "352tests pass with zero skips in28.871s, dc-current-pilot-all-helpers-v1-20261021.log.",
+    "remaining": "Current-dependent force matrix and independent agreement, current force mesh/domain/quadrature/source-opening controls, current-driven pose matrix, general supported geometry coverage and app integration."
   },
   "historical_evidence_correction": {
     "release_helpers_v1": "306 discovered, 4 skipped, 302 passed; original logs/manifests preserved.",

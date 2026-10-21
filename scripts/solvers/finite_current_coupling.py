@@ -60,6 +60,17 @@ def current_pairs(currents):
     return sorted({abs(x) for x in currents if x > 0 and -x in currents})
 
 
+def cache_mesh_path(cache, bias):
+    path = str(Path(cache['mesh_work'])/'mesh.vol')
+    # Netgen reserialization can change bytes without changing a loaded mesh.
+    # Require the exact original mesh hash consumed by BOTH accepted jobs, and
+    # load that original again. Do not infer identity from counts or geometry.
+    digest = cache['input_hashes'].get(path)
+    if cache['model'] != bias['model'] or not digest or bias['input_hashes'].get(path) != digest:
+        raise ValueError('Current cache and zero-current bias did not consume the same immutable mesh/model')
+    return Path(path)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--cache-work', type=Path, required=True)
@@ -70,6 +81,7 @@ def main():
     parser.add_argument('--mode', choices=['nonlinear', 'linear', 'vacuum'], default='nonlinear')
     parser.add_argument('--formulation', choices=['vector-b', 'scalar-h'], default='vector-b')
     parser.add_argument('--scalar-order', type=int, choices=[1, 2, 3], default=2)
+    parser.add_argument('--vector-order', type=int, choices=[0, 1, 2])
     parser.add_argument('--max-dofs', type=int, default=200000)
     add_thread_option(parser)
     args = parser.parse_args()
@@ -95,8 +107,7 @@ def main():
         raise ValueError('Unaccepted actual finite current source')
     origin = Path(source['source_work'])
     original = json.loads((origin/'summary.json').read_text())
-    if cache['model'] != bias['model'] or cache['input_hashes'].get(str(Path(cache['mesh_work'])/'mesh.vol')) != bias['mesh_sha256']:
-        raise ValueError('Current cache and zero-current bias use different geometry/mesh')
+    original_mesh = cache_mesh_path(cache, bias)
     if bare['source_work'] != str(origin) or bare['source_summary_sha256'] != source['input_hashes'][str(origin/'summary.json')] or bare['source_solution_sha256'] != source['input_hashes'][str(origin/'dc-current-potential.sol')]:
         raise ValueError('Bare PM force belongs to a different physical winding current')
     # Reuse only an exactly matched source/pose, not a similarly named fixture.
@@ -127,9 +138,9 @@ def main():
     if source['version'] != ng.__version__ or bias['version'] != ng.__version__:
         raise ValueError('Coupling engine differs from accepted source/bias')
     model = control_model(cache['model'], args.mode)
-    mesh = ng.Mesh(str(bias_work/'mesh.vol'))
+    mesh = ng.Mesh(str(original_mesh))
     degree = cache['request']['degree']
-    order = bias['request']['order']
+    order = bias['request']['order'] if args.vector_order is None else args.vector_order
     space = (ng.HCurl(mesh, order=order, nograds=True, dirichlet='outer') if args.formulation == 'vector-b'
              else ng.H1(mesh, order=args.scalar_order, dirichlet='outer'))
     if space.ndof > args.max_dofs:

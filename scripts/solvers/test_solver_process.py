@@ -13,6 +13,29 @@ from job_status import process_identity
 
 
 class SolverProcessTest(unittest.TestCase):
+    def test_duplicate_job_cannot_overwrite_completed_receipt_or_log(self):
+        with tempfile.TemporaryDirectory() as directory:
+            work=Path(directory)
+            run([sys.executable,'-c','print("first result")'],work,'once.log')
+            paths=[work/'once.log',work/'once.log.command.json']
+            original=[path.read_bytes() for path in paths]
+            with patch('check_free_space.subprocess.Popen') as spawn:
+                with self.assertRaises(FileExistsError):
+                    run([sys.executable,'-c','print("duplicate")'],work,'once.log')
+                spawn.assert_not_called()
+            self.assertEqual([path.read_bytes() for path in paths],original)
+
+    def test_active_receipt_or_existing_log_reserves_the_job_name(self):
+        for name in ['active.log.command.json','active.log']:
+            with tempfile.TemporaryDirectory() as directory:
+                work=Path(directory);path=work/name
+                path.write_text('preserve active evidence')
+                with patch('check_free_space.subprocess.Popen') as spawn:
+                    with self.assertRaises(FileExistsError):
+                        run([sys.executable,'-c','pass'],work,'active.log')
+                    spawn.assert_not_called()
+                self.assertEqual(path.read_text(),'preserve active evidence')
+
     def assert_stopped(self,pid):
         deadline=time.monotonic()+2
         while True:

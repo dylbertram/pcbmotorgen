@@ -1,10 +1,20 @@
 from copy import deepcopy
 import unittest
 
-from finite_current_coupling import CACHE_UNIT, control_model, current_pairs, validate_cache
+from finite_current_coupling import CACHE_UNIT, control_model, current_pairs, validate_cache, cache_mesh_path
 
 
 class FiniteCurrentCouplingInputTest(unittest.TestCase):
+    def test_exact_consumed_mesh_not_reserialization_bytes_establishes_identity(self):
+        cache = {'model': {'case': 'actual'}, 'mesh_work': '/case/original',
+                 'input_hashes': {'/case/original/mesh.vol': 'immutable-original'}}
+        bias = {'model': cache['model'], 'mesh_sha256': 'reserialized',
+                'input_hashes': dict(cache['input_hashes'])}
+        self.assertEqual(str(cache_mesh_path(cache, bias)), '/case/original/mesh.vol')
+        bias['input_hashes']['/case/original/mesh.vol'] = 'different-original'
+        with self.assertRaises(ValueError):
+            cache_mesh_path(cache, bias)
+
     def cache(self):
         return dict(status='passed-finite-source-material-quadrature-only', failures=[], unit=CACHE_UNIT,
                     evaluated_points=100, total_material_points=100,

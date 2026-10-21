@@ -122,6 +122,36 @@ source cache completed numerical checks and native storage but correctly rejecte
 an implementation change during its run. Preserve that failed receipt; repeat
 with unchanged snapshots rather than overriding its status.
 
+The full degree-8 source cache now passes on all 44,160 material points, with
+1.917% worst opening refinement, 0.06652% direct spot-check difference and
+5.93e-15 native storage error. It completed in 421.3 s. This remains a numerical
+cache for one mesh/rule, not a force-convergence result. The vacuum and linear/
+nonlinear vector-B pilots now pass at 0, +/-0.1 and +/-0.5 loop A. Preserve their
+recorded-case scope until independent and current-dependent refinement matrices
+pass. Linear current parity and current-induced balance are separate controls.
+
+Solver supervisors reserve log/receipt names exclusively. Reusing a name fails
+before spawning and cannot truncate active or completed evidence. Use a fresh
+name for every retry. A loaded Netgen mesh may serialize to different bytes;
+coupled jobs therefore require and reload the exact original mesh hash consumed
+by both accepted source-cache and bias jobs, rather than accepting count-only
+identity or comparing a reserialized copy as if it were the original.
+
+The initial nonlinear current/polarity matrix passes independent scalar-H versus
+vector-B force comparison at 0, +/-0.1 and +/-0.5 loop A. Worst total-force
+difference is 1.241%, and worst current-induced difference is 0.1852%, below 5%.
+This does not override the failed linear-material control: the first linear
+comparison differs by about 25.3% in total force and 11.1% in current-induced
+force. Both failures remain archived. Higher magnetic basis orders and physical
+mesh controls are being checked without changing source geometry, constitutive
+parameters, near-zero floors or agreement gates. Do not expose this pilot as a
+qualified app capability until that limit and all current-dependent controls pass.
+The higher-order linear vector-B order-2/scalar-H order-3 comparison passes at
+1.134% total and 0.5007% current-induced difference, but scalar order-2/3 refinement
+still fails at 14.76% total and 6.694% current-induced change. Agreement alone does
+not override that unconverged linear control. The degree-6 material source cache
+passes in 251.9 s and enables a separate degree-6/8 coupled force comparison.
+
 Evidence correction: earlier 306-test helper logs included four or five skipped
 tests, not 306 passes. Preserve those logs and historical delivery manifests.
 A fresh explicit NGSolve/PyAMG/Rust-entrypoint run covers the omitted checks.
