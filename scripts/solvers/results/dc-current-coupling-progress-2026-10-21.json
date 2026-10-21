@@ -481,12 +481,23 @@
       "checkpoints": "New meshing-progress.json distinguishes retained-CAD loading/identity verification, native meshing, and the legacy Boolean stages. The actual retry passed CAD identity in10.38s and entered native mesh generation. A successful mesh-only checkpoint can later supply only verified mesh/CAD bytes to a fresh DC solve; reused meshes are not reserialized and all solves consume exact saved/reloaded mesh bytes.",
       "long_retry": {
         "work": "dc-imported-star4-curvature4-mesh-v3-long-20261021",
-        "status": "Launched fresh identical mesh-only curvature4 attempt with10800s whole-job cap. Pending, not numerical acceptance.",
+        "status": "Failed at declared12M-DOF pre-assembly resource cap after saving refined mesh. Native meshing completed in2817.275s, job2858.544s. No current-system assembly or field. Mesh-only input checkpoint can be audited/reused only under existing hash/receipt guards.",
+        "summary_sha256": "e43d9971967ae0392ecf4495ad2eb52f896210e2e7262833a419796c10c80fff",
+        "mesh_sha256": "9fea3a8dc720d9265c1b284b29a491f8eb3922a91429c81bb9325a73c1bd7dc4",
+        "mesh_elements": 5433450,
+        "mesh_vertices": 1880974,
+        "estimated_mixed_dofs": 18182843,
+        "mesh_volume_relative_error": 0.0014428277766256326,
+        "seconds": 2858.544447250082,
+        "wall_seconds": 2859.59,
+        "max_rss_bytes": 5246042112,
+        "peak_memory_footprint_bytes": 11801863792,
         "timeout_s": 10800,
         "threads": 2,
         "max_dofs_before_assembly": 12000000,
         "reason": "Measured native meshing exceeded1800s; user approved12h compute window. Source/CAD/drive/mesh-size/curvature and gates unchanged. No files or failed fields imported from timed-out jobs. Launch explicitly checked three-hour budget fits before2026-10-22T06:53:31Z.",
-        "watcher": "dc-coupling-watch-12h-window-20261021-v1/long-mesh-watch checks every30s for errors/ends/stale identity or low-CPU stalls. Original background completion notification remains enabled."
+        "watcher": "long-mesh-watch caught the pre-assembly resource-cap failure at19:57:22Z. Original background completion notification also received; no idle hours after failure.",
+        "next_area_audit": "dc-imported-star4-curvature4-all-section-areas-v1-20261021.json now running with3600s bound and30s refined-area-watch. Audits all1511existing eligible active/passive/native-arc/full-stub areas before any decision to increase assembly cap. Actual18.18M-DOF solve memory is not measured; previous coarse current jobs and refined mesh peak footprint are not a proof it fits24GiB RAM."
       }
     },
     "preserved_trials": [
