@@ -1,11 +1,11 @@
 {
-  "status": "approved-disjoint-geometry-current-source-qualification-pending",
+  "status": "recorded-finite-current-source-pilot-verified-coupled-controls-pending",
   "goal": "Qualify static DC winding-magnet-shield coupling from actual supported generated/imported geometry, then integrate only qualified capabilities.",
   "archive_root": "$HOME/.local/opt/solver-prototypes-macos",
   "current_branch": "simulation/add-femm-and-improve",
   "priorities": {
     "DC03": "User approved35um nominal copper-surface/ferrite clearance without explicit soldermask and moving ferrite/housing together. Derived geometry passes zero-overlap, exact BRep distance, unchanged layer-volume/internal-gap checks. FE interface tagging still pending.",
-    "current_source": "Existing recorded compatible HDiv source/global/current/area controls and recent coarse spatial-loss controls retained; broader branch/local-current qualification remains incomplete.",
+    "current_source": "All501eligible signed winding sections pass unchanged2%area/5%graph-current gates. Exact affine RT0 export and six-point finite-volume magnetic integration pilot pass. This is recorded-case source evidence, not arbitrary geometry or every local/junction field.",
     "nonlinear_forces": "Not started under the new goal; approved disjoint geometry is available, but source qualification and coupled FE interface/field controls remain. Preserve zero-current/linear limits, force balance, 2% refinement and 5% independent-reference gates with explicit floors.",
     "app_integration": "Not started; preserve existing housing screening/UI and request lifecycle. Do not expose unqualified coupled outputs."
   },
@@ -41,7 +41,7 @@
     "scope": "Geometry approval/verification only, not coupled-field or hardware qualification."
   },
   "current_source_expanded_audit": {
-    "status": "running-not-accepted-from-partial-results",
+    "status": "passed-whole-501-eligible-section-audit",
     "source": "finite-copper-star2-v1-dc-curvature4-amg-20261020",
     "report": "dc-source-curvature4-all-eligible-sections-20261021.json",
     "eligible_trace_sections": 239,
@@ -50,9 +50,36 @@
     "historical_18_section_runtime_s": 17.393242542049848,
     "linear_forecast_s": 484.10516666666666,
     "timeout_cap_s": 900,
+    "whole_receipt_seconds": 139.41253170801792,
+    "maximum_area_relative_error": 0.01910599404085378,
+    "maximum_graph_current_relative_difference": 0.0017013551459465833,
+    "failures": [],
+    "report_sha256": "4bbd53ddcd1a487266617a6559fbe732415e4b75f87b3ba414156288c76f6d1e",
     "eligibility_limit": "Active phases only; longest straight trace piece>=1mm; aggregate physical vias; absolute expected share>0.05. Not every pointwise/junction/near-zero field.",
     "gates": "Unchanged2%area/5%independent graph-current agreement with1e-8 per-loop current floor.",
     "helper_verification": "319tests pass with no skips in29.517s, dc-source-all-eligible-all-helpers-v1-20261021.log."
+  },
+  "finite_current_source": {
+    "export_work": "dc-source-curvature4-rt0-export-v1-20261021",
+    "export_summary_sha256": "e2bcc3d0810f7d67cb60d2c7408e334fa04d3c27b285c85d4a9d9c65a9ac9aad",
+    "cells": 1707719,
+    "representation": "Every affine tetrahedron plus mean J and radial RT0 coefficient; no centreline, radius fit, nodal smoothing or dropped divergence term.",
+    "export_seconds": 14.646635042037815,
+    "power_relative_reload_error": 6.961098364399732e-14,
+    "net_current_relative_error": 1.0125208687057076e-16,
+    "maximum_64_cell_held_out_affine_identity_error": 3.919319471057982e-15,
+    "field_method": "Analytical exterior cell-face Coulomb integrals for the exact affine RT0 Biot-Savart volume source; caller must retain source continuity and source/force controls.",
+    "pilot_work": "dc-source-finite-field-pilot-v2-20261021",
+    "pilot_summary_sha256": "2047d4ccfb3f007b385364b4416fab785f8c2443305c26bf9d16c4a794e4b4ef",
+    "pilot_points": 6,
+    "pilot_scope": "Deterministic actual lower-trace locations projected to approved ferrite top and middle. Integration-kernel comparison sharing the saved current source, not an independent current/magnetic solve or full material-domain qualification.",
+    "pilot_seconds": 83.32451316691004,
+    "maximum_order8_to10_volume_quadrature_relative_change": 0.00436537774970231,
+    "maximum_analytical_vs_volume_relative_difference": 0.0008434520381494711,
+    "field_floor_t": 1e-12,
+    "gates": "Unchanged2%quadrature refinement and5%integration agreement. No physical error-bar claim.",
+    "helper_tests": "330passed/0skips in28.585s, dc-finite-source-green-all-helpers-v1-20261021.log.",
+    "remaining": "Material FEinterface/gauge/zero-current controls, source-field cache/runtime controls across actual material quadrature, nonlinear current/polarity/pose force and independent-reference verification, general supported geometry and app integration."
   },
   "historical_evidence_correction": {
     "release_helpers_v1": "306 discovered, 4 skipped, 302 passed; original logs/manifests preserved.",
@@ -64,7 +91,9 @@
     "guard": "Packaging verifier now rejects skipped/partial/failed unittest logs as a declared all-pass inventory. No further delivery bundling."
   },
   "preserved_trials": [
-    "Decision-v1 exact volume passed; picture clipping was applied before axes insertion and was overwritten. Decision-v2 sets the physical clip afterward, with a regression test; both receipts/pictures remain archived."
+    "Decision-v1 exact volume passed; picture clipping was applied before axes insertion and was overwritten. Decision-v2 sets the physical clip afterward, with a regression test; both receipts/pictures remain archived.",
+    "New kernel unit trials stopped on insufficient independent near-face quadrature convergence. Increased reference integration order, kept all tolerances unchanged. Final8kernel tests pass, including thin-copper35um-clearance and affine RT0 terms.",
+    "Field pilot-v1 analytical/volume agreement was within5%, but volume orders4/6 changed up to3.166% and failed the2%gate. Preserved unaccepted. Pilot-v2 uses orders6/8/10 and passes unchanged2%/5%gates."
   ],
   "boundaries": "No silent material priority or physical correction; roots, original evidence, merged UI and Mutagen preserved. No fitted constants. Inductance, reversal, thermal and hardware qualification remain separate. Commit verified milestones on the current branch; do not push or create bundles."
 }

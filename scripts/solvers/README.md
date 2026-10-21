@@ -43,6 +43,22 @@ at least 1 mm, merged physical via locations and expected signed share above
 junction-interior fields. A running checkpoint is written every ten sections;
 only the final report and whole successful receipt establish acceptance.
 
+`export_rt0_current_source.py --current-work ACCEPTED_CURRENT --work NEW_SOURCE`
+exports every affine source tetrahedron and its exact RT0 coefficients, retaining
+`J(y)=mean_J+slope*(y-cell_centroid)`. Source volume, power, mean-current and
+held-out polynomial identities are checked against the immutable saved solution.
+No constant-cell approximation or line-current replacement is made.
+
+`finite_tetra_current_field.py` integrates that finite source analytically via
+outward triangle potentials and the divergence theorem. It rejects observations
+inside/on copper and uses neither softening nor fitted radii. Unit tests compare
+independent Gauss/Duffy volume integration, near-face/thin-copper geometry,
+orientation/scaling and the affine term. The kernel is not a coupled solver.
+`audit_finite_current_source_field.py --source-work SOURCE --material-work APPROVED_GEOMETRY --section-audit WHOLE_SECTION_AUDIT --work NEW_PILOT --orders 6 8 10`
+compares it with separately refined tetrahedron volume quadrature at explicit
+physical material pilot points. A passing pilot is not full-domain source-field,
+nonlinear force, material, hardware or arbitrary-CAD qualification.
+
 Evidence correction: earlier 306-test helper logs included four or five skipped
 tests, not 306 passes. Preserve those logs and historical delivery manifests.
 A fresh explicit NGSolve/PyAMG/Rust-entrypoint run covers the omitted checks.
