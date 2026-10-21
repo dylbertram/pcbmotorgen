@@ -182,7 +182,14 @@
       "scope": "Higher-order magnetic formulations agree, but the2%linear refinement gate is not established. Continue physical mesh/basis controls with unchanged parameters and source."
     },
     "vector_works": ["dc-finite-current-linear-vector-v2-20261021", "dc-finite-current-nonlinear-vector-v2-20261021"],
-    "degree6_source_control": "Full degree6cache passed in251.877s under900s cap after672.771s forecast. Nonlinear vector degree6matrix running to compare current-induced forces against degree8. Degree10full-cache work remains unperformed, not silently counted.",
+    "degree6_source_control": "Full degree6cache passed in251.877s under900s cap after672.771s forecast. Nonlinear vector degree6matrix and degree6/8force comparison passed. Degree10full-cache work remains unperformed, not silently counted.",
+    "nonlinear_quadrature_control": {
+      "report": "dc-finite-current-nonlinear-degree6-8-control-v1-20261021.json",
+      "maximum_total_force_relative_change": 4.42351685419795e-6,
+      "maximum_current_induced_force_relative_change": 0.00015141587769495042,
+      "gate": 0.02,
+      "scope": "Recorded PM pose and0,+/-0.1,+/-0.5loop A, same physical mesh/source. This passes quadrature refinement only, not current-driven spatial/domain/pose controls or the unconverged linear-material limit."
+    },
     "preserved_input_failure": "vacuum-vector-v1 rejected before solve because runner compared reserialized Netgen file bytes. Corrected to require and reload the exact original mesh hash consumed by both accepted cache/bias jobs. Regression test rejects a different original mesh; no mesh-identity assumption based on counts.",
     "evidence_safety": "Supervisor now reserves log/receipt names by exclusive creation. Duplicate invocations cannot truncate running/completed evidence. Regression tests cover active receipt, existing log and completed job.",
     "helper_verification": "352tests pass with zero skips in28.871s, dc-current-pilot-all-helpers-v1-20261021.log.",
