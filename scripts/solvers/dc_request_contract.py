@@ -54,12 +54,14 @@ def geometry_descriptor(snapshot):
     if any(snapshot['routing'].get(key) for key in ['curves', 'splines', 'io_traces', 'io_pads']):
         raise UnsupportedDcRequest('Curved/spline/IO copper is outside this finite-DC qualification')
     networks = sorted(snapshot['networks'], key=lambda item: item['net'])
-    if not networks or len({network['net'] for network in networks}) != len(networks):
+    if not networks or len(networks) > 64 or len({network['net'] for network in networks}) != len(networks):
         raise UnsupportedDcRequest('Unique physical winding networks required')
     for network in networks:
         count = network['node_count']
         if type(count) is not int or count < 2 or not network['edges']:
             raise UnsupportedDcRequest('Explicit nonempty physical winding graph required')
+        if count > 2048 or len(network['edges']) > 10000:
+            raise UnsupportedDcRequest('Actual DC graph exceeds the declared preparation resource cap; no truncation applied')
         indices = [index for edge in network['edges'] for index in [edge['a'], edge['b']]]+network['terminal']+network['star']
         if any(type(index) is not int or not 0 <= index < count for index in indices):
             raise UnsupportedDcRequest('Winding graph node indices must be explicit valid integers')

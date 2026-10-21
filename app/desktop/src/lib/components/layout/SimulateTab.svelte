@@ -12,6 +12,7 @@
   import ForceSweepPlot from "../simulate/ForceSweepPlot.svelte";
   import MetricsPanel from "../simulate/MetricsPanel.svelte";
   import DriverSuitability from "../simulate/DriverSuitability.svelte";
+  import DcCouplingPanel from "../simulate/DcCouplingPanel.svelte";
 
   let { config, active, open, availableHeight, sweep, friction, height, drive,
     driveError = null, error, cadGeometry = null, onConfigureWinding,
@@ -37,6 +38,7 @@
     { id: "thrust", label: "Thrust vs. position" },
     { id: "driver", label: "Driver suitability" },
     { id: "summary", label: "Summary (live metrics)" },
+    { id: "dc", label: "Static DC (experimental)" },
   ];
   let selected = $state("flux");
   let requestedHeight = $state(320);
@@ -161,6 +163,9 @@
     <Tabs.Content value="summary" data-dock-panel="summary" class="min-h-0 flex-1 overflow-auto p-3">
       {@render warnings()}
       <MetricsPanel {config} {sweep} {friction} {height} />
+    </Tabs.Content>
+    <Tabs.Content value="dc" data-dock-panel="dc" class="min-h-0 flex-1 overflow-auto p-3">
+      <DcCouplingPanel {config} {cadGeometry} active={active && open && !collapsed && selected === "dc"} />
     </Tabs.Content>
     </div>
   </Tabs.Root>

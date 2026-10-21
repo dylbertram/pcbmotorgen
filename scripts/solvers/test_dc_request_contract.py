@@ -35,6 +35,12 @@ class LiveDcRequestTest(unittest.TestCase):
         self.assertNotIn('force_n', result)
         self.assertEqual(request, before)
 
+    def test_oversized_graph_is_rejected_before_allocating_a_current_solve(self):
+        request, fixture, model, closure = self.inputs()
+        request['winding']['networks'][0]['node_count'] = 1000000000
+        with self.assertRaisesRegex(UnsupportedDcRequest, 'resource cap'):
+            validate_request(request, fixture, model, closure, 'qualified-basis')
+
     def test_unsupported_current_pose_return_material_or_unknown_fields_rejected(self):
         for key, value in [('current_a', True), ('current_a', .2), ('pm_offset_x_m', 1e-5),
                            ('placement_acknowledged', False), ('source_basis_sha256', 'other'),

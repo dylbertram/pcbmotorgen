@@ -2713,12 +2713,14 @@ checksum = "57c0d7b74b563b49d38dae00a0c37d4d6de9b432382b2892f0574ddcae73fd0a"
 name = "pcbmotorgen"
 version = "0.5.0"
 dependencies = [
+ "libc",
  "pcbmotorgen-dfm",
  "pcbmotorgen-export",
  "pcbmotorgen-routing",
  "pcbmotorgen-simulation",
  "serde",
  "serde_json",
+ "sha2",
  "tauri",
  "tauri-build",
  "tauri-plugin-dialog",

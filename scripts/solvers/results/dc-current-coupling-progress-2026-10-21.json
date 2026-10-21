@@ -1,5 +1,5 @@
 {
-  "status": "recorded-case-verified-live-geometry-and-restricted-fresh-worker-tested-force-ui-pending",
+  "status": "recorded-case-managed-worker-and-force-ui-tested-broader-geometry-pending",
   "goal": "Qualify static DC winding-magnet-shield coupling from actual supported generated/imported geometry, then integrate only qualified capabilities.",
   "archive_root": "$HOME/.local/opt/solver-prototypes-macos",
   "current_branch": "simulation/add-femm-and-improve",
@@ -7,7 +7,7 @@
     "DC03": "User approved35um nominal copper-surface/ferrite clearance without explicit soldermask and moving ferrite/housing together. Derived geometry passes zero-overlap, exact BRep distance, unchanged layer-volume/internal-gap checks. Recorded FE material-volume/interface tagging now passes.",
     "current_source": "All501eligible signed winding sections pass unchanged2%area/5%graph-current gates. Exact affine RT0 export and six-point finite-volume magnetic integration pilot pass. This is recorded-case source evidence, not arbitrary geometry or every local/junction field.",
     "nonlinear_forces": "Recorded actual-case matrix at0,+/-0.1,+/-0.5loop A and nominal/+/-100um PM offsets passes solve, total/incremental balance, spatial/domain/quadrature, tighter source-opening and independent magnetic-formulation gates. Higher-order linear/vacuum controls pass; historical low-order failures remain unchanged. Machine audit verifies37magnetic jobs,185saved current states and44control pairs. This is sampled recorded-case evidence, not general geometry, interpolation or componentwise relative-accuracy qualification.",
-    "app_integration": "In progress: production Rust/IPC actual-geometry preparation and exact recorded-case request eligibility implemented; restricted offline live worker recomputes fields/forces rather than replaying archives. Force UI, managed desktop numerical controller, full lifecycle/browser/native interaction and broader geometry qualification remain incomplete. Existing housing screening and merged UI retained."
+    "app_integration": "Restricted recorded-case integration implemented: actual Rust geometry preparation, exact eligibility, managed installed desktop worker and separate experimental static-DC force tab. Fresh saved-design job, explicit unsupported-depth rejection and real numerical-child cancellation pass; UI lifecycle tests use labelled fixtures, not physics evidence. Broader geometry qualification, native-webview interaction and portable solver installation remain unfinished. Existing housing screening and merged UI retained."
   },
   "dc03_evidence": {
     "work": "dc03-copper-ferrite-decision-v2-20261021",
@@ -346,7 +346,37 @@
     "scope": "Only enumerated actual geometry/current basis and sampled current/pose points. Vector-norm gates do not imply componentwise relative error bounds, continuous interpolation, every pointwise copper field or arbitrary CAD. Shared prescribed sources are not an independent electrical-current solve.",
     "app_boundary": "Archived forces must never substitute for live actual-geometry recalculation. This magnetic audit itself does not qualify app integration; subsequent live-geometry preparation and offline fresh-worker work is recorded below. Housing screening, Mutagen and original designs retained. No push or delivery bundles."
   },
+  "managed_desktop_integration": {
+    "scope": "Restricted installed-solver integration for exact registered actual geometry and sampled current/pose states only. This does not qualify arbitrary or broader generated/imported geometry; new geometry is rejected before numerical work. No continuous interpolation, componentwise relative-accuracy, differential-inductance, retained-history reversal, thermal or hardware claim.",
+    "backend": "DcJobs with opt-in host-configured absolute Python/solver/evidence paths. Start command rebuilds actual winding via production geometry preparation from config/drive/CadBoard; IPC cannot select an executable/archive path or replace the winding snapshot. Physical material and finite return declaration/acknowledgement remain explicit. One job at a time, unique preserved evidence directories, bounded owned POSIX process group, no new launches after shutdown.",
+    "timeouts_seconds": {"whole_desktop_job": 360, "nested_supervisor": 350},
+    "cancellation": "desktop_dc_job.py and recalculate_dc_request.py inherit the same owned process group. Cancel/timeout/normal app exit kill that group and reap the owned leader. RAII guard covers monitor closure drop. Successful result publication is serialized against accepted cancellation. Abrupt host termination or power-loss cleanup is not qualified.",
+    "fresh_result_binding": "Host verifies unchanged request bytes/hash, request ID/current/pose, successful worker receipt, finite force vector, fresh magnetic report SHA/status/controls, selected current state's force and solution identity/hash. Failed, cancelled, timed-out, stale or mismatched jobs have no force result. Verifier has negative serialization fixtures, separate from numerical evidence.",
+    "ui": "Static DC (experimental) tab in existing simulation dock, separate from housing/force sweep/driver outputs. Requires explicit material_model/return_geometry JSON and placement acknowledgement; no prefilled geometry, silent stack shift or fixture forces. Clears forces and cancels known/late-starting jobs on physical edits, tab departure or unmount. No browser numerical substitute. Uses current source geometry from the active design.",
+    "real_regression_log": "dc-desktop-managed-real-geometry-v2-20261021.log",
+    "real_success_work": "dc-desktop-jobs/dc-Blj3hb",
+    "real_success_summary_sha256": "5545a01ff8a687bbcd4f32c85d341175108c1dcb1814014284601539b1bb92cc",
+    "desktop_status_hashes": {
+      "dc-desktop-jobs/dc-Blj3hb/desktop-status.json": "aad231c416abb8aa03b4516787125494a31596621193c7f7c55b71a080499e06",
+      "dc-desktop-jobs/dc-YV6A5G/desktop-status.json": "3bd7a50ae0a4318b8a33991d5652289ded0463d1674b9ccbf19c586ebd2feafe",
+      "dc-desktop-jobs/dc-N9y1Uk/desktop-status.json": "100db421f7107fba9078d48ced74e50a57ef55e4d48ebabc277964b95af81b20"
+    },
+    "real_success_seconds": 94.815636875,
+    "real_regression_scope": "Headless production Rust geometry preparation and managed-worker lifecycle, not native WKWebView IPC interaction. Starts from original star_2-layer.pmmotor version1 actual CadBoard routing/graph; only previously approved material placement and declared finite return are copied as explicit study inputs. Rust freshly builds the actual winding snapshot. Existing roots unchanged.",
+    "real_unsupported_work": "dc-desktop-jobs/dc-YV6A5G: changed imported depths rejected before a fresh magnetic directory was created, failed status/no force; previous successful job cannot be queried as the newer job.",
+    "real_cancel_work": "dc-desktop-jobs/dc-N9y1Uk: cancelled after a real magnetic solution state was saved; no force returned; both request-worker and numerical-child receipt PIDs absent or defunct, not live.",
+    "test_results": {
+      "python_helpers": "370passed/0skips in29.151s, dc-desktop-managed-all-helpers-v1-20261021.log. Added bounded-graph rejection before independent current allocation.",
+      "desktop_rust": "113passed,6ignored in36.64s, dc-desktop-managed-rust-all-v1-20261021.log. Includes5new default managed-job tests for nested cancellation/timeout, failure/unverified result suppression, explicit input limits, normal shutdown/late launch rejection and stale/wrong-state/changed-evidence verification. The new external-FEM test is explicitly ignored in ordinary runs and was separately run:1passed/0ignored in117.57s, including success/unsupported/cancel scenarios. Do not call the default ignored inventory all-pass.",
+      "frontend_unit": "470passed,1existing skipped across50files in0.958s, dc-desktop-managed-frontend-unit-v1-20261021.log. Added7view-independent lifecycle tests and3managed-IPC tests. No new browser force mock in production.",
+      "dc_browser": "12passed/0skips in9.8s, dc-desktop-ui-browser-v3-20261021/report.json. UI-fixture-only tests cover browser unavailable/explicit placement, fresh result clearing, unsupported error, late start, racing late force/cancel, tab departure and rejected archived-force input. Earlier capability-refresh failure screenshots retained; capability is refreshed on active-tab entry.",
+      "full_browser": "338passed/0skipped/0flaky/0unexpected in313.204363s, dc-desktop-full-browser-v1-20261021/report.json SHA256 7222e2839d9e9a3b530ef2e93502a827c11a3be1a6989322a7ead13110e45ff4. Includes existing housing/periodic/workspace/UI regressions and12DC lifecycle tests. Final DC-only screenshot-scroll update also verified separately by12/12 v3 run; no production changes after full-suite run.",
+      "frontend_build": "pnpm build passed in4.15s, dc-desktop-managed-frontend-build-v1-20261021.log, with existing large-chunk warning. tsc unavailable in this installation, so no separate TypeScript type-check claim. Official Svelte autofixer reports no issues; effect suggestions reviewed as necessary request-invalidation/async-capability side effects."
+    },
+    "remaining": "Broader substantially different supported source/geometry qualification and registration, native WKWebView interaction and clean portable installed-solver reproduction remain unperformed. This UI does not expose unqualified new geometries. No push or delivery bundles; existing housing methods/material restrictions and Mutagen unchanged."
+  },
   "live_request_integration": {
+    "milestone_scope": "Historical d7b44c4 live-request milestone; its pending UI/controller statements describe that checkpoint. Current integration status and tests are in managed_desktop_integration above.",
     "desktop_command": "prepare_dc_winding_geometry",
     "command_scope": "Production geometry preparation only from actual generated routing or mapped imported CadBoard. Preserves trace polylines, vias, layer depths, terminal choices, copper weights/plating/resistivity and graph identity. Emits no force or automatic finite return. Curves/splines/IO fanout, malformed depths and oversized graphs are rejected explicitly; no generated/chord/filament fallback.",
     "client": "Typed prepareDcWindingGeometry IPC with no browser mock; errors propagate. No force UI or desktop numerical-job controller yet.",

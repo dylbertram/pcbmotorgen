@@ -218,10 +218,44 @@ or failed numerical/source-snapshot checks suppress results. The numerical child
 inherits the outer job's process group so cancellation cannot leave an orphaned
 solve; bounded process-cleanup and stale-content regressions cover that boundary.
 
-The live request is not yet wired to a DC force panel or a desktop numerical-job
-controller. Those UI lifecycle/packaging steps, additional geometry qualification
-and real native-webview interaction remain unperformed. Existing housing and
-periodic-reference UI behavior is unchanged.
+The simulation dock now has a separate **Static DC (experimental)** tab. It takes
+only explicit `material_model` and `return_geometry` objects, sampled current and
+pose, and a fresh placement acknowledgement. No study geometry is prefilled or
+silently corrected. The host rebuilds actual copper from the submitted generated
+or imported design; the browser never supplies a replacement winding snapshot.
+Results are separate from the existing force sweep, housing screening and driver
+calculations. Changes, tab departure and unmount immediately hide old forces and
+request cancellation, including a start response that arrives after invalidation.
+
+The experimental desktop worker is disabled unless its launch environment sets
+all three absolute host paths. This is a local installed-solver integration, not
+a redistributed or packaged solver:
+
+```sh
+export PCB_MOTOR_DC_SOLVER_ROOT="$PWD/scripts/solvers"
+export PCB_MOTOR_DC_PYTHON="$HOME/.local/opt/solver-prototypes-macos/ngsolve-venv/bin/python"
+export PCB_MOTOR_DC_ARCHIVE_ROOT="$HOME/.local/opt/solver-prototypes-macos"
+```
+
+`DcJobs` admits one numerical job at a time, preserves a unique evidence directory
+under `dc-desktop-jobs`, and owns the worker's POSIX process group. The whole-job
+cap is 360 s, with a 350 s nested supervisor cap. Cancellation, timeout and normal
+app shutdown stop the group; late geometry preparation cannot launch after exit
+cleanup. Abrupt host termination/power loss is not a qualified cleanup path.
+`desktop_dc_job.py` and nested solvers inherit that same group. Failed, cancelled,
+timed-out or mismatched jobs return no force. The host checks request identity and
+content, successful receipt, force vector, fresh magnetic report and solution
+hashes, and the selected fresh current state before publishing a result.
+
+The explicit real-FEM Rust integration test is ignored in ordinary unit runs
+because it requires the pinned external installation and original project. Run
+it separately with `--ignored`; do not count the ordinary ignored inventory as
+all-pass numerical evidence. It exercises a fresh saved-design job, rejection of
+changed copper depths, and cancellation after a real numerical state was saved.
+Browser tests use labelled UI fixtures only; those do not establish numerical
+agreement or native WKWebView interaction. Broader source-geometry qualification,
+native interaction and portable solver installation remain unfinished. No new
+delivery bundle is produced by this work.
 
 Evidence correction: earlier 306-test helper logs included four or five skipped
 tests, not 306 passes. Preserve those logs and historical delivery manifests.

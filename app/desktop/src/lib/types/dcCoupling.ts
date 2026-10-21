@@ -25,3 +25,32 @@ export interface DcWindingGeometry {
   coordinate_convention: string;
   scope: string;
 }
+
+/** Physical placement and finite return are explicit inputs, never UI defaults. */
+export interface DcStudy {
+  request_id: string;
+  material_model: Record<string, unknown>;
+  return_geometry: Record<string, unknown>;
+  current_a: number;
+  pm_offset_x_m: number;
+  placement_acknowledged: boolean;
+}
+
+export interface DcJobStatus {
+  request_id: string;
+  job_id: string;
+  state: "running" | "cancelling" | "completed" | "cancelled" | "timed_out" | "failed";
+  elapsed_seconds: number;
+  evidence_directory: string;
+  request_sha256: string;
+  error: string | null;
+  result: null | {
+    status: "passed-fresh-recorded-geometry-dc-request-only";
+    pm_array_force_n: [number, number, number];
+    fresh_solution_sha256: string;
+    input_request_sha256: string;
+    eligibility: { request_id: string; current_a: number; pm_offset_x_m: number };
+  };
+}
+
+export interface DcCapability { available: boolean; reason?: string; scope?: string }
