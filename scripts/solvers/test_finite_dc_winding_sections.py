@@ -28,3 +28,19 @@ class WindingSectionProbeTest(unittest.TestCase):
         self.assertEqual([p['centre'][2] for p in traces],[.0008,.0008])
         self.assertEqual([p['centre'][2] for p in vias],[.0004,.0004])
         self.assertEqual([p['expected_per_loop_a'] for p in vias],[-1.,1.])
+
+    def test_all_eligible_is_not_silently_limited_to_historical_sample(self):
+        edges=[{'geometry':{'kind':'trace','layer':0},'points':[[0,i*.001,0],[.002,i*.001,0]]} for i in range(12)]
+        edges += [{'geometry':{'kind':'via'},'points':[[i*.001,0,0],[i*.001,0,-.0008]]} for i in range(20)]
+        fixture={'sim':{},'drive':{},'geometry_hints':{},'networks':[{'net':'A','edges':edges}]}
+        spec={'layers':[{'trace_width_m':.0002,'thickness_m':35e-6}],
+              'via_outer_radius_m':.000175,'via_barrel_area_m2':2.5525440310417068e-8}
+        with patch('audit_finite_dc_winding_sections.dimensions',return_value=spec),\
+                patch('audit_finite_dc_winding_sections.resistances',return_value=None),\
+                patch('audit_finite_dc_winding_sections.unit_currents',return_value=([1.]*len(edges),1.)),\
+                patch('audit_finite_dc_winding_sections.edge_points',side_effect=lambda edge,*args:np.asarray(edge['points'])):
+            historical=probes(fixture,np.zeros(3),{'A':{'current_a':1.}})
+            all_values=probes(fixture,np.zeros(3),{'A':{'current_a':1.}},all_eligible=True)
+        self.assertEqual(len(historical),18)
+        self.assertEqual(len(all_values),32)
+        self.assertEqual(len({p['label'] for p in all_values}),32)

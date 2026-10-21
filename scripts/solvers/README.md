@@ -34,6 +34,15 @@ not a measured manufacturing tolerance or thermal model. FE interface tagging,
 source coverage and coupled-field controls still require qualification.
 Do not reuse the old provisional ferrite law as a hardware rating.
 
+`audit_finite_dc_winding_sections.py --work ACCEPTED_CURRENT --output NEW_REPORT --all-eligible`
+expands the historical deterministic 6-trace/12-via sample to all eligible signed
+sections, keeping the same 2% saved-area and 5% independent network-current gates.
+Eligibility remains explicit: active phases, a trace's longest straight piece
+at least 1 mm, merged physical via locations and expected signed share above
+0.05 in magnitude. This does not silently qualify excluded short/near-zero or
+junction-interior fields. A running checkpoint is written every ten sections;
+only the final report and whole successful receipt establish acceptance.
+
 Evidence correction: earlier 306-test helper logs included four or five skipped
 tests, not 306 passes. Preserve those logs and historical delivery manifests.
 A fresh explicit NGSolve/PyAMG/Rust-entrypoint run covers the omitted checks.

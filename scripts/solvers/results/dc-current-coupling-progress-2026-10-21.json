@@ -40,6 +40,20 @@
     "original_files_unchanged": true,
     "scope": "Geometry approval/verification only, not coupled-field or hardware qualification."
   },
+  "current_source_expanded_audit": {
+    "status": "running-not-accepted-from-partial-results",
+    "source": "finite-copper-star2-v1-dc-curvature4-amg-20261020",
+    "report": "dc-source-curvature4-all-eligible-sections-20261021.json",
+    "eligible_trace_sections": 239,
+    "eligible_via_sections": 262,
+    "total_eligible_sections": 501,
+    "historical_18_section_runtime_s": 17.393242542049848,
+    "linear_forecast_s": 484.10516666666666,
+    "timeout_cap_s": 900,
+    "eligibility_limit": "Active phases only; longest straight trace piece>=1mm; aggregate physical vias; absolute expected share>0.05. Not every pointwise/junction/near-zero field.",
+    "gates": "Unchanged2%area/5%independent graph-current agreement with1e-8 per-loop current floor.",
+    "helper_verification": "319tests pass with no skips in29.517s, dc-source-all-eligible-all-helpers-v1-20261021.log."
+  },
   "historical_evidence_correction": {
     "release_helpers_v1": "306 discovered, 4 skipped, 302 passed; original logs/manifests preserved.",
     "release_helpers_v3": "306 discovered, 5 skipped, 301 passed; original logs/manifests preserved.",
