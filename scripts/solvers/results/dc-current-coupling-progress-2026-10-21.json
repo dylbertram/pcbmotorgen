@@ -469,7 +469,7 @@
       "user_approved_compute_window": "2026-10-21T18:53:31Z through 2026-10-22T06:53:31Z. Plan subsequent numerical jobs with longer explicit timeouts bounded by the remaining12h window; do not alter an active timer or relax numerical gates.",
       "watcher": "dc-coupling-watch-12h-window-20261021-v1/current-mesh-watch. Independent read-only watcher checks every30s and exits with a background notification on errors, finished chains, stale process identity or a possible low-CPU stall after1200s without file activity. Original command completion notifications remain enabled. Latest observed state was live-worker with no alerts. Watcher health is not numerical acceptance. Attach watchers at launch for subsequent long jobs.",
       "work": "dc-imported-star4-curvature4-mesh-v2-20261021",
-      "stage": "Launched bounded mesh-only curvature4 trial; final whole-job result pending. No current solve or refined source acceptance from the stage checkpoint.",
+      "stage": "Timed out at1800.0166s during native mesh generation, after10.38s retained-CAD identity verification. No refined mesh or field saved. Original report remains an unaccepted running checkpoint; final timeout receipt is authoritative. Old process-group leader is absent and no owned group members remained before retry.",
       "timeout_s": 1800,
       "max_mixed_dofs_before_assembly": 12000000,
       "source_mesh_sha256": "ddb4646bb964b9a504608d2d7ca67e23e516365f814445c43c7102ba0cc75fb1",
@@ -478,7 +478,16 @@
       "drive_volume_relative_reload_error": 6.661338147750939e-16,
       "drive_centre_error_m": 3.878959615385619e-18,
       "method": "Retrieve original copper/drive OCC geometry retained in exact original source mesh bytes. Check engine, original hash, material partition, total/drive CAD volumes and drive centroid. Generate a new mesh withcurvature4; no previous current, source radius fit, geometry healing, new clearance or count-based identity. Original CAD and drive split are not rebuilt by a repeated Boolean calculation.",
-      "checkpoints": "New meshing-progress.json distinguishes retained-CAD loading/identity verification, native meshing, and the legacy Boolean stages. The actual retry passed CAD identity in10.38s and entered native mesh generation. A successful mesh-only checkpoint can later supply only verified mesh/CAD bytes to a fresh DC solve; reused meshes are not reserialized and all solves consume exact saved/reloaded mesh bytes."
+      "checkpoints": "New meshing-progress.json distinguishes retained-CAD loading/identity verification, native meshing, and the legacy Boolean stages. The actual retry passed CAD identity in10.38s and entered native mesh generation. A successful mesh-only checkpoint can later supply only verified mesh/CAD bytes to a fresh DC solve; reused meshes are not reserialized and all solves consume exact saved/reloaded mesh bytes.",
+      "long_retry": {
+        "work": "dc-imported-star4-curvature4-mesh-v3-long-20261021",
+        "status": "Launched fresh identical mesh-only curvature4 attempt with10800s whole-job cap. Pending, not numerical acceptance.",
+        "timeout_s": 10800,
+        "threads": 2,
+        "max_dofs_before_assembly": 12000000,
+        "reason": "Measured native meshing exceeded1800s; user approved12h compute window. Source/CAD/drive/mesh-size/curvature and gates unchanged. No files or failed fields imported from timed-out jobs. Launch explicitly checked three-hour budget fits before2026-10-22T06:53:31Z.",
+        "watcher": "dc-coupling-watch-12h-window-20261021-v1/long-mesh-watch checks every30s for errors/ends/stale identity or low-CPU stalls. Original background completion notification remains enabled."
+      }
     },
     "preserved_trials": [
       "dc-imported-star4-source-input-v1 export: live production circular-geometry rejection; no replacement geometry emitted.",
