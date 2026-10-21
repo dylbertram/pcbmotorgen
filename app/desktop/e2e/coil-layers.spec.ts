@@ -22,7 +22,7 @@ test("zoom controls clear every open side panel", async ({ page }, testInfo) => 
         await expect.poll(async () => {
           const z = (await zoom.boundingBox())!;
           const p = (await panel.boundingBox())!;
-          return z.x + z.width <= p.x;
+          return z.x + z.width <= p.x || p.x + p.width <= z.x;
         }).toBe(true);
         // The zoom buttons remain usable without closing the panel.
         await workspace.getByRole("button", { name: "Zoom in", exact: true }).click();

@@ -272,8 +272,7 @@
         <!-- Bare zoom buttons: no background, with the same 12px gap on the
              right as the position box has at the bottom. -->
         {#if view.viewMode === "top"}
-        <div class="absolute z-20 {sidePanel ? 'hidden sm:block sm:top-[var(--dock-top)] lg:top-auto lg:bottom-3' : 'top-[32%] sm:top-auto sm:bottom-3'}"
-          style:--dock-top={`${toolbarHeight + 12}px`} style:right={`calc(${dockWidth}px + 3.5rem)`}>
+        <div class="absolute z-20 top-[32%] sm:top-auto sm:bottom-3 {sidePanel ? 'max-sm:hidden' : ''}" style:right={`calc(${dockWidth}px + 3.5rem)`}>
           <CoilPreviewControls
             zoomLabel={gestures.zoomLabel}
             canZoomIn={gestures.canZoomIn}
