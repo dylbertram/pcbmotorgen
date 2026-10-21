@@ -179,6 +179,17 @@ An accepted zero-current baseline may supply its exact material mesh to another
 pose only after whole-receipt, model/version, mesh-hash and physical-input checks.
 This avoids regenerating a nominally similar mesh or changing material priority.
 
+`audit_dc_case_matrix.py --archive-root ARCHIVE --work NEW_AUDIT` now verifies
+the complete recorded case: 37 magnetic jobs, 185 saved current states, 44
+recomputed refinement/formulation pairs and all 501 eligible signed sections.
+It checks job-bound successful receipts, immutable inputs/solutions/implementation
+snapshots, exact source/model identity, declared current/pose/basis/rule coverage,
+finite converged states and force balance. All enumerated case gates pass.
+The audit covers sampled points and vector-norm gates, not arbitrary geometry,
+continuous interpolation or componentwise relative accuracy near zero. Its
+archived forces are evidence, never a substitute for live app recalculation.
+Broader supported-geometry qualification and application integration remain open.
+
 Evidence correction: earlier 306-test helper logs included four or five skipped
 tests, not 306 passes. Preserve those logs and historical delivery manifests.
 A fresh explicit NGSolve/PyAMG/Rust-entrypoint run covers the omitted checks.
