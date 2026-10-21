@@ -216,7 +216,16 @@
       "linear_maximum_increment_relative_change": 0.0005576872232472002
     },
     "pose_bare_source_preparation": "Full corrected affine RT0 pose reference passed in292.081s, dc-affine-bare-pose-forces-v2-20261021, summary SHAceb429122e4cc0e657025c6b5be3d7162128b3804a4e6827d324b8a3a06fe84b. Three poses0,+/-100um, every physical source cell, max degree2/4force change6.25e-10N and degree4action/reaction error4.44e-13N. Original nominal force agrees within7.05e-18N. First full attempt preserved failed because strict volume reload incorrectly referenced CAD instead of archived mesh; corrected expected volume only, gates unchanged1e-9reload/2%mesh-CAD.",
-    "current_pose_jobs": "Nonlinear vector matrices at+/-100um completed with exact pose bias/bare references; scalar matrices remain running under480s per-pose caps. Refined vector pose baseline/current/mesh-comparison chain launched with180s/480s/120s caps. Independent pose/reference and spatial comparisons are not yet counted as passed.",
+    "current_pose_jobs": "Coarse nonlinear vector/scalar matrices at+/-100um completed with exact pose bias/bare references; independent comparisons pass5%. Refined vector pose chain remains in progress. Refined scalar pose baseline/current/mesh-comparison chain launched with180s/600s/120s caps; spatial comparisons are not yet counted as passed.",
+    "current_pose_formulation_controls": {
+      "plus100um_report": "dc-finite-current-nonlinear-plus100um-formulation-v1-20261021.json",
+      "plus100um_maximum_total_relative_difference": 0.012020622079288137,
+      "plus100um_maximum_increment_relative_difference": 0.0017888321254711378,
+      "minus100um_report": "dc-finite-current-nonlinear-minus100um-formulation-v1-20261021.json",
+      "minus100um_maximum_total_relative_difference": 0.012740056491793265,
+      "minus100um_maximum_increment_relative_difference": 0.0018800805865916625,
+      "scope": "Actual immutable finite-current basis at0,+/-0.1,+/-0.5loop A and explicit PM offsets. Independent magnetic formulations pass, but pose-specific spatial/domain/quadrature/source-opening and broader geometry/app coverage remain separate."
+    },
     "scalar_domain_and_linear_quadrature_controls": {
       "nonlinear_scalar_domain_report": "dc-finite-current-nonlinear-scalar-domain-control-v1-20261021.json",
       "nonlinear_scalar_domain_maximum_total_relative_change": 0.0004865075442415207,
