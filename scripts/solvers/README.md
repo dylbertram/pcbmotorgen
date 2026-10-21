@@ -404,8 +404,12 @@ host. A real subprocess regression verifies the failure/cleanup path. The
 refined solve now passes global electrical and curvature-resistance gates in
 1021.71 s. Resistance is 15.0453990189 ohm, changing by 0.06145% under the 2%
 gate. Measured peak footprint is 12.869 GB, versus the guard's sampled owned-group
-peak of 12.870 GB, both below 18 GiB. Full refined local-current and independent
-electrical checks remain pending; this is not source or force acceptance.
+peak of 12.870 GB, both below 18 GiB. The subsequent refined checks pass all 1004
+active sections, 507 passive/arc/stub sections and four return sections.
+Independent H1 resistance is 14.9849381390 ohm, differing by 0.4035% under the 5%
+reference gate. All original area/current gates and zero-current floors remain
+unchanged. Spatial/drive-length convergence, finite-source fields and coupled
+forces remain unqualified.
 
 `finite_copper_refinement.py --source-work REFINED_DC --kind mesh --value 0.0003 --work NEW_TRIAL`
 prepares an isolated spatial control using the exact source mesh's retained

@@ -538,7 +538,50 @@
           "memory_guard_evidence": "dc-imported-star4-curvature4-dc-v1-20261021-guard/guard.json",
           "scope": "Fresh electrical assembly/solve on exact byte-copied refined mesh via existing guarded pre-assembly checkpoint path. No previous fields. Original global electrical and2%curvature R gates pass. load(MIXED) verifies completed whole-job receipt,mesh,solution,physical inputs and archived implementation. All local source/reference/spatial/drive-length acceptance still required. Physical-footprint guard remained below18GiB; measured footprint is not replaced by smaller RSS.",
           "watcher": "refined-dc-watch caught successful completion at20:37:30Z with no alerts. Two-hour budget verified within approved window.",
-          "next_controls_pending": "Sequential all-active, all-passive/native-arc/stub, return sections and independent H1 runs launched with7200s per-stage bounds,18GiB native-memory guard and30s refined-controls-watch. Before each launch the stage budget must fit remaining approved window. Keep subsequent large mesh/source jobs serial with H1 until measured."
+          "local_reference_controls": {
+            "status": "All four numerical jobs completed successfully; refined-controls-watch caught chain completion at21:00:59Z. Completed receipts, physical inputs and archived implementations verified. H1 potential separately hash-verified before agreement audit.",
+            "active_report": "dc-imported-star4-curvature4-all-active-v1-20261021.json",
+            "active_sha256": "e7f8f01f984ff350556f58b7831aacc02f8f0a9000cbb7f5a8330345db51afd0",
+            "active_sections": 1004,
+            "active_failures": 0,
+            "active_max_abs_current_difference_per_loop_a": 0.0009344846396366902,
+            "active_max_relative_area_error": 0.01079026816641493,
+            "active_wall_seconds": 844.10,
+            "passive_report": "dc-imported-star4-curvature4-all-passive-v1-20261021.json",
+            "passive_sha256": "e6711247c50e88cdece34d8f451b77f336eb5bb178a5324a612d9d15b357fb2a",
+            "passive_sections": 507,
+            "passive_failures": 0,
+            "passive_max_abs_current_per_loop_a": 4.4311180427002663e-13,
+            "passive_max_relative_area_error": 0.008892138736728672,
+            "passive_wall_seconds": 442.03,
+            "return_report": "dc-imported-star4-curvature4-return-v1-20261021.json",
+            "return_sha256": "0bbdbf720b971aa3f4a545cdf413fc468d85d169e7634a6a84d8cc31080763e9",
+            "return_sections": 4,
+            "return_max_relative_current_error": 1.9984014443252818e-14,
+            "return_max_relative_area_error": 2.886579864025407e-15,
+            "return_wall_seconds": 39.96,
+            "primal_work": "dc-imported-star4-curvature4-primal-v1-20261021",
+            "primal_summary_sha256": "69a9bf4a4d3f56f052348ad4bf707b154c783cacc0bd4b4578d7b98a8b449ec6",
+            "primal_resistance_ohm": 14.98493813901381,
+            "primal_seconds": 41.11985762498807,
+            "agreement_report": "dc-imported-star4-curvature4-primal-agreement-v1-20261021.json",
+            "agreement_sha256": "c205e65787e7bd1bcd9534c78973100ec9736a276b16ca749fad285bb04f81b0",
+            "independent_resistance_relative_difference": 0.004034776742319668,
+            "independent_resistance_gate": 0.05,
+            "scope": "Full existing eligible refined-source local controls pass original area/current/near-zero gates; return and independent electrical R reference pass. No short/junction full-interior, spatial/drive-length, finite-source field or force qualification implied."
+          },
+          "isolated_refinements_pending": {
+            "mesh_work": "dc-imported-star4-curvature4-mesh-control-v1-20261021",
+            "port_work": "dc-imported-star4-curvature4-port-control-v1-20261021",
+            "mesh_target_m": 0.0003,
+            "port_target_fraction": 0.4,
+            "fixed_curvature_safety": 4,
+            "max_dofs_per_stage": 24000000,
+            "timeout_s_per_stage": 10800,
+            "physical_footprint_limit_bytes": 19327352832,
+            "stage": "Sequential isolated spatial and drive-length trials launched after H1/local chain ended. Fresh meshes and fields. Three-hour stage budget checked against remaining approved compute window before each launch. No numerical acceptance from launch.",
+            "watcher": "isolated-refinements-watch checks every30s for failures/completion/stale identity/low-CPU stalls. If an alert exits it while second job continues, attach a new watcher to remaining job. Original chain completion notifications remain enabled."
+          }
         }
       }
     },
@@ -555,7 +598,7 @@
       "browser": "36DC/housing/periodic lifecycle regressions pass without skips in34.6s, dc-imported-geometry-browser-regressions-v1-20261021/report.json. UI fixtures only, not imported numerical-source acceptance.",
       "generated_case_regression": "dc-generated-baseline-after-import-guard-v1-20261021 validates the original registered source and entire pinned matrix evidence under current implementation; no new magnetic force computed or old forces replayed."
     },
-    "remaining": "Refined mesh resolves59coarse barrel-area failures geometrically; fresh refined field passes global electrical and2%curvature R controls. Whole eligible active/passive/native-arc/stub/return controls and independent H1 on that field are running. Complete2%spatial/drive-length controls and refined5%electrical reference/raw-current checks. Exact source export/field/force controls, applicable explicit material geometry, sampled nonlinear current/polarity/pose matrix and eventual live registration remain unfinished. No imported source/force/general-CAD/hardware acceptance from passing mesh areas/global R/current/gauge alone."
+    "remaining": "Refined source passes global electrical,all1511eligible active/passive/native-arc/stub,current/area checks,4return sections,2%curvature R and5%independent H1 electrical R controls. Coarse failures remain archived. Isolated spatial and drive-length refinements now running; verify fresh fields and relevant local/raw-current controls without fitting. Exact source export/field/force controls, applicable explicit material geometry, sampled nonlinear current/polarity/pose matrix and eventual live registration remain unfinished. No imported source/force/general-CAD/hardware acceptance from current/local/R controls alone."
   },
   "managed_desktop_integration": {
     "scope": "Restricted installed-solver integration for exact registered actual geometry and sampled current/pose states only. This does not qualify arbitrary or broader generated/imported geometry; new geometry is rejected before numerical work. No continuous interpolation, componentwise relative-accuracy, differential-inductance, retained-history reversal, thermal or hardware claim.",
