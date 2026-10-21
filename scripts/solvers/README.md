@@ -59,6 +59,50 @@ compares it with separately refined tetrahedron volume quadrature at explicit
 physical material pilot points. A passing pilot is not full-domain source-field,
 nonlinear force, material, hardware or arbitrary-CAD qualification.
 
+`finite_current_zero_bias.py --material-work APPROVED_GEOMETRY --source-work SOURCE --work NEW_BASELINE`
+checks named material volumes/interfaces, the HCurl tree gauge, zero-source and
+vacuum limits, and the nonlinear zero-current PM bias. Use `--mesh-only` first
+and reuse that accepted mesh with `--mesh-work`. The recorded baseline passed
+in 11.1 s, with a 3.46e-15 relative nonlinear residual and 2.38e-6 N force-balance
+and force-quadrature differences. These are single-mesh controls, not convergence
+or independent magnetic-solve qualification.
+
+The reaction decomposition retains copper and fixed-remanence, mu=1 PMs as
+separate prescribed sources. Their particular vacuum field satisfies the source
+equations; the reaction energy is `W(B_source+curl(a))-B_source·curl(a)/mu0`,
+up to constants. In mu=1 regions only `|curl(a)|²/(2mu0)` remains. Thus no
+magnetic copper/PM interface is needed in that reaction mesh, and neither source
+geometry nor winding connectivity is replaced by air. This assumes prescribed
+static current, mu=1 copper/PM incremental response and the declared reversible
+material law. It is not a magnetoresistance, thermal or demagnetization model.
+
+`finite_current_tree.py` accelerates the same affine-cell source with translated
+second-order volume moments and exact near-cell integration. Every observation
+set needs opening refinement and direct checks; no a-priori error bound is
+claimed. `audit_finite_current_tree.py` checks the existing six-point pilot.
+`cache_finite_current_material_source.py --preflight-only` measures actual material
+quadrature-point costs before full preparation with `--preflight-work`. A full
+cache must pass 2% opening refinement at every point and 5% direct-reference
+agreement at the declared deterministic spot checks. These checks do not qualify
+magnetic force mesh/domain/quadrature convergence or every unsampled direct field.
+
+The first degree-8 cache attempt crashed with SIGTRAP and macOS heap-corruption
+diagnostics after both full field evaluations. The unsafe call was Python
+MeshPoint-array evaluation of an IntegrationRuleSpace field: matching coordinates
+do not preserve integration-point indices. `finite_current_quadrature.py` now
+uses native-rule integrals, exact DOF readback and native weighted-value extraction.
+Never evaluate an IR field through Python points, including nominal rule points.
+The failed attempt and crash report remain evidence, not an accepted cache.
+The cache writer checkpoints unaccepted arrays before native validation; an
+archive alone, a running report or failed whole-command receipt never qualifies.
+
+`finite_current_coupling.py` is a guarded offline pilot runner, not app output.
+It requires an accepted full cache, matching zero-current baseline and immutable
+bare finite-current PM-force reference at the exact same pose. Nonlinear current,
+linear/vacuum controls and incremental balance are still required alongside
+independent formulation, pose, mesh, domain and quadrature controls before app
+integration. Existing housing screening and all original design files stay unchanged.
+
 Evidence correction: earlier 306-test helper logs included four or five skipped
 tests, not 306 passes. Preserve those logs and historical delivery manifests.
 A fresh explicit NGSolve/PyAMG/Rust-entrypoint run covers the omitted checks.

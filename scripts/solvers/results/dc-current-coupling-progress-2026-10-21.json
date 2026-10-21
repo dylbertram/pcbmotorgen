@@ -1,12 +1,12 @@
 {
-  "status": "recorded-finite-current-source-pilot-verified-coupled-controls-pending",
+  "status": "zero-current-controls-verified-full-current-cache-and-force-controls-pending",
   "goal": "Qualify static DC winding-magnet-shield coupling from actual supported generated/imported geometry, then integrate only qualified capabilities.",
   "archive_root": "$HOME/.local/opt/solver-prototypes-macos",
   "current_branch": "simulation/add-femm-and-improve",
   "priorities": {
-    "DC03": "User approved35um nominal copper-surface/ferrite clearance without explicit soldermask and moving ferrite/housing together. Derived geometry passes zero-overlap, exact BRep distance, unchanged layer-volume/internal-gap checks. FE interface tagging still pending.",
+    "DC03": "User approved35um nominal copper-surface/ferrite clearance without explicit soldermask and moving ferrite/housing together. Derived geometry passes zero-overlap, exact BRep distance, unchanged layer-volume/internal-gap checks. Recorded FE material-volume/interface tagging now passes.",
     "current_source": "All501eligible signed winding sections pass unchanged2%area/5%graph-current gates. Exact affine RT0 export and six-point finite-volume magnetic integration pilot pass. This is recorded-case source evidence, not arbitrary geometry or every local/junction field.",
-    "nonlinear_forces": "Not started under the new goal; approved disjoint geometry is available, but source qualification and coupled FE interface/field controls remain. Preserve zero-current/linear limits, force balance, 2% refinement and 5% independent-reference gates with explicit floors.",
+    "nonlinear_forces": "Recorded zero-current nonlinear PM bias, gauge, zero-source/vacuum and force kernel controls pass. Nonzero-current coupling remains unaccepted; full-cache preparation crashed in native rule-field point evaluation. Revised native storage tested; whole cache, linear/nonlinear current/polarity/pose, mesh/domain/rule and independent-reference force controls remain.",
     "app_integration": "Not started; preserve existing housing screening/UI and request lifecycle. Do not expose unqualified coupled outputs."
   },
   "dc03_evidence": {
@@ -80,6 +80,35 @@
     "gates": "Unchanged2%quadrature refinement and5%integration agreement. No physical error-bar claim.",
     "helper_tests": "330passed/0skips in28.585s, dc-finite-source-green-all-helpers-v1-20261021.log.",
     "remaining": "Material FEinterface/gauge/zero-current controls, source-field cache/runtime controls across actual material quadrature, nonlinear current/polarity/pose force and independent-reference verification, general supported geometry and app integration."
+  },
+  "zero_current_controls": {
+    "mesh_work": "dc-zero-current-material-mesh-v1-20261021",
+    "bias_work": "dc-zero-current-bias-v1-20261021",
+    "elements": 21293,
+    "dofs": 25295,
+    "free_dofs": 21062,
+    "bias_seconds": 11.073277540970594,
+    "relative_nonlinear_residual": 3.4600131722740914e-15,
+    "pm_material_force_balance_error_n": 2.3710216986193056e-6,
+    "force_quadrature_change_n": 2.371680839441852e-6,
+    "scope": "Recorded zero-current controls only, not converged nonlinear current-driven force qualification. Copper is mu=1 in the reaction domain with its exact prescribed source retained separately."
+  },
+  "finite_source_acceleration": {
+    "pilot_work": "dc-source-tree-pilot-v1-20261021",
+    "maximum_pilot_opening_relative_change": 4.694768825791671e-5,
+    "maximum_pilot_direct_relative_difference": 2.019347875553591e-6,
+    "material_preflight_work": "dc-source-material-cache-preflight-v1-20261021",
+    "material_rule_points": 44160,
+    "preflight_points": 256,
+    "direct_reference_points": 64,
+    "preflight_maximum_opening_relative_change": 0.01445346307826779,
+    "preflight_maximum_direct_relative_difference": 0.0008650771571218468,
+    "forecast_full_cache_seconds": 1121.349434754753,
+    "full_cache_v1": "Unaccepted SIGTRAP/native heap corruption after opening evaluations of57.823s and293.594s. Preserve dc-source-material-cache-degree8-v1-20261021 summary/log/failed receipt and macOS Python-2026-10-21-133808.ips.",
+    "storage_repair": "Avoid Python MeshPoint-array evaluation of IntegrationRuleSpace. Validate exact DOF readback and native per-element integral moments; extract material moments using native IR test functions. Actual44160point storage control and thin-material degree8regression pass.",
+    "retry": "dc-source-material-cache-degree8-v2-20261021 launched under1500s cap. A duplicate invocation refused the existing output directory with exit2; do not treat that refusal as a numerical result. Implementation changed during the first retry for native moment extraction, so unchanged-snapshot acceptance must be checked before any use.",
+    "helper_verification": "343tests passed, zero skips,34.327s in dc-native-rule-repair-all-helpers-v1-20261021.log.",
+    "remaining": "Whole accepted full-material cache, vacuum/linear/nonlinear current states, mover poses, source/force quadrature and mesh/domain refinement, independent magnetic formulation, supported geometry coverage and app integration."
   },
   "historical_evidence_correction": {
     "release_helpers_v1": "306 discovered, 4 skipped, 302 passed; original logs/manifests preserved.",
