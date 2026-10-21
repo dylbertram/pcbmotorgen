@@ -400,7 +400,55 @@
     "current_peak_footprint_bytes": 5443064896,
     "active_local_controls": "dc-imported-star4-dc04-native-arc-sections-v2-20261021.json SHA8e083075c75c180b4a6c22c9e6d7a996c08e7f8643db63f6ba4739369ce2f26f.20sampled trace/via/native-arc sections: all signed-current checks pass5%agreement; two via-area failures3.50369269%and2.31721226% exceed2%. Both native active arcs pass with exact saved midpoint/tangent planes, area errors1.05156835%and1.20296319%. No chord-plane substitution. Historical18section trial also failed the same2barrel areas and is preserved.",
     "passive_stub_controls": "dc-imported-star4-dc04-zero-native-arc-sections-v2-20261021.json SHA82de08d37b86dd7b3f8d10dd7aababb3274fa86f0c9fc8785ef3c52277ab4b06.13checks pass:6passive long traces,1passive native arc and6full-barrel stubs. Maximum absolute current3.9895e-14Aper-loop below declared1e-8floor; maximum area error1.8374%<2%. Earlier12section pilot preserved. Whole eligible passive trace/via option added, not yet run; no claim for all passive/interior/short/junction fields.",
-    "curvature_refinement_trial": "dc-imported-star4-curvature4-v1-20261021 launched withcurvature-safety4,10M-DOF pre-assembly cap,2threads/AMG and1800s whole-job bound. Same actual copper/return/drive/resistivity and1V source; only numerical curved-boundary refinement changes. Budget derives from measured547s mesh+223s solve and anticipated refinement cost, not a completion promise. Do not accept a running checkpoint or relabel the coarse failures. Inspect final receipt on notification.",
+    "curvature_refinement_trial": "dc-imported-star4-curvature4-v1-20261021 timed out at1800s before saving a refined mesh; the running checkpoint is unaccepted. No inferred completion, no fields imported, no extension of the active timer. Prior output did not distinguish CAD splitting from native mesh generation, so the exact stalled operation is unknown.",
+    "independent_coarse_current_reference": {
+      "work": "dc-imported-star4-primal04-v2-20261021",
+      "summary_sha256": "ce14a3db6e3904d0d3ed88b31031064c20c8f81f9a89a0036d076b46a31dc6c1",
+      "potential_sha256": "878d33ddf85c47ecc4ae489713ad5b3cd3f6040d685f2a31b46896e6ee44731d",
+      "seconds": 14.22317487502005,
+      "h1_dofs": 585064,
+      "resistance_ohm": 14.950482594192488,
+      "relative_power_balance": 3.848051099986094e-9,
+      "relative_equation_residual": 3.192433582848648e-12,
+      "net_current_relative_error": 8.410541288206457e-11,
+      "agreement_report": "dc-imported-star4-primal04-agreement-v2-20261021.json",
+      "agreement_report_sha256": "233f10ade871a290669fc43f565076f4eea79e4a5f03cc195170a72af939a6a0",
+      "relative_resistance_disagreement": 0.0069670710190588014,
+      "agreement_gate": 0.05,
+      "preserved_failure": "primal04-v1 direct solve failed the unchanged1e-8power balance gate at1.9476e-8. v2 keeps the original H1 equations, same mesh/drive/resistivity and direct factorization, adding at most3original-matrix residual corrections; one correction passed all original electrical gates. Its initial direct pass also failed, at1.3702e-8. No fitted R/rho/source or gate relaxation.",
+      "provenance": "New primal jobs require exact saved resistivity from the hash-bound physical geometry, recheck immutable inputs/implementation, and hash the saved potential. Existing historical potential files without hashes remain unproven for pointwise provenance; no manifests or old reports were edited.",
+      "scope": "Independent electrical H1 formulation against compatible HDiv source on the same coarse physical mesh. R/power/mean-current reference only, not pointwise compatible magnetic-source current, geometry convergence or force agreement. The two coarse barrel-area failures remain unqualified."
+    },
+    "expanded_local_controls_pending": {
+      "active": "dc-imported-star4-dc04-all-active-v1-20261021.json",
+      "passive": "dc-imported-star4-dc04-all-passive-v1-20261021.json",
+      "scope": "All eligible signed active sections and all eligible passive traces/barrels/native arcs/full stubs on the completed coarse source. Independent of pending refined mesh. Preserve every local failure; no coarse acceptance from enumeration.",
+      "job_budget_s_each": 7200,
+      "watcher": "dc-coupling-watch-12h-window-20261021-v1/all-sections-watch. Sequential chain intentionally continues to passive controls after an active gate failure. If the error watcher exits early, reattach for remaining passive job; original whole-chain completion notification also remains enabled."
+    },
+    "original_mesh_drive_gauge_pending": {
+      "work": "dc-imported-star4-dc04-drive-gauge-v1-20261021",
+      "timeout_s": 3600,
+      "max_dofs": 6000000,
+      "threads": 1,
+      "scope": "Fresh compatible DC solve on exact original mesh with unchanged geometry and1V line EMF, changing only port field from1/L to6*s*(1-s)/L. Raw rho-weighted L2-current and loop-current differences retain2%gate. No fitted normalization. Ring regression passes; imported result pending. Not a substitute for drive-length, curvature or spatial controls.",
+      "watcher": "dc-coupling-watch-12h-window-20261021-v1/drive-gauge-watch checks every30s."
+    },
+    "retained_cad_mesh_retry": {
+      "user_approved_compute_window": "2026-10-21T18:53:31Z through 2026-10-22T06:53:31Z. Plan subsequent numerical jobs with longer explicit timeouts bounded by the remaining12h window; do not alter an active timer or relax numerical gates.",
+      "watcher": "dc-coupling-watch-12h-window-20261021-v1/current-mesh-watch. Independent read-only watcher checks every30s and exits with a background notification on errors, finished chains, stale process identity or a possible low-CPU stall after1200s without file activity. Original command completion notifications remain enabled. Latest observed state was live-worker with no alerts. Watcher health is not numerical acceptance. Attach watchers at launch for subsequent long jobs.",
+      "work": "dc-imported-star4-curvature4-mesh-v2-20261021",
+      "stage": "Launched bounded mesh-only curvature4 trial; final whole-job result pending. No current solve or refined source acceptance from the stage checkpoint.",
+      "timeout_s": 1800,
+      "max_mixed_dofs_before_assembly": 12000000,
+      "source_mesh_sha256": "ddb4646bb964b9a504608d2d7ca67e23e516365f814445c43c7102ba0cc75fb1",
+      "cache_identity_seconds": 10.383084084023722,
+      "cad_volume_relative_reload_error": 7.885625485926084e-11,
+      "drive_volume_relative_reload_error": 6.661338147750939e-16,
+      "drive_centre_error_m": 3.878959615385619e-18,
+      "method": "Retrieve original copper/drive OCC geometry retained in exact original source mesh bytes. Check engine, original hash, material partition, total/drive CAD volumes and drive centroid. Generate a new mesh withcurvature4; no previous current, source radius fit, geometry healing, new clearance or count-based identity. Original CAD and drive split are not rebuilt by a repeated Boolean calculation.",
+      "checkpoints": "New meshing-progress.json distinguishes retained-CAD loading/identity verification, native meshing, and the legacy Boolean stages. The actual retry passed CAD identity in10.38s and entered native mesh generation. A successful mesh-only checkpoint can later supply only verified mesh/CAD bytes to a fresh DC solve; reused meshes are not reserialized and all solves consume exact saved/reloaded mesh bytes."
+    },
     "preserved_trials": [
       "dc-imported-star4-source-input-v1 export: live production circular-geometry rejection; no replacement geometry emitted.",
       "dc-imported-star4-exact-copper-v1: preparer stopped on separate blind spans rather than filling gaps; no accepted geometry.",
@@ -408,13 +456,13 @@
       "dc-imported-star4-exact-copper-v3: completed exact Boolean CAD in89.155s but failed final validation on a string/Path report bug. New v4 uses verified geometry checkpoint only, reruns all bindings/reload checks; v3 stays failed."
     ],
     "test_results": {
-      "python_helpers": "386passed/0skips in30.272s, dc-imported-raw-copper-all-helpers-v3-20261021.log. Includes raw via gap/stub preservation, exact circular CAD, rejected legacy reconstruction, checkpoint bindings, passive/stub and native circular section selectors. Earlier384test inventory retained.",
+      "python_helpers": "390passed/0skips in30.744s, dc-imported-primal-retained-cad-gauge-all-helpers-v1-20261021.log. Includes saved resistivity/potential provenance, bounded algebraic corrections, retained CAD byte/material/volume/drive identity and mesh checkpoint reuse, analytic unit-EMF gauge identity and full compatible-current ring regression, plus existing raw via/arc/current controls. Watcher suite separately7passed in0.005s. Earlier388/387/386test inventories retained.",
       "rust_simulation": "199unit+7integration passed,2existing ignored; dc-imported-qualification-rust-simulation-v1-20261021.log. Production circular rejection and separate exact-primitive QA snapshot preservation tested.",
       "rust_desktop": "113passed/7ignored in42.08s, dc-imported-qualification-rust-desktop-v1-20261021.log. New external-project export test separately run1passed/0ignored; ignored in ordinary runs because it needs user source/pinned installation. No native-webview qualification.",
       "browser": "36DC/housing/periodic lifecycle regressions pass without skips in34.6s, dc-imported-geometry-browser-regressions-v1-20261021/report.json. UI fixtures only, not imported numerical-source acceptance.",
       "generated_case_regression": "dc-generated-baseline-after-import-guard-v1-20261021 validates the original registered source and entire pinned matrix evidence under current implementation; no new magnetic force computed or old forces replayed."
     },
-    "remaining": "Resolve sampled barrel-area failures through verified numerical refinement, then run whole eligible active/passive/native-arc/stub controls,2%mesh/curvature/drive-port controls and5%independent electrical-current reference. Exact source export/field/force controls, applicable explicit material geometry, sampled nonlinear current/polarity/pose matrix and eventual live registration remain unfinished. No imported source/force/general-CAD/hardware acceptance from passing global DC, CAD, mesh-volume or selected local checks."
+    "remaining": "Resolve sampled barrel-area failures through verified numerical refinement, then run whole eligible active/passive/native-arc/stub controls and2%mesh/curvature/drive-port controls. Coarse5%independent electrical R reference now passes, but must also cover the selected refined source. Exact source export/field/force controls, applicable explicit material geometry, sampled nonlinear current/polarity/pose matrix and eventual live registration remain unfinished. No imported source/force/general-CAD/hardware acceptance from passing coarse R, global DC, CAD, mesh-volume or selected local checks."
   },
   "managed_desktop_integration": {
     "scope": "Restricted installed-solver integration for exact registered actual geometry and sampled current/pose states only. This does not qualify arbitrary or broader generated/imported geometry; new geometry is rejected before numerical work. No continuous interpolation, componentwise relative-accuracy, differential-inductance, retained-history reversal, thermal or hardware claim.",

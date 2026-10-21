@@ -316,6 +316,52 @@ passive pilot before final source acceptance, retaining the 1e-8 A-per-loop
 zero-current floor. Curvature-safety refinement changes only numerical boundary
 tessellation, never the physical radius, plating, trace width or clearance.
 
+The coarse imported H1 electrical reference now passes the original equation,
+power and mean-current gates. Its resistance is 14.9504825942 ohm versus the
+mixed source's 15.0546436682 ohm, a 0.6967% difference under the 5% gate.
+This is resistance agreement on the same coarse mesh, not pointwise-current or
+mesh-convergence qualification. The first direct H1 run failed power balance
+at 1.9476e-8 against the unchanged 1e-8 gate and remains archived. A subsequent
+run permits at most three residual corrections using the original matrix and
+its existing factorization. One correction passed at 3.8481e-9. It changes no
+physical input, source scaling or gate. New H1 jobs bind resistivity to the
+saved geometry, hash their saved potential, and recheck input/implementation
+hashes. They do not retroactively establish hashes for historical potentials.
+
+The first imported curvature4 trial timed out after 1800 s without a saved
+mesh. Its sparse checkpoint cannot identify which CAD/meshing operation stalled.
+`finite_copper_curvature.py --reuse-cad-from-source-mesh --mesh-only` offers a
+separate input-only checkpoint path. It checks the original source mesh bytes,
+engine, retained copper/drive material partition, CAD volumes and drive centroid,
+then generates a fresh tessellation of its embedded OCC geometry. It does not
+reuse a current field or rebuild the drive split with another Boolean operation.
+`meshing-progress.json` distinguishes CAD loading, identity and meshing stages.
+Only a finished mesh-only job or verified pre-assembly resource-cap failure can
+supply `--mesh-work` to a fresh DC solve. Reused mesh bytes are copied unchanged,
+and all new solves consume the exact saved/reloaded mesh, never count-based
+identity. A mesh-only checkpoint is not current-source acceptance.
+
+`finite_copper_drive_profile.py` is a separate original-mesh gauge control.
+It replaces the uniform isolated-port field with `6*s*(1-s)/L`, retaining an
+exact one-volt line integral and identical drive geometry. The difference is
+the gradient of `3*s^2-2*s^3-s`, zero at both port ends. It compares raw compatible
+current in a resistivity-weighted L2 norm and unit-EMF loop current under the
+unchanged 2% gate. No fitted rescaling is allowed. Its ring regression checks
+current invariance; an imported numerical result must be obtained separately.
+This control does not replace drive-length or spatial/curvature refinement.
+
+Long runs need both an explicit whole-job timeout and a background
+`watch_solver_jobs.py` observation configured with their actual supervisor process
+identity and receipt patterns. The read-only watcher checks receipts, new error
+output, process identity and file/CPU activity, and exits with a notification
+when errors or finished chains are observed. Quiet but busy native meshing is
+not automatically a failure. Keep original command completion notifications
+enabled too, and replace a watcher if an alert ends it while its chain continues.
+The user-approved 12-hour window ends at 2026-10-22 06:53:31 UTC; subsequent
+longer budgets must fit its remaining time. The first retained-CAD mesh retry
+keeps its original 1800 s launch-time bound. Watcher observations never qualify
+a mesh, source or force result.
+
 Evidence correction: earlier 306-test helper logs included four or five skipped
 tests, not 306 passes. Preserve those logs and historical delivery manifests.
 A fresh explicit NGSolve/PyAMG/Rust-entrypoint run covers the omitted checks.

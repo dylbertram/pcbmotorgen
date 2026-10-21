@@ -3,7 +3,32 @@ import unittest
 
 import numpy as np
 
-from finite_copper_primal import solve
+from finite_copper_primal import solve,saved_resistivity,verify_potential_artifact
+
+
+class PrimalInputBindingTest(unittest.TestCase):
+    def test_saved_resistivity_cannot_be_fitted_and_potential_bytes_are_bound(self):
+        import json
+        from pathlib import Path
+        import tempfile
+        from post_project_force import sha
+        for count in [-1,6,True]:
+            with self.subTest(corrections=count),self.assertRaisesRegex(ValueError,'Bounded'):
+                solve(None,None,None,1.,max_corrections=count)
+        with tempfile.TemporaryDirectory() as folder:
+            work=Path(folder);geometry=work/'summary.json'
+            geometry.write_text(json.dumps({'geometry':{'copper_resistivity_ohm_m':2.0966426e-8}}))
+            source={'input_hashes':{str(work/'copper.brep'):'cad',str(geometry):sha(geometry)}}
+            self.assertEqual(saved_resistivity(source,2.0966426e-8),geometry)
+            with self.assertRaisesRegex(ValueError,'no fitted value'):
+                saved_resistivity(source,2e-8)
+            potential=work/'potential.sol';potential.write_bytes(b'potential-fixture')
+            report={'potential_sha256':sha(potential)};verify_potential_artifact(work,report)
+            with self.assertRaisesRegex(ValueError,'provenance'):
+                verify_potential_artifact(work,{})
+            potential.write_bytes(b'changed')
+            with self.assertRaisesRegex(ValueError,'provenance'):
+                verify_potential_artifact(work,report)
 
 
 @unittest.skipUnless(importlib.util.find_spec('ngsolve'),'optional pinned NGSolve environment required')

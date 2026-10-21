@@ -5,7 +5,7 @@ import unittest
 import numpy as np
 
 from audit_finite_dc_sections import section,tetrahedra
-from finite_copper_curvature import generate_mesh,validate_mesh_reuse
+from finite_copper_curvature import generate_mesh,validate_mesh_reuse,mesh_retained_cad
 
 
 class CurvatureInputTest(unittest.TestCase):
@@ -23,10 +23,40 @@ class CurvatureInputTest(unittest.TestCase):
             changed=copy.deepcopy(prior);changed[key]=value
             with self.assertRaises(ValueError):validate_mesh_reuse(changed,source,4.)
         with self.assertRaises(ValueError):validate_mesh_reuse(prior,source,3.)
+        checkpoint=copy.deepcopy(prior);checkpoint['status']='completed-finite-copper-curvature-mesh-only';checkpoint.pop('error')
+        validate_mesh_reuse(checkpoint,source,4.)
 
 
 @unittest.skipUnless(importlib.util.find_spec('ngsolve'),'optional pinned NGSolve required')
 class CurvatureGeometryTest(unittest.TestCase):
+    def test_retained_cad_reuse_is_byte_bound_and_preserves_drive_partition(self):
+        import tempfile
+        from pathlib import Path
+        import ngsolve as ng
+        from netgen.occ import Box,Pnt,Glue,OCCGeometry
+        from post_project_force import sha
+        copper=Box(Pnt(0,0,0),Pnt(.8,1,1));copper.mat('copper')
+        drive=Box(Pnt(.8,0,0),Pnt(1,1,1));drive.mat('drive')
+        initial=ng.Mesh(OCCGeometry(Glue([copper,drive])).GenerateMesh(maxh=.4));initial.Curve(1)
+        with tempfile.TemporaryDirectory() as folder:
+            work=Path(folder);initial.ngmesh.Save(str(work/'mesh.vol'))
+            source=dict(version=ng.__version__,mesh_sha256=sha(work/'mesh.vol'),request=dict(mesh_m=.4),
+                geometry=dict(volume_m3=1.,drive_volume_m3=.2,drive_path_m=[[.8,.5,.5],[1.,.5,.5]]))
+            stages=[]
+            result,identity=mesh_retained_cad(ng,work,source,4.,lambda stage,**kw:stages.append(stage))
+            self.assertEqual(set(result.GetMaterials()),{'copper','drive'})
+            self.assertLess(identity['cad_volume_relative_reload_error'],1e-9)
+            self.assertIn('native-mesh-generation-complete',stages)
+            changed=copy.deepcopy(source);changed['mesh_sha256']='same-counts-are-not-identity'
+            with self.assertRaisesRegex(ValueError,'immutable original mesh'):
+                mesh_retained_cad(ng,work,changed,4.)
+            changed=copy.deepcopy(source);changed['geometry']['drive_volume_m3']=.1
+            with self.assertRaisesRegex(ValueError,'drive identity'):
+                mesh_retained_cad(ng,work,changed,4.)
+            changed=copy.deepcopy(source);changed['geometry']['drive_path_m']=[[.7,.5,.5],[.9,.5,.5]]
+            with self.assertRaisesRegex(ValueError,'drive identity'):
+                mesh_retained_cad(ng,work,changed,4.)
+
     def test_saved_radius_and_plating_barrel_section(self):
         import ngsolve as ng
         from netgen.occ import Cylinder,Pnt,Dir
