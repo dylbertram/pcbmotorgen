@@ -18,13 +18,14 @@ import numpy as np
 from compare_reduced_fields import completed_receipt
 from finite_current_quadrature import check_rules, material_layout, source_components, weighted_rule_values
 from finite_current_zero_bias import magnetic_regions, reaction_form
+from finite_current_scalar import scalar_form, magnetization_h
 from ngsolve_material_motion import translated_source
 from pm_current_force import array_magnetization_force
 from post_project_force import sha
 from solver_threads import add_thread_option, runtime_metadata, threaded_main
 from source_snapshot import capture
 from tree_gauge import free_dofs
-from vector_material import magnetization_b
+from vector_material import MU0, magnetization_b
 
 CACHE_UNIT = 'tesla per loop ampere, divided by the recorded1V-loop current without fitting'
 
@@ -67,6 +68,8 @@ def main():
     parser.add_argument('--work', type=Path, required=True)
     parser.add_argument('--currents', type=float, nargs='+', default=[0., .1, -.1, .5, -.5])
     parser.add_argument('--mode', choices=['nonlinear', 'linear', 'vacuum'], default='nonlinear')
+    parser.add_argument('--formulation', choices=['vector-b', 'scalar-h'], default='vector-b')
+    parser.add_argument('--scalar-order', type=int, choices=[1, 2, 3], default=2)
     parser.add_argument('--max-dofs', type=int, default=200000)
     add_thread_option(parser)
     args = parser.parse_args()
@@ -127,10 +130,11 @@ def main():
     mesh = ng.Mesh(str(bias_work/'mesh.vol'))
     degree = cache['request']['degree']
     order = bias['request']['order']
-    space = ng.HCurl(mesh, order=order, nograds=True, dirichlet='outer')
+    space = (ng.HCurl(mesh, order=order, nograds=True, dirichlet='outer') if args.formulation == 'vector-b'
+             else ng.H1(mesh, order=args.scalar_order, dirichlet='outer'))
     if space.ndof > args.max_dofs:
         raise ValueError('Coupled field DOF cap exceeded before assembly')
-    selected, tree_count = free_dofs(ng, mesh, space, space)
+    selected, tree_count = (free_dofs(ng, mesh, space, space) if args.formulation == 'vector-b' else (space.FreeDofs(), 0))
     free = np.asarray(selected, dtype=bool)
     layout = material_layout(ng, mesh, cache['regions'], degree)
     with np.load(cache_work/'material-current-source.npz', allow_pickle=False) as archive:
@@ -143,11 +147,12 @@ def main():
     gradients = [pm.Diff(p).Compile() for p in position]
     amplitude = ng.Parameter(0.)
     field = (pm+amplitude*unit_field).Compile()
-    form = reaction_form(ng, space, mesh, model, field, layout.rules)
+    form = (reaction_form if args.formulation == 'vector-b' else scalar_form)(ng, space, mesh, model, field, layout.rules)
     state = ng.GridFunction(space)
     residual = state.vec.CreateVector()
     report = {'status': 'running', 'scope': __doc__, 'model': model, 'base_model': cache['model'], 'material_control': args.mode,
               'version': ng.__version__, 'execution': runtime_metadata(), 'input_hashes': inputs,
+              'formulation': args.formulation, 'field_order': order if args.formulation == 'vector-b' else args.scalar_order,
               'currents_a': args.currents, 'current_pairs_a': pairs, 'dofs': space.ndof, 'tree_fixed_edges': tree_count,
               'degree': degree, 'source_storage': storage, 'states': {}, 'incremental_balance': {}, 'failures': [],
               'scope_limits': ['Recorded actual geometry/source/pose only; no arbitrary-CAD qualification',
@@ -156,7 +161,7 @@ def main():
                   'Stationary-force balance is combined winding+shield, not separately qualified body forces',
                   'No differential inductance, reversal, temperature, housing eddy loss or hardware rating'],
               'source_snapshots': capture(work, [Path(__file__), *[Path(__file__).with_name(n) for n in
-                  ['finite_current_zero_bias.py', 'finite_current_quadrature.py', 'ngsolve_material_motion.py',
+                   ['finite_current_zero_bias.py', 'finite_current_scalar.py', 'ngsolve_reduced.py', 'finite_current_quadrature.py', 'ngsolve_material_motion.py',
                    'vector_material.py', 'tree_gauge.py', 'pm_current_force.py', 'volume_field_quadrature.py']]])}
     if os.environ.get('PCB_MOTOR_COMMAND_RECEIPT'):
         report['command_receipt'] = os.environ['PCB_MOTOR_COMMAND_RECEIPT']
@@ -165,7 +170,7 @@ def main():
     started = time.monotonic()
     save()
     try:
-        for current in args.currents:
+        for state_index, current in enumerate(args.currents):
             amplitude.Set(current)
             state.vec[:] = 0.
             form.Apply(state.vec, residual)
@@ -182,7 +187,9 @@ def main():
             material_source = np.zeros(3)
             points, weighted = [], []
             for region in magnetic_regions(model, mesh.GetMaterials()):
-                moment = magnetization_b(ng, field+ng.curl(state), region['mu_r'], region['bsat_t']).Compile()
+                moment = (magnetization_b(ng, field+ng.curl(state), region['mu_r'], region['bsat_t'])
+                          if args.formulation == 'vector-b' else
+                          magnetization_h(ng, field/MU0-ng.grad(state), region['mu_r'], region['bsat_t'])).Compile()
                 for axis in range(3):
                     material_source[axis] -= float(ng.Integrate(ng.InnerProduct(moment, gradients[axis])*ng.dx(
                         definedon=mesh.Materials(region['name']), intrules=layout.rules), mesh))
@@ -200,7 +207,7 @@ def main():
             limit = max(1e-8, .02*float(np.linalg.norm(pm_force)))
             if max(balance, kernel_change) > limit:
                 raise ValueError('Finite-current force balance/PM kernel derivative fails unchanged2%gate')
-            filename = f'current-{current:+.6f}.sol'
+            filename = f'current-{state_index:03d}-{current:+.17g}.sol'
             state.Save(str(work/filename))
             report['states'][str(current)] = dict(relative_residual=relative, newton_result=list(result),
                 reduced_energy_j=float(form.Energy(state.vec)), pm_array_force_n=pm_force.tolist(),
@@ -211,6 +218,13 @@ def main():
             save()
             print('current', current, 'mode', args.mode, 'PM force', pm_force.tolist(), 'balance', balance, flush=True)
         zero = report['states']['0.0']
+        if args.mode == 'nonlinear':
+            expected = np.asarray(bias['states']['pm_zero_current_bias']['independent_pm_force_n'])
+            error = float(np.linalg.norm(np.asarray(zero['pm_array_force_n'])-expected))
+            limit = max(1e-8, .02*float(np.linalg.norm(expected)))
+            report['zero_current_reload_control'] = dict(difference_n=error, limit_n=limit, passed=error <= limit)
+            if error > limit:
+                report['failures'].append('Zero-current coupled limit differs from accepted PM-bias baseline')
         for current in args.currents:
             if current == 0:
                 continue

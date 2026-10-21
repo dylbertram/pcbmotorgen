@@ -9,6 +9,7 @@ The original reversible material law is retained as a declared provisional law.
 No winding inductance, motion, thermal or hardware quantities are qualified.
 """
 import argparse
+from copy import deepcopy
 import itertools
 import json
 import os
@@ -39,6 +40,15 @@ def magnetic_regions(model, material_names):
         if region['name'] == 'housing' and region['mu_r'] != 1:
             raise ValueError('This baseline only supports an explicitly mu=1 housing')
     return [x for x in model['stack'] if x['name'] != 'housing' and x['mu_r'] > 1]
+
+
+def posed_model(model, offset):
+    if not np.isfinite(offset) or abs(offset) > 1e-4:
+        raise ValueError('Only recorded lateral offsets within +/-100um are supported')
+    result = deepcopy(model)
+    for magnet in result['magnets']:
+        magnet['origin_m'][0] += offset
+    return result
 
 
 def reaction_form(ng, space, mesh, model, source, rules):
@@ -89,6 +99,9 @@ def main():
     parser.add_argument('--air-mesh', type=float, default=.01)
     parser.add_argument('--material-mesh', type=float, default=.002)
     parser.add_argument('--order', type=int, choices=[0, 1, 2], default=1)
+    parser.add_argument('--formulation', choices=['vector-b', 'scalar-h'], default='vector-b')
+    parser.add_argument('--scalar-order', type=int, choices=[1, 2, 3], default=2)
+    parser.add_argument('--pm-offset-x', type=float, default=0., help='Explicit recorded lateral PM pose offset in metres, limited to +/-100um')
     parser.add_argument('--degree', type=int, default=8)
     parser.add_argument('--max-dofs', type=int, default=200000)
     add_thread_option(parser)
@@ -96,7 +109,7 @@ def main():
     material_work, source_work, work = [p.resolve() for p in [args.material_work, args.source_work, args.work]]
     if work.exists():
         parser.error('Preserve previous baselines')
-    if not np.isfinite([args.far, args.air_mesh, args.material_mesh]).all() or min(args.far, args.air_mesh, args.material_mesh) <= 0 or args.max_dofs < 1 or args.degree < 2 or args.degree % 2:
+    if not np.isfinite([args.far, args.air_mesh, args.material_mesh, args.pm_offset_x]).all() or abs(args.pm_offset_x) > 1e-4 or min(args.far, args.air_mesh, args.material_mesh) <= 0 or args.max_dofs < 1 or args.degree < 2 or args.degree % 2:
         parser.error('Positive finite mesh/resource limits and even integration degree required')
     material = json.loads((material_work/'summary.json').read_text())
     source = json.loads((source_work/'summary.json').read_text())
@@ -115,16 +128,20 @@ def main():
             raise ValueError('Approved physical source input changed')
     import ngsolve as ng
     from ngsolve.nonlinearsolvers import NewtonMinimization
+    from finite_current_scalar import scalar_form, magnetization_h
     if ng.__version__ != source['version']:
         raise ValueError('Source engine differs from magnetic baseline engine')
-    model = material['model']
+    base_model = material['model']
+    model = posed_model(base_model, args.pm_offset_x)
     started = time.monotonic()
     work.mkdir(parents=True)
     report = {'status': 'running', 'scope': __doc__, 'version': ng.__version__, 'execution': runtime_metadata(),
-              'model': model, 'input_hashes': inputs, 'current_a': 0., 'states': {}, 'failures': [],
+              'formulation': args.formulation, 'scalar_order': args.scalar_order,
+              'model': model, 'base_model': base_model, 'pm_offset_x_m': args.pm_offset_x,
+              'input_hashes': inputs, 'current_a': 0., 'states': {}, 'failures': [],
               'request': {k: getattr(args, k) for k in ['far', 'air_mesh', 'material_mesh', 'order', 'degree', 'max_dofs']},
               'source_snapshots': capture(work, [Path(__file__), *[Path(__file__).with_name(name) for name in
-                  ['vector_material.py', 'ngsolve_material_motion.py', 'ngsolve_reduced.py', 'tree_gauge.py',
+                  ['vector_material.py', 'finite_current_scalar.py', 'ngsolve_material_motion.py', 'ngsolve_reduced.py', 'tree_gauge.py',
                    'volume_field_quadrature.py', 'pm_current_force.py']]])}
     if os.environ.get('PCB_MOTOR_COMMAND_RECEIPT'):
         report['command_receipt'] = os.environ['PCB_MOTOR_COMMAND_RECEIPT']
@@ -135,7 +152,7 @@ def main():
             origin = args.mesh_work.resolve()
             prior = json.loads((origin/'summary.json').read_text())
             completed_receipt(prior)
-            if prior['status'] != 'passed-approved-material-mesh-controls-only' or prior['model'] != model or prior['version'] != ng.__version__:
+            if prior['status'] != 'passed-approved-material-mesh-controls-only' or prior.get('base_model', prior['model']) != base_model or prior['version'] != ng.__version__:
                 raise ValueError('Imported mesh is not an accepted same-model baseline mesh')
             for key in ['far', 'air_mesh', 'material_mesh', 'order', 'degree']:
                 if prior['request'][key] != getattr(args, key):
@@ -164,8 +181,9 @@ def main():
             if max(error, area_error) > .02:
                 raise ValueError('Material volume/interface-area mesh control exceeds2%')
             volumes[region['name']] = dict(volume_m3=volume, interface_area_m2=area, volume_relative_error=error, area_relative_error=area_error)
-        space = ng.HCurl(mesh, order=args.order, nograds=True, dirichlet='outer')
-        selected, tree_count = free_dofs(ng, mesh, space, space)
+        space = (ng.HCurl(mesh, order=args.order, nograds=True, dirichlet='outer') if args.formulation == 'vector-b'
+                 else ng.H1(mesh, order=args.scalar_order, dirichlet='outer'))
+        selected, tree_count = (free_dofs(ng, mesh, space, space) if args.formulation == 'vector-b' else (space.FreeDofs(), 0))
         free = np.asarray(selected, dtype=bool)
         report.update(mesh_sha256=sha(work/'mesh.vol'), elements=mesh.ne, dofs=space.ndof,
                       free_dofs=int(free.sum()), tree_fixed_edges=tree_count, material_mesh_controls=volumes,
@@ -192,7 +210,7 @@ def main():
                                         ('pm_zero_current_bias', model, pm)]:
             state = ng.GridFunction(space)
             residual = state.vec.CreateVector()
-            form = reaction_form(ng, space, mesh, case_model, field, rules)
+            form = (reaction_form if args.formulation == 'vector-b' else scalar_form)(ng, space, mesh, case_model, field, rules)
             form.Apply(state.vec, residual)
             initial = float(np.linalg.norm(residual.FV().NumPy()[free]))
             if label != 'pm_zero_current_bias':
@@ -218,7 +236,9 @@ def main():
             independent = []
             moments = []
             for region in magnetic_regions(case_model, mesh.GetMaterials()):
-                moment = magnetization_b(ng, field+ng.curl(state), region['mu_r'], region['bsat_t']).Compile()
+                moment = (magnetization_b(ng, field+ng.curl(state), region['mu_r'], region['bsat_t'])
+                          if args.formulation == 'vector-b' else
+                          magnetization_h(ng, field/MU0-ng.grad(state), region['mu_r'], region['bsat_t'])).Compile()
                 moments.append((region['name'], moment))
                 for axis in range(3):
                     source_force[axis] -= float(ng.Integrate(ng.InnerProduct(moment, gradients[axis]), mesh,

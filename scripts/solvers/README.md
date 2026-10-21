@@ -103,6 +103,25 @@ linear/vacuum controls and incremental balance are still required alongside
 independent formulation, pose, mesh, domain and quadrature controls before app
 integration. Existing housing screening and all original design files stay unchanged.
 
+`finite_current_scalar.py` supplies an independent H1 reaction-H formulation.
+The prescribed source carries all free current; only the reaction is a scalar
+gradient. The reversible coenergy law is inverse to the reaction-B constitutive
+law, tested at zero, linear and saturated fields. This is an independent magnetic
+discretization with shared physical source data, not an independent current solve.
+Use `--formulation scalar-h --scalar-order 2` in the baseline or coupled runner.
+`compare_finite_current_controls.py` checks immutable input/solution/snapshot
+hashes and whole receipts, then applies the 2% refinement or 5% formulation gate.
+Current-induced force is checked separately from the PM bias so a large static
+attraction cannot hide an inaccurate current effect. The force floor is 1e-8 N.
+
+Recorded zero-current followup passes spatial refinement in both formulations,
+degree-8/10 quadrature and 40/60 mm outer-domain checks. The refined scalar/vector
+force difference is 0.7255%, below 5%; vector/scalar mesh changes are 0.5405% and
+0.02284%, below 2%. These remain zero-current results only. The first revised full
+source cache completed numerical checks and native storage but correctly rejected
+an implementation change during its run. Preserve that failed receipt; repeat
+with unchanged snapshots rather than overriding its status.
+
 Evidence correction: earlier 306-test helper logs included four or five skipped
 tests, not 306 passes. Preserve those logs and historical delivery manifests.
 A fresh explicit NGSolve/PyAMG/Rust-entrypoint run covers the omitted checks.
