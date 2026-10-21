@@ -35,6 +35,12 @@ class LiveDcRequestTest(unittest.TestCase):
         self.assertNotIn('force_n', result)
         self.assertEqual(request, before)
 
+    def test_offline_circular_qualification_snapshot_is_not_an_app_capability(self):
+        request, fixture, model, closure = self.inputs()
+        request['winding']['schema'] = 'finite-dc-winding-circular-qualification-v1'
+        with self.assertRaisesRegex(UnsupportedDcRequest, 'Actual live winding geometry snapshot required'):
+            validate_request(request, fixture, model, closure, 'qualified-basis')
+
     def test_oversized_graph_is_rejected_before_allocating_a_current_solve(self):
         request, fixture, model, closure = self.inputs()
         request['winding']['networks'][0]['node_count'] = 1000000000

@@ -257,6 +257,65 @@ agreement or native WKWebView interaction. Broader source-geometry qualification
 native interaction and portable solver installation remain unfinished. No new
 delivery bundle is produced by this work.
 
+### Broader imported source qualification
+
+`star_2-layer.pmmotor` version 1 is a **generated** routing source, not imported
+CAD. Its numerical evidence is unchanged. The original four-layer imported
+project is a separate, still-unqualified source. The live production command
+correctly rejects its three circular primitives. The offline-only
+`circular_qualification_snapshot` retains those exact three-point circles, actual
+mapped routes, explicit depths and full raw via records. It is not an IPC
+capability and its schema is rejected by the live force request contract.
+
+`prepare_imported_dc_source.py --export-log SUCCESSFUL_ACTUAL_EXPORT --declaration EXPLICIT_SOURCE_STUDY --work NEW_GEOMETRY`
+builds exact finite circular trace solids with OCCT arc edges, not graph chords.
+The graph chord length is independently compared with analytic arc length under
+the unchanged 2% geometry gate. The actual imported trace width is 127 µm,
+copper is 35 µm thick, and layer depths remain 0, −1.6, −3.2 and −4.8 mm despite
+the saved nominal PCB thickness of 0.8 mm. Neither the root file nor those depths
+is changed to reconcile that nominal setting.
+
+Raw physical vias, not only graph landing intervals, determine the copper. There
+are 789 physical spans at 396 XY positions: 393 positions have two separate
+blind-via spans with a real gap, and three full through-vias extend beyond their
+electrical landings. Each declared span retains its plated barrel and annular
+pads at the saved copper planes it traverses. The new path preserves gaps and
+unlanded stubs. `finite_copper_eligibility.py` now rejects legacy network-only
+construction that would fill a gap, shorten a barrel, omit pads or replace a
+native circle by chords. The qualified generated two-layer case passes this
+guard unchanged.
+
+`cases/star4-v0-source-only-return-20261021.json` explicitly declares an A-positive,
+C-negative screening return outside the saved winding. It is not recovered
+cable CAD or a material-placement approval. No magnetic model or corrected stack
+is added. `finite_copper_circuit.py` accepts this source-only return preparation
+without requiring an unrelated unqualified magnetic trial.
+
+`audit_imported_dc_cad.py --geometry-work EXACT_GEOMETRY --work NEW_AUDIT` queries
+the saved BRep independently. It checks all 393 gap windows, all 789 drill bores,
+and six isolated through-via stub sections. These are CAD controls, not current,
+mesh, magnetic-force or hardware qualification. The accepted v4 geometry reuses
+only hash-verified CAD from v3's post-CAD report-path failure and verifies exact
+reload volume/topology and unchanged construction dependencies. It imports no
+failed field or acceptance. Original failures and the earlier 240 s construction
+timeout remain preserved. A single exact union of bore tools avoids repeatedly
+cutting the whole CAD body; it changes the Boolean evaluation order, not the
+physical holes or a tolerance.
+
+The imported case is not registered for app forces. Current continuity/power,
+local active/passive/stub controls, mesh/curvature/drive-port refinement and the
+independent current formulation must pass before any coupled-field study.
+The first coarse solve passes global DC gates and all 13 selected passive,
+native-arc and stub zero-current checks, but two active via sections fail the
+2% area gate at 3.50% and 2.32%. Those failures are preserved, not waived by the
+passing global volume/current checks. Native circular controls use the actual
+saved midpoint and tangent-normal plane rather than a chord section; both
+active arc sections pass the current and area gates on this coarse trial.
+`audit_imported_dc_zero_sections.py --all-eligible-passive` expands the initial
+passive pilot before final source acceptance, retaining the 1e-8 A-per-loop
+zero-current floor. Curvature-safety refinement changes only numerical boundary
+tessellation, never the physical radius, plating, trace width or clearance.
+
 Evidence correction: earlier 306-test helper logs included four or five skipped
 tests, not 306 passes. Preserve those logs and historical delivery manifests.
 A fresh explicit NGSolve/PyAMG/Rust-entrypoint run covers the omitted checks.

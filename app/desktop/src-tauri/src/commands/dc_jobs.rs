@@ -787,6 +787,38 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "Explicit actual-project snapshot for independent geometry/source qualification"]
+    fn export_saved_dc_geometry_for_independent_qualification() {
+        let project_path = PathBuf::from(std::env::var_os("PCB_MOTOR_PROJECT_PATH").unwrap());
+        let original = fs::read(&project_path).unwrap();
+        let project: Value = serde_json::from_slice(&original).unwrap();
+        let index: usize = std::env::var("PCB_MOTOR_VERSION_INDEX").unwrap().parse().unwrap();
+        let saved = &project["versions"][index]["state"];
+        let config: crate::ipc::ProjectConfigStateIpc = serde_json::from_value(saved["config"].clone()).unwrap();
+        let cad: Option<pcbmotorgen_export::cad_dxf::CadGeometry> = serde_json::from_value(saved["cad_geometry"].clone()).unwrap();
+        let qualification_only = std::env::var("PCB_MOTOR_DC_QUALIFY_CIRCULAR").as_deref() == Ok("1");
+        let snapshot = if qualification_only {
+            // This branch is available only in this explicitly run offline test,
+            // never through the production IPC command's supported-case gate.
+            let cad = cad.as_ref().expect("circular qualification expects an actual imported source");
+            let core = config.to_linear_motor_ipc().to_core();
+            let board = super::super::cad_source::CadBoard::new(cad,&core).unwrap();
+            pcbmotorgen_simulation::dc_geometry::circular_qualification_snapshot(&board.simulation_input(cad,&core),
+                &board.routing,&config.drive,&super::super::cad_source::CadBoard::drive_hints(cad)).unwrap()
+        } else {
+            tauri::async_runtime::block_on(super::super::physics::prepare_dc_winding_geometry(
+                config.to_linear_motor_ipc(), config.drive, cad)).unwrap()
+        };
+        let output = PathBuf::from(std::env::var_os("PCB_MOTOR_DC_EXPORT_PATH").unwrap());
+        let bytes = serde_json::to_vec_pretty(&snapshot).unwrap();
+        File::options().create_new(true).write(true).open(&output).unwrap().write_all(&bytes).unwrap();
+        assert_eq!(fs::read(&project_path).unwrap(), original);
+        println!("{}",serde_json::to_string(&json!({"source_project":project_path,"source_sha256":hash(&original),
+            "version_index":index,"imported":!saved["cad_geometry"].is_null(),"qualification_only":qualification_only,
+            "snapshot":output,"snapshot_sha256":hash(&bytes)})).unwrap());
+    }
+
+    #[test]
     #[ignore = "Explicit bounded real FEM integration: requires configured pinned solver/evidence and PCB_MOTOR_PROJECT_PATH"]
     fn real_saved_geometry_desktop_job_recalculates_requested_force() {
         let runtime = Runtime::from_env().unwrap();

@@ -59,7 +59,8 @@ def main():
     if not np.isfinite(args.mesh) or args.mesh<=0 or args.max_dofs<1:parser.error('Invalid mesh/resource controls')
     geometry=json.loads((geometry_work/'summary.json').read_text());source=json.loads((return_work/'summary.json').read_text())
     completed_receipt(geometry);completed_receipt(source)
-    if geometry['status']!='completed-finite-copper-geometry-only-unqualified' or source['status']!='completed-closed-winding-nonlinear-current-response-unqualified' or source['failures']:
+    if geometry['status']!='completed-finite-copper-geometry-only-unqualified' or source['status'] not in [
+        'completed-closed-winding-nonlinear-current-response-unqualified','prepared-physical-dc-return-geometry-only'] or source['failures']:
         raise ValueError('Need completed saved finite copper and explicit return sources')
     if sha(geometry_work/'copper.brep')!=geometry['brep_sha256']:raise ValueError('Finite copper geometry changed')
     if geometry['translation_m']!=source['translation_m']:raise ValueError('Copper and return coordinate frames differ')

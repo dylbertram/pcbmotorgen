@@ -21,7 +21,7 @@ from winding_oracle import edge_points,resistances,unit_currents
 
 
 def probes(fixture,shift,phase_data,all_eligible=False):
-    spec=dimensions(fixture);traces=[];vias={}
+    spec=dimensions(fixture);traces=[];vias={};arcs=[]
     for network in fixture['networks']:
         sign=phase_data.get(network['net'],{}).get('current_a',0.)
         if not sign:continue
@@ -35,6 +35,14 @@ def probes(fixture,shift,phase_data,all_eligible=False):
                     'radius':spec['via_outer_radius_m']*1.2,'expected_per_loop_a':0.,'expected_area_m2':spec['via_barrel_area_m2']})
                 value['expected_per_loop_a']+=sign*share*normal[2]/length
             else:
+                if 'circular_arc_m' in edge['geometry']:
+                    from finite_circular_copper import section_plane
+                    layer=spec['layers'][edge['geometry']['layer']]
+                    plane=section_plane(edge['geometry']['circular_arc_m'],layer['centre_z_m'],layer['trace_width_m'])
+                    plane['centre']=(np.asarray(plane['centre'])+shift).tolist()
+                    arcs.append(dict(plane,label=f"arc:{network['net']}:{index}",expected_per_loop_a=sign*share,
+                        expected_area_m2=layer['trace_width_m']*layer['thickness_m']))
+                    continue
                 lengths=np.linalg.norm(np.diff(points,axis=0),axis=1);i=int(np.argmax(lengths));length=lengths[i]
                 if length<.001:continue
                 layer=spec['layers'][edge['geometry']['layer']]
@@ -47,6 +55,7 @@ def probes(fixture,shift,phase_data,all_eligible=False):
         group=[p for p in group if abs(p['expected_per_loop_a'])>.05]
         if not group:raise ValueError('No eligible signed winding cross-sections')
         result.extend(group if all_eligible else [group[i] for i in np.unique(np.linspace(0,len(group)-1,min(count,len(group)),dtype=int))])
+    result.extend(probe for probe in arcs if abs(probe['expected_per_loop_a'])>.05)
     return result
 
 
@@ -77,9 +86,10 @@ def main():
         'source_work':str(work),'source_summary_sha256':sha(work/'summary.json'),'source_solution_sha256':source['solution_sha256'],
         'fixture_sha256':sha(fixtures[0]),'execution':runtime_metadata(),'sections':records,'failures':failures,
         'selection':'all eligible' if args.all_eligible else 'historical deterministic6trace/12via sample',
-        'eligibility':'Active phases only; trace longest straight piece>=1mm; aggregate via currents; absolute expected signed share>0.05. Excluded/near-zero/short/junction interior fields remain unqualified.',
+        'eligibility':'Active phases only; trace longest straight piece>=1mm; aggregate via currents; native circular midsections use exact tangent normals and a declared junction-clear window; absolute expected signed share>0.05. Excluded/near-zero/short/junction interior fields remain unqualified.',
         'expected_sections':len(selected),
-        'source_snapshots':capture(args.output.parent,[Path(__file__),Path(__file__).with_name('audit_finite_dc_sections.py'),Path(__file__).with_name('winding_oracle.py')])}
+        'source_snapshots':capture(args.output.parent,[Path(__file__),*[Path(__file__).with_name(name) for name in
+            ['audit_finite_dc_sections.py','winding_oracle.py','finite_circular_copper.py','finite_copper_geometry.py']]])}
     if os.environ.get('PCB_MOTOR_COMMAND_RECEIPT'):report['command_receipt']=os.environ['PCB_MOTOR_COMMAND_RECEIPT']
     def save():args.output.write_text(json.dumps(report,indent=2,allow_nan=False)+'\n')
     save()

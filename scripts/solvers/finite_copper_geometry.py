@@ -67,6 +67,8 @@ def trace_solid(points,width,thickness):
 def build(fixture,shift):
     from netgen.occ import Pnt,Dir,Cylinder
     spec=dimensions(fixture);shift=np.asarray(shift,dtype=float)
+    from finite_copper_eligibility import require_network_representable
+    require_network_representable(fixture,spec)
     if shift.shape!=(3,) or not np.isfinite(shift).all():raise ValueError('Invalid rigid copper translation')
     layers={x['layer']:x for x in spec['layers']};pieces=[];via_intervals={};trace_count=0
     for network in fixture['networks']:
@@ -113,7 +115,7 @@ def main():
     if model['source_sha256']!=exported['source_project_sha256'] or model['version_index']!=exported['version_index']:raise ValueError('Different saved project/version')
     fixture=json.loads(fixture_path.read_text());shift=translation(fixture['sim'],model,exported['saved_mover_position_mm']*1e-3)
     work.mkdir(parents=True);started=time.monotonic();report={'status':'running','scope':__doc__,'execution':runtime_metadata(),
-        'source_snapshots':capture(work,[Path(__file__),Path(__file__).with_name('winding_oracle.py'),Path(__file__).with_name('winding_coordinates.py')]),
+        'source_snapshots':capture(work,[Path(__file__),Path(__file__).with_name('winding_oracle.py'),Path(__file__).with_name('winding_coordinates.py'),Path(__file__).with_name('finite_copper_eligibility.py')]),
         'input_hashes':{str(p):sha(p) for p in [copper_work/'summary.json',fixture_path,model_path]},'translation_m':shift.tolist()}
     if os.environ.get('PCB_MOTOR_COMMAND_RECEIPT'):report['command_receipt']=os.environ['PCB_MOTOR_COMMAND_RECEIPT']
     path=work/'summary.json'

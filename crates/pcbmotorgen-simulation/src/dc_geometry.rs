@@ -10,11 +10,23 @@ use serde_json::{Value, json};
 
 pub fn snapshot(sim: &SimulationInput, routing: &RoutingResult, drive: &DriveSettings,
                 hints: &DriveGeometryHints) -> Result<Value, String> {
+    snapshot_with_scope(sim, routing, drive, hints, false)
+}
+
+/// Offline qualification input only. Not registered as an application command.
+/// Circular primitives are retained independently of the graph's chord samples.
+pub fn circular_qualification_snapshot(sim: &SimulationInput, routing: &RoutingResult, drive: &DriveSettings,
+                hints: &DriveGeometryHints) -> Result<Value, String> {
+    snapshot_with_scope(sim, routing, drive, hints, true)
+}
+
+fn snapshot_with_scope(sim: &SimulationInput, routing: &RoutingResult, drive: &DriveSettings,
+                hints: &DriveGeometryHints, circular_qualification: bool) -> Result<Value, String> {
     sim.validate().map_err(|error| error.to_string())?;
-    if routing.segments.len().saturating_add(routing.vias.len()) > 10_000 {
+    if routing.segments.len().saturating_add(routing.vias.len()).saturating_add(routing.curves.len()) > 10_000 {
         return Err("Finite DC geometry preparation exceeds the declared 10000-edge resource cap; geometry was not truncated".into());
     }
-    if !routing.curves.is_empty() || !routing.splines.is_empty() {
+    if (!circular_qualification && !routing.curves.is_empty()) || !routing.splines.is_empty() {
         return Err("Finite DC coupling has not qualified curved/spline copper; no chord or filament replacement was made".into());
     }
     if !routing.io_traces.is_empty() || !routing.io_pads.is_empty() {
@@ -32,6 +44,11 @@ pub fn snapshot(sim: &SimulationInput, routing: &RoutingResult, drive: &DriveSet
         return Err("Via plating extends outside its physical annular pad".into());
     }
     let valid_layer = |layer: u32| layer < sim.num_layers && hints.layer_z(sim, layer).is_finite();
+    if routing.curves.iter().any(|curve| !valid_layer(curve.layer)
+        || ![curve.start.x,curve.start.y,curve.mid.x,curve.mid.y,curve.end.x,curve.end.y].iter().all(|x|x.is_finite())
+        || curve.start == curve.end || curve.start == curve.mid || curve.mid == curve.end) {
+        return Err("Invalid circular copper primitive; no chord substitution was made".into());
+    }
     if routing.segments.iter().any(|segment| !valid_layer(segment.layer)
         || ![segment.start.x, segment.start.y, segment.end.x, segment.end.y].iter().all(|value| value.is_finite())
         || segment.start == segment.end)
@@ -66,25 +83,39 @@ pub fn snapshot(sim: &SimulationInput, routing: &RoutingResult, drive: &DriveSet
             || solution.current_share.iter().any(|value| !value.is_finite()) {
             return Err(format!("Winding {} is disconnected, shorted or electrically invalid; no finite-current source was emitted", network.net));
         }
+        let edges: Vec<Value> = network.edges.iter().zip(&resistance).map(|(edge,r)| {
+            let geometry = match &edge.kind {
+                EdgeKind::Trace {layer,points,..} => {
+                    let mut geometry = json!({"kind":"trace","layer":layer,"points_m":points});
+                    if points.len() > 2 {
+                        let matching: Vec<_> = routing.curves.iter().filter(|curve| curve.net == network.net && curve.layer == *layer
+                            && points.first() == Some(&[curve.start.x*1e-3,curve.start.y*1e-3])
+                            && points.last() == Some(&[curve.end.x*1e-3,curve.end.y*1e-3])).collect();
+                        if matching.len() != 1 { return Err("Circular graph edge has no unique actual CAD primitive".to_string()); }
+                        let curve = matching[0];
+                        geometry["circular_arc_m"] = json!({"start":[curve.start.x*1e-3,curve.start.y*1e-3],
+                            "mid":[curve.mid.x*1e-3,curve.mid.y*1e-3],"end":[curve.end.x*1e-3,curve.end.y*1e-3]});
+                    }
+                    geometry
+                },
+                EdgeKind::Via {layers,position_m} => json!({"kind":"via","layers":layers,"position_m":position_m}),
+            };
+            Ok(json!({"a":edge.a,"b":edge.b,"r_ohm":r,"geometry":geometry}))
+        }).collect::<Result<_,String>>()?;
         networks.push(json!({"net":network.net,"node_count":network.node_count,
             "terminal":network.terminal,"star":network.star,
-            "edges":network.edges.iter().zip(&resistance).map(|(edge,r)| {
-                let geometry = match &edge.kind {
-                    EdgeKind::Trace {layer,points,..} => json!({"kind":"trace","layer":layer,"points_m":points}),
-                    EdgeKind::Via {layers,position_m} => json!({"kind":"via","layers":layers,"position_m":position_m}),
-                };
-                json!({"a":edge.a,"b":edge.b,"r_ohm":r,"geometry":geometry})
-            }).collect::<Vec<_>>(),"rust_current_share":solution.current_share,
+            "edges":edges,"rust_current_share":solution.current_share,
             "rust_resistance_ohm":solution.resistance_ohm}));
     }
     networks.sort_by(|a,b| a["net"].as_str().cmp(&b["net"].as_str()));
-    Ok(json!({"schema":"finite-dc-winding-geometry-v1","sim":sim,"routing":routing,
+    Ok(json!({"schema":if circular_qualification {"finite-dc-winding-circular-qualification-v1"} else {"finite-dc-winding-geometry-v1"},"sim":sim,"routing":routing,
         "drive":drive,"geometry_hints":{"layer_z_m":hints.layer_z_m,"terminals":hints.terminals},
         "networks":networks,"finite_copper":{"layers":layers,"via_drill_m":sim.min_via_drill_m,
             "via_annular_ring_m":sim.min_via_annular_ring_m,"via_plating_m":drive.via_plating_m,
             "resistivity_ohm_m":rho,"temperature_c":drive.winding_temp_c},
         "coordinate_convention":"PCB top z=0; generated layers at negative depth; imported depths unchanged",
-        "scope":"Actual geometry preparation only. No automatic return, material placement, finite-current or coupled force qualification."}))
+        "scope":if circular_qualification {"Offline qualification only: actual circular CAD primitives retained; graph resistance still uses its declared chord samples and must be checked against analytic arc length. Not app/source/force qualification."}
+            else {"Actual geometry preparation only. No automatic return, material placement, finite-current or coupled force qualification."}}))
 }
 
 #[cfg(test)]
@@ -146,5 +177,14 @@ mod tests {
         let error = snapshot(&SimulationInput::default(),&route,&DriveSettings::default(),
             &DriveGeometryHints::default()).unwrap_err();
         assert!(error.contains("no chord or filament replacement"));
+        let prepared = circular_qualification_snapshot(&SimulationInput::default(),&route,&DriveSettings::default(),
+            &DriveGeometryHints::default()).unwrap();
+        assert_eq!(prepared["schema"],"finite-dc-winding-circular-qualification-v1");
+        assert_eq!(prepared["routing"],serde_json::to_value(&route).unwrap());
+        let arcs: Vec<_> = prepared["networks"].as_array().unwrap().iter().flat_map(|network|
+            network["edges"].as_array().unwrap()).filter(|edge|edge["geometry"].get("circular_arc_m").is_some()).collect();
+        assert_eq!(arcs.len(),1);
+        assert_eq!(arcs[0]["geometry"]["circular_arc_m"]["mid"],json!([0.001,0.001]));
+        assert!(prepared.get("force_n").is_none());
     }
 }
