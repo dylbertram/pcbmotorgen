@@ -287,7 +287,22 @@
       "nonlinear_scalar_quadrature_report": "dc-finite-current-nonlinear-scalar-degree6-8-control-v1-20261021.json",
       "nonlinear_scalar_maximum_increment_quadrature_change": 0.000161927436811043
     },
-    "tighter_opening_control": "Full44160point0.075cache passed in1612.490s under3600s cap after3226.315s forecast. Max pointwise opening change0.0014018782783597641,direct spot-check difference4.5397367902942736e-5. Nominal nonlinear/linear-order2and shifted nonlinear vector-force comparisons now running; none counted as passed yet.",
+    "tighter_opening_control": "Full44160point0.075cache passed in1612.490s under3600s cap after3226.315s forecast. Max pointwise opening change0.0014018782783597641,direct spot-check difference4.5397367902942736e-5. All nominal nonlinear/linear-order2and shifted nonlinear vector-force opening comparisons pass2%for total and current-induced forces.",
+    "source_opening_force_controls": {
+      "nonlinear_nominal_report": "dc-finite-current-nonlinear-vector-nominal-opening-control-v1-20261021.json",
+      "nonlinear_nominal_maximum_total_relative_change": 9.820962015999275e-9,
+      "nonlinear_nominal_maximum_increment_relative_change": 4.0558904113452925e-7,
+      "linear_nominal_report": "dc-finite-current-linear-vector-nominal-opening-control-v1-20261021.json",
+      "linear_nominal_maximum_total_relative_change": 1.7646941545085832e-8,
+      "linear_nominal_maximum_increment_relative_change": 3.726807982525035e-6,
+      "plus100um_report": "dc-finite-current-nonlinear-vector-plus100um-opening-control-v1-20261021.json",
+      "plus100um_maximum_total_relative_change": 9.48126800383456e-9,
+      "plus100um_maximum_increment_relative_change": 3.8892667507457785e-7,
+      "minus100um_report": "dc-finite-current-nonlinear-vector-minus100um-opening-control-v1-20261021.json",
+      "minus100um_maximum_total_relative_change": 1.0145014301708334e-8,
+      "minus100um_maximum_increment_relative_change": 4.2149798059968507e-7,
+      "scope": "Recorded actual geometry/source at0,+/-0.1,+/-0.5loop A. Exact near tetrahedra and translated finite-volume far moments retained; numerical opening changed0.15to0.075without fitted corrections."
+    },
     "degree6_source_control": "Full degree6cache passed in251.877s under900s cap after672.771s forecast. Nonlinear vector degree6matrix and degree6/8force comparison passed. Degree10full-cache work remains unperformed, not silently counted.",
     "nonlinear_quadrature_control": {
       "report": "dc-finite-current-nonlinear-degree6-8-control-v1-20261021.json",
