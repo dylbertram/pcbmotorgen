@@ -74,6 +74,15 @@
     {:else if pending}
       <p role="status" class="text-[11px] text-slate-400">Calculating current housing motion settings. No previous estimate is reused.</p>
     {:else if result?.status === "experimental"}
+      <p class="text-[11px] text-slate-300" aria-label="Housing calculation method">
+        {#if result.estimate.method === "linear_planar_odd_harmonics_region_joule_v2"}
+          Linear planar travel harmonics through {result.estimate.max_travel_harmonic}.
+          Omitted travel-source power bound: {result.estimate.travel_tail_bound_w?.toPrecision(2)} W.
+        {:else}
+          Effective-DC shielding, fundamental only. Higher-harmonic heating is not resolved for this stack.
+        {/if}
+        Driver drag diagnostics remain fundamental-only and can differ from housing results.
+      </p>
       <dl class="grid grid-cols-2 gap-x-3 gap-y-1 text-xs" aria-label="Experimental housing motion results">
         <dt class="text-slate-400">Housing-equivalent drag</dt><dd class="font-mono text-slate-200">{result.estimate.housing_drag_n.toPrecision(3)} N</dd>
         <dt class="text-slate-400">Total stack drag</dt><dd class="font-mono text-slate-200">{result.estimate.total_stack_drag_n.toPrecision(3)} N</dd>

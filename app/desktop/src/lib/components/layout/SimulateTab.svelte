@@ -1,5 +1,6 @@
 <script lang="ts">
   import { Tabs } from "bits-ui";
+  import { tick } from "svelte";
   import { ChevronDown, ChevronUp } from "@lucide/svelte";
   import type { ConfigStore } from "../../stores/config.svelte";
   import type { ForceSweepResult, FrictionBudgetDto, HeightStackResultDto, DriveAnalysis, CadGeometry } from "../../types";
@@ -46,6 +47,52 @@
   const dockId = $props.id();
   let drag: { pointer: number; y: number; height: number } | null = null;
   const coilEnds = $derived(cadGeometry ? inferMissingCoilEnds(cadGeometry) : null);
+  let dock = $state<HTMLElement | null>(null);
+  const scrollOffsets: Record<string, number> = {};
+  let restoringScroll = false;
+  function rememberScroll(event: Event) {
+    const panel = event.target;
+    if (!open || collapsed || restoringScroll || !(panel instanceof HTMLElement) || !panel.clientHeight) return;
+    const key = panel.dataset.dockPanel;
+    const maximum = panel.scrollHeight - panel.clientHeight;
+    // Pending results can temporarily remove the scrollable content. That
+    // browser-generated clamp is not a request to forget the user's position.
+    if (!key || maximum <= 0 || (maximum < (scrollOffsets[key] ?? 0) && panel.scrollTop >= maximum)) return;
+    scrollOffsets[key] = panel.scrollTop;
+  }
+  $effect(() => {
+    const node = dock, visible = open && !collapsed, tab = selected;
+    if (!node || !visible) return;
+    let cancelled = false;
+    let cleanup = () => {};
+    restoringScroll = true;
+    void tick().then(() => {
+      if (cancelled) return;
+      const panel = node.querySelector<HTMLElement>(`[data-dock-panel="${tab}"]`);
+      restoringScroll = false;
+      if (!panel) return;
+      const restore = () => {
+        // Do not overwrite a fresh user scroll before its queued scroll event
+        // has updated the memory. Restore only a lost positive offset at zero.
+        if (cancelled || !(scrollOffsets[tab] > 0) || panel.scrollTop !== 0) return;
+        restoringScroll = true;
+        panel.scrollTop = scrollOffsets[tab];
+        restoringScroll = false;
+      };
+      const observer = new ResizeObserver(restore);
+      const observeChildren = () => {
+        observer.disconnect();
+        observer.observe(panel);
+        for (const child of panel.children) observer.observe(child);
+        restore();
+      };
+      const mutations = new MutationObserver(observeChildren);
+      mutations.observe(panel, { childList: true });
+      observeChildren();
+      cleanup = () => { observer.disconnect(); mutations.disconnect(); };
+    });
+    return () => { cancelled = true; restoringScroll = false; cleanup(); };
+  });
 
   function resize(value: number): void {
     collapsed = false;
@@ -74,7 +121,7 @@
   }
 </script>
 
-<section id={dockId} aria-label="Simulation results" hidden={!open}
+<section bind:this={dock} id={dockId} aria-label="Simulation results" hidden={!open} onscrollcapture={rememberScroll}
   class="relative min-h-0 shrink-0 border-t border-slate-700 bg-slate-900 {open ? 'flex flex-col' : 'hidden'}"
   style:height={collapsed ? "auto" : `${panelHeight}px`}>
   {#if !collapsed}
@@ -99,19 +146,19 @@
       </button>
     </div>
     <div id={`${dockId}-content`} hidden={collapsed} class="min-h-0 flex-1 flex-col {collapsed ? 'hidden' : 'flex'}">
-    <Tabs.Content value="flux" class="min-h-0 flex-1 overflow-auto p-3">
+    <Tabs.Content value="flux" data-dock-panel="flux" class="min-h-0 flex-1 overflow-auto p-3">
       {@render warnings()}
       <div class="h-full min-h-40"><FluxDiagram {config} active={active && open && !collapsed && selected === "flux"} embedded /></div>
     </Tabs.Content>
-    <Tabs.Content value="thrust" class="min-h-0 flex-1 overflow-auto p-3">
+    <Tabs.Content value="thrust" data-dock-panel="thrust" class="min-h-0 flex-1 overflow-auto p-3">
       {@render warnings()}
       <div class="h-full min-h-40"><ForceSweepPlot result={sweep} embedded /></div>
     </Tabs.Content>
-    <Tabs.Content value="driver" class="min-h-0 flex-1 overflow-auto p-3">
+    <Tabs.Content value="driver" data-dock-panel="driver" class="min-h-0 flex-1 overflow-auto p-3">
       {@render warnings()}
       <DriverSuitability embedded analysis={drive} error={driveError} onConfigureWinding={usesDeltaConnection(config.toIpc(), !!cadGeometry && !unmappedCoils(cadGeometry).length) ? onConfigureWinding : undefined} />
     </Tabs.Content>
-    <Tabs.Content value="summary" class="min-h-0 flex-1 overflow-auto p-3">
+    <Tabs.Content value="summary" data-dock-panel="summary" class="min-h-0 flex-1 overflow-auto p-3">
       {@render warnings()}
       <MetricsPanel {config} {sweep} {friction} {height} />
     </Tabs.Content>

@@ -24,12 +24,15 @@ async function motionBridge(page: Page) {
         const drag = speed === 0 ? 0 : power / Math.abs(speed);
         const housing_motion = unavailable ? { status: 'unavailable', reason: 'Test model applicability failure' } : {
           status: 'experimental', estimate: {
-            method: 'ui-fixture-only', housing_material: config.backplane.housing.material,
+            method: config.backplane.layers.length ? 'planar_travelling_fundamental_region_joule_v1' : 'linear_planar_odd_harmonics_region_joule_v2', housing_material: config.backplane.housing.material,
             speed_m_s: settings.target_speed_m_s, duration_s: duration, equivalent_travel_m: duration * settings.target_speed_m_s,
             housing_drag_n: drag, signed_housing_drag_n: -Math.sign(speed) * drag, housing_joule_power_w: power,
             housing_energy_j: power * duration, layer_joule_power_w: config.backplane.layers.length ? [layerPower] : [], total_stack_joule_power_w: power + layerPower,
             total_stack_drag_n: speed === 0 ? 0 : (power + layerPower) / Math.abs(speed), power_balance_relative_error: 1e-12, quadrature_relative_change: 0.001,
-            quadrature_samples: 400, warnings: ['Test model scope warning']
+            quadrature_samples: 400, max_travel_harmonic: config.backplane.layers.length ? 1 : 15,
+            travel_tail_bound_w: config.backplane.layers.length ? null : 0.001,
+            cross_travel_tail_bound_w: config.backplane.layers.length ? null : 1e-20,
+            cutoff_relative_change: 0.0001, warnings: ['Test model scope warning']
           }
         };
         return housing_motion;
@@ -55,6 +58,8 @@ test("housing motion is opt-in and separates housing heat from stack heat", asyn
   await expect(panel.locator("dt", { hasText: "Housing-equivalent drag" }).locator("+ dd")).toHaveText("10.0 N");
   await expect(panel.locator("dt", { hasText: "Total stack drag" }).locator("+ dd")).toHaveText("16.0 N");
   await expect(panel).toContainText("Test model scope warning");
+  await expect(panel.getByLabel("Housing calculation method")).toContainText("Effective-DC shielding, fundamental only");
+  await expect(panel).toContainText("Driver drag diagnostics remain fundamental-only");
   await expect.poll(() => page.evaluate(() => (window as any).__housingRequests.at(-1).settings.housing_motion.duration_s)).toBe(0.1);
   await panel.getByRole("checkbox").uncheck();
   await expect(panel.locator("dl")).toHaveCount(0);
@@ -113,6 +118,8 @@ test("a coreless housing can be analyzed without adding a magnetic shielding lay
   await panel.getByRole("checkbox").check(); await expect(panel.locator("dl")).toHaveCount(1);
   await expect.poll(() => page.evaluate(() => (window as any).__housingRequests.at(-1).config.backplane.layers.length)).toBe(0);
   await expect(panel.locator("dt", { hasText: "Total stack Joule heat" }).locator("+ dd")).toHaveText("5.00 W");
+  await expect(panel.getByLabel("Housing calculation method")).toContainText("Linear planar travel harmonics through 15");
+  await expect(panel.getByLabel("Housing calculation method")).toContainText("0.0010 W");
 });
 
 test("housing motion does not require a compatible electrical driver or star winding", async ({ page }) => {

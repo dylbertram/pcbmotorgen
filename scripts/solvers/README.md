@@ -7,6 +7,95 @@ not turn screening estimates into hardware ratings.
 
 ## Current scope: DC motor windings
 
+### Bounded followup on 2026-10-21
+
+### Higher-harmonic release verification
+
+`check_housing_harmonics_reference.py` verifies the upgraded linear housing/FR4
+path against independent complex P1 diffusion solves. It separately refines
+depth and cross-travel sampling, retains the 2% refinement/5% agreement gates,
+and checks four further odd terms against the production omitted-power bound.
+Use a new evidence directory on every run. It does not replace nonlinear
+shielding, finite-housing or hardware qualification.
+
+The linear production method `linear_planar_odd_harmonics_region_joule_v2`
+uses physical odd Fourier coefficients and harmonic-specific motion frequency.
+It integrates region Joule loss and independently evaluates surface work for
+each harmonic. Simpson sample refinement and the 15-to-30 cross-travel cutoff
+comparison are separate checks. Conservative passive-admittance bounds limit
+the omitted travel-source and cross-travel powers, each to 0.5% of computed
+housing power with a 1e-12 W numerical floor. A bounded workload rejects cases
+that cannot meet these checks. These bounds concern the declared linear
+periodic source model, not finite arrays, slots, startup, or thermal accuracy.
+
+For positive linear materials, the surface admittance has nonnegative real
+part, so the reflection magnitude is at most one. With pole pitch tau, source
+separation d, magnet depth D and h an odd travel harmonic, surface work is
+bounded by `C*exp(-2*h*pi*d/tau)/h^2`, where
+`C = N*tau*abs(v)/mu0*(2*Br/pi)^2*D`. The omitted odd series uses its first
+omitted denominator and geometric exponential ratio. For cross-travel
+wavenumbers above K, use `|spectrum| <= D` and
+`integral_K^infinity exp(-2*d*y)/y dy <= exp(-2*d*K)/(2*d*K)`.
+The implementation records both bounds and the highest included harmonic.
+
+Magnetic shielding retains `planar_travelling_fundamental_region_joule_v1`
+with explicit unresolved higher-harmonic heating and effective-DC saturation
+warnings. Independent linear harmonic superposition is not promoted through
+saturated shielding. Driver drag diagnostics remain fundamental-only and are
+not a same-model check of upgraded housing results. The earlier fundamental
+reference script and archived results retain their historical scope.
+
+Workspace regression reproduction uses `pnpm --dir app/desktop test:workspace`
+with a fresh absolute `CORELESS_BROWSER_ARTIFACTS` directory. It runs both
+viewport projects against an isolated server, including imported geometry,
+keyboard menus, dock scroll retention and housing request lifecycle tests.
+`test:coreless` remains the smaller 100-check release subset. Browser transport
+fixtures do not establish native WKWebView or numerical qualification.
+
+`package_housing_harmonic_release.py` preserves existing delivery directories.
+For a subsequent full-workspace release, pass the final `--browser-work`,
+`--browser-count`, `--browser-log`, `--regression-tag`, `--build-log` and
+`--startup-tag`. It rejects incomplete/flaky/skipped browser matrices and
+unsuccessful command receipts, verifies numerical/reference source hashes and
+root designs, and includes source/app hashes and exact receipts. Native build
+source manifests and startup executable hashes are checked when supplied.
+The app is a debug arm64 experimental build without developer signing or
+notarization. A live startup process is not a native interaction test.
+`verify_housing_harmonic_package.py DELIVERY --output NEW_RECEIPT.json` reads
+every app file back from the ZIP and every source file from the tar archive,
+checks complete inventories and hashes, and compares the standalone app to
+the manifest. It never executes the app or overwrites prior receipts.
+
+Kata `04yx` tracks a separate 3–4 hour reference window. Current progress is
+in `results/housing-followup-progress-2026-10-21.json`; running trajectories
+are not accepted from partial results.
+
+`compare_housing_model_scope.py` maps actual PM dimensions, pitch, remanence,
+material conductivity and PM-to-housing separation between the offline
+PCB-bottom coordinate convention and the app's PCB-top convention. Removing
+ferrite from a housing-only comparison does not move the housing upward.
+The finite reference must have completed control evidence whose input hash
+matches the selected trajectory. Centre-region instantaneous finite losses
+remain distinct from the app's established steady periodic estimate; a
+full-entry/exit average is never used as steady drag.
+
+`housing_spectral_diagnostic.py` independently solves linear planar P1
+diffusion for odd travel harmonics through15, with separate depth, sample,
+cross-travel cutoff and series checks. It rejects magnetic/conducting shielding
+rather than silently linearizing it. This diagnostic does not change the app
+or supply a fitted correction. Initial held-out narrow-magnet/small-gap cases
+show28–32% more heat with these harmonics than with the fundamental alone.
+The production5% quadrature check therefore must not be read as a physical
+accuracy bound or as convergence of the omitted source harmonics.
+
+`audit_material_motion_mirror.py` checks two complete x-symmetric nonlinear
+short strokes with opposite constant speeds. Housing and ferrite longitudinal
+forces are checked separately from their vector norms, so a large static
+normal attraction cannot hide a drag failure. A mirrored run is not a
+start/stop/reversal cycle with retained state. `audit_housing_followup_time.py`
+checks the housing-only full-stroke time pair using the original2% heat/work,
+force-history, stored-energy-history and endpoint gates.
+
 Program scope is coreless PCB motors with at most3 backplane layers, each
 no thicker than2mm, not a2mm total-stack cap. All housing walls are at
 most5mm. Current housing scope is aluminum and nominally non-magnetic

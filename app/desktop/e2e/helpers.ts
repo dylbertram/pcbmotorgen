@@ -15,10 +15,27 @@ export async function gotoDesignApp(page: Page): Promise<void> {
   await expect(dialog).toBeHidden();
 }
 
-/** The expanded viewer is now opened from Simulate, not the Design canvas. */
+/** Focus the persistent workspace. Retains the old helper name for callers
+ * being migrated; there is no expanded viewer or modal to open. */
 export async function openCoilPreview(page: Page): Promise<void> {
-  await page.getByRole("tab", { name: /^Simulate/i }).click();
-  await page.getByRole("button", { name: "Open coil preview", exact: true }).click();
+  const workspace = coilWorkspace(page);
+  await expect(workspace).toBeVisible();
+  for (const name of ["Design side tools", "Preview side tools"]) {
+    const selected = workspace.getByRole("toolbar", { name, exact: true }).locator('button[aria-expanded="true"]');
+    if (await selected.count()) await selected.click();
+  }
+}
+
+export function coilWorkspace(page: Page): Locator {
+  return page.getByRole("region", { name: "Coil design workspace", exact: true });
+}
+
+export async function selectDesignPanel(page: Page, name: string): Promise<void> {
+  const trigger = coilWorkspace(page).getByRole("toolbar", { name: "Design side tools", exact: true })
+    .getByRole("button", { name, exact: true });
+  if (await trigger.getAttribute("aria-expanded") !== "true") await trigger.click();
+  await expect(coilWorkspace(page).getByRole("dialog", { name, exact: true })).toBeVisible();
+  await expect(coilWorkspace(page).locator("#design-settings-scroll")).toHaveCount(1);
 }
 
 /**
@@ -39,21 +56,21 @@ export function designPanel(page: Page) {
 /** Active-area length readout in Design constraints. */
 export function activeLengthReadout(page: Page) {
   return page.locator(
-    `section[aria-labelledby="design-constraints-heading"] dt:has(> span:text-is("Active copper region")) + dd`,
+    `#design-constraints-heading dt:has(> span:text-is("Active copper region")) + dd`,
   );
 }
 
 /** The "PCB trace total (X)" live output (traces' first-to-last X span). */
 export function traceTotalReadout(page: Page) {
   return page.locator(
-    `section[aria-labelledby="design-constraints-heading"] dt:has(> span:text-is("PCB trace total (X)")) + dd`,
+    `#design-constraints-heading dt:has(> span:text-is("PCB trace total (X)")) + dd`,
   );
 }
 
 /** The constraints section in the preview's Design settings drawer. */
 export function designConstraintsPanel(page: Page) {
   return page.locator(
-    `section[aria-labelledby="design-constraints-heading"]`,
+    `#design-constraints-heading`,
   );
 }
 

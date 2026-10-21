@@ -1,0 +1,34 @@
+{
+  "status": "accepted-full-workspace-regressions",
+  "issue": "pcbmotorgen#0z3q",
+  "archive_root": "$HOME/.local/opt/solver-prototypes-macos",
+  "baseline_release": "coreless-harmonic-experimental-delivery-20261021 remains preserved and verified. Continuation now also fixes a reproduced SelectionAssignmentMenu keyboard-focus race; updated native bundle/source evidence will be packaged separately.",
+  "implemented": [
+    "Legacy openCoilPreview helper now focuses the persistent workspace and closes active rails instead of invoking a retired modal",
+    "Constraints/density/logic/readout helpers follow current panel navigation and stable workspace labels",
+    "CAD import motor-preview checks now use persistent workspace, active dock tabpanel and workflow persistence",
+    "Retired coil-modal scroll expectations explicitly moved to the still-supported AddDriver modal, preserving actual background containment/focus/lock-release checks",
+    "Screenshot tooling writes per-run evidence instead of overwriting repository screenshots",
+    "SelectionAssignmentMenu focus-scope reattachment is idempotent when focus is already inside the menu/submenus; duplicate submenu opening autofocus is suppressed and stale close callbacks cannot steal newer focus",
+    "Related file-tab and layout tests follow actual panel navigation and independently scrolling simulation dock, preserving meaningful persistence/containment assertions"
+  ],
+  "preserved_trials": {
+    "small_v1": "31/32 pass; background-scroll baseline raced an outgoing panel transition, corrected by awaiting detachment",
+    "cad_v1": "34/37 pass; terminal-active accessible role, duplicate inactive dock-tab error text and keyboard-to-mouse submenu transition corrected without force/sleep",
+    "full_v1": "Early abort at8failures:85passed/233unrun. Failures expose remaining panel/layout assumptions and an actual keyboard focus-scope reattachment race. Aborted run is not acceptance.",
+    "keyboard_diagnostics": "Failed speculative navigation/trap-focus changes and instrumented traces preserved outside checkout. Trace proved repeated FocusScope.mount restarted parent focus while already in submenu. Final source uses idempotent autofocus instead; no event suppression/trap-focus workaround remains."
+  },
+  "verified_keyboard": "workspace-keyboard-submenu-final-v1-20261021:20/20 uninstrumented repetitions across both viewport projects pass, whole receipt exit0. Svelte official autofixer reports no issues/suggestions.",
+  "verified_scroll": "workspace-scroll-retention-v6-20261021:10/10 repetitions pass across both viewports. Dock preserves per-tab scroll memory while hidden or temporarily displaying short pending results. Test waits for actual scrollable content rather than treating the transient pending placeholder as a completed result. Earlier v1-v5 failures preserved.",
+  "full_v3_diagnostic": "323/326 pass in408.57s, no skipped/flaky cases; three desktop Routing-panel navigation assumptions in sensor-curves/startup corrected. Diagnostic run overlapped final test-only migration and is not acceptance. Complete final suite is rerun with immutable test-source hashes.",
+  "targeted_final": "workspace-final-navigation-scroll-v2-20261021:28/28 pass. Includes sensor/startup panel navigation and dock retention through collapse/expand and intentional scroll-to-top. Prior targetedv1:27/28, scrollbar test lacked actual overflow in taller viewport; now requires explicit overflow at600px viewport height and retains both track-end assertions.",
+  "final_matrix": "workspace-browser-full-v4-20261021:326/326 pass in309.194s with zero skipped/flaky/failed cases. Whole command receipt completed exit0; all test-source hashes unchanged throughout run and checked again afterward.",
+  "final_scroll_stress": "workspace-scroll-retention-final-20261021:20/20 pass in47.309s across both viewports, including workflow retention, collapse/expand and intentional return to top. Final keyboard stress20/20 remains verified.",
+  "regressions_v3": "All whole command receipts completed exit0 after final app fixes: simulation195+7passed/2ignored, desktop106passed/5ignored, Python306passed, frontend457passed/1skipped, frontend build passed. Exact logs checked against declared counts.",
+  "native_current": "Buildv3 completed with per-file source hashes stable throughout compilation and an executable hash; startupv2 confirms that exact executable remains live through8seconds before owned cleanup. No native WKWebView interaction claim.",
+  "remaining": [
+    "Package accepted app/sources and complete archive readback into coreless-harmonic-workspace-delivery-20261021, preserving initial release",
+    "Close0z3q after package integrity verification; native WKWebView interaction and unrelated physics limits remain explicitly unqualified"
+  ],
+  "constraints": "No production solver changes, geometry/material reassignment, Mutagen edits, commits or pushes. Current numerical19-case/real-project release evidence remains valid; source archives are immutable snapshots. New UI focus fix requires separate fresh build/package before final handover."
+}

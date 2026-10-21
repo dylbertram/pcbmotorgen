@@ -1,0 +1,48 @@
+{
+  "status": "verified-experimental-harmonic-housing-release",
+  "issues": ["pcbmotorgen#7pkw", "pcbmotorgen#0z3q"],
+  "archive_root": "$HOME/.local/opt/solver-prototypes-macos",
+  "implemented": [
+    "Linear planar odd-travel-harmonic region Joule model with physical source coefficients and individual frequencies",
+    "Conservative passive linear source-tail and cross-travel-tail power bounds, separate cutoff/sample checks and bounded-workload rejection",
+    "Legacy effective-DC magnetic-shielding fundamental method preserved with explicit omitted-harmonic limitations",
+    "Method and fundamental-only driver distinction in housing UI, existing request-lifecycle safeguards preserved",
+    "Persistent-workspace camera/layer/3D/dock test migration and responsive mover-box clearance fix"
+  ],
+  "verified": {
+    "independent_reference_v1": "housing-harmonic-release-reference-v1-20261021/summary.json:19 cases pass in38.08s; maximum region relative discrepancy7.332733326064476e-5; unchanged2% refinement/5% independent agreement gates. Later test-only source edits require final-sourcev2 provenance repeat.",
+    "regressions_v1": "housing-harmonic-release-acceptance-v1-20261021/summary.json: simulation, desktop, helpers, frontend and frontend-build whole receipts completed exit0",
+    "browser_v1": "32/36 passed; responsive zoom clearance and housing lifecycle/method tests pass in both viewport projects. Four authored migration failures were incorrect Display-vs-Layers and default-open Constraints assumptions; artifacts preserved in housing-harmonic-release-ui-v1-20261021. No production view-switch relocation.",
+    "browser_v2": "99/100 passed. All migrated workspace/3D/clearance/housing checks pass. One driver-modal test exposed delayed opening autofocus sending peak-current typing into driver name; screenshot preserved. Test now waits for initial name focus rather than force-clicking or sleeping. Combined final matrixv3 running.",
+    "independent_reference_v2": "19 cases passed with final-source hashes in39.54s; max region relative discrepancy7.332733326064476e-5",
+    "real_projects": "Current binary passed real generated2-layer/imported4-layer plus12-magnet stainless316 routed-project integration. Explicit rejection/derived PCB-thickness comparison retained for original4-layer overlap; root/copper depths unchanged.",
+    "native_build": "Fresh current-source native debug arm64 bundle built, finalv2 whole receipt exit0. No developer signature/notarization; binary has only linker ad-hoc signature. Eight-second native process startup smoke passed; no WKWebView interaction/e2e claim.",
+    "browser_v3": "Final expanded pnpm test:coreless100/100 passed across both viewport projects, no skipped/flaky cases. All migrated camera/layer/3D/dock/clearance/housing method/lifecycle checks pass. Does not cover the remaining obsolete modal-helper suites.",
+    "final_counts": {"simulation_unit":195,"simulation_vectors":7,"simulation_ignored":2,"desktop":106,"desktop_ignored":5,"helpers":306,"frontend":457,"frontend_skipped":1,"current_browser":100,"independent_cases":19,"real_project_cases":3},
+    "post_release_dc02_audit": "Read-only1,707,719-tetrahedron curvature mesh inventory: no degenerate chordal cells; min/median mean-ratio0.16057/0.86435, longest/shortest edge max11.679. Whole receipt exit0, original summary/mesh hashes preserved. Descriptive chordal statistics only, not local-current/curved-Jacobian/hotspot qualification."
+  },
+  "running": [],
+  "workspace_followup": {
+    "status": "accepted-full-workspace-regressions",
+    "progress": "workspace-legacy-migration-progress-2026-10-21.json",
+    "browser": "workspace-browser-full-v4-20261021:326/326 pass in309.194s; no skipped/flaky/failed cases; exact source hashes stable",
+    "app_fixes": "Idempotent submenu focus-scope reattachment and per-tab dock scroll retention through workflow/pending-result changes; merged UI unchanged",
+    "regressions": "Final batchv3:simulation195+7passed/2ignored,desktop106passed/5ignored,Python306passed,frontend457passed/1skipped,frontend build passed",
+    "native": "Fresh arm64 debug buildv3 with per-file source and executable hashes; startupv2 observes same executable through8s, no WKWebView interaction claim",
+    "delivery_target": "coreless-harmonic-workspace-delivery-20261021; final package manifest and readback receipt establish archive acceptance separately"
+  },
+  "delivery": {
+    "directory": "coreless-harmonic-experimental-delivery-20261021",
+    "zip": "pcbmotorgen-harmonic-experimental-macos-arm64-20261021.zip",
+    "zip_sha256": "dde72684d1312a6595f4b78052075c4bd04319c73538a58a8a8ea0d97c298684",
+    "verification_sha256": "5b665f67314bfb1ab20e3c2d9b2b0cf89c7c69e892b55f38790cced7bf96cce5",
+    "provenance": "Source archive/diff/file hashes, exact whole command receipts and reference/project/browser evidence included. Source snapshot precedes this final progress-document update; application build inputs remain unchanged. ZIP extraction and source archive per-file hashes independently checked after packaging. No developer signing/notarization/install/commit/push."
+  },
+  "remaining": [
+    "Full browser migration is accepted at326/326;0z3q closure follows final updated package integrity check",
+    "Native WKWebView interaction/end-to-end coverage remains unperformed",
+    "DC02 local-current/curved-Jacobian/hotspot qualification, DC03 physical overlap decision and dependent nonlinear winding/inductance work remain separate",
+    "True reversal-memory, general finite3D/material coverage, thermal/hardware qualification remain unachieved"
+  ],
+  "limitations": "Periodic linear source truncation bounds are not finite-array/edge/startup physical accuracy bounds. Magnetic shielding remains fundamental-only effectiveDC. No winding reaction, copper-eddy feedback, nonlinear winding coupling, differential inductance, reversal-memory, temperature or hardware qualification. No fit to finite/planar differences. No commit/push/Mutagen/root geometry changes."
+}

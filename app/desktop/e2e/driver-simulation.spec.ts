@@ -201,6 +201,9 @@ test("select drivers and add validated custom parameters in a modal", async ({ p
   await expect(selector).toHaveValue("DRV8316");
   await page.getByRole("button", { name: "Add driver…", exact: true }).click();
   const modal = page.getByRole("dialog", { name: "Add driver", exact: true });
+  // Wait for Bits UI's opening autofocus before typing into another field.
+  // Otherwise a delayed focus can send the peak-current input into the name.
+  await expect(modal.getByLabel("Driver name")).toBeFocused();
   await modal.getByLabel("Driver name").fill("My driver");
   await modal.getByLabel("Min supply (V)", { exact: true }).fill("30");
   await modal.getByLabel("Max supply (V)", { exact: true }).fill("24");

@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { designConstraintsPanel, gotoDesignApp } from "./helpers";
+import { designConstraintsPanel, gotoDesignApp, selectDesignPanel } from "./helpers";
 
 test("constraint readouts share one value color in both themes", async ({ page }) => {
   await gotoDesignApp(page);
@@ -42,9 +42,11 @@ test("assembly draws opaque visible faces and keeps its dimension below the boar
 
 test("assembly and dimension stay inside the drawing for tall magnets and both travel limits", async ({ page }) => {
   await gotoDesignApp(page);
+  await selectDesignPanel(page, "Magnets");
   const height = page.getByRole("spinbutton", { name: "Z Thickness (mm), magnetisation-axis thickness", exact: true });
   await height.fill("20");
   await height.press("Enter");
+  await selectDesignPanel(page, "Constraints");
   const constraints = designConstraintsPanel(page);
   const diagram = constraints.getByRole("img", { name: "Three-quarter isometric view of the assembly" });
   const slider = page.locator("#panel-design").getByRole("slider", { name: "Mover position slider (mm)" });

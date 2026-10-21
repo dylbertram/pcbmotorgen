@@ -53,6 +53,10 @@ export interface HousingMotionEstimate {
   power_balance_relative_error: number;
   quadrature_relative_change: number;
   quadrature_samples: number;
+  max_travel_harmonic: number;
+  travel_tail_bound_w: number | null;
+  cross_travel_tail_bound_w: number | null;
+  cutoff_relative_change: number;
   warnings: string[];
 }
 

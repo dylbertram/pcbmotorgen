@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { gotoDesignApp } from "./helpers";
+import { gotoDesignApp, selectDesignPanel } from "./helpers";
 
 test("empty workspace offers file creation and opening without creating a draft", async ({ page }) => {
   await page.goto("/");
@@ -36,6 +36,7 @@ test("New sensor creates a sensor-only workflow", async ({ page }) => {
 
 test("CAD import is tied to the active file type and cancel preserves settings", async ({ page }) => {
   await gotoDesignApp(page);
+  await selectDesignPanel(page, "Routing");
   await page.getByRole("button", { name: "Routing source", exact: true }).click();
   await page.getByRole("option", { name: "Load design from file…" }).click();
   const dialog = page.getByRole("dialog", { name: "Import CAD", exact: true });
@@ -52,6 +53,7 @@ test("CAD import is tied to the active file type and cancel preserves settings",
 
 test("routing source retains file loaders after startup setup moves into the editor", async ({ page }) => {
   await gotoDesignApp(page);
+  await selectDesignPanel(page, "Routing");
   const source = page.getByRole("button", { name: "Routing source", exact: true });
   const original = await source.textContent();
   await source.click();

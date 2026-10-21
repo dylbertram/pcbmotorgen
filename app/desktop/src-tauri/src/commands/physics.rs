@@ -1023,6 +1023,11 @@ mod cad_source_tests {
             (HousingMotionAnalysis::Experimental { estimate: a }, HousingMotionAnalysis::Experimental { estimate: b }) => {
                 assert!(a.housing_joule_power_w > 0.);
                 assert!((a.housing_joule_power_w / b.housing_joule_power_w - 1.).abs() < 1e-12);
+                assert_eq!(a.method, "linear_planar_odd_harmonics_region_joule_v2");
+                assert_eq!(a.method, b.method);
+                assert!(a.travel_tail_bound_w.unwrap() <= 0.005 * a.housing_joule_power_w);
+                assert!((b.housing_energy_j - b.housing_joule_power_w * 0.1).abs() < 1e-12);
+                assert!((b.housing_drag_n * 3.0 - b.housing_joule_power_w).abs() < 1e-12);
             }
             values => panic!("{values:?}"),
         }

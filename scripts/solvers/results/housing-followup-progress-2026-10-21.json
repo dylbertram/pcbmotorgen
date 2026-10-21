@@ -1,0 +1,93 @@
+{
+  "status": "verified-bounded-reference-followup-production-model-unchanged",
+  "ticket": "pcbmotorgen#04yx",
+  "authorized_window": {
+    "started_utc": "2026-10-21T05:38:40Z",
+    "hard_deadline_utc": "2026-10-21T09:38:40Z",
+    "final_audit_reserve_s": 900,
+    "nonlinear_job_cap_s": 4800,
+    "housing_only_job_cap_s": 1500
+  },
+  "archive_root": "$HOME/.local/opt/solver-prototypes-macos",
+  "active": {
+    "nonlinear": "Completed3834.26s mirrored48-step stroke, force audits and all10 mirror comparison checks; no active nonlinear job",
+    "housing_only": "Completed480/960-step pair, time/force audits and3m/s960-step finer1.2mm mesh control; no active solve",
+    "monitoring": [],
+    "completed_mesh_watch": "housing-followup-mesh-watch-20261021/latest.json: chains-finished-observed2026-10-21T06:54:03Z, no alerts",
+    "completed_initial_watch": "housing-followup-watch-20261021/latest.json: chains-finished-observed2026-10-21T06:45:29Z, no alerts; not claimed as current monitoring",
+    "completed_housing_only_watch": "housing-followup-bare-watch-20261021/latest.json: chains-finished-observed2026-10-21T06:14:45Z, normal exit/no alerts"
+  },
+  "completed_initial_evidence": {
+    "nonlinear_force_snapshots": "Base steps5/17/35/47 all passed with whole exit0; each uses degree8/10 and derivative1e-7/5e-8 controls. Reports in housing-followup-window-20261021.",
+    "nonlinear_mirror_control": {
+      "report": "housing-followup-window-20261021/nonlinear-mirror-control.json",
+      "sha256": "458540b38a506724f6862e22e05ab15b2e84cc20aa30e3854e360f4ea3944a81",
+      "status": "passed-mirrored-nonlinear-short-stroke-only",
+      "whole_receipts": "Mirrored48-step solve3834.26s, independent force at steps5/23/47 and mirror-control receipt all completed integer exit0",
+      "checks_passed": 10,
+      "heat_absolute_change_j": 8.21636121986491e-9,
+      "material_longitudinal_force_l2_change_n": 0.0002705968505337553,
+      "material_longitudinal_force_limit_n": 0.005935243256436926,
+      "scope": "Same reversible x-symmetric physical model/mesh, negative constant speed. Vector and longitudinal ferrite/housing forces checked separately. Not a stop/restart/reversal cycle, full entry/exit, independent transient solution or hardware qualification."
+    },
+    "matched_comparison": "housing-followup-matched-speed20-v2-20261021: finite reference provenance/refinement checked; PM-to-housing surface separation1.6mm preserved. Housing gap0.3mm retains space formerly occupied by excluded0.2mm ferrite. Central finite sample mean16.809787W vs planar steady18.332728W; ratio0.916928. Different physical models/startup, not isolated edge error or a correction constant.",
+    "linear_spectral_matrix": "housing-followup-spectral-v1-20261021: four cases pass isolated depth/sample/cutoff/series controls. Harmonics1–15 add0.228% for matched20m/s,0.223% for3m/s and3.343% for selected small-gap geometry. No magnetic shielding linearization.",
+    "heldout_spectral_matrix": "housing-followup-spectral-heldout-v1-20261021: narrow1.5mm magnets at6mm pitch,0.2mm PCB/0.1mm airgap,5mm Al5052 wall/zero housing gap. Harmonics1–15 add32.1497% at20m/s and28.3943% at3m/s. All diagnostic numerical controls pass. Fundamental omission can materially affect housing heat within the input envelope; the app5% quadrature check is not a physical error bound.",
+    "helpers": "Whole helper-v1/v2 receipts exit0,306 tests pass. This does not qualify pending trajectories or promote the spectral diagnostic into production.",
+    "housing_speed3_time_control": {
+      "report": "housing-followup-window-20261021/bare-speed3-time-control.json",
+      "sha256": "049608e8289a4403662308922f85f53d970464cd3afc2787b72a9d2e8467e213",
+      "status": "passed-full-stroke-housing-time-pair-only",
+      "whole_receipts": "480-step650.42s,960-step1294.73s and control all completed integer exit0",
+      "checks_passed": 5,
+      "heat_relative_change": 2.330726060817412e-6,
+      "stored_energy_history_relative_change": 0.0028971992357198547,
+      "end_energy_relative_change": 0.00015951618377962884,
+      "scope": "Same immutable mesh, full-entry/exit profile at3m/s. No new3m/s spatial/domain or general material/geometry qualification inferred."
+    },
+    "housing_speed3_force_snapshots": "Steps287/479/671 pass independent PM/current force, degree6/10 body quadrature, original volume/current/Joule reload and total action-reaction checks; all whole receipts exit0. Reports bare-speed3-pm-force-*.json in window archive.",
+    "housing_speed3_mesh_control": {
+      "report": "housing-followup-window-20261021/bare-speed3-mesh-control.json",
+      "sha256": "eb1675a97be0791eae1a93f3efd14271a6a18744918e3115871f0945ceb186ef",
+      "status": "passed-full-stroke-housing-mesh-pair-only",
+      "solve_seconds": 431.7414583340287,
+      "checks_passed": 5,
+      "heat_relative_change": 2.3538714249538017e-5,
+      "stored_energy_history_relative_change": 0.0016452257188590066,
+      "end_energy_relative_change": 0.0012507194675592803,
+      "scope": "1.5mm/1.2mm housing mesh at fixed960-step full stroke,3m/s, physical geometry/source/domain/quadrature unchanged. Whole solve/audit receipts exit0. No separate3m/s domain/quadrature or broader finite-geometry/material coverage inferred."
+    },
+    "matched_speed3_mesh_comparison": {
+      "report": "housing-followup-matched-speed3-mesh12-20261021/summary.json",
+      "sha256": "3f4491e2c85a823527eaa74b06b33654e73620b0cc5e95f2e9218c44f10bfdd1",
+      "finite_centre_mean_power_w": 0.3959040017167579,
+      "planar_steady_power_w": 0.4349882661068871,
+      "finite_over_planar": 0.9101486926534121,
+      "scope": "The approximately9% model discrepancy persists after time/mesh controls; this does not isolate finite edges, finite-array or startup contributions. No empirical correction applied."
+    },
+    "matched_speed3_comparison": {
+      "report": "housing-followup-matched-speed3-20261021/summary.json",
+      "sha256": "3f95a676e5838e07822d5af70ac612cb93a882ed0a977ff7aab1260ea31eccba",
+      "finite_centre_mean_power_w": 0.39591133892884295,
+      "planar_steady_power_w": 0.4349882661068871,
+      "finite_over_planar": 0.9101655602626255,
+      "scope": "Matched source/separation/material, distinct finite/startup versus periodic/steady physical models; not a fitted correction or universal error bound."
+    }
+  },
+  "final_evidence_audit": {
+    "report": "housing-followup-window-20261021/verification-v2.json",
+    "sha256": "954d6818ed4e2af80179fe3f0c7a51220f2eb81a9f1948dbd466fd25e9aa9ea9",
+    "status": "verified-bounded-housing-reference-followup-only",
+    "whole_receipts": 26,
+    "artifacts": 18,
+    "checks": "Recomputed mirror/time/mesh comparisons agree exactly; all selected force/spectral reports and whole receipts pass; archived source/input hashes and original root-project hashes checked. Production app/crate/Cargo files have no changes relative to HEAD. Final306 helper tests pass.",
+    "preserved_first_audit_failure": "First inventory included its own running meta-audit receipt and failed closed. Original failed receipt/script/log remain preserved. Separatev2 excludes meta-audits from solver/test inventory, discloses the failure and completes whole exit0. No numerical gate or solver receipt changed."
+  },
+  "scope": "Compare physical-model differences rather than fit app constants. Mirrored constant-speed motion is not acceleration/reversal with retained history. Existing entry/exit/slot aluminum evidence is reused, not claimed as new. All quantities require complete whole receipts and their own unchanged acceptance checks.",
+  "remaining": [
+    "Production harmonic extension tracked separately as pcbmotorgen#7pkw; not implemented or physically qualified by this reference-only followup",
+    "Full finite/current nonlinear coupling still requires non-overlapping copper/ferrite material assignment, no invented gap",
+    "Actual acceleration/reversal with retained state, broader finite housing geometries/materials, thermal/hardware and inductance qualification remain separate work"
+  ],
+  "constraints": "No root project, UI-main layout, Mutagen, historical failure, material remapping or new commits/pushes. No5mm ferrite, AC/PWM/core loss, thermal or hardware claim. Finite-current ferrite overlap remains unresolved and is not silently corrected."
+}

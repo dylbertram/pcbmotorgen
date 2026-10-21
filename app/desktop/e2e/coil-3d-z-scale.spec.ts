@@ -1,10 +1,9 @@
 import { test, expect } from "@playwright/test";
 import { gotoDesignApp } from "./helpers";
 
-test("Z height defaults to 1× and the left vertical slider updates both previews", async ({ page }, testInfo) => {
+test("Z height defaults to 1× and persists across workflow changes", async ({ page }, testInfo) => {
   await gotoDesignApp(page);
-  await page.getByRole("button", { name: "Expand coil preview" }).click();
-  const dialog = page.getByRole("dialog", { name: "Coil Preview", exact: true });
+  const dialog = page.getByRole("region", { name: "Coil design workspace", exact: true });
   await dialog.getByRole("button", { name: "Display", exact: true }).click();
   const display = page.getByRole("dialog", { name: "Coil preview display", exact: true });
   await display.getByRole("radio", { name: "3D", exact: true }).check();
@@ -39,9 +38,9 @@ test("Z height defaults to 1× and the left vertical slider updates both preview
   const value = (await viewer.getAttribute("data-z-scale"))!;
   await page.screenshot({ path: testInfo.outputPath("z-height.png") });
 
-  await dialog.getByRole("button", { name: "Close coil preview", exact: true }).click();
+  await page.getByRole("tab", { name: /^Simulate/i }).click();
   const inline = page.getByTestId("coil-iso");
   await expect(inline.getByRole("slider", { name: "Z height scale", exact: true })).toHaveAttribute("aria-valuenow", value);
-  await page.getByRole("button", { name: "Expand coil preview" }).click();
+  await page.getByRole("tab", { name: /^Design/i }).click();
   await expect(dialog.getByRole("slider", { name: "Z height scale", exact: true })).toHaveAttribute("aria-valuenow", value);
 });

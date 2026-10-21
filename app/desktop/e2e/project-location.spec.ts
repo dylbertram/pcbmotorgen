@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { gotoDesignApp } from "./helpers";
+import { gotoDesignApp, selectDesignPanel } from "./helpers";
 
 test.beforeEach(async ({ page }) => {
   // Only replace native dialogs and file transport. Rust tests cover disk safety.
@@ -43,6 +43,7 @@ test("tab context menu Rename modal saves, renames and moves while keeping the u
   await expect(form).toBeHidden();
   await expect(tab).toContainText("Motor.pmmotor");
 
+  await selectDesignPanel(page, "Magnets");
   await page.locator("#magnet-count").fill("8");
   await page.locator("#magnet-count").press("Enter");
   await expect(page.getByLabel("Unsaved changes", { exact: true })).toBeVisible();
