@@ -1,0 +1,67 @@
+{
+  "status": "passed-coupled-3d-sphere-controls-only",
+  "scope": "Offline 3D reaction-vector-potential and conductor charge-continuity benchmarks. Uniform harmonic applied field, isolated nonmagnetic conductor. Not a moving PM motor or nonlinear ferrite/housing result.",
+  "raw_archives": "$HOME/.local/opt/solver-prototypes-macos",
+  "implementation": "ngsolve_eddy_av.py, NGSolve 6.2.2608, complex HCurl A plus conductor H1 potential, exact Coulomb multiplier or checked tree gauge, separate mean-zero conductor-potential multiplier. No penalty mass or fitted magnetic constants.",
+  "weak_disk": {
+    "work": "ngsolve-av-disk-pilot-v2-20261020",
+    "geometry": "6mm radius, 1mm thickness, 30mm exterior radius",
+    "frequency_hz": 1,
+    "sigma_s_m": 25000000,
+    "applied_peak_b_t": 0.01,
+    "joule_power_w": 2.5114627596138056e-8,
+    "source_work_w": 2.511462759613809e-8,
+    "relative_equation_residual": 3.741773657864911e-15,
+    "net_volume_current_relative_error": 4.773231121125845e-17,
+    "scope": "Single pilot passes analytical weak-disk loss agreement and equation/current/power controls. Independent mesh, domain, quadrature and slotted-disk reference checks remain required."
+  },
+  "electric_potential_order": "Quadratic potential contains affine physical coordinates on the quadratic curved mesh. This brought isolated-volume current from 8.17e-9 in the original linear-potential pilot to 4.77e-17; current gate is 1e-9, unchanged from other closure controls.",
+  "sphere_reference": {
+    "implementation": "eddy_sphere_reference.py",
+    "derivation": "Match the interior l=1 spherical-Bessel potential to the vacuum field. Independently compute loss from dipole source work and interior electric-field volume integration; tests require agreement within 1e-9.",
+    "radius_m": 0.003,
+    "frequency_hz": 5000,
+    "exact_loss_w": 0.07328774729024139,
+    "weak_limit_loss_w": 0.12557542055521428,
+    "purpose": "Induced magnetic feedback is substantial, so this checks more than a weak-induction model."
+  },
+  "preserved_failed_sphere_trials": [
+    {"work":"ngsolve-av-sphere-pilot-20261020","reaction_order":0,"loss_relative_error":0.2956616602971247,"status":"failed-reference-agreement"},
+    {"work":"ngsolve-av-sphere-order1-20261020","reaction_order":1,"loss_relative_error":0.29566166239928005,"status":"failed-reference-agreement"},
+    {"work":"ngsolve-av-sphere-order2-20261020","reaction_order":2,"status":"timeout","timeout_seconds":180}
+  ],
+  "tree_gauge": {
+    "implementation": "tree_gauge.py",
+    "method": "Remove higher gradient functions using HCurl(nograds=True), then fix a rooted spanning tree of lowest-order edges. Applicable only to the simply connected global field domain used here.",
+    "verification": "Small actual 3D FE tests compare tree and Coulomb gauges: current/loss, source work and reaction magnetic energy agree within 1e-8. Zero source and reversed harmonic-frequency controls also pass.",
+    "completed_work": "ngsolve-av-sphere-order2-tree-20261020",
+    "summary_sha256": "ba99c026e34aa31834bdaa9e40e3cbfc23ffc8703da3726ea39969496e51b182",
+    "status": "completed-coupled-3d-av-sphere-unqualified",
+    "loss_w": 0.07410437305009943,
+    "analytical_loss_relative_error": 0.011142732449176851,
+    "relative_equation_residual": 4.4111069461443955e-15,
+    "relative_source_work_joule_balance": 7.689444636582721e-10,
+    "net_volume_current_relative_error": 1.7736887288046637e-16,
+    "solve_seconds": 0.6116207080194727,
+    "dofs": 21398,
+    "scope": "Equivalent gauge selection reduces algebraic cost. It changes no constitutive law, source or acceptance gate, and does not rescue the failed coarse sphere results."
+  },
+  "gauge_check_followup": "Higher-order tests exposed a 3.33e-8 reaction-energy difference from different automatic compound-space integration orders. Explicit identical tetrahedron rules remove that difference and retain the 1e-8 gauge-equivalence gate. Exact constraint scaling/iterative refinement improve algebraic conditioning without penalty terms or changed equations.",
+  "completed_independent_controls": ["ngsolve-av-sphere-controls16-base-20261020", "ngsolve-av-sphere-controls16-mesh-20261020", "ngsolve-av-sphere-controls16-domain-20261020", "ngsolve-av-sphere-controls16-quadrature-20261020"],
+  "control_audit": {
+    "report": "ngsolve-av-sphere-controls16-audit-20261020.json",
+    "sha256": "02d86776959a4de88f9e8e8b96c7de74570440703cab098e3568598763fb7a7e",
+    "status": "passed-coupled-3d-sphere-controls-only",
+    "final_analytical_loss_relative_error": 0.003152110220948412,
+    "loss_over_weak_induction_limit": 0.5854550040325748,
+    "mesh_loss_relative_change": 0.00589823915881893,
+    "mesh_reaction_energy_relative_change": 0.012578480531774128,
+    "domain_loss_relative_change": 0.002055152587586262,
+    "domain_reaction_energy_relative_change": 0.000749917978131287,
+    "quadrature_loss_relative_change": 3.552713678800501e-15,
+    "unchanged_gates": "2% independent refinement; 5% analytical reference; equation/current/power controls",
+    "solver_task_threads": 16
+  },
+  "finite_motion_followup": "finite-housing-moving-pm-progress-2026-10-20.json",
+  "remaining": ["disk mesh/domain/quadrature controls and slotted-conductor independent comparison", "coupled translating finite-PM transient and operating-speed controls", "nonlinear backplane/winding coupling"]
+}

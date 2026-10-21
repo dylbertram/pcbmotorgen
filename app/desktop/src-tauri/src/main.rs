@@ -71,6 +71,7 @@ fn main() {
             commands::physics::travel_envelope,
             commands::physics::compute_friction,
             commands::physics::analyze_drive,
+            commands::physics::analyze_housing_motion,
             commands::kicad::connect_kicad,
             commands::kicad::write_coils_to_board,
             commands::kicad::write_sensor_to_board,

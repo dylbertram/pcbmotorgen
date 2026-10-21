@@ -33,7 +33,32 @@ export interface DriveSettings {
   voltage_headroom: number;
   /** External series inductance per phase at the driver terminals [H]. */
   series_inductance_h: number;
+  /** Opt-in established steady travel; starts/stops are not represented. */
+  housing_motion?: { duration_s: number } | null;
 }
+
+export interface HousingMotionEstimate {
+  method: string;
+  housing_material: import("./backplane").HousingMaterial;
+  speed_m_s: number;
+  duration_s: number;
+  equivalent_travel_m: number;
+  housing_drag_n: number;
+  signed_housing_drag_n: number;
+  housing_joule_power_w: number;
+  housing_energy_j: number;
+  layer_joule_power_w: number[];
+  total_stack_joule_power_w: number;
+  total_stack_drag_n: number;
+  power_balance_relative_error: number;
+  quadrature_relative_change: number;
+  quadrature_samples: number;
+  warnings: string[];
+}
+
+export type HousingMotionAnalysis =
+  | { status: "experimental"; estimate: HousingMotionEstimate }
+  | { status: "unavailable"; reason: string };
 
 export interface PhaseElectrical {
   net: string;
@@ -78,6 +103,7 @@ export interface DragPoint {
 
 /** Backplane and housing at the operating point (`DriveBackplane`). */
 export interface DriveBackplane {
+  housing_motion?: HousingMotionAnalysis | null;
   /** Low-frequency inductance factor, with the magnets' bias. */
   inductance_factor: number;
   /** Inductance factor at the PWM frequency, eddy currents included. */

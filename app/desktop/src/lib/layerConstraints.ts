@@ -10,6 +10,7 @@
  */
 
 import type { RoutingPatternInfo } from "./types";
+import { MAX_PCB_LAYERS } from "./types/simulationLimits";
 
 /** Layer-range constraints of the active pattern (null = unconstrained). */
 export interface PatternLayerRange {
@@ -45,7 +46,7 @@ export function layerOptions(
 ): number[] {
   const boardMax = Number.isFinite(maxLayers) ? Math.floor(maxLayers) : 0;
   const lo = Math.max(2, range.min_layers ?? 2);
-  const hi = Math.min(boardMax, range.max_layers ?? boardMax);
+  const hi = Math.min(boardMax, range.max_layers ?? boardMax, MAX_PCB_LAYERS);
   const mult = range.layers_multiple_of;
   const options: number[] = [];
   for (let n = 2; n <= hi; n += 2) {

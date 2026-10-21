@@ -103,8 +103,11 @@ export interface BackplaneAnalysis {
 /** Silicon steel above this switching frequency is flagged [Hz]. */
 export const SILICON_STEEL_PWM_LIMIT_HZ = 20e3;
 
-/** Largest accepted thickness for one layer or the housing [m]. */
-export const BACKPLANE_MAX_THICKNESS_M = 0.02;
+/** Largest accepted thickness for each backplane layer [m], not a total cap. */
+export const BACKPLANE_MAX_THICKNESS_M = 0.002;
+export const BACKPLANE_MAX_LAYERS = 3;
+export const HOUSING_MAX_THICKNESS_M = 0.005;
+export const HOUSING_MAX_GAP_M = 0.01;
 
 export interface MaterialOption<T extends string> {
   value: T;
@@ -162,11 +165,14 @@ export function newLayer(material: LayerMaterial): BackplaneLayer {
 export const HOUSING_MATERIAL_OPTIONS: MaterialOption<HousingMaterial>[] = [
   { value: "aluminum6061", label: "Aluminum 6061-T6" },
   { value: "aluminum5052", label: "Aluminum 5052-H32" },
-  { value: "steel1018", label: "Mild steel 1018" },
   { value: "stainless304", label: "Stainless 304" },
   { value: "stainless316", label: "Stainless 316" },
-  { value: "stainless430", label: "Stainless 430" },
 ];
+
+/** Legacy magnetic materials remain in the file type, not selectable inputs. */
+export function isSupportedHousingMaterial(material: HousingMaterial): boolean {
+  return HOUSING_MATERIAL_OPTIONS.some((option) => option.value === material);
+}
 
 /** Housing defaults used when the housing is first enabled [m]. */
 export const DEFAULT_HOUSING: HousingSpec = {

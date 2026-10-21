@@ -248,6 +248,13 @@ def check_force_paths(runs, absolute_floor_n=1e-8):
 
 
 def getdp_nonlinear_convergence(job):
+    """Read the legacy GetDP update/stopping proxy and its actual loop count.
+
+    GetDP labels this value 'Nonlinear Residual norm', but SolveJac documents
+    it as relative solution-update error. It is not an independently assembled
+    ||F(x)|| certificate. New reduced-response checks use equilibrium.txt instead.
+    The historical return-key name is retained for archived-report compatibility.
+    """
     residual=np.loadtxt(job/'nonlinear.txt').reshape(-1,2)[-1]
     log=(job/'solve.log').read_text()
     values=re.findall(r'^\s*Info\s*:\s+(\d+) Nonlinear Residual norm\s+(\S+)',log,re.M)
@@ -258,6 +265,22 @@ def getdp_nonlinear_convergence(job):
         raise ValueError('Nonlinear log and residual artifact do not agree')
     # GetDP 3.5.0's printed $NLIteration can be zero even after a real loop.
     return {'relative_residual':float(residual[0]),'iterations':iteration,'iteration_source':'nonlinear residual log'}
+
+
+def finish_report(report, source, work, status, failures):
+    """Validate immutable inputs before publishing any completed study status."""
+    if status not in ['comparison-only','completed-bare-field-only-unqualified']:
+        raise ValueError('Unsupported completed project status')
+    failures=list(failures)
+    if hashlib.sha256(Path(source).read_bytes()).hexdigest()!=report['model']['source_sha256']:
+        failures.append('Source project changed during the job')
+    for path,entry in report.get('source_snapshots',{}).items():
+        if hashlib.sha256(Path(path).read_bytes()).hexdigest()!=entry['sha256']:
+            failures.append('Source implementation or input changed during the job: '+path)
+    report.update(status='failed' if failures else status,failures=failures,
+                  mesh_sha256=hashlib.sha256((work/'project.msh').read_bytes()).hexdigest())
+    (work/'summary.json').write_text(json.dumps(report,indent=2,allow_nan=False)+'\n')
+    if failures:raise ValueError('\n'.join(failures))
 
 
 def main():
@@ -282,7 +305,7 @@ def main():
     parser.add_argument('--element-order',type=int,choices=[1,2],default=2,help='GetDP scalar basis; all field/force gates remain unchanged')
     parser.add_argument('--relaxation',type=float,default=1.,help='GetDP Newton damping only; material law and 1e-9 residual gate stay unchanged')
     parser.add_argument('--quarter',action='store_true',help='GetDP only: verify exact x/y mirror symmetry and reconstruct full fields/force surfaces')
-    parser.add_argument('--z-stretch',type=float,default=1.,help='experimental GetDP mesh construction only: stretch CAD Z, then restore mesh nodes to physical SI before solving')
+    parser.add_argument('--z-stretch',type=float,default=1.,help='experimental mesh construction only: stretch CAD Z, then restore mesh nodes to physical SI before either backend solves')
     parser.add_argument('--mesh-from',type=Path,help='reuse only a byte-identical geometry job mesh, after region validation')
     args=parser.parse_args()
     if not 2<=args.force_subdivisions<=512:parser.error('force subdivisions must be between 2 and 512')
@@ -290,7 +313,6 @@ def main():
     if bool(args.elmer)!=bool(args.elmergrid) or (args.elmer and not args.gmsh):parser.error('solve requires gmsh, ElmerGrid and ElmerSolver')
     if args.getdp and (args.elmer or not args.gmsh):parser.error('choose GetDP with gmsh, or Elmer with gmsh/ElmerGrid')
     if args.quarter and args.elmer:parser.error('quarter symmetry is qualified for the scalar GetDP formulation only')
-    if args.z_stretch!=1 and args.elmer:parser.error('stretched-mesh prototype currently supports scalar GetDP only')
     if args.far_mesh is not None and (not np.isfinite(args.far_mesh) or not args.mesh<=args.far_mesh<args.radius):
         parser.error('far mesh must be finite and between the near mesh and exterior radius')
     if args.magnet_face_mesh is not None and (not np.isfinite(args.magnet_face_mesh) or not 0<args.magnet_face_mesh<=args.mesh):
@@ -311,9 +333,10 @@ def main():
     if args.magnet_face_mesh is not None:
         geo=with_magnet_faces(geo,solver_model,args.magnet_face_mesh,args.z_stretch,args.far_mesh if args.far_mesh is not None else args.radius/6,args.magnet_face_band)
     (work/'project.geo').write_text(geo)
+    backend='elmer' if args.elmer else ('getdp' if args.getdp or args.quarter or args.z_stretch!=1 else 'elmer')
     report={'scope':__doc__,'status':'inputs-only','model':model,'mesh_m':args.mesh,'gap_mesh_m':args.gap_mesh,'air_radius_m':args.radius,'runs':{},
-            'backend':'getdp' if args.getdp or args.quarter or args.z_stretch!=1 else 'elmer',
-            'element_order':args.element_order if args.getdp or args.quarter or args.z_stretch!=1 else 1,
+            'backend':backend,
+            'element_order':args.element_order if backend=='getdp' else 1,
              'getdp_relaxation':args.relaxation,
              'quarter_symmetry':args.quarter,
              'z_stretch':args.z_stretch,
@@ -332,7 +355,7 @@ def main():
             'pde_geometry_and_materials_unscaled':True,'helper_sha256':hashlib.sha256((HERE/'mesh_stretch.py').read_bytes()).hexdigest()}
     if args.far_mesh is not None:report['far_mesh_control_sha256']=hashlib.sha256((HERE/'mesh_controls.py').read_bytes()).hexdigest()
     if args.magnet_face_mesh is not None:report['magnet_mesh_control_sha256']=hashlib.sha256((HERE/'magnet_mesh.py').read_bytes()).hexdigest()
-    report['source_snapshots']=capture(work,[Path(__file__),*[HERE/name for name in ['magnet_mesh.py','mesh_stretch.py','mesh_controls.py',
+    report['source_snapshots']=capture(work,[args.project,Path(__file__),*[HERE/name for name in ['magnet_mesh.py','mesh_stretch.py','mesh_controls.py',
         'project_symmetry.py','check_free_space.py','job_status.py','check_finite_plate.py','check_plate2d.py','maxwell_stress.py','read_vtu.py','cuboid.sif']]])
     output=work/'summary.json';output.write_text(json.dumps(report,indent=2)+'\n')
     if not args.gmsh:return
@@ -412,15 +435,10 @@ def main():
             output.write_text(json.dumps(report,indent=2)+'\n')
             raise SystemExit('\n'.join(failures))
         if args.bare_only:
-            if hashlib.sha256(args.project.read_bytes()).hexdigest()!=model['source_sha256']:raise ValueError('Source changed during the bare field job')
-            report.update(status='completed-bare-field-only-unqualified',failures=[],mesh_sha256=hashlib.sha256((work/'project.msh').read_bytes()).hexdigest())
-            output.write_text(json.dumps(report,indent=2)+'\n')
+            finish_report(report,args.project,work,'completed-bare-field-only-unqualified',[])
             return
     failures.extend(check_force_paths(report['runs']))
-    report.update(status='failed' if failures else 'comparison-only',failures=failures,mesh_sha256=hashlib.sha256((work/'project.msh').read_bytes()).hexdigest())
-    output.write_text(json.dumps(report,indent=2)+'\n')
-    if hashlib.sha256(args.project.read_bytes()).hexdigest()!=model['source_sha256']:raise ValueError('Source changed during the job')
-    if failures:raise SystemExit('\n'.join(failures))
+    finish_report(report,args.project,work,'comparison-only',failures)
 
 
 if __name__=='__main__':

@@ -640,7 +640,7 @@ mod tests {
         assert!(stack
             .periodic_static_reference(&sim())
             .unwrap_err()
-            .contains("nonmagnetic housing"));
+            .contains("unsupported for coreless screening"));
         stack.housing = None;
         let mut invalid = sim();
         invalid.magnet_remanence_t = f64::NAN;

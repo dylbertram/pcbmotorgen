@@ -1,0 +1,36 @@
+{
+  "status": "passed-native-installation-upstream-and-refined-free-space-only",
+  "scope": "Native macOS ARM Elmer 26.2 build. No finite-array force, winding material response or housing-motion acceptance follows from installation tests.",
+  "source_archive_sha256": "7addfb102d735929a40929be08be0c16703d734498d33bc70c96e7d526fe249c",
+  "compiler": "Homebrew GNU Fortran 16.2.0",
+  "c_cxx_compiler": "AppleClang 21.0.0.21000334",
+  "blas_lapack": "macOS SDK Accelerate framework, default LP64 Fortran interfaces",
+  "configuration": "Release, serial, no MPI/OpenMP/GUI/ElmerIce, bundled UMFPACK enabled; six magnetic/output modules",
+  "source_changes": "None. Initial WITH_UMFPACK=OFF trial failed linking because upstream still adds umfpack/amd library names; final build retains the default bundled UMFPACK. The failed build log is preserved.",
+  "elmer_solver_sha256": "97ea50c4fc7d734027b572885b48db6f39494bf6ae9b7ec56b35ae1e1a676fd9",
+  "elmer_grid_sha256": "e562aa923a8fb2580aa8ee964688cafd87002f7279e910c27607da3440e0f950",
+  "cmake_cache_sha256": "9489e178f55a0fc75a01cf65cfe0931d7caf7a14f23f168127cb385ab9b6ea17",
+  "upstream_tests": {
+    "passed": ["mgdyn_airgap_force", "mgdyn_bh", "mgdyn_faraday_disc"],
+    "wall_seconds": 16.67,
+    "last_test_log_sha256": "334d2da4d189bbd72a7d4ab8186b2e0b83cd1f3026cbd4d1f7e539793cb45281"
+  },
+  "rejected_free_space": {
+    "work_relative_to_solver_opt": "free-space-elmer-arm64-20261019",
+    "summary_sha256": "ef8ee50c25327501fa15b0d28013fa822b4493af03516d51fed6a9e618eb27e7",
+    "reason": "0.25/0.20mm mesh change 2.389% and domain change 2.032% exceed unchanged 2% gates."
+  },
+  "passed_free_space": {
+    "work_relative_to_solver_opt": "free-space-elmer-arm64-refined-20261019",
+    "summary_sha256": "68f7d3afa1a5bf7b4e544ec3ba2062d3f2fa1fd90382ff919965bd9b417bf3f8",
+    "mesh_m": [0.0002, 0.00015, 0.00015],
+    "field_relative_errors": [0.012530043545770279, 0.007587267341922819, 0.005990472927985774],
+    "mesh_relative_change": 0.013005655024892822,
+    "domain_relative_change": 0.008164753663175749,
+    "solve_seconds": [16.760127791028935, 41.08816837496124, 47.91240241599735],
+    "field_gate": 0.05,
+    "refinement_gate": 0.02
+  },
+  "raw_archives": "$HOME/.local/opt/solver-prototypes-macos",
+  "distribution": "User-owned offline installation only. No engine bundled with the app. Elmer component, bundled UMFPACK and compiler/dependency licenses require separate review before redistribution."
+}

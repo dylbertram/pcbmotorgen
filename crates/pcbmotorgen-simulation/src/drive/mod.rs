@@ -156,6 +156,9 @@ pub struct DriveSettings {
     /// the per-phase (synchronous) inductance used for the ripple, time
     /// constant, and ω·L voltage terms; zero means none.
     pub series_inductance_h: f64,
+    /// Opt-in experimental steady-travel housing heat exposure, not PWM loss.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub housing_motion: Option<crate::backplane::HousingMotionProfile>,
 }
 
 impl Default for DriveSettings {
@@ -172,6 +175,7 @@ impl Default for DriveSettings {
             ripple_limit_fraction: 0.3,
             voltage_headroom: 0.85,
             series_inductance_h: 0.0,
+            housing_motion: None,
         }
     }
 }
@@ -326,6 +330,9 @@ pub struct DriveAnalysis {
 /// 04n2, q9nw). See [`crate::backplane`] for the model.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DriveBackplane {
+    /// Separate per-region steady-motion estimate; absent unless opted in.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub housing_motion: Option<crate::backplane::HousingMotionAnalysis>,
     /// Low-frequency inductance factor, with the magnets' bias on saturated
     /// layers.
     pub inductance_factor: f64,
@@ -774,6 +781,9 @@ pub fn analyze_drive_with(
             .sum();
         let at_target = s.magnet_forces(sim, settings.target_speed_m_s);
         DriveBackplane {
+            housing_motion: settings.housing_motion.map(|profile| {
+                sim.backplane.as_ref().expect("solved stack exists").housing_motion(sim, settings.target_speed_m_s, profile)
+            }),
             inductance_factor: s.coil_factor(0.0).re,
             pwm_inductance_factor: s.coil_factor(settings.pwm_hz).re,
             pwm_inductance_h: l_ripple,

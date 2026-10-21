@@ -8,6 +8,7 @@ envelope of this periodic model only. No moving finite housing, hysteresis, PWM
 waveform, imported winding or hardware qualification is implied.
 """
 import math
+from pathlib import Path
 
 import numpy as np
 from scipy.sparse import block_diag, coo_matrix
@@ -107,28 +108,48 @@ class Transient:
 
 
 def run(thickness,mu,bsat,frequency=100e3,fraction=1e-3,phase=0,cells=8,modes=3,samples=128,
-        steps_per_period=128,periods=32,wall_cells=32,gap_cells=4):
+        steps_per_period=128,periods=32,wall_cells=32,gap_cells=4,layer_conductivity=0.,harmonic_initial_guess=False,trace_path=None):
     if not np.isfinite([frequency,fraction]).all() or min(frequency,fraction)<=0 or phase not in [0,1] or steps_per_period<32 or periods<4:
         raise ValueError('Invalid transient excitation or time resolution')
+    if trace_path is not None:
+        trace_path=Path(trace_path)
+        if trace_path.exists():raise ValueError('Preserve previous transient traces')
     plate,hessian,bias_proof=bias_state(thickness,mu,bsat,cells,modes,samples)
-    harmonic=complex_response(plate,hessian,frequency,wall_cells=wall_cells,gap_cells=gap_cells)
-    transient=Transient(plate,wall_cells=wall_cells,gap_cells=gap_cells)
+    harmonic=complex_response(plate,hessian,frequency,wall_cells=wall_cells,gap_cells=gap_cells,layer_conductivity=layer_conductivity)
+    transient=Transient(plate,wall_cells=wall_cells,gap_cells=gap_cells,layer_conductivity=layer_conductivity)
     vector,equilibrium_proof=transient.equilibrium();equilibrium=vector.copy()
     amplitude=abs(plate.incident[0])*fraction;index=phase*modes
     dt=1/(frequency*steps_per_period);omega=2*math.pi*frequency
+    if harmonic_initial_guess:
+        # Exact discrete linear midpoint orbit about the attached-tail bias.
+        # This seeds only the state; every subsequent equation is nonlinear.
+        tangent=transient.evaluate(equilibrium)[2]
+        discrete_omega=2/dt*math.tan(omega*dt/2)
+        forcing=np.zeros(transient.size,dtype=complex);forcing[index]=-1j*amplitude/MU0
+        orbit=spsolve(tangent.astype(complex)+1j*discrete_omega*transient.mass,forcing)
+        vector+=orbit.real/math.cos(omega*dt/2)
+    initial_guess='discrete-harmonic-tangent-orbit' if harmonic_initial_guess else 'attached-tail-DC-equilibrium'
     midpoints=[];loss=[];work=[];max_residual=0.;iterations=0
+    trace_previous=[];trace_next=[]
     for step in range(periods*steps_per_period):
         time=(step+0.5)*dt
         source=np.zeros(transient.size);source[index]=amplitude/MU0*math.sin(omega*time)
         next_vector,midpoint,residual,count=transient.step(vector,dt,source)
         derivative=(next_vector-vector)/dt
         if step>=(periods-2)*steps_per_period:
+            if trace_path is not None:trace_previous.append(vector.copy());trace_next.append(next_vector.copy())
             midpoints.append(midpoint-equilibrium)
             loss.append(float(derivative@(transient.mass@derivative)))
             work.append(float(source@derivative))
         vector=next_vector;max_residual=max(max_residual,residual);iterations+=count
     midpoints=np.asarray(midpoints);last=midpoints[-steps_per_period:];previous=midpoints[:steps_per_period]
     settled=float(np.linalg.norm(last-previous)/max(np.linalg.norm(last),np.finfo(float).tiny))
+    if trace_path is not None:
+        # Retain absolute states even if settlement or later physical gates fail.
+        with trace_path.open('xb') as stream:
+            np.savez_compressed(stream,previous=np.asarray(trace_previous),midpoints=midpoints+equilibrium,
+                next=np.asarray(trace_next),equilibrium=equilibrium,loss=np.asarray(loss),source_work=np.asarray(work),
+                dt=dt,amplitude=amplitude,phase=phase,steps_per_period=steps_per_period,periods=periods)
     if settled>1e-5:raise ValueError(f'Transient has not settled to a periodic state: {settled}')
     time=(np.arange(steps_per_period)+0.5)*dt
     phasor=2*np.mean(last[:,index]*np.exp(-1j*omega*time))
@@ -152,7 +173,7 @@ def run(thickness,mu,bsat,frequency=100e3,fraction=1e-3,phase=0,cells=8,modes=3,
         peak=max(peak,float(magnitude.max()))
     harmonics=[2*np.mean(last[:,index]*np.exp(-1j*n*omega*time)) for n in range(2,6)]
     distortion=float(np.linalg.norm(harmonics)/abs(phasor))
-    return {'scope':__doc__,'frequency_hz':frequency,'fraction_of_pm_fundamental':fraction,'phase':phase,
+    result={'scope':__doc__,'frequency_hz':frequency,'fraction_of_pm_fundamental':fraction,'phase':phase,
             'depth_cells':cells,'modes_per_phase':modes,'angular_samples':samples,'wall_cells':wall_cells,'gap_cells':gap_cells,
             'steps_per_period':steps_per_period,'periods':periods,'static_bias_convergence':bias_proof,
             'attached_tail_equilibrium_convergence':equilibrium_proof,'max_step_relative_residual':max_residual,
@@ -162,4 +183,9 @@ def run(thickness,mu,bsat,frequency=100e3,fraction=1e-3,phase=0,cells=8,modes=3,
             'linearized_joule_coefficient_w_m2_t2':harmonic['joule_coefficient_w_m2_t2'][phase],
             'source_work_coefficient_w_m2_t2':source_work,'relative_power_balance_error':balance,
             'incident_ripple_peak_b_t':amplitude,'quadrature_sampled_peak_b_t':peak,
-            'quadrature_fraction_crossing_knee':crossing,'top_a_harmonics_2_to_5_relative':distortion}
+            'quadrature_fraction_crossing_knee':crossing,'top_a_harmonics_2_to_5_relative':distortion,
+            'layer_conductivity_s_m':layer_conductivity,'initial_guess':initial_guess}
+    if trace_path is not None:
+        from post_project_force import sha
+        result.update(trace=str(trace_path.resolve()),trace_sha256=sha(trace_path))
+    return result

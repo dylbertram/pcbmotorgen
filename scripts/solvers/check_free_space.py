@@ -35,8 +35,10 @@ def run(command, work, log):
     receipt_path.write_text(json.dumps(receipt, indent=2)+"\n")
     with (work / log).open('w') as output:
         try:
+            child_environment=os.environ.copy()
+            child_environment['PCB_MOTOR_COMMAND_RECEIPT']=str(receipt_path.resolve())
             process = subprocess.Popen(command, cwd=work, text=True, stdout=output, stderr=subprocess.STDOUT,
-                                       start_new_session=os.name=='posix')
+                                       start_new_session=os.name=='posix',env=child_environment)
         except BaseException as error:
             receipt.update(status='spawn-failed',error=str(error),seconds=time.monotonic()-start)
             receipt_path.write_text(json.dumps(receipt, indent=2)+"\n")

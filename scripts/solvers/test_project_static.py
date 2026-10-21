@@ -1,12 +1,14 @@
 import copy
+import hashlib
 import json
 import tempfile
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 
 import numpy as np
 
-from project_static import project, geometry, sif, getdp_input, check_force_paths, getdp_nonlinear_convergence
+from project_static import project, geometry, sif, getdp_input, check_force_paths, getdp_nonlinear_convergence, finish_report, main
 from maxwell_stress import box_faces, force
 
 
@@ -18,6 +20,41 @@ CONFIG={'topology':'linear','magnet_count':5,'electrical_pitch_mm':12,'magnet_wi
 
 
 class ProjectStaticTest(unittest.TestCase):
+    def test_restored_stretched_mesh_keeps_the_explicit_elmer_backend(self):
+        with tempfile.TemporaryDirectory() as directory:
+            work=Path(directory)/'job';source=Path(directory)/'source.pmmotor'
+            source.write_text(json.dumps({'format':'pcbmotorgen-coil','format_version':1,'document_type':'motor',
+                'versions':[{'state':{'config':CONFIG}}]}))
+            argv=['project_static.py','--project',str(source),'--version','0','--footprint-mm','36','12',
+                  '--array-centre-mm','0','0','--work',str(work),'--z-stretch','4','--gmsh','gmsh',
+                  '--elmer','ElmerSolver','--elmergrid','ElmerGrid']
+            with patch('sys.argv',argv),patch('project_static.run',side_effect=RuntimeError('stop before native meshing')):
+                with self.assertRaisesRegex(RuntimeError,'stop before native meshing'):main()
+            report=json.loads((work/'summary.json').read_text())
+            self.assertEqual(report['backend'],'elmer');self.assertEqual(report['element_order'],1)
+            self.assertEqual(report['mesh_coordinate_transform']['physical_node_z_divisor'],4)
+            self.assertFalse(report['quarter_symmetry'])
+
+    def test_changed_project_or_implementation_never_publishes_completed_status(self):
+        with tempfile.TemporaryDirectory() as directory:
+            work=Path(directory);source=work/'source.pmmotor';implementation=work/'analysis.py'
+            source.write_text('original project');implementation.write_text('original analysis')
+            (work/'project.msh').write_text('mesh')
+            digest=lambda path:hashlib.sha256(path.read_bytes()).hexdigest()
+            template={'model':{'source_sha256':digest(source)},'source_snapshots':{str(implementation):{'sha256':digest(implementation)}}}
+            for status in ['comparison-only','completed-bare-field-only-unqualified']:
+                report=copy.deepcopy(template)
+                finish_report(report,source,work,status,[])
+                self.assertEqual(json.loads((work/'summary.json').read_text())['status'],status)
+                for path in [source,implementation]:
+                    before=path.read_bytes();path.write_text('changed')
+                    with self.assertRaises(ValueError):finish_report(copy.deepcopy(template),source,work,status,[])
+                    failed=json.loads((work/'summary.json').read_text())
+                    self.assertEqual(failed['status'],'failed');self.assertTrue(failed['failures'])
+                    path.write_bytes(before)
+                with self.assertRaises(ValueError):finish_report(copy.deepcopy(template),source,work,status,['force failed'])
+                self.assertEqual(json.loads((work/'summary.json').read_text())['status'],'failed')
+
     def test_scalar_nonlinear_iteration_count_comes_from_the_real_log(self):
         with tempfile.TemporaryDirectory() as directory:
             job=Path(directory)

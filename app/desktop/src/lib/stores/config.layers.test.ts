@@ -26,8 +26,8 @@ function storeWithLayers(numLayers: number, patternId: string): ConfigStore {
 describe("ConfigStore pattern-constrained layer selection", () => {
   it("derives the layer options from the board max and pattern metadata", () => {
     const store = storeWithLayers(4, "infinity-braid");
-    // Braid: min 2, no max -> even ladder up to max_layers (12).
-    expect(store.layerOptions).toEqual([2, 4, 6, 8, 10, 12]);
+    // Braid: min 2, no max -> even ladder up to the 16-layer program cap.
+    expect(store.layerOptions).toEqual([2, 4, 6, 8, 10, 12, 14, 16]);
     expect(store.patternLayerRange).toEqual({
       min_layers: 2,
       max_layers: null,
@@ -42,7 +42,7 @@ describe("ConfigStore pattern-constrained layer selection", () => {
 
   it("updates options and range when the pattern switches", () => {
     const store = storeWithLayers(4, "infinity-braid");
-    expect(store.layerOptions).toEqual([2, 4, 6, 8, 10, 12]);
+    expect(store.layerOptions).toEqual([2, 4, 6, 8, 10, 12, 14, 16]);
     store.routing_pattern = "quad-stack";
     expect(store.layerOptions).toEqual([4, 8]);
   });
@@ -81,7 +81,7 @@ describe("ConfigStore pattern-constrained layer selection", () => {
 
   it("is unconstrained for an unknown pattern (catalog not loaded yet)", () => {
     const store = storeWithLayers(10, "not-in-catalog");
-    expect(store.layerOptions).toEqual([2, 4, 6, 8, 10, 12]);
+    expect(store.layerOptions).toEqual([2, 4, 6, 8, 10, 12, 14, 16]);
     store.constrainLayersToPattern();
     expect(store.num_layers).toBe(10);
   });
@@ -97,5 +97,13 @@ describe("ConfigStore pattern-constrained layer selection", () => {
     expect(store.layerOptions).toEqual([]);
     store.constrainLayersToPattern();
     expect(store.num_layers).toBe(4);
+  });
+
+  it("preserves an unsupported imported layer count instead of truncating geometry", () => {
+    const store = storeWithLayers(20, "infinity-braid");
+    store.max_layers = 24;
+    store.constrainLayersToPattern();
+    expect(store.num_layers).toBe(20);
+    expect(store.layerOptions).toEqual([2, 4, 6, 8, 10, 12, 14, 16]);
   });
 });

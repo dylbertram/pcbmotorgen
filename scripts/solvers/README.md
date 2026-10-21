@@ -1,10 +1,216 @@
 # Offline solver prototypes
 
-Kata `pcbmotorgen#ytgr`, `#04n2`, `#q9nw`. These jobs test external solvers
-before any application integration. They do not replace the fast analytical
-preview or turn its estimates into qualified motor predictions.
+Kata `pcbmotorgen#ytgr`, `#04n2`, `#q9nw`, with current app work in `#d458`
+and `#bs7k`. External finite-FEM jobs remain offline references. Separate
+verification supports the app's experimental analytical capabilities; it does
+not turn screening estimates into hardware ratings.
+
+## Current scope: DC motor windings
+
+Program scope is coreless PCB motors with at most3 backplane layers, each
+no thicker than2mm, not a2mm total-stack cap. All housing walls are at
+most5mm. Current housing scope is aluminum and nominally non-magnetic
+annealed304/316 stainless; ferromagnetic steel1018 and magnetic430 stainless
+housing are deferred. Magnetic ferrite shielding remains in scope.
+Housing gap is at most10mm, magnet count at most12 and PCB copper layer
+count at most16. These are user-confirmed input bounds, not a statement that
+every configuration inside them is already qualified. The
+UI/backend/typed-JSON entrypoint guards implement this envelope; legacy
+research scripts retain their historical mathematical cases and are not app
+support declarations. No further monolithic5mm ferrite studies should run; historical
+evidence is retained, not a current completion requirement. The desired100C
+temperature ceiling means absolute temperature, not a100C rise. Thermal
+assumptions and predictions must remain explicit and must not be clamped to
+that desired ceiling. The shielding cap does not limit PCB thickness.
+
+The user has explicitly excluded AC winding excitation for now. Do not start
+new periodic/PWM/envelope or AC-loss studies as part of completing this work.
+Historical AC evidence and failures are retained below, but are not current
+completion gates. The remaining owned AC queue was stopped, with its inputs
+and interrupted receipt preserved.
+
+Focus is saved-file finite copper geometry, DC current distribution/resistance,
+static saturation/fields/forces, DC linkage and differential inductance, and
+separate motion-induced housing effects. Copper dimensions come from PMMOTOR,
+including trace width, via drill/annulus/plating and layer weight. The actual
+finite geometry and bounded DC solve are indexed in
+`results/dc-finite-copper-progress-2026-10-20.json`.
+
+### Experimental housing motion and heating
+
+The user wants theoretical motion-induced housing eddy-current drag and heat
+generation as opt-in experimental capabilities that improve over time, with
+explicit model assumptions and declared numerical targets. Hardware rating claims are deferred until a
+future prototype. Initial app integration now exists; it does not relabel
+failed strict-reference studies as passed or qualify arbitrary finite housing.
+
+Keep application numerical targets separate from the offline reference gates. Coarser
+mesh/time resolution is acceptable only with explicit applicability limits and
+reference checks. Failed solves, lost current continuity, negative dissipation
+or broken energy checks must still be rejected. Low-Rm source-only results
+cannot be scaled to operating speeds where magnetic feedback matters.
+
+Report drag, heat-generation power and motion-profile energy distinctly.
+Temperature rise additionally needs explicit heat-capacity/mass and cooling
+assumptions. The existing fast application drag-power estimate is for the
+whole conducting stack; do not relabel it as housing-only heat without a
+per-region loss calculation or a verified housing-only conducting case.
+AC winding excitation, PWM, skin/proximity and core loss remain excluded.
+
+The opt-in setting is `DriveSettings.housing_motion: { duration_s }`.
+`target_speed_m_s` supplies the constant travel speed. The result is the tagged
+`analyze_housing_motion` command returns a tagged `experimental` estimate or
+`unavailable` reason without numbers. The UI owns an independent request
+lifecycle: driver delta/current-loop compatibility cannot block PM-induced
+housing physics, and late responses cannot replace a newer request. There is
+no fabricated browser substitute when the desktop backend is absent. The
+optional `DriveBackplane.housing_motion` diagnostic remains available for
+consistency checks but is not the UI's request dependency. Disabled/missing
+settings preserve the previous driver-analysis contract.
+
+`backplane/housing_motion.rs` integrates each conducting region's electric
+field, including magnetic feedback. Housing Joule power is not the total
+stack loss. It verifies region-loss sums against independent boundary work
+and refines the cross-travel spectral integral. Housing drag is a steady
+power-equivalent opposing contribution, not a separately qualified body force.
+Energy means an established steady field maintained for the declared exposure,
+not a transient entry/exit/stopping simulation. Conductivity remains at its
+room-temperature material value; there is no temperature output or thermal
+feedback. Finite housing edges, slots and full moving nonlinear shielding
+remain outside this planar model.
+
+The field source here is the moving PM array. Winding-current reaction and
+induced PCB-copper shielding are omitted. Under that explicit assumption,
+changing only the winding pattern does not change housing heat if PM/PCB/
+backplane/housing inputs stay fixed; routed copper still determines the
+electrical and force calculations. This is not a reference-geometry lookup.
+
+An independent complex P1 diffusion FEM matrix covers12 material/geometry/
+speed cases, including all4 supported housing materials, maximum wall/gap/
+magnet/layer input values, reversal and conducting-backplane loss partition.
+It passes2% reference mesh refinement and5% Rust/FEM region-loss agreement;
+maximum observed difference is0.122%. This qualifies only the declared
+periodic-planar operator, not finite-housing or hardware accuracy. Raw evidence
+is `$SOLVER_OPT/housing-motion-independent-planar-v2-20261020`; the first
+attempt's final provenance writer failed on a string/path mismatch and remains
+failed, with the corrected whole-job rerun stored separately.
+
+```sh
+CARGO_BUILD_JOBS=2 cargo build -p pcbmotorgen-simulation --example housing_motion_dump
+"$SOLVER_OPT/ngsolve-venv/bin/python" scripts/solvers/check_housing_motion_reference.py \
+  --binary target/debug/examples/housing_motion_dump --work "$SOLVER_OPT/new-housing-reference"
+```
+
+Run through `check_free_space.run` for a whole-job receipt. Browser tests in
+`e2e/housing-motion.spec.ts` verify opt-in rendering, separate housing/stack
+labels, pending/error invalidation and input controls with explicit transport
+fixtures; they do not substitute for the independent numerical tests.
 
 ## Installation
+
+For Apple Silicon diagnostics see the [macOS portability instructions](PORTABILITY.md#apple-silicon-macos-diagnostics).
+That installation uses native GetDP 4.0.0 and requires fresh numerical checks;
+it does not inherit the Linux 3.5.0 qualifications below.
+
+An optional native serial Elmer 26.2 build is now available through
+`install_elmer_macos.sh`, with a separately installed Fortran compiler. Its
+three upstream magnetic tests and a refined free-space study pass, but its
+first full five-PM bare control fails near-source maps and self-force. See
+`results/native-elmer-installation-2026-10-19.json` and
+`results/five-pm-elmer-bare-failed-2026-10-19.json`. Installation is not force
+qualification, and no nonlinear five-PM job is accepted from that control.
+
+## Handover review follow-up
+
+### Interrupted-work reporting and finite-source progress, 2026-10-20
+
+No worker remained running when the apparently stuck run was inspected. The
+GetDP continuation was failed/interrupted, and a standalone force audit still
+said `running` despite its supervisor receipt saying `interrupted`. The original
+records were preserved. New supervised Python jobs receive their authoritative
+receipt path, and force reports link it. `job_status.py` can inspect standalone
+reports with `--summary`, and historical reports with an explicit `--receipt`.
+An interrupted receipt overrides a stale or prematurely completed report; an
+explicit whole-job receipt is not mixed with unrelated trials in a shared prefix.
+
+Force postprocessing now checkpoints each complete surface. A fresh bounded
+audit reused 18 matching quadrature units from the interrupted audit, recomputed
+the six missing units, reran every gate and finished successfully in 121 seconds.
+This does not relabel the interrupted job as accepted. The original source,
+mesh, nonlinear solution, physics-code hashes, surface coverage and quadrature
+settings were verified before reuse. No new FEM solve was started for recovery.
+
+The centred five-PM nonlinear source/response case now passes the original
+surface, bare-floor, action/reaction and quadrature gates. Stator force is
+1.189–1.190 N and mover force about −1.186 N, with 0.24–0.33% imbalance. This is
+numerical consistency on that fixed provisional-material case, not hardware
+accuracy or full motor qualification. Independent mesh/far/domain and converged
+cross-backend checks remain separate. See
+`results/finite-source-response-progress-2026-10-20.json`.
+
+The review found a pending-request Kf race missed by the earlier rejection-only
+browser test. It was reproduced before the fix: a changed bus voltage reached
+driver analysis with the previous sweep's Kf while the replacement sweep was
+still pending. Simulation-generation changes now invalidate thrust/Kf and
+driver state immediately. All 22 targeted browser regressions pass afterward;
+see `results/pending-kf-race-review-2026-10-19.json`.
+
+### Explicit GetDP equilibrium and controlled refinements
+
+The legacy GetDP `SolveJac` log label "Nonlinear Residual norm" is a relative
+solution-update proxy, not an assembled equation residual. Historical evidence
+retains its original labels. `getdp_equilibrium_check.py` instead certifies
+`||b-A*x||_2`, normalized by the full-source residual at zero response, at 1e-9.
+The centred case passed at 1.2341e-10 after two updates. Its initial guess came
+from NGSolve. `getdp_initial_guess.py` verified that P2 transfer over all 43,117
+elements, with maximum gradient discrepancy 5.50e-15 T. Transfer alone does not
+solve or certify any equations.
+
+The resulting GetDP force audit passes the unchanged surface and quadrature
+gates. `compare_reduced_fields.py` also passes the unchanged 5% cross-backend
+gate for total fields, material-response fields and all six force paths.
+Maximum probe-set discrepancies are 0.000983% for total B and 0.04145% for the
+material response; force differences are below 0.8 microN. Both backends share
+the source, mesh, material law and initial guess. This checks their separately
+assembled equations, not cold-start convergence or hardware accuracy.
+
+The 0.8/0.6 mm near-mesh comparison passes the 2% field gate, including the
+material response, whose largest probe-set change is 1.807%. Its finer force
+audit timed out after 22 complete surface integrals. A new supervised audit
+verified and reused those units, computed the two missing units and reran all
+gates successfully. The full mesh comparison passes for all six force paths,
+with maximum force change 0.000905 N. The original timeout remains unaccepted.
+Far-air refinement also passes the unchanged field/force gates. The expanded
+domain cold start timed out at 650 seconds and remains unaccepted. A separate
+same-physics initial-guess retry converged in 17 updates to a relative equation
+residual of 2.64e-15. The expanded 60/75mm domain comparison passes all unchanged
+field/force controls, including the material response at 1.363% maximum change
+and all six force paths with maximum change 0.000761N. This completes those
+numerical controls for the single fixed static case, not other poses/materials
+or a coupled winding/motion solve. Shared-seed provenance remains explicit.
+See the dated progress index for completed
+evidence and outstanding work:
+`results/reduced-equilibrium-and-refinement-2026-10-20.json`.
+
+Direct GetDP evaluations at 32 off-symmetry air-cell interiors match the archived
+affine reader to 3.56e-15 T. This rules out that export/reader path as an
+explanation of the large self-force, not the FEM discretization itself. Both
+root PMMOTOR v0 windings pass independent 10/20/40/80 resistance, sparse-current,
+signed trace/via sample and prescribed-source force checks. The four-layer DXF
+also passes read-only copper-preserving import/exchange. None establishes
+nonlinear winding response; the compact evidence is
+`results/getdp-export-and-winding-review-2026-10-19.json`.
+
+New project jobs snapshot the actual input project and validate source/input
+hashes **before** publishing a completed status. A changed input or analysis
+cannot leave a completed comparison behind after raising an error. Explicit
+far-air controls now disable CAD curvature sizing: the stretched sphere's pole
+curvature otherwise introduced a hidden radius-dependent size cap. Legacy
+geometry without `--far-mesh` remains unchanged, and old failed trials are not
+rewritten or reused as if generated with the corrected control. Helper tests
+cover these changes. Finite forces, actual winding/material response, finite
+housing motion/current closure, MnZn AC agreement and deployment qualification
+remain open.
 
 For a fresh checkout on another computer, start with
 [the portability guide](PORTABILITY.md). It covers host prerequisites, pinned
@@ -254,6 +460,21 @@ but the acceptance audit requires the raw-element reports.
 
 ## Finite eddy-current closure, weak-induction limit
 
+`ngsolve_eddy_av.py` adds an independent 3D reaction-A / conductor-potential
+implementation, including induced magnetic feedback. It has a coupled weak-disk
+pilot, zero-source and frequency-reversal controls. A separate sphere reference
+matches the spherical-Bessel interior field to vacuum and cross-checks dipole
+source work against volume Joule heating. Coarse strong-diffusion sphere trials
+fail the unchanged 5% reference gate despite passing equation and power checks.
+An order-2 Coulomb-gauged trial timed out. A tree gauge, checked against Coulomb
+at both low and higher order using identical quadrature, completes the sphere
+reference. Separate mesh/domain/quadrature controls pass unchanged 2% gates;
+final loss agrees with the coupled analytic solution within 0.316%. Magnetic
+feedback reduces loss to 58.55% of the weak-induction result, so this is not just
+another negligible-reaction check. These are benchmark qualifications, not
+finite motor predictions. The disk/slotted and moving-PM studies remain separate. See
+`results/coupled-3d-av-progress-2026-10-20.json`.
+
 `check_eddy_disk.py` solves a finite 6 mm-radius, 1 mm-thick conducting disk in
 uniform Bz with Elmer's complex 3D A-v formulation. The source is a 10 mT **peak**
 field; reported losses are time averages, with the factor 1/2 explicit. This is
@@ -324,6 +545,326 @@ a completed zero-exit receipt, a normal solver finish and a single archived VTU.
 The result records reuse and the original receipt hash.
 
 ## Finite motional-current diagnostic
+
+### Coupled translating-PM housing baseline
+
+`ngsolve_housing_motion.py` now advances a finite 3D nonmagnetic housing with
+translating analytical cuboid PMs. It solves reaction A and charge potential
+together, including magnetic feedback at Rm=22.6 rather than extrapolating a
+weak-induction snapshot to 20m/s. The first model explicitly excludes ferrite
+and winding, retaining their original geometric spacing. It is not a full
+motor prediction.
+
+The 24mm / 20m/s baseline passes independent time, mesh, domain and quadrature
+controls, plus zero/reverse controls and the independent closed/slotted weak
+limit. The coarse 24/48 time pair fails stored-energy convergence at 4.834%;
+the finer 48/96 pair passes the unchanged 2% gates. Exact source-work accounting
+includes stored magnetic energy instead of imposing steady drag/Joule equality
+at entry/exit. A separate postprocessor reconstructs current from saved fields
+and calculates PM force from magnetization/Biot-Savart face integrals. It does
+not negate a conductor result. At three snapshots, independently extracted
+PM and total housing forces agree within 0.00060N, passing original force and
+quadrature controls without subtracting the housing self-force term.
+
+The tested single-sided 0.5mm slit removes 0.694% of metal volume and gives
+7.25% less heat over this short profile. That is not a general slot rating.
+Whole-array 120mm entry/exit profiles now complete their equation/current/energy
+and reverse/weak-limit checks, with PMs starting and ending beyond the housing.
+The closed case dissipates 0.02953J over this pass; the slotted case 0.02801J.
+Their full-path average includes travel outside the housing and is not a steady
+drag rating. Separate full-stroke 480/960-step and 1.5/1.2mm mesh checks now pass
+for both closed and slotted housings. Force histories, heat/source work, complete
+stored-energy histories and endpoints retain their unchanged 2% gates. Source
+current/PM interaction forces also pass independent entry/centre/exit extraction
+for both full profiles; worst total balance error is 0.075%, a numerical metric,
+not hardware accuracy. Source
+currents and magnetic fields remain self-consistent, but nonlinear ferrite,
+actual winding returns and hardware validation remain open. Evidence:
+`results/finite-housing-moving-pm-progress-2026-10-20.json`.
+
+`ngsolve_vector_static.py` is the next nonlinear-coupling prerequisite. Its
+full-vector B-energy solve with exact tree gauge agrees with the separately
+qualified scalar-H response: maximum material-response field difference 2.95%,
+force difference 0.000072N, both within the unchanged 5% reference gate. Volume
+magnetization force and its source-derivative quadrature pass 2% controls.
+This static check is not yet moving ferrite/current feedback. See
+`results/static-vector-material-progress-2026-10-20.json`.
+
+`ngsolve_material_motion.py` now builds the full ferrite/metal geometry and
+solves its nonlinear static bias before any time stepping. The reversible
+two-slope energy and automatic tangent are spatial vector laws. Mechanical
+source work includes the ferrite position derivative as well as current work;
+neither a frozen secant permeability nor Joule heat alone is substituted.
+The source-position derivatives are checked against finite differences.
+The zero-motion pilot retains the real 1.19N-scale static ferrite interaction
+while producing exactly zero eddy heat/current force. Its initial failed
+zero-control exposed lazy-vector FMA roundoff, corrected by subtracting equal
+states before derivative scaling rather than relaxing current gates. A moving
+20m/s pilot is separate and unaccepted until its whole receipt and energy
+checks finish; even then refinement/force controls remain. Evidence:
+`results/nonlinear-ferrite-housing-progress-2026-10-20.json`.
+
+The first moving nonlinear trajectory timed out after 60/96 steps at 900s.
+It remains unaccepted; a separate full rerun has a 2400s cap. The completed
+full-domain static material PM-force audit passes volume and source-derivative
+integration checks. Separate static mesh, remote-air and tetrahedral-quadrature
+controls are now dispatched; the comparison also checks the scalar-H reference.
+Those jobs and force audits completed, but the coarse full-domain air mesh
+fails response-field convergence: up to 18% mesh/domain changes despite less
+than 0.36% total-field changes and stable integrated forces. The independent
+material-response check therefore rejects the mesh rather than letting the
+dominant PM source mask its error. Quadrature refinement passes. Explicit
+air refinement around the PM/ferrite observation region is required next;
+the earlier quarter-domain Gmsh vector comparison remains separate evidence.
+The96-step nonlinear moving rerun and independent near-centre PM-force audit
+have now completed. Integrated source-work/heat/magnetic-energy mismatch is
+0.0018%; the force kernels include current and nonlinear material contributions
+separately. The coarse mesh failure still prevents qualification of those
+operating numbers. No failed or interrupted trial was promoted to completion.
+`audit_material_motion_controls.py` keeps the nonlinear dynamic controls separate
+and compares current and material force histories individually, plus magnetic
+energy changes rather than a potentially masking static energy offset.
+
+`closed_winding.py` checks a physically closed balanced two-phase circuit from
+the saved trace/via resistor graph plus explicit external-return waypoints.
+`closed_wire_source.py` supplies off-wire Biot-Savart B and Coulomb A, checked
+against an independent polyline kernel, curl(A) and compiled/NumPy agreement.
+`ngsolve_winding_static.py` is an unqualified nonlinear current-response pilot.
+It must finish before its independently extracted mover-force current
+differences or material differential linkage can be used even as numerical
+evidence. It does not negate copper force to obtain Kf, and reports only the
+material contribution to differential inductance, not a total L from 2W/I^2.
+The external return is an archived screening scenario, not recovered cable CAD.
+See `results/closed-winding-current-progress-2026-10-20.json`.
+
+`ngsolve_material_air_static.py` adds a vacuum mesh partition around all PMs
+and material bodies, extending2mm beyond them. It keeps the exterior gauge
+boundary remote and introduces no artificial field boundary at the partition.
+Pinned geometry tests verify exact ferrite/metal volumes and both vacuum tags.
+New1.2/0.9mm local/material mesh,40/60mm remote domain and degree10/12
+quadrature jobs are separate unaccepted trials until their audits finish.
+See `results/material-local-air-progress-2026-10-20.json`.
+
+The independent nonlinear periodic FE and spectral implementations now agree
+at one0.1%-of-PM-fundamental ripple in spatial phase0: loss differs by0.0585%,
+within the unchanged reference gate. Both full-nonlinear absolute traces were
+reassembled and checked, not replaced by tangent harmonic equations. This is
+single-amplitude agreement, not a qualified amplitude envelope. Separate
+nonlinear time/space/source/quadrature checks and1% ripple/both-phase trials
+remain unaccepted. `audit_ngsolve_transient_trace.py` checks FE absolute traces;
+`compare_periodic_nonlinear.py` requires completed audited implementations;
+`audit_periodic_nonlinear_controls.py` rejects mixed refinement axes.
+See `results/periodic-mnzn-independent-progress-2026-10-20.json`.
+
+The0.1% phase0 nonlinear spectral time/depth/mode/angular controls and FE
+time/lateral/depth controls have now completed and passed their original gates.
+Every compared trajectory first passed its absolute-state equation audit.
+A1% spectral trial failed8-period settlement at2.29e-5 versus the unchanged
+1e-5 limit. Separate24-period retries retain the same physics and mesh/time
+settings; neither failure nor the larger-amplitude envelope is accepted.
+
+The uncached winding-current sweep timed out at1800s after archiving only the
+zero-current state. A process sample located prescribed wire-field evaluation
+inside automatic-differentiation tangent assembly. `quadrature_source.py`
+stores the fixed unit-wire source at the exact declared integration points,
+with bitwise-matching quadrature and analytical/source-cache checks. Energy,
+gradient and the full material tangent match the uncached formulation in tests.
+This is not a spatial field interpolator or a frozen material law; force and
+off-rule field integration still use the analytical source. A separate cached
+trial is unaccepted until its whole receipt and current-difference checks finish.
+That cached trial has now finished all five equilibria in440s on two workers;
+independent mover-force current differences and material-only linkage current
+differences pass their step-refinement checks. These remain one-mesh pilot
+outputs, not operating Kf or inductance ratings. In particular, the saved bottom
+copper centreline coincides with the model ferrite interface. A filament there
+does not resolve finite copper width/thickness or actual clearance; fixed-mesh
+current-step convergence must not be mistaken for physical inductance
+convergence. No source radius or material constant is fitted to fix this.
+`wire_pm_linkage.py` also checks reciprocal free-space PM linkage against the
+independent current-to-PM force kernel. Nonlinear pose/linkage and total winding
+inductance qualification remain separate.
+Four additional zero-current pose jobs translate only the PMs by +/-100um and
++/-50um. All four and `audit_winding_reciprocity.py` now complete: the full
+PM-bias linkage position derivative agrees with the independent mover-force
+current derivative within0.0554%, passing the unchanged2% consistency gate.
+Pose-step and PM-volume-quadrature controls also pass. Copper, ferrite, return
+routing and mesh stay fixed; off-axis or mixed-model pose changes are rejected.
+This one-mesh reciprocity does not replace the pending spatial controls.
+
+The first local-air equilibrium now passes the scalar-reference field gate:
+maximum material-response discrepancy is3.92%, below the unchanged5% gate.
+Mesh/domain/quadrature qualification remains separate. The exterior field can
+also be reconstructed independently from integrated volume magnetization with
+`material_source_field.py`; no field is evaluated inside its source material.
+That baseline reconstruction differs from the scalar reference by at most1.33%
+and passes its own source-volume quadrature control. Raw A-curl and both
+reconstructed maps are archived, not corrected by subtracting a failed floor.
+Neither single-case comparison substitutes for mesh/domain controls.
+
+Those exterior-source controls have now completed. Reconstructed static
+response fields change by at most0.0808% under mesh refinement,0.0307% under
+domain expansion and0.000661% under quadrature refinement. PM forces also pass.
+Each case separately passes the scalar-reference and source-volume checks.
+This qualifies these exterior outputs for the centred prototype under the
+unchanged2%/5% gates. The raw A-curl interpolation still fails4.6%/4.9%
+mesh/domain response changes and remains unqualified; it is not relabeled by
+the reconstruction. Interior fields/tensors and moving/current regimes remain
+separate qualification work.
+
+`wire_material_contacts.py` quantifies the nominal interface-source issue:
+79 active ideal-wire segments, totaling0.365m, lie on the declared ferrite
+boundary. This is not a measurement of actual copper surfaces. New winding jobs
+return null for physical material differential inductance in this unsupported
+case, retaining the finite-mesh current difference under an explicitly
+unqualified diagnostic key. Tests verify that Kf diagnostics remain separate.
+
+Explicit full constitutive gradient/tangent assembly and checked Newton-factor
+reuse reproduce the original nonlinear FE smoke trajectory to about1e-10.
+They did not demonstrate a speedup: historical automatic assembly took39.5s,
+versus73.6/75.2s for the explicit/direct and explicit/PCG examples. Their
+unfinished large retries were preserved and stopped, not promoted to results.
+The default remains full automatic energy assembly with fresh Cholesky.
+
+The3D material-motion tool can import an immutable completed mesh/equilibrium,
+re-solve/check the new start pose, and update exact material-quadrature PM
+source values at every midpoint. `--reuse-newton-factor` uses a vacuum
+curl-curl/unchanged conducting-mass factor only as a preconditioner. The actual
+full nonlinear Jacobian is updated and its linear residual checked each time;
+no physical permeability is frozen. Its generalized material contrast is
+bounded by mu_max, unlike a rotating first-iterate tangent. The full coarse
+96-step retry, assembly-equivalence and independent-force audits completed.
+It did not improve runtime. On the locally refined-air mesh the short-stroke
+24/48-step time control also passes, but moving spatial/domain controls and
+full-profile qualification remain required.
+
+The saved copper now has finite200um-wide,35um-thick traces,500um via pads
+and hollow300/350um-ID/OD barrels. The complete export has533 trace edges,
+393 via positions and one connected solid. No root input or layer depth is
+changed. Its finite extents reveal2.09mm^3 overlap with the previous nominal
+magnetic envelope; this is reported, not hidden by a new gap. Geometry alone
+does not qualify current distribution or inductance.
+
+`finite_copper_current.py` uses compatible HDiv current and cellwise potential,
+with exterior zero flux and internal conductor interfaces left open. Closed
+annulus resistance and direct/block-solver equivalence tests pass. The first
+full winding mesh reaches1.97M mixed DOFs and correctly stops at its800k cap
+before assembly. The separate block-MINRES retry retains the physical mesh and
+original equation/continuity/power gates; its pressure graph factor is only a
+preconditioner, not a fitted resistor-graph current replacement.
+
+A fresh linear-geometry solve with a central straight drive port now passes
+the unchanged equation/current-moment/power gates. Its loop resistance is
+4.79103 ohm at the saved75C temperature. An independent H1 potential solve
+on the same mesh gives4.75738 ohm, within0.71%. This is a source-formulation
+comparison, not independent geometry or hardware validation. The old port
+overlapped widened return bends and drove local circulation. Curved-mesh
+retries also failed the current-moment gate. Those failures remain archived.
+
+`audit_finite_dc_controls.py` checks completed receipts, hashes, isolated mesh
+or port changes, and resistance gates. `audit_finite_dc_sections.py` intersects
+linear tetrahedra with explicit planes and clips the section geometrically.
+Four straight-return sections reproduce the imposed loop current. The saved
+trace/via probes in `audit_finite_dc_winding_sections.py` compare signed
+currents against the independent winding resistor graph. All18 sampled
+currents pass the5% reference gate, but three barrel sections miss the saved
+area by2.36–2.81%, failing the2% local geometry gate. Whole-volume agreement
+of0.366% therefore does not qualify this mesh. The0.15mm global refinement
+now passes resistance convergence with a relative change of3.03e-7 and retains
+0.71% primal agreement, but two local barrel-area failures remain unchanged.
+`finite_copper_curvature.py` changes curvature safety2 to4 on the same CAD,
+global size and DC physics to target this tessellation error. A saved-radius/
+plating barrel test passes. The full curvature mesh has1.71M tetrahedra and
+5.74M estimated mixed DOFs, so the3.5M cap correctly stopped it before assembly.
+A geometry-only diagnostic now puts all18 sampled sections within2% of saved
+areas, but no current solution exists on that mesh. A memory-control rerun
+tests native face adjacency and released sparse-copy buffers on the original
+mesh. It reproduces the mesh and DC result, but its336M-entry pressure factor
+still exceeds the extrapolated memory budget, so the larger factor-based solve
+was not started. A symmetric multilevel pressure-preconditioner control now
+passes on the original mesh and the full5.74M-DOF curvature mesh, with original
+equations/gates unchanged. The larger current solve took171.6s with3.48GB
+maximum RSS and5.29GB peak footprint. All18 sampled winding area/current
+checks pass; maximum barrel-area error is1.46%. Curvature resistance change
+is0.0791%; independent primal agreement is0.4116%. These checks do not
+establish all local interior fields or finite nonlinear magnetic coupling.
+The separate0.5/0.4 straight-port control
+passes with a resistance relative change of1.56e-6 and0.71% primal agreement;
+the historical coarse local via-area failures remain failed. Neither finite-source magnetic coupling
+nor physical self/differential inductance is qualified by these DC checks.
+
+For archived completed jobs, run audits through `check_free_space.run` to
+retain whole-job command receipts. Use new output paths for every attempt:
+
+```sh
+"$SOLVER_OPT/ngsolve-venv/bin/python" scripts/solvers/audit_finite_dc_controls.py \
+  --first-work "$SOLVER_OPT/finite-copper-star2-v1-dc20-linear-20261020" \
+  --second-work "$SOLVER_OPT/finite-copper-star2-v1-dc20-linear-primal-20261020" \
+  --kind agreement --output "$SOLVER_OPT/new-dc-resistance-check.json"
+"$SOLVER_OPT/ngsolve-venv/bin/python" scripts/solvers/audit_finite_dc_winding_sections.py \
+  --work "$SOLVER_OPT/finite-copper-star2-v1-dc20-linear-20261020" \
+  --output "$SOLVER_OPT/new-dc-winding-section-check.json" --threads 2
+```
+
+The second command currently fails the retained local via-area controls.
+Evidence and exact hashes are in
+`results/dc-finite-copper-progress-2026-10-20.json`.
+
+`audit_finite_dc_pm_force.py` provides a separate bare PM/current interaction
+control using streamed finite-volume current sources, analytical PM-face
+Green kernels and the conductor Lorentz integral. It refines tetrahedral body
+quadrature and reproduces current/power/volume observables. Ferrite, housing,
+current self-field and inductance are excluded. Passing integrated force
+checks cannot override failed local copper-area controls. The base audit
+completed: independent PM/copper force balance is2.70e-13N and body-quadrature
+force change is9.93e-10N. The finer-mesh force audit also completes and passes;
+its per-loop-current force differs by1.81e-6 relative under global mesh
+refinement. The curvature-mesh audit also completes, with independent force
+balance4.43e-13N, quadrature change5.00e-10N and relative per-loop-current
+force change8.64e-6 from the0.15mm global mesh. These are bare PM/current
+interaction controls, not nonlinear ferrite/housing, self-field or inductance
+qualification. They do not validate experimental housing motion/heating
+capabilities or establish hardware ratings.
+
+```sh
+"$SOLVER_OPT/ngsolve-venv/bin/python" scripts/solvers/ngsolve_housing_motion.py \
+  --source-work "$SOLVER_OPT/reduced-near06-bare-20261020" \
+  --sigma 25000000 --speed 20 --span .024 --steps 96 \
+  --mesh .0015 --far .06 --air-mesh .01 --threads 16 \
+  --work "$SOLVER_OPT/new-coupled-motion"
+```
+
+### Low-speed charge-potential comparison
+
+`finite_current_closure.py` now solves the saved prototype's actual finite
+36x12x1mm nonmagnetic housing volume with NGSolve electric potential and
+insulating walls. It compares closed and one-sided 0.5mm slotted geometries.
+It uses only the analytical PM field. Neither induced magnetic reaction nor
+the ferrite response is included in this particular diagnostic.
+
+At 0.001m/s and 25MS/m, Rm is 0.00113. Mesh and independent quadrature
+refinements pass the unchanged 2% gates. Zero/reverse-speed controls,
+uniform-field charge cancellation, isolated-volume current, assembled
+continuity residuals and mechanical/Joule power balance pass. A curl-free
+linear-gradient source agrees with an independent rectangular streamfunction
+Fourier-series loss within 0.0023%. `compare_finite_current.py` rotates the
+existing independent SciPy resistor-grid oracle into the same physical
+geometry. Its own refinement passes, and loss/force agree within 0.42% for
+both closed and slotted housings. Required receipts and archived inputs are
+checked before accepting either comparison.
+
+At 20m/s, Rm would be about 22.6. This tool rejects Rm above 0.01. Do not scale
+the low-speed loss or drag into an operating-speed prediction. The remaining
+work needs coupled magnetic reaction and a moving-field/transient check.
+Evidence: `results/finite-housing-lowrm-2026-10-20.json`.
+
+```sh
+"$SOLVER_OPT/ngsolve-venv/bin/python" scripts/solvers/finite_current_closure.py \
+  --source-work "$SOLVER_OPT/completed-reduced-response" \
+  --sigma 25000000 --speed .001 --bonus-order 8 \
+  --work "$SOLVER_OPT/new-finite-housing-closure"
+```
+
+### Historical single-PM diagnostic
 
 `weak_motion.py` uses Magpylib's prescribed PM field and a separate SciPy
 finite-volume charge-continuity solve for a 12 x 12 x 1 mm conductor.
@@ -592,6 +1133,33 @@ are unchanged. Tests verify 0.1/0.2 mm sheets keep both secant and incremental
 mu at 130; the six-case dump confirms all selected linear controls stay linear.
 
 ### DC-biased complex response
+
+An independent 2D triangular FE implementation is now in
+`ngsolve_periodic_ac.py`. It solves nonlinear PM bias with reaction vector
+potential, then uses the full local differential-reluctivity tensor in a
+separate complex coil-response solve with finite conducting wall. The analytic
+PM field stays DC. `periodic_spectral_study.py` regenerates separate spectral
+resolution controls, and `compare_periodic_ac.py` checks the FE controls before
+cross-backend comparison. These tools require the optional pinned NGSolve
+environment. They do not add an application dependency.
+
+The first FE comparison passed diagonal responses and losses, but an extra
+cross-phase check exposed numerical coupling from the mesh/integration setup.
+Reflection-symmetric triangles alone did not remove it. Closing each triangle
+rule under all six barycentric permutations preserves its degree/weight and
+removes the pilot's artificial coupling without subtracting a failed term.
+The unchanged 1e-8 cross-phase gate now passes throughout the corrected FE
+mesh/source/domain refinement study, with maximum coupling 7.53e-15. Both
+phase responses agree with independently refined spectral calculations; loss
+errors are below 0.057% after the additional quadrature-order refinement. The
+quadrature check also passes the unchanged 2% gate. The fine cold-start job hit its 180s cap and remains
+unaccepted. Separate same-physics initial-guess jobs completed the fine and
+expanded-air checks. Original failures and preliminary comparisons are retained, not
+promoted to final evidence. See
+`results/periodic-mnzn-independent-progress-2026-10-20.json` for current status.
+
+The original failed FEMM MnZn comparisons below remain failed. A new FE versus
+spectral agreement cannot explain or rewrite those missing raw Linux studies.
 
 `spectral_biased_ac.py` transfers the full static Hessian into a complex A solve
 with conductive-layer mass terms and a resolved finite Al wall. It checks the
@@ -943,9 +1511,19 @@ OPENBLAS_NUM_THREADS=1 .magpy-venv/bin/python scripts/solvers/audit_project_bare
   --output "$SOLVER_OPT/new-interface-bare-map.json"
 ```
 
-### On-demand application reference
+### Historical on-demand application reference prototype
 
-The application now has an explicit **Run periodic reference** action in the
+The initial portable-tooling commit included the Rust reference library and
+CLI validation, but not the later periodic-reference Svelte panel, IPC command
+registration or stale-result UI changes. Commit `22e602b` supplies those files;
+the Mac worktree repair restored their committed contents. The UI/browser
+results below describe the original server workspace, not fresh verification
+of this checkout. A subsequent fresh Mac rerun passed the Rust/frontend suites,
+production build and 21 targeted browser regressions. See
+`results/macos-application-regressions-2026-10-19.json` for logs and scope;
+this does not qualify finite motor physics or the macOS WKWebView shell.
+
+That application prototype had an explicit **Run periodic reference** action in the
 backplane panel. It invokes the Rust `periodic_static_reference` reduced model
 on a blocking worker, not on the UI thread. Analytical previews, finite-array
 image forces, friction and driver calculations are unchanged. This is not a
@@ -1178,6 +1756,26 @@ live supervisor. Neither is accepted evidence. The separate observations are
 indexed by `results/stale-workers-band-and-mnzn-2026-10-19.json`. Only the
 wide-band bare control was restarted, in a fresh directory using its validated
 mesh and a 900-second solver limit. No physics or tolerances were changed.
+
+The later Apple Silicon transfer did not include that raw directory. A fresh
+native GetDP 4.0.0 control on 2026-10-19 used Gmsh 4.13.1 and the same explicit
+0.2 mm interface target / 0.4 mm physical band settings. All six above/below
+Magpylib maps pass the unchanged 5% gate, with worst error 2.622%. Exact closed
+mover surfaces still give **0.462–0.465 N bare self-force**. The wider band fixes
+map coverage but does not justify a nonlinear material retry or force acceptance.
+Surface stability is not correctness. The fresh mesh is not byte-identical to
+the missing Linux mesh, and both platform and GetDP version changed. Full raw
+inputs, source snapshots, logs, receipts and audits remain outside git under
+`$HOME/.local/opt/solver-prototypes-macos`. The compact index is
+`results/five-pm-wideband-macos-force-unqualified-2026-10-19.json`.
+
+A single finer 0.1 mm interface control held the physical band and all other
+mesh controls fixed. It reached 3,934,366 DOFs but timed out at the 900-second
+cap during `GenerateJac[S]`, before producing a usable field. Owned-worker
+cleanup was verified. Its unchanged `running` summary is not progress evidence:
+the inspector reports `incomplete-with-failed-child` from the timeout receipt.
+No self-force convergence result or OOM diagnosis is inferred. Evidence is in
+`results/five-pm-wideband-face01-macos-timeout-2026-10-19.json`.
 
 Python helper checks:
 

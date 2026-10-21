@@ -1,5 +1,10 @@
-import { test, expect } from "@playwright/test";
-import { gotoDesignApp } from "./helpers";
+import { test, expect, type Page } from "@playwright/test";
+import { gotoDesignApp as gotoWorkspace } from "./helpers";
+
+async function gotoDesignApp(page: Page) {
+  await gotoWorkspace(page);
+  await page.getByRole("button", { name: "Stackup", exact: true }).click();
+}
 
 // UI fixture only. Numerical agreement is tested against actual solver runs.
 const referenceFixture = {
@@ -41,7 +46,7 @@ test("periodic reference is explicit, scoped and hidden after settings change", 
   await expect(panel).toContainText("not your winding");
   await expect(panel).toContainText("not finite-motor force or a bearing load");
   await page.evaluate(() => { delete (window as any).__TAURI_INTERNALS__; });
-  await page.getByRole("spinbutton", { name: "Layer 1 thickness (mm)", exact: true }).fill("3");
+  await page.getByRole("spinbutton", { name: "Layer 1 thickness (mm)", exact: true }).fill("1.5");
   await page.getByRole("spinbutton", { name: "Layer 1 thickness (mm)", exact: true }).press("Enter");
   await expect(panel).toContainText("Settings changed");
   await expect(panel.locator("dl")).toHaveCount(0);
@@ -61,7 +66,7 @@ test("late reference completion cannot attach old physics to new settings", asyn
   await expect(panel.getByRole("button", { name: "Checking periodic reference…", exact: true })).toBeDisabled();
   await page.evaluate(() => { delete (window as any).__TAURI_INTERNALS__; });
   const thickness = page.getByRole("spinbutton", { name: "Layer 1 thickness (mm)", exact: true });
-  await thickness.fill("3");
+  await thickness.fill("1.5");
   await thickness.press("Enter");
   await page.evaluate((fixture) => { (window as any).__resolvePeriodicReference(fixture); }, referenceFixture);
   await expect(panel).toContainText("Settings changed");

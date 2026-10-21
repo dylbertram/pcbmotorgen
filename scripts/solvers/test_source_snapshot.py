@@ -8,7 +8,7 @@ from source_snapshot import capture
 class SourceSnapshotTest(unittest.TestCase):
     def test_changed_sources_keep_both_versions_and_corrupt_snapshots_are_rejected(self):
         with tempfile.TemporaryDirectory() as directory:
-            work=Path(directory);source=work/'analysis.py';source.write_text('original\n')
+            work=Path(directory).resolve();source=work/'analysis.py';source.write_text('original\n')
             first=capture(work,[source])[str(source)]
             source.write_text('updated\n')
             second=capture(work,[source])[str(source)]

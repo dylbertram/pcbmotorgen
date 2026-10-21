@@ -1,0 +1,96 @@
+{
+  "status": "passed-source-only-full-stroke-and-slot-time-mesh-controls",
+  "scope": "Five finite 5x5x3mm axial PMs, Br=1.34T, translating at 20m/s over a stationary explicit 36x12x1mm Al housing, sigma=25MS/m. The ferrite and winding are excluded, retaining the original housing position. Fixed-remanence mu_r=1 PMs, reversible linear housing, no thermal-property evolution or hardware accuracy claim.",
+  "raw_archives": "$HOME/.local/opt/solver-prototypes-macos",
+  "implementation": "ngsolve_housing_motion.py, coupled real HCurl reaction A and conductor charge potential with exact tree gauge and scalar-potential reference. Crank-Nicolson midpoint updates the translated analytical PM forcing, not frozen static snapshots or sigma*v_cross_B alone.",
+  "magnetic_reynolds_number": 22.619467105846514,
+  "source_motion": {"start_offset_m":-0.012,"end_offset_m":0.012,"speed_m_s":20,"duration_s":0.0012,"initial_state":"static source at rest with zero nonmagnetic reaction, prescribed velocity starts at t=0","termination":"integration ends without assuming a velocity-stop/decay segment"},
+  "selected_numerics": {"steps":96,"dt_s":0.0000125,"near_mesh_m":0.0015,"far_radius_m":0.06,"air_mesh_m":0.01,"hcurl_order":2,"electric_h1_order":3,"integration_bonus_order":8,"solver_threads":16},
+  "field_report": "housing-motion-controls-quadrature-20261020/summary.json",
+  "field_report_sha256": "fd8f0147da35309ca8100d8139ce94aa9d31584f69a2a3e5dc26446f704420de",
+  "energy_accounting": {
+    "joule_heat_j": 0.01770796941763827,
+    "source_work_j": 0.017849810318795286,
+    "reaction_magnetic_energy_at_end_j": 0.00014184090115701556,
+    "maximum_step_relative_balance": 6.795073664674601e-14,
+    "rule": "Source work equals heat plus stored reaction-field energy change; no steady F*v=heat assumption at entry/exit."
+  },
+  "maximum_relative_equation_residual": 2.037779883548632e-14,
+  "maximum_net_current_relative_error": 2.7620367195088735e-14,
+  "maximum_housing_self_force_n": 0.000613611599459853,
+  "controls": {
+    "report": "housing-motion-controls-audit-20261020.json",
+    "sha256": "978e012d3da0d0664d4bf8701e990359a9f1c64679e84f7112d3bfe4b4e3db0d",
+    "status": "passed-finite-housing-motion-controls-source-only",
+    "coarse_time_pair": "24/48 steps fails stored-energy refinement at 4.834%; original completed coarse trial remains unqualified for time accuracy.",
+    "selected_time_pair": "48/96 steps passes all unchanged 2% controls, including 1.1734% final stored-energy change.",
+    "mesh_refinement": "2.0/1.5mm at fixed time and exterior",
+    "domain_refinement": "40/60mm at fixed physical air/near sizing",
+    "quadrature_refinement": "bonus orders 4/8, identical reused mesh",
+    "time_control_mesh_bytes_identical": true
+  },
+  "limits": {
+    "report": "housing-motion-limits-audit-20261020.json",
+    "sha256": "84fa824c10ec03ee8cfb8874105b75209aba845d10257873928ccdcb096ed101",
+    "status": "passed-finite-housing-motion-limits-source-only",
+    "zero_control": "Static PM source gives exactly zero heat, reaction energy and current force.",
+    "reverse_control": "Mirrored -20m/s force trajectory, heat and stored energy pass 2% checks on identical mesh.",
+    "independent_weak_limit": "At 0.001m/s and the same centred pose, closed/slotted force and loss agree within 0.24% with the independently refined SciPy finite-volume current oracle. Conductor-motion versus PM-motion signs are converted explicitly.",
+    "slotted_geometry": "0.5mm central x slit from y=0 to +y edge, through thickness; conductor remains connected.",
+    "removed_volume_fraction": 0.006944444444445308,
+    "slotted_over_closed_short_stroke_heat": 0.9274871989478907,
+    "slot_scope": "This particular slot's later full-stroke time/mesh refinement is recorded below; not a general slot-design rating."
+  },
+  "independent_mover_force": {
+    "method": "Reconstruct current from saved midpoint and adjacent endpoint. Integrate PM magnetization against the free-space Biot-Savart current field using analytical opposite-face integrals. Independently verify against numerical face quadrature and a closed-loop reciprocity test; deliberately open currents do not automatically cancel.",
+    "force_audits": [
+      {"step":23,"report":"housing-motion-independent-pm-force-step23-20261020.json","sha256":"ab698ceacd86a4efd522e9e85e2fa5c70e0ce95252cb568abff8c8666b5a8bce","pm_force_n":[-0.7714448023789103,3.1632012501246753e-6,0.17168605465981515],"total_action_reaction_error_n":0.0005601889776936418},
+      {"step":48,"report":"housing-motion-independent-pm-force-step48-20261020.json","sha256":"81b26d035ff122f820814ae55e65018865922e9c1c5cd154ac0ea01da117b04a","pm_force_n":[-0.840873589646427,2.441894008770387e-6,0.2164502712149532],"total_action_reaction_error_n":0.0005926414688551659},
+      {"step":71,"report":"housing-motion-independent-pm-force-step71-20261020.json","sha256":"f76183fcd09487afc7df817f20d3f95c295dc91c6ed21ccd417d00273c7a25d5","pm_force_n":[-0.808308999497219,1.467515019209359e-6,0.20380244243604895],"total_action_reaction_error_n":0.0005824800111150832}
+    ],
+    "unchanged_gate": "max(10nN, 2%) body quadrature convergence and both interaction/total action-reaction checks. Housing self force is retained, not subtracted to force agreement."
+  },
+  "preserved_failure": "First pilot exited on unsupported DynamicVectorExpression division before force/energy output; multiplication by reciprocal corrected the API usage. Its failed receipt remains archived.",
+  "completed_full_strokes": {
+    "profile": "120mm, -60 to +60mm or the mirrored reverse, 480 steps, 12.5us time step. Housing and all numerical controls stay fixed; PMs may lie outside the reaction-field mesh because the imposed source is analytical.",
+    "closed": {"work":"housing-motion-full-closed-20261020","sha256":"72c7748d9483422db6c9a75ca12b4e27b062009818f25c50263c26cbf4373118","joule_energy_j":0.029533422481766106,"source_work_j":0.0295334225056309,"reaction_energy_end_j":2.3864714066311906e-11,"peak_housing_interaction_fx_n":0.8410104821486164,"mean_housing_interaction_fx_over_entire_path_n":0.24611185421359047,"seconds":125.42129970900714},
+    "reverse": {"work":"housing-motion-full-reverse-20261020","sha256":"02686c64b5d56403921244529af76a37906a9a498bf60370829119909ac782cd","joule_energy_j":0.029533422481768445,"source_work_j":0.02953342250563079,"reaction_energy_end_j":2.3862357676729234e-11,"seconds":129.02599791705143},
+    "slotted": {"work":"housing-motion-full-slotted-20261020","sha256":"70106179105e4e03fb18342c2916d5b8c892f2e21693b7dfac263c5ee0fcaddb","joule_energy_j":0.028008607341415394,"source_work_j":0.02800860736173119,"reaction_energy_end_j":2.0315881470115045e-11,"peak_housing_interaction_fx_n":0.8298135480558883,"mean_housing_interaction_fx_over_entire_path_n":0.23340506134775993,"seconds":148.41386620898265},
+    "limit_audit": "housing-motion-full-limits-audit-20261020.json",
+    "limit_audit_sha256": "e0de53f51cd100d6d01de30866a6730eb020b680b2f2b2189a8bd54ce682b5d9",
+    "limit_audit_status": "passed-finite-housing-motion-limits-source-only",
+    "slotted_over_closed_heat": 0.948369846356543,
+    "scope": "Whole jobs and their internal equation/current/energy and reversal/weak-limit gates pass. Subsequent full-stroke and slot-specific time/mesh refinements are recorded below; the full-path mean includes travel outside the housing and is not a steady drag rating."
+  },
+  "completed_full_stroke_force_audits": {
+    "status": "all-six-independent-current-PM-force-snapshots-passed",
+    "maximum_total_action_reaction_relative_error": 0.0007409430702394112,
+    "unchanged_gate": "max(10nN, 2%); independent body-current quadrature and total housing self-force retained",
+    "reports": [
+      {"file":"housing-motion-full-closed-pm-force-143-20261020.json","sha256":"0f1c7d1e828dcc777ba99603148e8dc9a7bfccd63d6d1443704ae8e0fd803229"},
+      {"file":"housing-motion-full-closed-pm-force-240-20261020.json","sha256":"dc8507adf7a8bbc720108dd39cbbb2ec39c4a781bec43dbba3d162b29ced4be4"},
+      {"file":"housing-motion-full-closed-pm-force-335-20261020.json","sha256":"d05eb5544d70d6c8cec26a1ab7236332381244d0b2043e1b46815d9758ae5482"},
+      {"file":"housing-motion-full-slotted-pm-force-143-20261020.json","sha256":"8fa339d05ca3aa2af8631ba899868927befdf62e4e69f5811f08af2d03ffa0e2"},
+      {"file":"housing-motion-full-slotted-pm-force-240-20261020.json","sha256":"16de066e48729b3fa303e10c39362c985c8c0278cbae0af354df95041762a2c9"},
+      {"file":"housing-motion-full-slotted-pm-force-335-20261020.json","sha256":"5c2689c974ccd14044f2ba10cc6beb2d2cffa93217aa383677dea326d1e14895"}
+    ],
+    "scope": "Numerical force consistency, not hardware prediction error or an independent nonlinear material qualification."
+  },
+  "completed_full_stroke_refinements": {
+    "report": "housing-motion-full-refinement-audit-v2-20261020.json",
+    "sha256": "b405fb70ec05223a1a81648e50be32b0c723773bcd39f4797160b7ec18802425",
+    "status": "passed-full-entry-exit-and-slot-controls-source-only",
+    "time_steps": [480,960],
+    "near_mesh_m": [0.0015,0.0012],
+    "closed_heat_time_relative_change": 9.709676125113642e-5,
+    "closed_heat_mesh_relative_change": 0.0001816886261321038,
+    "slotted_heat_time_relative_change": 9.923384527088519e-5,
+    "slotted_heat_mesh_relative_change": 0.0001750955782773289,
+    "maximum_stored_energy_history_relative_change": 0.0028123889763827462,
+    "gate": 0.02,
+    "scope": "Force histories, integral heat/work, complete stored-energy histories AND endpoints each pass. The original V1 history-focused audit remains archived; V2 additionally retains the strict endpoint-relative gate, which also passes despite near-zero end energies."
+  },
+  "nonlinear_material_preparation": "static-vector-material-progress-2026-10-20.json",
+  "remaining": ["full-stroke domain/slot-quadrature expansion and additional operating speeds/held-out geometry", "nonlinear ferrite plus current feedback", "finite DC winding Kf/differential inductance and return connectivity", "measured material inputs", "offline deployment and hardware qualification"],
+  "current_scope":"Motion-induced housing currents are separate DC-motor motion effects. AC winding excitation/envelope work is deferred by user instruction, not a current completion gate."
+}

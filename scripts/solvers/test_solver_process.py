@@ -9,14 +9,15 @@ import unittest
 from unittest.mock import patch
 
 from check_free_space import run
+from job_status import process_identity
 
 
 class SolverProcessTest(unittest.TestCase):
     def assert_stopped(self,pid):
         deadline=time.monotonic()+2
         while True:
-            status=Path(f'/proc/{pid}/stat')
-            if not status.exists() or status.read_text().split()[2]=='Z':return
+            status=process_identity(pid)
+            if status is None or status['state']=='Z':return
             if time.monotonic()>deadline:self.fail(f'Owned process {pid} survived cleanup')
             time.sleep(0.01)
 
@@ -42,7 +43,7 @@ class SolverProcessTest(unittest.TestCase):
             with self.assertRaises(ValueError):run([sys.executable,'-c','raise AssertionError()'],work,'invalid.log')
             self.assertFalse((work/'invalid.log').exists())
 
-    @unittest.skipUnless(os.name=='posix' and Path('/proc').exists(),'Linux process-tree cleanup evidence')
+    @unittest.skipUnless(sys.platform in ['linux','darwin'],'Linux/macOS process-tree cleanup evidence')
     def test_timeout_stops_the_owned_solver_and_its_child(self):
         with tempfile.TemporaryDirectory() as directory,patch.dict(os.environ,{'PCB_MOTOR_SOLVER_TIMEOUT':'0.7'}):
             work=Path(directory)
@@ -53,7 +54,7 @@ class SolverProcessTest(unittest.TestCase):
             for pid in [receipt['pid'],int((work/'child.pid').read_text())]:
                 self.assert_stopped(pid)
 
-    @unittest.skipUnless(os.name=='posix' and Path('/proc').exists(),'Linux process-tree cleanup evidence')
+    @unittest.skipUnless(sys.platform in ['linux','darwin'],'Linux/macOS process-tree cleanup evidence')
     def test_failed_parent_cannot_leave_its_child_running(self):
         with tempfile.TemporaryDirectory() as directory:
             work=Path(directory)
@@ -63,7 +64,7 @@ class SolverProcessTest(unittest.TestCase):
             self.assertEqual(receipt['status'],'failed');self.assertEqual(receipt['exit_code'],3)
             self.assert_stopped(int((work/'child.pid').read_text()))
 
-    @unittest.skipUnless(os.name=='posix' and Path('/proc').exists(),'Linux SIGTERM cleanup evidence')
+    @unittest.skipUnless(sys.platform in ['linux','darwin'],'Linux/macOS SIGTERM cleanup evidence')
     def test_sigterm_of_supervisor_cleans_up_solver_process_group(self):
         with tempfile.TemporaryDirectory() as directory:
             work=Path(directory)

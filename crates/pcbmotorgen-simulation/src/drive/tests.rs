@@ -189,6 +189,71 @@ fn two_strand_fixture() -> RoutingResult {
 }
 
 #[test]
+fn housing_motion_is_opt_in_and_computed_for_generated_and_imported_copper() {
+    use crate::backplane::{BackplaneStack, HousingSpec, HousingMaterial, HousingMotionProfile, HousingMotionAnalysis};
+    for layers in [2, 4, 16] {
+        let mut config = sim(); config.num_layers = layers; config.max_layers = 16;
+        config.magnet_count = if layers == 16 { 12 } else { 5 };
+        config.backplane = Some(BackplaneStack { layers: vec![], housing: Some(HousingSpec {
+            material: if layers == 4 { HousingMaterial::Stainless316 } else { HousingMaterial::Aluminum6061 },
+            thickness_m: 0.001, gap_m: 0.0001,
+        }) });
+        let mut imported = RoutingResult::default();
+        for layer in 0..layers {
+            let (a, b) = if layer % 2 == 0 { (0., 10.) } else { (10., 0.) };
+            imported.segments.push(seg(a, 0., b, 0., layer, "A"));
+            if layer + 1 < layers { imported.vias.push(Via { position: Point::new(b, 0.), from_layer: layer, to_layer: layer+1, net: "A".into() }); }
+        }
+        let hints = DriveGeometryHints {
+            layer_z_m: (0..layers).map(|i| -config.pcb_thickness_m * (i as f64 / (layers-1) as f64).powi(2)).collect(),
+            terminals: std::collections::BTreeMap::from([("A".into(), vec![TerminalPair {
+                input: TerminalPoint { layer: 0, position: Point::new(0., 0.) },
+                output: TerminalPoint { layer: layers-1, position: Point::new(0., 0.) },
+            }])]),
+        };
+        validate_copper_placement(&config, &imported, &hints).unwrap();
+        let mut settings = DriveSettings { target_speed_m_s: 3., ..Default::default() };
+        let disabled = analyze_drive_with(&config, &imported, &settings, None, &hints);
+        assert!(disabled.backplane.as_ref().unwrap().housing_motion.is_none());
+        settings.housing_motion = Some(HousingMotionProfile { duration_s: 0.2 });
+        let enabled = analyze_drive_with(&config, &imported, &settings, None, &hints);
+        assert!(enabled.phases[0].connected);
+        assert_eq!(enabled.phase_resistance_ohm, disabled.phase_resistance_ohm);
+        match enabled.backplane.unwrap().housing_motion.unwrap() {
+            HousingMotionAnalysis::Experimental { estimate } => assert!(estimate.housing_joule_power_w > 0.),
+            HousingMotionAnalysis::Unavailable { reason } => panic!("{reason}"),
+        }
+        assert_eq!(hints.layer_z_m.last().copied(), Some(-config.pcb_thickness_m));
+    }
+    let config = sim();
+    let ctx = RoutingContext { active_area_length_mm: 110., board_width_mm: 8., num_layers: 2, phases: 3,
+        min_trace_mm: 0.1, trace_width_mm: 0.1, min_space_mm: 0.127, expects_continuous: false,
+        params: std::collections::HashMap::from([("num_strands".into(), 2.), ("connection".into(), 2.)]),
+        magnet_pitch_mm: Some(6.), magnet_array_span_mm: Some(35.), phase_clearance_mm: None };
+    let generated = generate_routing_result(&ctx, "infinity-braid").unwrap();
+    let mut config = config;
+    config.backplane = Some(BackplaneStack { layers: vec![], housing: Some(HousingSpec { material: HousingMaterial::Stainless304, thickness_m: 0.001, gap_m: 0.0 }) });
+    let settings = DriveSettings { housing_motion: Some(HousingMotionProfile { duration_s: 0.1 }), ..Default::default() };
+    let generated_result = analyze_drive(&config, &generated, &settings, None);
+    assert!(matches!(generated_result.backplane.unwrap().housing_motion, Some(HousingMotionAnalysis::Experimental { .. })));
+}
+
+#[test]
+fn housing_motion_settings_round_trip_without_changing_legacy_defaults() {
+    let settings = DriveSettings::default();
+    let legacy = serde_json::to_value(&settings).unwrap();
+    assert!(legacy.get("housing_motion").is_none());
+    let restored: DriveSettings = serde_json::from_value(legacy).unwrap();
+    assert!(restored.housing_motion.is_none());
+    let enabled = DriveSettings {
+        housing_motion: Some(crate::backplane::HousingMotionProfile { duration_s: 0.25 }),
+        ..settings
+    };
+    let restored: DriveSettings = serde_json::from_str(&serde_json::to_string(&enabled).unwrap()).unwrap();
+    assert_eq!(enabled, restored);
+}
+
+#[test]
 fn through_barrel_intervals_sum_to_one_physical_barrel() {
     let mut config = sim();
     config.num_layers = 4;
@@ -269,7 +334,7 @@ fn imported_copper_below_responding_stack_is_rejected_without_moving_geometry() 
     assert!(validate_copper_placement(&config, &routing, &hints).is_ok());
     // Nonmagnetic spacers/air above the first responding surface are allowed.
     config.pcb_thickness_m = 0.0008;
-    config.backplane = Some(BackplaneStack { layers: vec![BackplaneLayer::new(LayerMaterial::Fr4, 0.005), BackplaneLayer::new(LayerMaterial::FlexFerrite, 0.0002)], housing: None });
+    config.backplane = Some(BackplaneStack { layers: vec![BackplaneLayer::new(LayerMaterial::Fr4, 0.002), BackplaneLayer::new(LayerMaterial::Fr4, 0.002), BackplaneLayer::new(LayerMaterial::FlexFerrite, 0.0002)], housing: None });
     assert!(validate_copper_placement(&config, &routing, &hints).is_ok());
     config.backplane = Some(BackplaneStack { layers: vec![], housing: Some(HousingSpec { material: HousingMaterial::Aluminum6061, thickness_m: 0.001, gap_m: 0.005 }) });
     assert!(validate_copper_placement(&config, &routing, &hints).is_ok());

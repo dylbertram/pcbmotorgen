@@ -35,6 +35,7 @@ pub async fn compute_height_stack(
     config: LinearMotorConfigIpc,
 ) -> Result<HeightStackResultIpc, String> {
     let core = config.to_core();
+    core.validate().map_err(|e| e.to_string())?;
     tauri::async_runtime::spawn_blocking(move || {
         let hs = HeightStackCalculator::default().calculate(&core.to_simulation());
         Ok(HeightStackResultIpc {
@@ -56,6 +57,32 @@ pub async fn compute_height_stack(
 }
 
 static PERIODIC_REFERENCE_JOB: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+/// PM-induced housing loss does not depend on electrical-driver compatibility.
+/// Validate physical geometry/depths, but do not run a coil-current/driver solve.
+#[tauri::command]
+pub async fn analyze_housing_motion(
+    config: LinearMotorConfigIpc,
+    profile: pcbmotorgen_simulation::backplane::HousingMotionProfile,
+    speed: f64,
+    cad_geometry: Option<pcbmotorgen_export::cad_dxf::CadGeometry>,
+) -> Result<pcbmotorgen_simulation::backplane::HousingMotionAnalysis, String> {
+    let core = config.to_core();
+    core.validate().map_err(|e| e.to_string())?;
+    tauri::async_runtime::spawn_blocking(move || {
+        let sim = if let Some(cad) = cad_geometry.as_ref() {
+            let board = super::cad_source::CadBoard::new(cad, &core)?;
+            let sim = board.simulation_input(cad, &core);
+            sim.validate().map_err(|e| e.to_string())?;
+            let hints = super::cad_source::CadBoard::drive_hints(cad);
+            pcbmotorgen_simulation::drive::validate_copper_placement(&sim, &board.routing, &hints).map_err(|e| e.to_string())?;
+            sim
+        } else { core.to_simulation() };
+        sim.validate().map_err(|e| e.to_string())?;
+        let stack = sim.backplane.as_ref().ok_or("Add a supported housing before calculating motion-induced heat")?;
+        Ok(stack.housing_motion(&sim, speed, profile))
+    }).await.map_err(|e| format!("housing motion worker failed: {e}"))?
+}
 
 /// Explicit periodic static reference. Does not replace previews, finite-array
 /// force, friction or driver calculations, and never substitutes a mock result.
@@ -94,6 +121,7 @@ pub async fn periodic_backplane_reference(
 #[tauri::command]
 pub async fn generate_coils(config: LinearMotorConfigIpc) -> Result<CoilPathIpc, String> {
     let core = config.to_core();
+    core.validate().map_err(|e| e.to_string())?;
     let num_layers = config.num_layers;
     tauri::async_runtime::spawn_blocking(move || {
         let ctx = core.routing_context();
@@ -141,6 +169,7 @@ pub async fn evaluate_force_sweep(
     }
     let drive = drive.ok_or("Force analysis requires explicit drive settings; use the same copper, temperature and via settings as driver analysis.")?;
     let core = config.to_core();
+    core.validate().map_err(|e| e.to_string())?;
     let n_positions = config.n_positions.max(2) as usize;
     let meshing = config.meshing.max(1) as usize;
     let commutation = match config.commutation {
@@ -166,6 +195,7 @@ pub async fn evaluate_force_sweep(
             }
         };
 
+        sim.validate().map_err(|e| e.to_string())?;
         let hints = cad_geometry.as_ref().map(super::cad_source::CadBoard::drive_hints).unwrap_or_default();
         let (mut evaluator, coils) = ForceEvaluator::new(n_positions, meshing, commutation, 0.0)
             .with_routed_currents(&routing, &sim, &drive, &hints)
@@ -223,6 +253,7 @@ pub async fn evaluate_force_sweep(
 #[tauri::command]
 pub async fn compute_friction(config: LinearMotorConfigIpc) -> Result<FrictionBudgetIpc, String> {
     let core = config.to_core();
+    core.validate().map_err(|e| e.to_string())?;
     tauri::async_runtime::spawn_blocking(move || {
         let fb = FrictionEstimator::default().estimate_for_config(&core.to_simulation());
         Ok(FrictionBudgetIpc {
@@ -278,6 +309,7 @@ pub async fn sample_b_field(
         ));
     }
     let core = config.to_core();
+    core.validate().map_err(|e| e.to_string())?;
     tauri::async_runtime::spawn_blocking(move || {
         // Build linspaces from extents.
         let x_sample: Vec<f64> = linspace(x_extent_m[0], x_extent_m[1], n_x);
@@ -334,6 +366,7 @@ pub async fn analyze_drive(
     cad_geometry: Option<pcbmotorgen_export::cad_dxf::CadGeometry>,
 ) -> Result<pcbmotorgen_simulation::drive::DriveAnalysis, String> {
     let core = config.to_core();
+    core.validate().map_err(|e| e.to_string())?;
     // Pattern-owned contract from motor-coil-generator-add-inputs:
     // 0 = closed, 1 = delta, 2 = star/wye. Imported copper is independent.
     let delta = match cad_geometry.as_ref() {
@@ -348,6 +381,7 @@ pub async fn analyze_drive(
         if let Some(cad) = cad_geometry.as_ref() {
             let board = super::cad_source::CadBoard::new(cad, &core)?;
             let sim = board.simulation_input(cad, &core);
+            sim.validate().map_err(|e| e.to_string())?;
             let hints = super::cad_source::CadBoard::drive_hints(cad);
             pcbmotorgen_simulation::drive::validate_copper_placement(&sim, &board.routing, &hints)
                 .map_err(|error| error.to_string())?;
@@ -395,6 +429,7 @@ pub async fn analyze_drive(
 #[tauri::command]
 pub async fn travel_envelope(config: LinearMotorConfigIpc) -> Result<TravelEnvelopeIpc, String> {
     let core = config.to_core();
+    core.validate().map_err(|e| e.to_string())?;
     tauri::async_runtime::spawn_blocking(move || {
         let sim = core.to_simulation();
         // The copper active area is the whole track: [0, active_area_length].
@@ -419,6 +454,43 @@ pub async fn travel_envelope(config: LinearMotorConfigIpc) -> Result<TravelEnvel
 // ===========================================================================
 // Tests — travel_envelope reflects the charge-based refinement (kata k5r5)
 // ===========================================================================
+
+#[cfg(test)]
+mod coreless_envelope_tests {
+    use super::*;
+
+    #[test]
+    fn every_public_motor_calculation_rejects_out_of_envelope_inputs_before_work() {
+        let mut config = crate::ipc::ProjectConfigStateIpc::default().to_linear_motor_ipc();
+        config.magnet_count = 13;
+        let drive = pcbmotorgen_simulation::drive::DriveSettings::default();
+        let errors = vec![
+            tauri::async_runtime::block_on(compute_height_stack(config.clone())).unwrap_err(),
+            tauri::async_runtime::block_on(compute_friction(config.clone())).unwrap_err(),
+            tauri::async_runtime::block_on(generate_coils(config.clone())).unwrap_err(),
+            tauri::async_runtime::block_on(sample_b_field(config.clone(), 2, 2, [0.,0.01], [0.,0.01])).unwrap_err(),
+            tauri::async_runtime::block_on(analyze_drive(config.clone(), drive.clone(), None, None)).unwrap_err(),
+            tauri::async_runtime::block_on(evaluate_force_sweep(config.clone(), None, Some(drive))).unwrap_err(),
+            tauri::async_runtime::block_on(travel_envelope(config.clone())).unwrap_err(),
+            tauri::async_runtime::block_on(analyze_housing_motion(config.clone(), pcbmotorgen_simulation::backplane::HousingMotionProfile { duration_s: 0.1 }, 3., None)).unwrap_err(),
+        ];
+        assert!(errors.iter().all(|e| e.contains("≤ 12")), "{errors:?}");
+        assert_eq!(config.magnet_count, 13, "no command may clamp saved geometry");
+    }
+
+    #[test]
+    fn housing_motion_remains_available_when_the_driver_cannot_handle_delta() {
+        use pcbmotorgen_simulation::backplane::{BackplaneStack, HousingSpec, HousingMaterial, HousingMotionProfile, HousingMotionAnalysis};
+        let mut state = crate::ipc::ProjectConfigStateIpc::default();
+        state.routing_params.insert("connection".into(), 1.0);
+        state.backplane = Some(BackplaneStack { layers: vec![], housing: Some(HousingSpec { material: HousingMaterial::Aluminum6061, thickness_m: 0.001, gap_m: 0.001 }) });
+        let config = state.to_linear_motor_ipc();
+        let error = tauri::async_runtime::block_on(analyze_drive(config.clone(), state.drive, None, None)).unwrap_err();
+        assert!(error.contains("Star") || error.contains("delta"));
+        let value = tauri::async_runtime::block_on(analyze_housing_motion(config, HousingMotionProfile { duration_s: 0.1 }, 3., None)).unwrap();
+        assert!(matches!(value, HousingMotionAnalysis::Experimental { estimate } if estimate.housing_joule_power_w > 0.));
+    }
+}
 
 #[cfg(test)]
 mod travel_envelope_tests {
@@ -928,11 +1000,33 @@ mod cad_source_tests {
         cad.layer_z_mm = (0..count).map(|layer| -2.0 * (count - 1 - layer) as f64).collect();
         ipc.backplane = Some(BackplaneStack { layers: vec![BackplaneLayer::new(LayerMaterial::FlexFerrite, 0.0002)], housing: None });
         let force_error = tauri::async_runtime::block_on(evaluate_force_sweep(ipc.clone(), Some(cad.clone()), Some(Default::default()))).unwrap_err();
-        let driver_error = tauri::async_runtime::block_on(analyze_drive(ipc, Default::default(), Some(0.4), Some(cad))).unwrap_err();
-        for error in [force_error, driver_error] {
+        let driver_error = tauri::async_runtime::block_on(analyze_drive(ipc.clone(), Default::default(), Some(0.4), Some(cad.clone()))).unwrap_err();
+        let housing_error = tauri::async_runtime::block_on(analyze_housing_motion(ipc, pcbmotorgen_simulation::backplane::HousingMotionProfile { duration_s: 0.1 }, 3., Some(cad))).unwrap_err();
+        for error in [force_error, driver_error, housing_error] {
             assert!(error.contains("below the first magnetic/conducting stack surface"), "{error}");
             assert!(error.contains("geometry has not been moved"), "{error}");
         }
+    }
+
+    #[test]
+    fn independent_housing_command_uses_imported_geometry_without_driver_or_connection_substitution() {
+        use pcbmotorgen_simulation::backplane::{BackplaneStack, HousingSpec, HousingMaterial, HousingMotionProfile, HousingMotionAnalysis};
+        let (mut ipc, mut cad) = exported_default();
+        for p in ["A", "B", "C"] { cad.coil_phases.insert(format!("coil {p}"), p.to_string()); }
+        ipc.backplane = Some(BackplaneStack { layers: vec![], housing: Some(HousingSpec { material: HousingMaterial::Stainless316, thickness_m: 0.001, gap_m: 0.001 }) });
+        let depths = cad.layer_z_mm.clone();
+        let profile = HousingMotionProfile { duration_s: 0.1 };
+        let generated = tauri::async_runtime::block_on(analyze_housing_motion(ipc.clone(), profile, 3., None)).unwrap();
+        cad.terminal_connection = Some(pcbmotorgen_export::cad_dxf::TerminalConnection::Delta);
+        let imported = tauri::async_runtime::block_on(analyze_housing_motion(ipc, profile, 3., Some(cad.clone()))).unwrap();
+        match (generated, imported) {
+            (HousingMotionAnalysis::Experimental { estimate: a }, HousingMotionAnalysis::Experimental { estimate: b }) => {
+                assert!(a.housing_joule_power_w > 0.);
+                assert!((a.housing_joule_power_w / b.housing_joule_power_w - 1.).abs() < 1e-12);
+            }
+            values => panic!("{values:?}"),
+        }
+        assert_eq!(cad.layer_z_mm, depths);
     }
 
     #[test]

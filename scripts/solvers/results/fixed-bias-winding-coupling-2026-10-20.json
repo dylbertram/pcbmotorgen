@@ -1,0 +1,33 @@
+{
+  "status": "passed-fixed-bias-copper-lorentz-coefficients-only",
+  "scope": "Forces on actual saved-version copper per phase ampere at zero winding excitation, at one saved pose in the existing static 36x12mm material-footprint prototype. Not mover thrust/Kf, finite-current backreaction, differential inductance, AC or hardware validation.",
+  "raw_archives": "$HOME/.local/opt/solver-prototypes-macos",
+  "source_project": "star_2-layer.pmmotor",
+  "source_project_sha256": "0ed215f6ff403b927dbeac1ea3d4d9587489a1f1c0680e4ce3a2a48658475d82",
+  "version_index": 1,
+  "saved_mover_position_m": 0.0414,
+  "geometry_export": {
+    "report": "winding-star2-v1-copper-20261020/summary.json",
+    "sha256": "8b5b4061b354f6d2bf8d8aab863acb272ca1f8b8c48178ee18120463c2f72c10",
+    "procedure": "Archive original project, remove only backplane from a derived copy for the free-space copper exporter, verify resistance/current/signed trace-via samples, restore that one field and require exact equality to original. Original file untouched.",
+    "copper_quadrature_levels": [20,40,80],
+    "pcb_thickness_m": 0.0008,
+    "phase_resistance_ohm": [2.4518291812920716,2.453160382950247,2.4664723994510824],
+    "prior_version_not_reused": "The previously audited v0 has a 1.6mm rather than 0.8mm PCB and different trace-width settings."
+  },
+  "coupling": {
+    "report": "winding-v1-fixed-bias-coupling-v2-20261020.json",
+    "sha256": "b9eff932cc053b38f8077996c020f2322d358b358f899581ea8e24e0754143b5",
+    "translation_m": [-0.0534,-0.004,0.0008],
+    "signed_dl_and_imported_depth_spacing_preserved": true,
+    "mover_offset_applied_once": true,
+    "air_side_observation_offsets_m": [1e-7,5e-8],
+    "checks_passed": 48,
+    "gates": {"conductor_refinement":0.02,"air_side_limit":0.02,"same_backend_mesh_refinement":0.02,"cross_backend":0.05,"absolute_n_per_a":1e-8},
+    "fine_ngsolve_copper_force_x_n_per_a": [0.041911485255512713,-0.007251316128025279,-0.04901358865345259],
+    "qualification_boundary": "Lorentz force on copper is not automatically the negative of mover force when a magnetic stator can carry incremental force. Do not wire these coefficients into driver Kf. Material plate remains the explicit prototype footprint, not extracted full motor CAD.",
+    "superseded_audit": "The v1 coupling report remains archived. V2 corrects comparison pairing so near-mesh NGSolve refinement uses the NGSolve baseline and 2%, not the different-backend 5% gate."
+  },
+  "remaining": ["finite-source DC mover/coil/stator force partition", "DC winding-current nonlinear bias and differential linkage/inductance", "bias-position sweeps with material geometry held fixed"],
+  "current_scope":"AC amplitude/envelope work is deferred by explicit user instruction; retain historical references without treating AC as a current completion gate."
+}

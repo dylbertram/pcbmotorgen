@@ -1,0 +1,31 @@
+{
+  "status": "failed-near-source-maps-and-self-force-not-qualified",
+  "scope": "Full-domain native Elmer 26.2 Whitney bare-only control of the supplied five-PM geometry. No nonlinear material job or accepted motor prediction.",
+  "work_relative_to_solver_opt": "five-pm-elmer-wideband-bare-20261019",
+  "summary_sha256": "c9384be72cf5ec2a6369546bc2f0702d8eb9790708d5469ae33c516208d81b5b",
+  "self_force_audit_sha256": "d85c390a76726bdce3ca616a908015705a45d84dc5a8263a25ca94e3ddf87673",
+  "map_audit_sha256": "072bfaa5cc59bfee23cf58657ee08ee4afd2a5b758730c7d0d96043220358048",
+  "resource_receipt_sha256": "f66688da986e13637c7f52ac8fd49844ac3c7302b00deaefc8bc4acd043b2b45",
+  "mesh": {
+    "near_m": 0.0008,
+    "gap_m": 0.0001,
+    "magnet_interface_m": 0.0002,
+    "physical_interface_band_m": 0.0004,
+    "far_m": 0.01,
+    "radius_m": 0.06,
+    "cad_z_stretch_restored_before_solve": 4,
+    "quarter_symmetry": false,
+    "element_order": 1,
+    "note": "This historical job predates the explicit-far curvature-sizing fix. Original geometry and snapshots remain unchanged."
+  },
+  "centreline_field_error": 0.02368147975091249,
+  "clearances_m": [0.0001, 0.0002, 0.0003],
+  "below_map_errors": [0.12500565403946104, 0.08858657429793401, 0.0797293133777066],
+  "above_map_errors": [0.14447820540077444, 0.12309212058308779, 0.13673418507730203],
+  "unchanged_map_gate": 0.05,
+  "raw_exact_mover_self_force_z_n": [-3.679718564201424, -3.683509796484997, -3.613763468399367],
+  "solver_seconds": 408.16846250003437,
+  "whole_job_wall_seconds": 447.18,
+  "whole_job_time_l_maximum_rss_bytes": 4442963968,
+  "conclusion": "A passing installation/upstream suite and centreline do not qualify near-source fields or forces. Raw near-source maps and exact closed self-force fail badly. No floors are subtracted and no nonlinear retry is justified from this control."
+}

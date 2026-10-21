@@ -2,9 +2,9 @@
  * Physics IPC calls with deterministic mock fallback.
  *
  * The UI schedules coil generation independently for the design reflection
- * and gates Simulation-tab calculations on the active tab. Their failure is
- * recoverable — the user just sees stale data. When the Tauri runtime is
- * missing (plain `vite dev`), the corresponding mock is returned instead.
+ * and gates Simulation-tab calculations on the active tab. Errors propagate
+ * so controllers clear old results. Some legacy previews have a browser-only
+ * mock; housing motion and the periodic reference never fabricate one.
  */
 
 import { invoke } from "@tauri-apps/api/core";
@@ -23,6 +23,7 @@ import type {
   DriveAnalysis,
   CadGeometry,
 } from "../types";
+import type { HousingMotionAnalysis } from "../types/drive";
 import { isTauriAvailable } from "./core";
 import type { PeriodicStaticReference } from "../types/periodicReference";
 import {
@@ -119,6 +120,20 @@ export async function analyzeDrive(
     thrustConstantNPerA: kf,
     cadGeometry,
   });
+}
+
+/** Independent PM/housing capability. Never fabricates a browser substitute. */
+export async function analyzeHousingMotion(
+  config: LinearMotorConfig,
+  profile: { duration_s: number },
+  speed: number,
+  cadGeometry: CadGeometry | null = null,
+): Promise<HousingMotionAnalysis> {
+  assertCadMapping(cadGeometry, config);
+  if (!isTauriAvailable()) {
+    throw new Error("Housing motion estimates require the desktop app. Browser previews do not substitute physics results.");
+  }
+  return await invoke<HousingMotionAnalysis>("analyze_housing_motion", { config, profile, speed, cadGeometry });
 }
 
 /**

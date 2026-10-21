@@ -233,7 +233,7 @@ impl Default for ProjectConfigStateIpc {
             min_via_drill_mm: 0.2,
             min_via_annular_ring_mm: 0.1,
             pcb_thickness_mm: 1.6,
-            max_layers: 12,
+            max_layers: pcbmotorgen_simulation::params::MAX_PCB_LAYERS,
             drive_frequency_hz: 500.0,
             max_temperature_rise_c: 20.0,
             drive: pcbmotorgen_simulation::drive::DriveSettings::default(),
@@ -661,9 +661,20 @@ mod tests {
 
     #[test]
     fn design_validation_clean_for_valid_design() {
-        let v = design_validation(&sample_state());
+        let mut state = sample_state();
+        state.config.magnet_count = 12;
+        let v = design_validation(&state);
         assert!(v.errors.is_empty(), "errors: {:?}", v.errors);
         assert!(v.warnings.is_empty(), "warnings: {:?}", v.warnings);
+    }
+
+    #[test]
+    fn legacy_design_outside_coreless_envelope_still_loads_but_reports_error() {
+        let state = sample_state();
+        assert_eq!(state.config.magnet_count, 16);
+        let v = design_validation(&state);
+        assert!(v.errors.iter().any(|error| error.contains("≤ 12")));
+        assert_eq!(state.config.magnet_count, 16, "validation must not clamp restored geometry");
     }
 
     #[test]

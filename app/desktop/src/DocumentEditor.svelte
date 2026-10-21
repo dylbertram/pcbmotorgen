@@ -426,6 +426,11 @@
     void geometryKey(projects.cadGeometry);
 
     const generation = ++simulationGeneration;
+    // Driver-only work is debounced for 120ms, before the 150ms replacement
+    // sweep starts. Invalidate its Kf now, not only when that sweep settles.
+    // Otherwise an old sweep can be paired with the newly edited IPC inputs.
+    sweep = null;
+    drive = null;
     if (!active || activeTab !== "simulate") {
       scheduleSimulation.cancel();
       loading = false;
@@ -441,8 +446,11 @@
   // and again when only the driver settings change, without re-running the
   // sweep. The expanded preview also needs live electrical results.
   let driveGeneration = 0;
+  const driveRequested = $derived(active && (
+    activeTab === "simulate" || coilPreviewExpanded || previewPanel === "driver"
+  ));
   const scheduleDrive = debounce((generation: number) => {
-    if (generation !== driveGeneration || !active || (activeTab !== "simulate" && !coilPreviewExpanded && previewPanel !== "driver")) return;
+    if (generation !== driveGeneration || !driveRequested) return;
     void runDrive(generation);
   }, 120);
 
@@ -482,7 +490,7 @@
     void geometryKey(projects.cadGeometry);
     void valid;
     const generation = ++driveGeneration;
-    if (!active || (activeTab !== "simulate" && !coilPreviewExpanded && previewPanel !== "driver")) {
+    if (!driveRequested) {
       scheduleDrive.cancel();
       drivePending = false;
       return;

@@ -571,13 +571,20 @@ fn describing_function_limits() {
 fn thicker_sheet_saturates_less() {
     let s = benchmark();
     let r = |t| stack(vec![layer(LayerMaterial::FlexFerrite, t)], None).analyze(&s);
-    let (thin, thick, plate) = (r(0.1), r(1.0), r(8.0));
+    let (thin, thick, plate) = (r(0.1), r(1.0), r(2.0));
     assert!(thin.layer_states[0].flux_overload > thick.layer_states[0].flux_overload);
     assert!(thin.image_strength < thick.image_strength);
     assert!(thick.image_strength < plate.image_strength);
-    // The thickness the warning suggests carries the flux at Bsat.
-    let t_req = thin.layer_states[0].required_thickness_m.unwrap();
-    let at_req = r(t_req * 1e3).layer_states[0].clone();
+    // The strong source needs more than the allowed 2 mm: no unsupported
+    // thickness suggestion is emitted. A weaker source exercises the root
+    // finder inside the supported envelope without changing material values.
+    assert!(thin.layer_states[0].required_thickness_m.is_none());
+    let mut weaker = s.clone();
+    weaker.magnet_remanence_t *= 0.1;
+    let candidate = stack(vec![layer(LayerMaterial::FlexFerrite, 0.1)], None).analyze(&weaker);
+    let t_req = candidate.layer_states[0].required_thickness_m.unwrap();
+    assert!(t_req <= MAX_THICKNESS_M);
+    let at_req = stack(vec![layer(LayerMaterial::FlexFerrite, t_req * 1e3)], None).analyze(&weaker).layer_states[0].clone();
     assert!(
         (at_req.flux_overload - 1.0).abs() < 1e-6,
         "{}",
@@ -617,15 +624,15 @@ fn version_two_reports_saturation_instead_of_a_multi_tesla_peak() {
         a.inductance_factor
     );
     assert!(a.inductance_factor > 1.3 && a.inductance_factor < away.re);
-    assert!(sheet.required_thickness_m.unwrap() > mm(2.0));
-    assert!(sheet.mnzn_thickness_m.unwrap() < sheet.required_thickness_m.unwrap());
+    assert!(sheet.required_thickness_m.is_none());
+    assert!(sheet.mnzn_thickness_m.is_none());
     assert!(
         a.attraction_n > 0.0 && a.attraction_n < 2.0,
         "{}",
         a.attraction_n
     );
     let w = a.warnings.join(" ");
-    assert!(w.contains("saturated") && w.contains("MnZn"), "{w}");
+    assert!(w.contains("saturated") && w.contains("more than 2 mm"), "{w}");
     assert!(!w.contains("5.57"));
 
     // At 100 kHz the aluminium screens the coil through the saturated part.
@@ -758,6 +765,31 @@ fn validation_rejects_bad_thickness_gap_and_overrides() {
     assert!(with(None, Some(0.0)).is_err());
     assert!(with(None, Some(5.0)).is_err());
     assert!(with(Some(150.0), Some(0.3)).is_ok());
+}
+
+#[test]
+fn coreless_envelope_allows_three_two_mm_layers_and_five_mm_nonmagnetic_housing() {
+    for material in [HousingMaterial::Aluminum6061, HousingMaterial::Aluminum5052,
+        HousingMaterial::Stainless304, HousingMaterial::Stainless316] {
+        let st = stack(vec![layer(LayerMaterial::FlexFerrite, 2.0); 3], housing(material, 5.0, 10.0));
+        assert!(st.validate().is_ok());
+        assert!((st.stack_thickness_m() - 0.006).abs() < 1e-12);
+    }
+    assert!(stack(vec![layer(LayerMaterial::FlexFerrite, 0.1); 4], None).validate().is_err());
+    assert!(stack(vec![layer(LayerMaterial::FlexFerrite, 2.001)], None).validate().is_err());
+    for (wall, gap) in [(5.001, 0.0), (1.0, 10.001), (f64::NAN, 0.0), (1.0, f64::INFINITY)] {
+        assert!(stack(vec![], housing(HousingMaterial::Aluminum6061, wall, gap)).validate().is_err());
+    }
+}
+
+#[test]
+fn legacy_magnetic_housing_decodes_but_is_not_silently_supported() {
+    for material in ["steel1018", "stainless430"] {
+        let text = format!(r#"{{"layers":[],"housing":{{"material":"{material}","thickness_m":0.001,"gap_m":0.0}}}}"#);
+        let st: BackplaneStack = serde_json::from_str(&text).unwrap();
+        assert!(st.validate().unwrap_err().contains("unsupported"));
+        assert_eq!(serde_json::to_string(&st).unwrap(), text);
+    }
 }
 
 #[test]
