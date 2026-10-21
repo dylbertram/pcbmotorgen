@@ -172,6 +172,12 @@ pose bias baseline and `--pose-reference-work`; it never replays nominal bare
 force at another pose. Current-only quadrature storage is reusable only because
 the copper/material observation geometry is unchanged and the PM source is
 recomputed for each explicit pose. Application integration remains gated.
+Pose spatial refinement now passes in both formulations, and refined independent
+current-induced force differences remain below 0.053%. The tighter 0.075-opening
+material cache also passes; its coupled-force controls are still separate work.
+An accepted zero-current baseline may supply its exact material mesh to another
+pose only after whole-receipt, model/version, mesh-hash and physical-input checks.
+This avoids regenerating a nominally similar mesh or changing material priority.
 
 Evidence correction: earlier 306-test helper logs included four or five skipped
 tests, not 306 passes. Preserve those logs and historical delivery manifests.

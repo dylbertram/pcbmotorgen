@@ -216,7 +216,30 @@
       "linear_maximum_increment_relative_change": 0.0005576872232472002
     },
     "pose_bare_source_preparation": "Full corrected affine RT0 pose reference passed in292.081s, dc-affine-bare-pose-forces-v2-20261021, summary SHAceb429122e4cc0e657025c6b5be3d7162128b3804a4e6827d324b8a3a06fe84b. Three poses0,+/-100um, every physical source cell, max degree2/4force change6.25e-10N and degree4action/reaction error4.44e-13N. Original nominal force agrees within7.05e-18N. First full attempt preserved failed because strict volume reload incorrectly referenced CAD instead of archived mesh; corrected expected volume only, gates unchanged1e-9reload/2%mesh-CAD.",
-    "current_pose_jobs": "Coarse nonlinear vector/scalar matrices at+/-100um completed; independent comparisons pass5%. Vector spatial and degree6/8quadrature refinement pass2%at both poses. Refined scalar pose chain remains in progress under180s/600s/120s caps. Pose-specific domain and tighter-opening checks remain pending.",
+    "current_pose_jobs": "Coarse/refined nonlinear vector/scalar matrices at+/-100um completed; independent comparisons pass5%and both spatial refinements pass2%. Vector degree6/8quadrature and40/60mm domain checks pass2%at both poses. Scalar pose-domain/quadrature chains and tighter-opening vector-force comparisons are running under bounded per-job caps; those controls remain pending.",
+    "current_pose_vector_domain_controls": {
+      "plus100um_report": "dc-finite-current-nonlinear-vector-plus100um-domain-control-v1-20261021.json",
+      "plus100um_maximum_total_relative_change": 0.0022921414563975505,
+      "plus100um_maximum_increment_relative_change": 0.0019233132960568848,
+      "minus100um_report": "dc-finite-current-nonlinear-vector-minus100um-domain-control-v1-20261021.json",
+      "minus100um_maximum_total_relative_change": 0.003664076552206159,
+      "minus100um_maximum_increment_relative_change": 0.0008652067766682977,
+      "scope": "Same actual finite-current source and explicit PM poses at40/60mm reaction-domain radii. No source clipping or approximate mesh-identity substitution."
+    },
+    "current_pose_scalar_spatial_and_refined_formulation": {
+      "plus100um_scalar_mesh_report": "dc-finite-current-nonlinear-scalar-plus100um-mesh-control-v1-20261021.json",
+      "plus100um_scalar_maximum_total_relative_change": 0.00022803760677325634,
+      "plus100um_scalar_maximum_increment_relative_change": 0.0003093833333094282,
+      "minus100um_scalar_mesh_report": "dc-finite-current-nonlinear-scalar-minus100um-mesh-control-v1-20261021.json",
+      "minus100um_scalar_maximum_total_relative_change": 0.00023203245039101034,
+      "minus100um_scalar_maximum_increment_relative_change": 0.0004791063655870811,
+      "plus100um_refined_formulation_report": "dc-finite-current-nonlinear-plus100um-formulation-refined-v1-20261021.json",
+      "plus100um_refined_maximum_total_relative_difference": 0.007364465100953368,
+      "plus100um_refined_maximum_increment_relative_difference": 0.000523352980013931,
+      "minus100um_refined_formulation_report": "dc-finite-current-nonlinear-minus100um-formulation-refined-v1-20261021.json",
+      "minus100um_refined_maximum_total_relative_difference": 0.0073073891182539995,
+      "minus100um_refined_maximum_increment_relative_difference": 0.00030473065786234985
+    },
     "current_pose_vector_quadrature_controls": {
       "plus100um_report": "dc-finite-current-nonlinear-vector-plus100um-quadrature-control-v1-20261021.json",
       "plus100um_maximum_total_relative_change": 0.000005957129064516786,
@@ -264,7 +287,7 @@
       "nonlinear_scalar_quadrature_report": "dc-finite-current-nonlinear-scalar-degree6-8-control-v1-20261021.json",
       "nonlinear_scalar_maximum_increment_quadrature_change": 0.000161927436811043
     },
-    "tighter_opening_control": "Material preflight at openings0.15/0.075passed,max field refinement0.000900573553604698,direct difference3.5432945488629e-5. Full44160point tighter cache running under3600s cap after3226.315s forecast. No tighter-opening coupled-force comparison yet counted.",
+    "tighter_opening_control": "Full44160point0.075cache passed in1612.490s under3600s cap after3226.315s forecast. Max pointwise opening change0.0014018782783597641,direct spot-check difference4.5397367902942736e-5. Nominal nonlinear/linear-order2and shifted nonlinear vector-force comparisons now running; none counted as passed yet.",
     "degree6_source_control": "Full degree6cache passed in251.877s under900s cap after672.771s forecast. Nonlinear vector degree6matrix and degree6/8force comparison passed. Degree10full-cache work remains unperformed, not silently counted.",
     "nonlinear_quadrature_control": {
       "report": "dc-finite-current-nonlinear-degree6-8-control-v1-20261021.json",
@@ -275,7 +298,7 @@
     },
     "preserved_input_failure": "vacuum-vector-v1 rejected before solve because runner compared reserialized Netgen file bytes. Corrected to require and reload the exact original mesh hash consumed by both accepted cache/bias jobs. Regression test rejects a different original mesh; no mesh-identity assumption based on counts.",
     "evidence_safety": "Supervisor now reserves log/receipt names by exclusive creation. Duplicate invocations cannot truncate running/completed evidence. Regression tests cover active receipt, existing log and completed job.",
-    "helper_verification": "359tests pass with zero skips in27.588s, dc-nominal-matrix-and-pose-guards-helpers-v1-20261021.log.",
+    "helper_verification": "360tests pass with zero skips in34.133s, dc-pose-domain-mesh-reuse-helpers-v1-20261021.log. Material-mesh reuse accepts an immutable successful mesh/bias producer only, with matching model/version/declared controls and unchanged physical input hashes.",
     "remaining": "Current-driven pose matrix and its controls, tighter source-opening force control, general supported geometry coverage and app integration. No hardware/material/thermal/differential-inductance/reversal qualification."
   },
   "historical_evidence_correction": {

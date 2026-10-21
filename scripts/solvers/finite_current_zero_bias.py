@@ -51,6 +51,12 @@ def posed_model(model, offset):
     return result
 
 
+def accepted_material_mesh(report, model, version):
+    if (report.get('status') not in ['passed-approved-material-mesh-controls-only', 'passed-recorded-zero-current-bias-controls-only']
+        or report.get('failures') != [] or report.get('base_model', report.get('model')) != model or report.get('version') != version):
+        raise ValueError('Imported mesh is not an accepted same-model material mesh/bias job')
+
+
 def reaction_form(ng, space, mesh, model, source, rules):
     soft = magnetic_regions(model, mesh.GetMaterials())
     vacuum = sorted(set(mesh.GetMaterials())-{x['name'] for x in soft})
@@ -151,9 +157,13 @@ def main():
         if args.mesh_work:
             origin = args.mesh_work.resolve()
             prior = json.loads((origin/'summary.json').read_text())
+            if not prior.get('command_receipt'):
+                raise ValueError('Imported material mesh requires a whole supervisor receipt')
             completed_receipt(prior)
-            if prior['status'] != 'passed-approved-material-mesh-controls-only' or prior.get('base_model', prior['model']) != base_model or prior['version'] != ng.__version__:
-                raise ValueError('Imported mesh is not an accepted same-model baseline mesh')
+            accepted_material_mesh(prior, base_model, ng.__version__)
+            for path, digest in prior['input_hashes'].items():
+                if sha(Path(path)) != digest:
+                    raise ValueError('Imported material mesh physical inputs changed')
             for key in ['far', 'air_mesh', 'material_mesh', 'order', 'degree']:
                 if prior['request'][key] != getattr(args, key):
                     raise ValueError('Imported mesh changed the declared baseline controls')

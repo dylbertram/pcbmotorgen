@@ -1,9 +1,19 @@
 import unittest
 
-from finite_current_zero_bias import magnetic_regions, posed_model
+from finite_current_zero_bias import magnetic_regions, posed_model, accepted_material_mesh
 
 
 class ZeroBiasMaterialTagTest(unittest.TestCase):
+    def test_accepted_bias_can_supply_its_exact_material_mesh_to_a_new_pose(self):
+        model = {'case': 'approved'}
+        report = dict(status='passed-recorded-zero-current-bias-controls-only', failures=[],
+                      model=model, version='pinned')
+        accepted_material_mesh(report, model, 'pinned')
+        for key, value in [('status', 'running'), ('failures', ['failed']), ('version', 'different'), ('model', {'case': 'other'})]:
+            changed = dict(report, **{key: value})
+            with self.subTest(key=key), self.assertRaises(ValueError):
+                accepted_material_mesh(changed, model, 'pinned')
+
     def test_recorded_pose_changes_only_pm_x_without_mutating_design(self):
         model = {'magnets': [{'origin_m': [0., 0., .001]}], 'stack': [{'mu_r': 130.}]}
         result = posed_model(model, 1e-4)
