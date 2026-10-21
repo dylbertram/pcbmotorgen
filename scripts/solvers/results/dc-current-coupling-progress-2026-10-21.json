@@ -512,8 +512,23 @@
           "peak_memory_footprint_bytes": 5695345536,
           "scope": "All existing eligible active/passive/native-arc/full-stub geometric section areas pass on exact refined mesh. Finished receipt, original physical inputs and archived implementation hashes verified. Resolves all59coarse-area failures numerically without physical edits, but no current/force acceptance. refined-area-watch caught successful completion at20:18:23Z."
         },
-        "fresh_refined_dc_pending": {
+        "fresh_refined_dc": {
           "work": "dc-imported-star4-curvature4-dc-v1-20261021",
+          "status": "completed-finite-copper-closed-dc-basis-unqualified",
+          "summary_sha256": "e0dada99f19b8a73d8bba39a26fa0ce1b7ffff5a0b8b42ae04b613bf242e3d3b",
+          "solution_sha256": "d0b9b6c7dd5896f41fbf44037c9d79165b6e6d458ef778ab4c14e195130b5ef0",
+          "seconds": 1021.706742624985,
+          "wall_seconds": 1022.56,
+          "max_rss_bytes": 5808619520,
+          "peak_memory_footprint_bytes": 12869151112,
+          "sampled_owned_group_peak_footprint_bytes": 12870134344,
+          "effective_loop_current_a": 0.06646550209427185,
+          "resistance_ohm": 15.045399018902202,
+          "relative_equation_residual": 1.2666296606650509e-13,
+          "relative_power_balance": 6.206146707654625e-14,
+          "net_current_relative_error": 9.24550399105086e-17,
+          "curvature_relative_resistance_difference": 0.0006144502569598309,
+          "curvature_gate": 0.02,
           "max_dofs_before_assembly": 19000000,
           "timeout_s": 7200,
           "threads": 2,
@@ -521,8 +536,9 @@
           "physical_footprint_limit_bytes": 19327352832,
           "memory_sample_interval_s": 1,
           "memory_guard_evidence": "dc-imported-star4-curvature4-dc-v1-20261021-guard/guard.json",
-          "scope": "Fresh electrical assembly/solve on exact byte-copied refined mesh via existing guarded pre-assembly checkpoint path. No previous fields. Numerical DOF budget increased after all1511area checks passed. Actual current memory unmeasured at launch; opt-in native physical-footprint guard stops owned group above18GiB on24GiB machine. This is sampled protection, not guaranteed allocation enforcement. Other numerical gates remain unchanged.",
-          "watcher": "refined-dc-watch checks errors/ends/stale identity or low-CPU stalls every30s. New memory-limit receipt status is explicitly recognized; original job completion notification also enabled. Two-hour budget verified within approved window."
+          "scope": "Fresh electrical assembly/solve on exact byte-copied refined mesh via existing guarded pre-assembly checkpoint path. No previous fields. Original global electrical and2%curvature R gates pass. load(MIXED) verifies completed whole-job receipt,mesh,solution,physical inputs and archived implementation. All local source/reference/spatial/drive-length acceptance still required. Physical-footprint guard remained below18GiB; measured footprint is not replaced by smaller RSS.",
+          "watcher": "refined-dc-watch caught successful completion at20:37:30Z with no alerts. Two-hour budget verified within approved window.",
+          "next_controls_pending": "Sequential all-active, all-passive/native-arc/stub, return sections and independent H1 runs launched with7200s per-stage bounds,18GiB native-memory guard and30s refined-controls-watch. Before each launch the stage budget must fit remaining approved window. Keep subsequent large mesh/source jobs serial with H1 until measured."
         }
       }
     },
@@ -533,13 +549,13 @@
       "dc-imported-star4-exact-copper-v3: completed exact Boolean CAD in89.155s but failed final validation on a string/Path report bug. New v4 uses verified geometry checkpoint only, reruns all bindings/reload checks; v3 stays failed."
     ],
     "test_results": {
-      "python_helpers": "396passed/0skips in30.249s, dc-native-memory-guard-all-helpers-v1-20261021.log. Includes opt-in native physical-footprint probe, sample/peak control and actual owned-group termination on budget failure, default runner regression, plus existing pre-assembly area/checkpoint/finite-barrel, primal, retained-CAD, gauge and raw source controls. Earlier393/392/390/388/387/386test inventories retained.",
+      "python_helpers": "398passed/0skips in29.890s, dc-isolated-refinement-policy-all-helpers-v1-20261021.log. Adds one-axis spatial/drive-length policy controls, unchanged curvature/physical union and rejection of non-refinement; includes native-memory/default runner and existing source controls. Actual isolated refinement numerical runs remain pending. Earlier396/393/392/390/388/387/386test inventories retained.",
       "rust_simulation": "199unit+7integration passed,2existing ignored; dc-imported-qualification-rust-simulation-v1-20261021.log. Production circular rejection and separate exact-primitive QA snapshot preservation tested.",
       "rust_desktop": "113passed/7ignored in42.08s, dc-imported-qualification-rust-desktop-v1-20261021.log. New external-project export test separately run1passed/0ignored; ignored in ordinary runs because it needs user source/pinned installation. No native-webview qualification.",
       "browser": "36DC/housing/periodic lifecycle regressions pass without skips in34.6s, dc-imported-geometry-browser-regressions-v1-20261021/report.json. UI fixtures only, not imported numerical-source acceptance.",
       "generated_case_regression": "dc-generated-baseline-after-import-guard-v1-20261021 validates the original registered source and entire pinned matrix evidence under current implementation; no new magnetic force computed or old forces replayed."
     },
-    "remaining": "Resolve59coarse barrel-area failures through verified numerical refinement. Run mesh-only area checks before fresh source assembly, then repeat whole eligible active/passive/native-arc/stub controls on the refined field and complete2%mesh/curvature/drive-length controls. Coarse5%independent electrical R reference and raw-current drive-gauge controls pass, but must also cover the selected refined source. Exact source export/field/force controls, applicable explicit material geometry, sampled nonlinear current/polarity/pose matrix and eventual live registration remain unfinished. No imported source/force/general-CAD/hardware acceptance from passing coarse R/current/gauge, CAD or global mesh-volume checks."
+    "remaining": "Refined mesh resolves59coarse barrel-area failures geometrically; fresh refined field passes global electrical and2%curvature R controls. Whole eligible active/passive/native-arc/stub/return controls and independent H1 on that field are running. Complete2%spatial/drive-length controls and refined5%electrical reference/raw-current checks. Exact source export/field/force controls, applicable explicit material geometry, sampled nonlinear current/polarity/pose matrix and eventual live registration remain unfinished. No imported source/force/general-CAD/hardware acceptance from passing mesh areas/global R/current/gauge alone."
   },
   "managed_desktop_integration": {
     "scope": "Restricted installed-solver integration for exact registered actual geometry and sampled current/pose states only. This does not qualify arbitrary or broader generated/imported geometry; new geometry is rejected before numerical work. No continuous interpolation, componentwise relative-accuracy, differential-inductance, retained-history reversal, thermal or hardware claim.",

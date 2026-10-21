@@ -401,7 +401,21 @@ RSS is not silently substituted for footprint. The default runner is unchanged
 unless the caller supplies this option. This sampled guard is not a kernel
 allocation guarantee; its budget leaves 6 GiB outside the solver on the 24 GiB
 host. A real subprocess regression verifies the failure/cleanup path. The
-refined electrical result and actual solve memory remain pending.
+refined solve now passes global electrical and curvature-resistance gates in
+1021.71 s. Resistance is 15.0453990189 ohm, changing by 0.06145% under the 2%
+gate. Measured peak footprint is 12.869 GB, versus the guard's sampled owned-group
+peak of 12.870 GB, both below 18 GiB. Full refined local-current and independent
+electrical checks remain pending; this is not source or force acceptance.
+
+`finite_copper_refinement.py --source-work REFINED_DC --kind mesh --value 0.0003 --work NEW_TRIAL`
+prepares an isolated spatial control using the exact source mesh's retained
+CAD, unchanged curvature setting and unchanged drive geometry. `--kind port
+--value 0.4` instead shortens the central imposed-field partition while keeping
+physical copper and curvature fixed. It checks the CAD union and drive volumes,
+uses a fresh saved/reloaded mesh and fresh unit-EMF solve, and applies the existing
+2% resistance-control gate. These two modes are separate trials, not combined
+changes. `--mesh-only` stops before assembly. Input-policy tests pass, but each
+actual trial needs its own completed receipt and local/refinement evidence.
 
 Evidence correction: earlier 306-test helper logs included four or five skipped
 tests, not 306 passes. Preserve those logs and historical delivery manifests.
