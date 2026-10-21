@@ -32,6 +32,13 @@ def completed(path):
     return value
 
 
+def verify_unittest_inventory(text, expected):
+    text = re.sub(r'\x1b\[[0-9;]*m', '', text)
+    counts = re.findall(r'^Ran (\d+) tests? in ', text, re.MULTILINE)
+    if counts != [str(expected)] or not re.search(r'\nOK\s*\Z', text):
+        raise ValueError('Declared helper pass count requires a whole successful run with no skips')
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     for name in ['root', 'archive', 'work']: parser.add_argument('--'+name, type=Path, required=True)
@@ -41,7 +48,9 @@ def main():
     parser.add_argument('--build-log', default='housing-harmonic-release-native-build-v2-20261021.log')
     parser.add_argument('--regression-tag', default='v1')
     parser.add_argument('--startup-tag', default='v1')
+    parser.add_argument('--helper-count', type=int, default=306)
     args = parser.parse_args()
+    if args.helper_count <= 0: parser.error('Positive declared helper pass count required')
     root, archive, work = args.root.resolve(), args.archive.resolve(), args.work.resolve()
     if work.exists(): parser.error('Preserve previous delivery')
     reference_path = archive/'housing-harmonic-release-reference-v2-20261021/summary.json'
@@ -86,13 +95,13 @@ def main():
     expected_counts = {
         'simulation': ['195 passed', '7 passed', '2 ignored'],
         'desktop': ['106 passed', '5 ignored'],
-        'helpers': ['Ran 306 tests', 'OK'],
         'frontend': ['457 passed', '1 skipped'],
     }
     for name, markers in expected_counts.items():
         text = (archive/f'housing-harmonic-release-{name}-{args.regression_tag}-20261021.log').read_text()
         text = re.sub(r'\x1b\[[0-9;]*m', '', text)
         if any(marker not in text for marker in markers): raise ValueError('Declared test inventory not observed: '+name)
+    verify_unittest_inventory((archive/f'housing-harmonic-release-helpers-{args.regression_tag}-20261021.log').read_text(), args.helper_count)
     startup = read(archive/f'housing-harmonic-release-native-startup-{args.startup_tag}-20261021.json')
     if startup['status'] != 'process-live-through-eight-second-startup-observation':
         raise ValueError('Native startup smoke failed')
@@ -170,7 +179,7 @@ def main():
         'architecture': architecture, 'codesign_output': signature.stderr,
         'signing': 'No developer identity, notarization or resource seal. Mach-O contains a linker ad-hoc signature only.',
         'checks': {'simulation_unit_passed': 195, 'simulation_vectors_passed': 7, 'simulation_ignored': 2,
-                   'desktop_passed': 106, 'desktop_ignored': 5, 'python_helpers_passed': 306,
+                   'desktop_passed': 106, 'desktop_ignored': 5, 'python_helpers_passed': args.helper_count,
                    'frontend_passed': 457, 'frontend_skipped': 1, 'browser_passed': args.browser_count,
                    'independent_harmonic_cases_passed': 19, 'real_project_cases_passed': 3,
                    'native_process_startup': startup['status']},

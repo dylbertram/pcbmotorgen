@@ -7,6 +7,31 @@ not turn screening estimates into hardware ratings.
 
 ## Current scope: DC motor windings
 
+### Current-driven coupling and DC03 physical decision
+
+`audit_copper_magnetic_overlap.py --geometry-work ACCEPTED_GEOMETRY --work NEW_AUDIT --picture`
+reloads the immutable finite-copper BRep and its original rectangular magnetic
+envelope. It verifies input hashes, reproduces the original intersection volume,
+and produces a saved-geometry projection plus a local section. It never cuts,
+moves or reassigns either material. OCCT tolerance-padded bounds are reported
+separately from nominal physical layer extents.
+
+The recorded two-layer case has 35 µm copper centered at the nominal PCB-bottom
+plane and a ferrite envelope ending at that plane. Their exact intersection is
+2.090425 mm³; nominal penetration is 17.5 µm. A physical decision is required:
+place a flat sheet below the copper with an explicitly approved clearance,
+confirm real ferrite recesses around the copper, or supply corrected layer-depth
+semantics/design geometry. No option is applied automatically. The next coupling
+work remains blocked on this decision; current-source controls may proceed
+independently. Do not reuse the old provisional ferrite law as a hardware rating.
+
+Evidence correction: earlier 306-test helper logs included four or five skipped
+tests, not 306 passes. Preserve those logs and historical delivery manifests.
+A fresh explicit NGSolve/PyAMG/Rust-entrypoint run covers the omitted checks.
+The packaging verifier now requires the declared unittest count to finish with
+plain `OK`, rejecting `OK (skipped=...)`; `--helper-count` declares a new inventory.
+This corrects future evidence claims without rebuilding historical deliveries.
+
 ### Bounded followup on 2026-10-21
 
 ### Higher-harmonic release verification

@@ -1,0 +1,44 @@
+{
+  "status": "dc03-physical-decision-required",
+  "goal": "Qualify static DC winding-magnet-shield coupling from actual supported generated/imported geometry, then integrate only qualified capabilities.",
+  "archive_root": "$HOME/.local/opt/solver-prototypes-macos",
+  "current_branch": "simulation/add-femm-and-improve",
+  "priorities": {
+    "DC03": "Exact overlap reproduced and visualized; awaiting explicit physical decision before any geometry/material changes.",
+    "current_source": "Existing recorded compatible HDiv source/global/current/area controls and recent coarse spatial-loss controls retained; broader branch/local-current qualification remains incomplete.",
+    "nonlinear_forces": "Not started under the new goal; waits for mutually exclusive approved materials and source qualification. Preserve zero-current/linear limits, force balance, 2% refinement and 5% independent-reference gates with explicit floors.",
+    "app_integration": "Not started; preserve existing housing screening/UI and request lifecycle. Do not expose unqualified coupled outputs."
+  },
+  "dc03_evidence": {
+    "work": "dc03-copper-ferrite-decision-v2-20261021",
+    "original_copper_work": "finite-copper-star2-v1-geometry-20261020",
+    "exact_intersection_mm3": 2.090425070613595,
+    "fraction_of_original_copper": 0.07613960113625856,
+    "fraction_of_ferrite_envelope": 0.024194734613583273,
+    "nominal_lower_copper_interval_um": [-17.5, 17.5],
+    "nominal_ferrite_interval_um": [-200, 0],
+    "nominal_penetration_um": 17.5,
+    "intersection_components": 65,
+    "component_limit": "Boolean intersection pieces, not winding-network components.",
+    "geometry_changed": false,
+    "picture": "layer_0-overlap.png",
+    "picture_limit": "Saved intersecting-layer copper projection is a location aid; exact volume comes from the BRep boolean. OCCT bounding-box padding is not physical penetration."
+  },
+  "approval_options": [
+    "Flat ferrite below unchanged copper: explicitly approve whole backplane-stack displacement and physical copper-to-ferrite clearance. Nominal contact-only displacement candidate is 17.5um, not an invented insulating gap.",
+    "Real relieved ferrite: explicitly confirm copper-shaped recesses so a derived mutually exclusive magnetic region can preserve copper and the nominal outer ferrite envelope.",
+    "Corrected design/depth convention: supply or approve the actual layer-depth specification before changing any centreplanes."
+  ],
+  "historical_evidence_correction": {
+    "release_helpers_v1": "306 discovered, 4 skipped, 302 passed; original logs/manifests preserved.",
+    "release_helpers_v3": "306 discovered, 5 skipped, 301 passed; original logs/manifests preserved.",
+    "new_helpers_v2": "311 discovered, 4 skipped, 307 passed; missing explicit Rust-entrypoint environment, retained as incomplete coverage.",
+    "new_helpers_v3": "311 passed with no skips using explicit Rust-entrypoint/NGSolve/PyAMG environment; further inventory-verifier regression tests added afterward.",
+    "new_helpers_v4": "314 passed with no skips in27.911s; whole command receipt completed exit0 in dc-coupling-overlap-all-helpers-v4-20261021.log.command.json. Application source files and five original root inputs remain byte-identical to the accepted release.",
+    "guard": "Packaging verifier now rejects skipped/partial/failed unittest logs as a declared all-pass inventory. No further delivery bundling."
+  },
+  "preserved_trials": [
+    "Decision-v1 exact volume passed; picture clipping was applied before axes insertion and was overwritten. Decision-v2 sets the physical clip afterward, with a regression test; both receipts/pictures remain archived."
+  ],
+  "boundaries": "No silent material priority or physical correction; roots, original evidence, merged UI and Mutagen preserved. No fitted constants. Inductance, reversal, thermal and hardware qualification remain separate. Commit verified milestones on the current branch; do not push or create bundles."
+}
