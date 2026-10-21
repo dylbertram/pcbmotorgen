@@ -341,14 +341,35 @@ supply `--mesh-work` to a fresh DC solve. Reused mesh bytes are copied unchanged
 and all new solves consume the exact saved/reloaded mesh, never count-based
 identity. A mesh-only checkpoint is not current-source acceptance.
 
+`audit_dc_mesh_section_areas.py --source-work ORIGINAL_DC --mesh-work FINISHED_MESH_CHECKPOINT --output NEW_REPORT --all-eligible`
+checks the existing active/passive/native-arc/full-stub planes before assembling
+another current system. It verifies the finished checkpoint receipt, unchanged
+mesh/CAD/input hashes and archived implementation, and refuses electric solution
+files in that checkpoint. It applies the original 2% physical area gate and
+emits no current result. A small finite-barrel regression exercises the same
+geometric section integration without a current solution. A passing area check
+does not establish continuity, current or power balance.
+
+The completed full coarse audit covers 1004 active sections and 507 passive/stub
+sections. All signed active-current comparisons and passive zero-current checks
+pass, but 41 active barrels and 18 passive barrels fail the 2% area gate. The
+worst active area error is 4.7025%, at `via:C:613`; the worst passive error is
+3.9158%, at `passive-via:B:424`. The original two sampled barrel failures remain
+archived. Global current agreement does not waive these 59 geometric failures.
+
 `finite_copper_drive_profile.py` is a separate original-mesh gauge control.
 It replaces the uniform isolated-port field with `6*s*(1-s)/L`, retaining an
 exact one-volt line integral and identical drive geometry. The difference is
 the gradient of `3*s^2-2*s^3-s`, zero at both port ends. It compares raw compatible
 current in a resistivity-weighted L2 norm and unit-EMF loop current under the
 unchanged 2% gate. No fitted rescaling is allowed. Its ring regression checks
-current invariance; an imported numerical result must be obtained separately.
+current invariance; it does not establish the imported numerical result.
 This control does not replace drive-length or spatial/curvature refinement.
+The imported coarse gauge run now passes. The raw resistivity-weighted L2 current
+difference is 3.3026e-12 and unit-EMF loop-current difference is 5.3291e-15, both
+under the original 2% gate without rescaling. It took 247.17 s with a 3.05 GB
+maximum resident set. This confirms drive-profile invariance on that mesh, not
+acceptance of its failing barrel areas.
 
 Long runs need both an explicit whole-job timeout and a background
 `watch_solver_jobs.py` observation configured with their actual supervisor process
