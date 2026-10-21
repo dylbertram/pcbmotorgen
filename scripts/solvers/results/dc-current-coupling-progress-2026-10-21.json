@@ -216,7 +216,16 @@
       "linear_maximum_increment_relative_change": 0.0005576872232472002
     },
     "pose_bare_source_preparation": "Full corrected affine RT0 pose reference passed in292.081s, dc-affine-bare-pose-forces-v2-20261021, summary SHAceb429122e4cc0e657025c6b5be3d7162128b3804a4e6827d324b8a3a06fe84b. Three poses0,+/-100um, every physical source cell, max degree2/4force change6.25e-10N and degree4action/reaction error4.44e-13N. Original nominal force agrees within7.05e-18N. First full attempt preserved failed because strict volume reload incorrectly referenced CAD instead of archived mesh; corrected expected volume only, gates unchanged1e-9reload/2%mesh-CAD.",
-    "current_pose_jobs": "Coarse nonlinear vector/scalar matrices at+/-100um completed with exact pose bias/bare references; independent comparisons pass5%. Refined vector pose chain remains in progress. Refined scalar pose baseline/current/mesh-comparison chain launched with180s/600s/120s caps; spatial comparisons are not yet counted as passed.",
+    "current_pose_jobs": "Coarse nonlinear vector/scalar matrices at+/-100um completed; independent comparisons pass5%. Vector spatial refinement passes2%at both poses. Refined scalar pose chain remains in progress under180s/600s/120s caps. Vector pose degree6/8quadrature chain launched under300s/120s caps; those results are not yet counted as passed.",
+    "current_pose_vector_spatial_controls": {
+      "plus100um_report": "dc-finite-current-nonlinear-vector-plus100um-mesh-control-v1-20261021.json",
+      "plus100um_maximum_total_relative_change": 0.005038563019596505,
+      "plus100um_maximum_increment_relative_change": 0.0018997114697127321,
+      "minus100um_report": "dc-finite-current-nonlinear-vector-minus100um-mesh-control-v1-20261021.json",
+      "minus100um_maximum_total_relative_change": 0.0058146019095809895,
+      "minus100um_maximum_increment_relative_change": 0.0012675258353391705,
+      "scope": "Recorded vector nonlinear current matrix at both explicit lateral PM poses. Scalar spatial, pose-specific domain/quadrature and tighter-opening force checks remain separate."
+    },
     "current_pose_formulation_controls": {
       "plus100um_report": "dc-finite-current-nonlinear-plus100um-formulation-v1-20261021.json",
       "plus100um_maximum_total_relative_difference": 0.012020622079288137,
