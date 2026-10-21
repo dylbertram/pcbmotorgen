@@ -190,6 +190,39 @@ continuous interpolation or componentwise relative accuracy near zero. Its
 archived forces are evidence, never a substitute for live app recalculation.
 Broader supported-geometry qualification and application integration remain open.
 
+### Live-request preparation
+
+The desktop command `prepare_dc_winding_geometry` now serializes the request's
+actual generated or mapped imported routing, terminal choices, copper dimensions,
+explicit layer depths, resistivity settings and checked electrical graph. It
+emits geometry only, not force results or an implicit physical return. Curves,
+splines, IO fan-out, malformed depths and out-of-cap graphs are rejected without
+generated fallback or chord substitution. The IPC client has no browser mock.
+This command does not claim every prepared geometry is numerically qualified.
+
+`dc_request_contract.py` currently admits only exact recorded-case copper/graphs,
+explicit finite return/drive geometry and acknowledged disjoint material placement
+at the sampled current/pose points. It independently recalculates graph currents
+and resistance, checks nominal UI stack settings against the explicit material
+geometry/law, and rejects unsupported changes without rounding/interpolation.
+Eligibility output contains no force. Other source geometries need qualification
+and explicit registration before admission.
+
+`recalculate_dc_request.py --request REQUEST --archive-root EVIDENCE --work NEW_JOB`
+is the restricted offline live-request worker. It pins the accepted aggregate
+case audit, verifies its immutable evidence and validates the actual request
+before launching any numerical job. It may reuse the exact-keyed, audited finite
+current basis and material rule, but recomputes the nonlinear reaction field and
+forces in a fresh job. It does not replay archived forces. Request-content changes
+or failed numerical/source-snapshot checks suppress results. The numerical child
+inherits the outer job's process group so cancellation cannot leave an orphaned
+solve; bounded process-cleanup and stale-content regressions cover that boundary.
+
+The live request is not yet wired to a DC force panel or a desktop numerical-job
+controller. Those UI lifecycle/packaging steps, additional geometry qualification
+and real native-webview interaction remain unperformed. Existing housing and
+periodic-reference UI behavior is unchanged.
+
 Evidence correction: earlier 306-test helper logs included four or five skipped
 tests, not 306 passes. Preserve those logs and historical delivery manifests.
 A fresh explicit NGSolve/PyAMG/Rust-entrypoint run covers the omitted checks.

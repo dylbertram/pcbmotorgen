@@ -23,6 +23,7 @@
 
 pub mod backplane;
 pub mod drive;
+pub mod dc_geometry;
 pub mod magnet_grades;
 pub mod magnetic;
 pub mod params;

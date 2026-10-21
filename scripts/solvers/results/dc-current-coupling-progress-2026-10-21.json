@@ -1,5 +1,5 @@
 {
-  "status": "recorded-actual-case-dc-matrix-verified-broader-geometry-and-app-integration-pending",
+  "status": "recorded-case-verified-live-geometry-and-restricted-fresh-worker-tested-force-ui-pending",
   "goal": "Qualify static DC winding-magnet-shield coupling from actual supported generated/imported geometry, then integrate only qualified capabilities.",
   "archive_root": "$HOME/.local/opt/solver-prototypes-macos",
   "current_branch": "simulation/add-femm-and-improve",
@@ -7,7 +7,7 @@
     "DC03": "User approved35um nominal copper-surface/ferrite clearance without explicit soldermask and moving ferrite/housing together. Derived geometry passes zero-overlap, exact BRep distance, unchanged layer-volume/internal-gap checks. Recorded FE material-volume/interface tagging now passes.",
     "current_source": "All501eligible signed winding sections pass unchanged2%area/5%graph-current gates. Exact affine RT0 export and six-point finite-volume magnetic integration pilot pass. This is recorded-case source evidence, not arbitrary geometry or every local/junction field.",
     "nonlinear_forces": "Recorded actual-case matrix at0,+/-0.1,+/-0.5loop A and nominal/+/-100um PM offsets passes solve, total/incremental balance, spatial/domain/quadrature, tighter source-opening and independent magnetic-formulation gates. Higher-order linear/vacuum controls pass; historical low-order failures remain unchanged. Machine audit verifies37magnetic jobs,185saved current states and44control pairs. This is sampled recorded-case evidence, not general geometry, interpolation or componentwise relative-accuracy qualification.",
-    "app_integration": "Not started; preserve existing housing screening/UI and request lifecycle. Do not expose unqualified coupled outputs."
+    "app_integration": "In progress: production Rust/IPC actual-geometry preparation and exact recorded-case request eligibility implemented; restricted offline live worker recomputes fields/forces rather than replaying archives. Force UI, managed desktop numerical controller, full lifecycle/browser/native interaction and broader geometry qualification remain incomplete. Existing housing screening and merged UI retained."
   },
   "dc03_evidence": {
     "work": "dc03-copper-ferrite-decision-v2-20261021",
@@ -344,7 +344,32 @@
     "seconds": 0.3373176249442622,
     "checks": "Exact job-bound successful receipts, immutable physical input/solution/implementation hashes, common actual current source/model, declared pose/current/basis/rule coverage, finite converged fields and force balance, eligible signed sections, recomputed2%refinement/5%formulation force-vector and current-increment gates. Quadrature normalization uses degree8as reference. Evidence unchanged throughout audit.",
     "scope": "Only enumerated actual geometry/current basis and sampled current/pose points. Vector-norm gates do not imply componentwise relative error bounds, continuous interpolation, every pointwise copper field or arbitrary CAD. Shared prescribed sources are not an independent electrical-current solve.",
-    "app_boundary": "Archived forces must never substitute for live actual-geometry recalculation. App integration is unperformed; original app/housing screening/Mutagen and design files remain unchanged. No push or delivery bundles."
+    "app_boundary": "Archived forces must never substitute for live actual-geometry recalculation. This magnetic audit itself does not qualify app integration; subsequent live-geometry preparation and offline fresh-worker work is recorded below. Housing screening, Mutagen and original designs retained. No push or delivery bundles."
+  },
+  "live_request_integration": {
+    "desktop_command": "prepare_dc_winding_geometry",
+    "command_scope": "Production geometry preparation only from actual generated routing or mapped imported CadBoard. Preserves trace polylines, vias, layer depths, terminal choices, copper weights/plating/resistivity and graph identity. Emits no force or automatic finite return. Curves/splines/IO fanout, malformed depths and oversized graphs are rejected explicitly; no generated/chord/filament fallback.",
+    "client": "Typed prepareDcWindingGeometry IPC with no browser mock; errors propagate. No force UI or desktop numerical-job controller yet.",
+    "eligibility": "dc_request_contract.py independently recalculates graph currents/resistances, exactly compares all actual winding/finite copper/return/drive/material geometry to the registered recorded case, requires explicit placement acknowledgement and sampled currents/poses, and rejects unsupported changes before numerical work. Geometry preparation does not imply magnetic qualification.",
+    "recalculation_worker": "recalculate_dc_request.py pins the registered aggregate-audit SHA and verifies its evidence. Reuses only exact-keyed immutable finite-current basis/material quadrature, not archived forces. Solves the nonlinear magnetic field anew and binds the selected fresh force to request content/hash. No interpolation or fitted correction.",
+    "fresh_result_work": "dc-live-request-roundtrip-v1-20261021/fresh-result-v3",
+    "fresh_result_summary_sha256": "67ee5568c6c5f997eb8cf67905c0866e4a503e8d65a8c1230bb448ca2282b8b3",
+    "fresh_magnetic_seconds": 91.36456724989694,
+    "fresh_current_a": 0.1,
+    "fresh_pose_offset_x_m": 0.0,
+    "live_test_geometry_export": "dc-live-request-roundtrip-v1-20261021/actual-geometry.json is a fresh production Rust serialization of the recorded actual winding data, not a force fixture. Descriptor routing/sim/networks match the qualified physical source. Separate real desktop command tests exercise actual imported geometry and unmapped-import rejection.",
+    "unsupported_request_trials": "dc-live-request-roundtrip-v1-20261021/unapproved-placement.log and changed-copper-depth.log reject before creating numerical result directories; no force fallback.",
+    "stale_and_cancellation_controls": "Fresh content hash checked before parsing and after solve; changed requests suppress forces. Numerical child inherits the outer owned process group so timeout/cancellation stops both worker and solver. Regression covers nested numerical-child cleanup and stale content. Force-panel cancellation/stale browser lifecycle is still unimplemented.",
+    "preserved_trials": "First live request passed on its captured implementation. Fresh-result-v2 rejected implementation drift during the solve and emitted no force. Fresh-result-v3 uses unchanged captured sources and passes. Failed first contract unit trial exposed boolean graph indexing; node indices are now validated explicitly, regression retained.",
+    "test_results": {
+      "python_helpers": "369passed/0skips in30.448s, dc-live-request-all-helpers-v3-20261021.log; includes malformed/unsupported request and inherited-process/stale-content controls. Earlier v2 passed the same369 tests in33.866s.",
+      "rust_simulation": "199unit tests passed,2existing ignored;7integration tests passed. Four new dc_geometry tests passed. Do not call the ignored inventory all-pass.",
+      "rust_desktop_physics": "17passed,4existing ignored; includes2new real imported-geometry command tests. No new ignores introduced.",
+      "frontend_unit": "460passed,1existing skipped across48files;3new DC geometry IPC tests passed. No browser geometry/force mock added.",
+      "browser_regressions": "24housing-motion/periodic-reference Playwright tests passed without skips/flakiness in25.9s across desktop-tauri/desktop-wide projects. These are browser regressions, not native WKWebView or a DC force panel test.",
+      "frontend_build": "pnpm build passed in7.42s; pre-existing large-chunk warning remains. No delivery bundle created."
+    },
+    "remaining": "Managed desktop numerical-job controller and explicit force UI with actual placement/return choices and failure/cancel/stale protections, broader generated/imported physical source qualification, additional live-request/IPC/browser coverage and native interaction. Restricted worker is not a general app capability or hardware/material/thermal/reversal/differential-inductance qualification."
   },
   "historical_evidence_correction": {
     "release_helpers_v1": "306 discovered, 4 skipped, 302 passed; original logs/manifests preserved.",

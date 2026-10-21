@@ -342,14 +342,14 @@ fn builder<'a>(nets: &'a mut BTreeMap<String, Builder>, net: &str) -> &'a mut Bu
 }
 
 /// A picked phase terminal: a trace endpoint on one copper layer [mm].
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
 pub struct TerminalPoint {
     pub layer: u32,
     pub position: Point,
 }
 
 /// The IN (phase terminal) and OUT (star end) of one coil.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
 pub struct TerminalPair {
     pub input: TerminalPoint,
     pub output: TerminalPoint,

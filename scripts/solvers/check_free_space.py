@@ -24,13 +24,14 @@ from job_status import process_identity
 HERE = Path(__file__).resolve().parent
 
 
-def run(command, work, log):
+def run(command, work, log, *, new_process_group=True):
     start = time.monotonic()
     timeout = float(os.environ.get('PCB_MOTOR_SOLVER_TIMEOUT','600'))
     if not math.isfinite(timeout) or timeout <= 0:
         raise ValueError('PCB_MOTOR_SOLVER_TIMEOUT must be positive and finite')
+    owns_group = os.name=='posix' and new_process_group
     receipt = {"command": command, "status": "running", "timeout_seconds": timeout,
-               "cleanup_scope": "owned-posix-process-group" if os.name=='posix' else "single-process-descendants-unqualified"}
+               "cleanup_scope": "owned-posix-process-group" if owns_group else "single-process-in-inherited-group" if os.name=='posix' else "single-process-descendants-unqualified"}
     receipt_path = work / (log+".command.json")
     if (work / log).exists():
         raise FileExistsError('Preserve solver evidence; use a new log name')
@@ -43,7 +44,7 @@ def run(command, work, log):
             child_environment=os.environ.copy()
             child_environment['PCB_MOTOR_COMMAND_RECEIPT']=str(receipt_path.resolve())
             process = subprocess.Popen(command, cwd=work, text=True, stdout=output, stderr=subprocess.STDOUT,
-                                       start_new_session=os.name=='posix',env=child_environment)
+                                       start_new_session=owns_group,env=child_environment)
         except BaseException as error:
             receipt.update(status='spawn-failed',error=str(error),seconds=time.monotonic()-start)
             receipt_path.write_text(json.dumps(receipt, indent=2)+"\n")
@@ -60,7 +61,7 @@ def run(command, work, log):
         receipt['supervisor_pid']=os.getpid()
         receipt['supervisor_identity']=process_identity(os.getpid())
         def terminate_owned_job():
-            if os.name=='posix':
+            if owns_group:
                 try:os.killpg(pid,signal.SIGKILL)
                 except ProcessLookupError:pass
             else:process.kill()

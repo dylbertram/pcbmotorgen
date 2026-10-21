@@ -72,6 +72,7 @@ fn main() {
             commands::physics::compute_friction,
             commands::physics::analyze_drive,
             commands::physics::analyze_housing_motion,
+            commands::physics::prepare_dc_winding_geometry,
             commands::kicad::connect_kicad,
             commands::kicad::write_coils_to_board,
             commands::kicad::write_sensor_to_board,

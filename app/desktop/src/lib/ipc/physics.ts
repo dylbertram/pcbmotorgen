@@ -26,6 +26,7 @@ import type {
 import type { HousingMotionAnalysis } from "../types/drive";
 import { isTauriAvailable } from "./core";
 import type { PeriodicStaticReference } from "../types/periodicReference";
+import type { DcWindingGeometry } from "../types/dcCoupling";
 import {
   mockCoils,
   mockForceSweep,
@@ -120,6 +121,19 @@ export async function analyzeDrive(
     thrustConstantNPerA: kf,
     cadGeometry,
   });
+}
+
+/** Actual winding geometry only, with no browser physics substitute. */
+export async function prepareDcWindingGeometry(
+  config: LinearMotorConfig,
+  driveSettings: DriveSettings,
+  cadGeometry: CadGeometry | null = null,
+): Promise<DcWindingGeometry> {
+  assertCadMapping(cadGeometry, config);
+  if (!isTauriAvailable()) {
+    throw new Error("Finite DC geometry preparation requires the desktop app. Browser previews do not substitute winding geometry or forces.");
+  }
+  return await invoke<DcWindingGeometry>("prepare_dc_winding_geometry", { config, driveSettings, cadGeometry });
 }
 
 /** Independent PM/housing capability. Never fabricates a browser substitute. */

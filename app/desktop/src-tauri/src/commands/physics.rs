@@ -58,6 +58,31 @@ pub async fn compute_height_stack(
 
 static PERIODIC_REFERENCE_JOB: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
+/// Prepare the request's actual copper for finite-DC eligibility checking.
+/// This returns geometry only, never archived forces or implied qualification.
+#[tauri::command]
+pub async fn prepare_dc_winding_geometry(
+    config: LinearMotorConfigIpc,
+    drive_settings: pcbmotorgen_simulation::drive::DriveSettings,
+    cad_geometry: Option<pcbmotorgen_export::cad_dxf::CadGeometry>,
+) -> Result<serde_json::Value, String> {
+    let core = config.to_core();
+    core.validate().map_err(|error| error.to_string())?;
+    tauri::async_runtime::spawn_blocking(move || {
+        let (routing, sim, hints) = if let Some(cad) = cad_geometry.as_ref() {
+            let board = super::cad_source::CadBoard::new(cad, &core)?;
+            let sim = board.simulation_input(cad, &core);
+            let hints = super::cad_source::CadBoard::drive_hints(cad);
+            (board.routing, sim, hints)
+        } else {
+            let routing = pcbmotorgen_routing::generate_routing_result(
+                &core.routing_context(), &core.routing_pattern_id()).map_err(|error| error.to_string())?;
+            (routing, core.to_simulation(), Default::default())
+        };
+        pcbmotorgen_simulation::dc_geometry::snapshot(&sim, &routing, &drive_settings, &hints)
+    }).await.map_err(|error| format!("DC geometry worker failed: {error}"))?
+}
+
 /// PM-induced housing loss does not depend on electrical-driver compatibility.
 /// Validate physical geometry/depths, but do not run a coil-current/driver solve.
 #[tauri::command]
@@ -989,6 +1014,29 @@ mod cad_source_tests {
         let err = tauri::async_runtime::block_on(evaluate_force_sweep(ipc, Some(cad), Some(Default::default())))
             .expect_err("unmapped");
         assert!(err.contains("coil A"), "{err}");
+    }
+
+    #[test]
+    fn dc_geometry_command_preserves_actual_imported_depths_and_has_no_force_result() {
+        let (ipc, mut cad) = exported_default();
+        for phase in ["A", "B", "C"] { cad.coil_phases.insert(format!("coil {phase}"), phase.into()); }
+        let original = serde_json::to_value(&cad).unwrap();
+        let result = tauri::async_runtime::block_on(prepare_dc_winding_geometry(
+            ipc, Default::default(), Some(cad.clone()))).expect("actual imported geometry");
+        let hints = crate::commands::cad_source::CadBoard::drive_hints(&cad);
+        assert_eq!(result["geometry_hints"]["layer_z_m"], serde_json::json!(hints.layer_z_m));
+        assert_eq!(serde_json::to_value(&cad).unwrap(), original);
+        assert_eq!(result["schema"], "finite-dc-winding-geometry-v1");
+        assert!(result.get("force_n").is_none());
+        assert!(result.get("return_path_m").is_none());
+    }
+
+    #[test]
+    fn dc_geometry_command_rejects_unmapped_imports_without_generated_fallback() {
+        let (ipc, cad) = exported_default();
+        let error = tauri::async_runtime::block_on(prepare_dc_winding_geometry(
+            ipc, Default::default(), Some(cad))).unwrap_err();
+        assert!(error.contains("coil A"), "{error}");
     }
 
     #[test]

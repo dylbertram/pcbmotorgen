@@ -13,6 +13,19 @@ from job_status import process_identity
 
 
 class SolverProcessTest(unittest.TestCase):
+    @unittest.skipUnless(sys.platform in ['linux','darwin'],'POSIX inherited live-job cancellation')
+    def test_outer_live_job_timeout_also_stops_nested_numerical_child(self):
+        with tempfile.TemporaryDirectory() as directory,patch.dict(os.environ,{'PCB_MOTOR_SOLVER_TIMEOUT':'1.5'}):
+            work=Path(directory)
+            numerical='import os,time; from pathlib import Path; Path("numerical.pid").write_text(str(os.getpid())); time.sleep(60)'
+            worker=(f'import sys,os; from pathlib import Path; sys.path.insert(0,{str(Path(__file__).resolve().parent)!r}); '
+                    f'from check_free_space import run; os.environ["PCB_MOTOR_SOLVER_TIMEOUT"]="60"; '
+                    f'run([sys.executable,"-c",{numerical!r}],Path.cwd(),"inner.log",new_process_group=False)')
+            with self.assertRaisesRegex(RuntimeError,'timed out'):
+                run([sys.executable,'-c',worker],work,'outer.log')
+            self.assertTrue((work/'numerical.pid').exists())
+            self.assert_stopped(int((work/'numerical.pid').read_text()))
+
     def test_duplicate_job_cannot_overwrite_completed_receipt_or_log(self):
         with tempfile.TemporaryDirectory() as directory:
             work=Path(directory)

@@ -7,6 +7,7 @@
 //! |-------------------------------|---------------|------------------------------------------|
 //! | `get_magnet_grades`           | REAL          | Reads core `magnet_grades::MAGNET_GRADES`.|
 //! | `compute_height_stack`        | REAL          | Uses core `HeightStackCalculator`.       |
+//! | `prepare_dc_winding_geometry` | REAL (pure)   | Actual routed copper/terminal/depth snapshot only; no force or return substitution. |
 //! | `generate_coils`              | REAL          | Resolves the selected routing pattern and returns geometry plus dimensions. |
 //! | `evaluate_force_sweep`        | REAL          | Uses core `ForceEvaluator` (Lorentz).    |
 //! | `compute_friction`            | REAL          | Uses core `FrictionEstimator`.           |
