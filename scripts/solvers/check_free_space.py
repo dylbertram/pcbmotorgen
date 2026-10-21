@@ -24,12 +24,19 @@ from job_status import process_identity
 HERE = Path(__file__).resolve().parent
 
 
-def run(command, work, log, *, new_process_group=True):
+def run(command, work, log, *, new_process_group=True, memory_limit_bytes=None):
     start = time.monotonic()
     timeout = float(os.environ.get('PCB_MOTOR_SOLVER_TIMEOUT','600'))
     if not math.isfinite(timeout) or timeout <= 0:
         raise ValueError('PCB_MOTOR_SOLVER_TIMEOUT must be positive and finite')
     owns_group = os.name=='posix' and new_process_group
+    memory_exception=()
+    if memory_limit_bytes is not None:
+        import sys
+        if type(memory_limit_bytes) is not int or memory_limit_bytes<=0 or not owns_group or sys.platform!='darwin':
+            raise ValueError('Native memory guard needs a positive integer byte budget and an owned macOS process group')
+        from solver_memory_budget import MemoryBudgetExceeded,wait_guarded
+        memory_exception=MemoryBudgetExceeded
     receipt = {"command": command, "status": "running", "timeout_seconds": timeout,
                "cleanup_scope": "owned-posix-process-group" if owns_group else "single-process-in-inherited-group" if os.name=='posix' else "single-process-descendants-unqualified"}
     receipt_path = work / (log+".command.json")
@@ -73,7 +80,20 @@ def run(command, work, log, *, new_process_group=True):
             previous_term=signal.signal(signal.SIGTERM,cancelled)
         try:
             receipt_path.write_text(json.dumps(receipt, indent=2)+"\n")
-            code = process.wait(timeout=timeout)
+            if memory_limit_bytes is None:
+                code = process.wait(timeout=timeout)
+            else:
+                receipt['native_memory_limit_bytes']=memory_limit_bytes
+                def memory_sample(value):
+                    path=receipt_path.with_suffix('.memory.json');temporary=path.with_suffix('.partial')
+                    temporary.write_text(json.dumps(value,indent=2)+'\n');temporary.replace(path)
+                code=wait_guarded(process,timeout,memory_limit_bytes,memory_sample)
+        except memory_exception as error:
+            terminate_owned_job()
+            output.write(f'\nFAILED: solver native memory budget exceeded: {error}\n')
+            receipt.update(status='memory-limit',error=str(error),seconds=time.monotonic()-start,native_memory_limit_bytes=memory_limit_bytes)
+            receipt_path.write_text(json.dumps(receipt,indent=2)+'\n')
+            raise RuntimeError(f'Solver native memory budget exceeded; see {work / log}') from error
         except subprocess.TimeoutExpired as error:
             terminate_owned_job()
             output.write(f"\nFAILED: solver timeout after {timeout:g} seconds\n")

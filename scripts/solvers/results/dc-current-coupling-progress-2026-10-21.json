@@ -497,7 +497,33 @@
         "max_dofs_before_assembly": 12000000,
         "reason": "Measured native meshing exceeded1800s; user approved12h compute window. Source/CAD/drive/mesh-size/curvature and gates unchanged. No files or failed fields imported from timed-out jobs. Launch explicitly checked three-hour budget fits before2026-10-22T06:53:31Z.",
         "watcher": "long-mesh-watch caught the pre-assembly resource-cap failure at19:57:22Z. Original background completion notification also received; no idle hours after failure.",
-        "next_area_audit": "dc-imported-star4-curvature4-all-section-areas-v1-20261021.json now running with3600s bound and30s refined-area-watch. Audits all1511existing eligible active/passive/native-arc/full-stub areas before any decision to increase assembly cap. Actual18.18M-DOF solve memory is not measured; previous coarse current jobs and refined mesh peak footprint are not a proof it fits24GiB RAM."
+        "area_audit": {
+          "report": "dc-imported-star4-curvature4-all-section-areas-v1-20261021.json",
+          "sha256": "786b95dfa90533b98837cefc07cfad012912c525a01182459a7c122a31eb7125",
+          "status": "passed-mesh-only-section-areas",
+          "sections": 1511,
+          "failures": 0,
+          "worst_relative_area_error": 0.01079026816641493,
+          "worst_label": "via:C:361",
+          "gate": 0.02,
+          "seconds": 1254.7946737500606,
+          "wall_seconds": 1256.45,
+          "max_rss_bytes": 4312612864,
+          "peak_memory_footprint_bytes": 5695345536,
+          "scope": "All existing eligible active/passive/native-arc/full-stub geometric section areas pass on exact refined mesh. Finished receipt, original physical inputs and archived implementation hashes verified. Resolves all59coarse-area failures numerically without physical edits, but no current/force acceptance. refined-area-watch caught successful completion at20:18:23Z."
+        },
+        "fresh_refined_dc_pending": {
+          "work": "dc-imported-star4-curvature4-dc-v1-20261021",
+          "max_dofs_before_assembly": 19000000,
+          "timeout_s": 7200,
+          "threads": 2,
+          "pressure_solver": "amg",
+          "physical_footprint_limit_bytes": 19327352832,
+          "memory_sample_interval_s": 1,
+          "memory_guard_evidence": "dc-imported-star4-curvature4-dc-v1-20261021-guard/guard.json",
+          "scope": "Fresh electrical assembly/solve on exact byte-copied refined mesh via existing guarded pre-assembly checkpoint path. No previous fields. Numerical DOF budget increased after all1511area checks passed. Actual current memory unmeasured at launch; opt-in native physical-footprint guard stops owned group above18GiB on24GiB machine. This is sampled protection, not guaranteed allocation enforcement. Other numerical gates remain unchanged.",
+          "watcher": "refined-dc-watch checks errors/ends/stale identity or low-CPU stalls every30s. New memory-limit receipt status is explicitly recognized; original job completion notification also enabled. Two-hour budget verified within approved window."
+        }
       }
     },
     "preserved_trials": [
@@ -507,7 +533,7 @@
       "dc-imported-star4-exact-copper-v3: completed exact Boolean CAD in89.155s but failed final validation on a string/Path report bug. New v4 uses verified geometry checkpoint only, reruns all bindings/reload checks; v3 stays failed."
     ],
     "test_results": {
-      "python_helpers": "393passed/0skips in30.777s, dc-imported-mesh-area-preassembly-all-helpers-v2-20261021.log. Includes pre-assembly mesh-only area gate/checkpoint bindings and finite barrel numerical regression, saved resistivity/potential provenance, bounded algebraic corrections, retained CAD byte/material/volume/drive identity and mesh checkpoint reuse, analytic unit-EMF gauge identity and full compatible-current ring regression, plus existing raw via/arc/current controls. Watcher suite separately7passed in0.005s. Earlier392/390/388/387/386test inventories retained.",
+      "python_helpers": "396passed/0skips in30.249s, dc-native-memory-guard-all-helpers-v1-20261021.log. Includes opt-in native physical-footprint probe, sample/peak control and actual owned-group termination on budget failure, default runner regression, plus existing pre-assembly area/checkpoint/finite-barrel, primal, retained-CAD, gauge and raw source controls. Earlier393/392/390/388/387/386test inventories retained.",
       "rust_simulation": "199unit+7integration passed,2existing ignored; dc-imported-qualification-rust-simulation-v1-20261021.log. Production circular rejection and separate exact-primitive QA snapshot preservation tested.",
       "rust_desktop": "113passed/7ignored in42.08s, dc-imported-qualification-rust-desktop-v1-20261021.log. New external-project export test separately run1passed/0ignored; ignored in ordinary runs because it needs user source/pinned installation. No native-webview qualification.",
       "browser": "36DC/housing/periodic lifecycle regressions pass without skips in34.6s, dc-imported-geometry-browser-regressions-v1-20261021/report.json. UI fixtures only, not imported numerical-source acceptance.",

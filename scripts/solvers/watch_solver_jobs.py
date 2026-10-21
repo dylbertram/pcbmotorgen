@@ -21,7 +21,7 @@ from source_snapshot import capture
 
 ERRORS=['Traceback (most recent call last):','FAILED:','Error   :','DIVERGED_',
     'ERROR::','NOT CONVERGED','Segmentation fault','SIGBUS']
-FAILURES=['failed','timeout','interrupted','spawn-failed','invalid-process-handle']
+FAILURES=['failed','timeout','interrupted','spawn-failed','invalid-process-handle','memory-limit']
 
 
 def process_table():

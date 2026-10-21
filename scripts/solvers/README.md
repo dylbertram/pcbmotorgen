@@ -383,6 +383,26 @@ longer budgets must fit its remaining time. The first retained-CAD mesh retry
 keeps its original 1800 s launch-time bound. Watcher observations never qualify
 a mesh, source or force result.
 
+The long imported curvature4 mesh finished in 2817 s but correctly stopped at
+the original 12-million-DOF pre-assembly cap. Its saved mesh contains 5,433,450
+tetrahedra and an estimated 18,182,843 mixed DOFs. Global volume error is 0.1443%.
+The subsequent mesh-only audit passes all 1511 existing section areas, with a
+worst error of 1.0790%, under the unchanged 2% gate. This resolves the coarse
+area failures without changing physical copper, but does not qualify a current
+field. Only verified mesh/CAD inputs, never a failed field, feed the next solve.
+
+The fresh refined solve has an explicit 19-million-DOF budget, a two-hour
+whole-job timeout and a separate completion/error watcher. It also opts into
+`check_free_space.run(..., memory_limit_bytes=18*1024**3)`. This samples the sum
+of native macOS `proc_pid_rusage` physical footprint in the owned POSIX group
+every second. It records current/peak memory separately and kills only that
+owned group on a budget breach, preserving a `memory-limit` receipt and log.
+RSS is not silently substituted for footprint. The default runner is unchanged
+unless the caller supplies this option. This sampled guard is not a kernel
+allocation guarantee; its budget leaves 6 GiB outside the solver on the 24 GiB
+host. A real subprocess regression verifies the failure/cleanup path. The
+refined electrical result and actual solve memory remain pending.
+
 Evidence correction: earlier 306-test helper logs included four or five skipped
 tests, not 306 passes. Preserve those logs and historical delivery manifests.
 A fresh explicit NGSolve/PyAMG/Rust-entrypoint run covers the omitted checks.
