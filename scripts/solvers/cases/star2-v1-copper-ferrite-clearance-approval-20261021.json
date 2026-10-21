@@ -1,0 +1,17 @@
+{
+  "status": "user-approved-derived-geometry",
+  "source_project_sha256": "0ed215f6ff403b927dbeac1ea3d4d9587489a1f1c0680e4ce3a2a48658475d82",
+  "source_version_index": 1,
+  "copper_to_ferrite_clearance_m": 0.000035,
+  "clearance_interpretation": "Geometric separation from the lowest finite copper surface to the upper ferrite surface; no explicit soldermask region.",
+  "clearance_precision": "User supplied roughly35um;35um is the declared nominal study input, not a measured manufacturing tolerance.",
+  "move_policy": "translate-entire-backplane-stack-downward",
+  "preserve_copper": true,
+  "preserve_magnets": true,
+  "preserve_layer_thicknesses": true,
+  "preserve_internal_stack_gaps": true,
+  "preserve_root_files": true,
+  "user_construction_note": "The distance should be the height of soldermask. However, we will leave the soldermask out of the calculation. So the ferrite should not intersect with the copper and should have a gap of roughly35um.",
+  "user_placement_confirmation": "Move ferrite and housing",
+  "scope": "Approved derived geometry for the recorded saved case; not an automatic correction policy for other designs or qualified coupled physics."
+}

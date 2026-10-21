@@ -18,12 +18,21 @@ separately from nominal physical layer extents.
 
 The recorded two-layer case has 35 µm copper centered at the nominal PCB-bottom
 plane and a ferrite envelope ending at that plane. Their exact intersection is
-2.090425 mm³; nominal penetration is 17.5 µm. A physical decision is required:
-place a flat sheet below the copper with an explicitly approved clearance,
-confirm real ferrite recesses around the copper, or supply corrected layer-depth
-semantics/design geometry. No option is applied automatically. The next coupling
-work remains blocked on this decision; current-source controls may proceed
-independently. Do not reuse the old provisional ferrite law as a hardware rating.
+2.090425 mm³; nominal penetration is 17.5 µm. No option is applied automatically.
+The user subsequently approved 35 µm nominal copper-surface-to-ferrite clearance,
+omitting an explicit soldermask region, and moving ferrite and housing together
+to preserve their 100 µm gap. The recorded approval is
+`cases/star2-v1-copper-ferrite-clearance-approval-20261021.json`.
+`derive_copper_clearance_model.py --geometry-work ACCEPTED_GEOMETRY --current-work ACCEPTED_CURRENT --approval APPROVAL_JSON --work NEW_DERIVED_STUDY`
+constructs that explicitly derived model without changing the copper, PMs or
+original files. BRep booleans check zero overlap and exact minimum distances
+for both original copper and the closed-return current-source copper. It also
+checks unchanged layer volumes and internal spacing. The approved whole-stack
+translation is 52.5 µm downward; ferrite top becomes Z=-52.5 µm and housing top
+Z=-352.5 µm in the nominal PCB-bottom frame. The 35 µm is a nominal study input,
+not a measured manufacturing tolerance or thermal model. FE interface tagging,
+source coverage and coupled-field controls still require qualification.
+Do not reuse the old provisional ferrite law as a hardware rating.
 
 Evidence correction: earlier 306-test helper logs included four or five skipped
 tests, not 306 passes. Preserve those logs and historical delivery manifests.

@@ -1,12 +1,12 @@
 {
-  "status": "dc03-physical-decision-required",
+  "status": "approved-disjoint-geometry-current-source-qualification-pending",
   "goal": "Qualify static DC winding-magnet-shield coupling from actual supported generated/imported geometry, then integrate only qualified capabilities.",
   "archive_root": "$HOME/.local/opt/solver-prototypes-macos",
   "current_branch": "simulation/add-femm-and-improve",
   "priorities": {
-    "DC03": "Exact overlap reproduced and visualized; awaiting explicit physical decision before any geometry/material changes.",
+    "DC03": "User approved35um nominal copper-surface/ferrite clearance without explicit soldermask and moving ferrite/housing together. Derived geometry passes zero-overlap, exact BRep distance, unchanged layer-volume/internal-gap checks. FE interface tagging still pending.",
     "current_source": "Existing recorded compatible HDiv source/global/current/area controls and recent coarse spatial-loss controls retained; broader branch/local-current qualification remains incomplete.",
-    "nonlinear_forces": "Not started under the new goal; waits for mutually exclusive approved materials and source qualification. Preserve zero-current/linear limits, force balance, 2% refinement and 5% independent-reference gates with explicit floors.",
+    "nonlinear_forces": "Not started under the new goal; approved disjoint geometry is available, but source qualification and coupled FE interface/field controls remain. Preserve zero-current/linear limits, force balance, 2% refinement and 5% independent-reference gates with explicit floors.",
     "app_integration": "Not started; preserve existing housing screening/UI and request lifecycle. Do not expose unqualified coupled outputs."
   },
   "dc03_evidence": {
@@ -24,17 +24,29 @@
     "picture": "layer_0-overlap.png",
     "picture_limit": "Saved intersecting-layer copper projection is a location aid; exact volume comes from the BRep boolean. OCCT bounding-box padding is not physical penetration."
   },
-  "approval_options": [
-    "Flat ferrite below unchanged copper: explicitly approve whole backplane-stack displacement and physical copper-to-ferrite clearance. Nominal contact-only displacement candidate is 17.5um, not an invented insulating gap.",
-    "Real relieved ferrite: explicitly confirm copper-shaped recesses so a derived mutually exclusive magnetic region can preserve copper and the nominal outer ferrite envelope.",
-    "Corrected design/depth convention: supply or approve the actual layer-depth specification before changing any centreplanes."
-  ],
+  "approved_derived_geometry": {
+    "approval": "scripts/solvers/cases/star2-v1-copper-ferrite-clearance-approval-20261021.json",
+    "work": "dc03-approved-35um-clearance-v1-20261021",
+    "clearance_um": 35,
+    "soldermask_region": "Omitted by user instruction; geometric clearance retained.",
+    "whole_backplane_translation_um": -52.5,
+    "derived_ferrite_z_um": [-252.5, -52.5],
+    "derived_housing_z_um": [-1352.5, -352.5],
+    "exact_brep_copper_ferrite_distance_m": 0.000034999999999999956,
+    "exact_brep_copper_housing_distance_m": 0.0003349999999999999,
+    "exact_brep_ferrite_housing_distance_m": 0.00009999999999999994,
+    "all_tested_material_overlap_m3": 0,
+    "copper_magnets_layer_volumes_and_internal_gaps_preserved": true,
+    "original_files_unchanged": true,
+    "scope": "Geometry approval/verification only, not coupled-field or hardware qualification."
+  },
   "historical_evidence_correction": {
     "release_helpers_v1": "306 discovered, 4 skipped, 302 passed; original logs/manifests preserved.",
     "release_helpers_v3": "306 discovered, 5 skipped, 301 passed; original logs/manifests preserved.",
     "new_helpers_v2": "311 discovered, 4 skipped, 307 passed; missing explicit Rust-entrypoint environment, retained as incomplete coverage.",
     "new_helpers_v3": "311 passed with no skips using explicit Rust-entrypoint/NGSolve/PyAMG environment; further inventory-verifier regression tests added afterward.",
     "new_helpers_v4": "314 passed with no skips in27.911s; whole command receipt completed exit0 in dc-coupling-overlap-all-helpers-v4-20261021.log.command.json. Application source files and five original root inputs remain byte-identical to the accepted release.",
+    "approved_clearance_helpers": "318 passed with no skips in27.782s, dc03-approved-clearance-all-helpers-v1-20261021.log. Approved derived geometry summary SHA321e909cda1b95f0c6a06fba419f6b1493d90767278d9127ea10e032c245fbd4. No magnetic field solve has yet been performed for this geometry.",
     "guard": "Packaging verifier now rejects skipped/partial/failed unittest logs as a declared all-pass inventory. No further delivery bundling."
   },
   "preserved_trials": [
