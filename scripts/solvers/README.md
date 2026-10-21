@@ -152,6 +152,27 @@ still fails at 14.76% total and 6.694% current-induced change. Agreement alone d
 not override that unconverged linear control. The degree-6 material source cache
 passes in 251.9 s and enables a separate degree-6/8 coupled force comparison.
 
+Subsequent physical-mesh refinement passes at the selected higher linear orders
+and at the nonlinear orders in both magnetic formulations. Refined scalar/vector
+current-induced force differences are 0.0691% linear and 0.0281% nonlinear. The
+40/60 mm domain comparisons and degree-6/8 linear force quadrature controls also
+pass their unchanged gates. These are nominal-pose, recorded-source controls;
+they do not qualify arbitrary geometry or current-driven mover poses.
+
+`finite_current_pose_force.py` builds new bare-current force references for
+0 and +/-100 um lateral PM positions from every archived affine RT0 cell, with
+independent copper-Lorentz and PM-face kernels. Its runtime preflight is timing
+only, not an accepted partial source. Volume checks distinguish strict mesh reload
+from the existing mesh/CAD geometry check: the first attempt incorrectly used
+CAD volume as the strict reload reference and is preserved as failed. Both gates
+remain unchanged at 1e-9 reload and 2% geometry agreement.
+`finite_current_pose_inputs.py` rejects partial, stale, wrong-pose, failed-control
+or incorrectly normalized references. Coupled `--pm-offset-x` requires the exact
+pose bias baseline and `--pose-reference-work`; it never replays nominal bare
+force at another pose. Current-only quadrature storage is reusable only because
+the copper/material observation geometry is unchanged and the PM source is
+recomputed for each explicit pose. Application integration remains gated.
+
 Evidence correction: earlier 306-test helper logs included four or five skipped
 tests, not 306 passes. Preserve those logs and historical delivery manifests.
 A fresh explicit NGSolve/PyAMG/Rust-entrypoint run covers the omitted checks.

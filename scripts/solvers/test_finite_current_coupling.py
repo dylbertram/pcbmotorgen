@@ -15,6 +15,25 @@ class FiniteCurrentCouplingInputTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             cache_mesh_path(cache, bias)
 
+    def test_cache_can_consume_exact_mesh_produced_by_accepted_bias_job(self):
+        cache = {'model': {'case': 'actual'}, 'mesh_work': '/case/bias',
+                 'input_hashes': {'/case/bias/mesh.vol': 'produced-mesh'}}
+        bias = {'model': cache['model'], 'mesh_sha256': 'produced-mesh', 'input_hashes': {}}
+        self.assertEqual(str(cache_mesh_path(cache, bias, '/case/bias')), '/case/bias/mesh.vol')
+        with self.assertRaises(ValueError):
+            cache_mesh_path(cache, bias, '/case/different-bias')
+        bias['mesh_sha256'] = 'changed'
+        with self.assertRaises(ValueError):
+            cache_mesh_path(cache, bias, '/case/bias')
+
+    def test_pose_requires_explicit_expected_baseline_model(self):
+        cache = {'model': {'pose': 0.}, 'mesh_work': '/case/original',
+                 'input_hashes': {'/case/original/mesh.vol': 'immutable-original'}}
+        bias = {'model': {'pose': .0001}, 'input_hashes': dict(cache['input_hashes'])}
+        with self.assertRaises(ValueError):
+            cache_mesh_path(cache, bias)
+        self.assertEqual(str(cache_mesh_path(cache, bias, requested_model={'pose': .0001})), '/case/original/mesh.vol')
+
     def cache(self):
         return dict(status='passed-finite-source-material-quadrature-only', failures=[], unit=CACHE_UNIT,
                     evaluated_points=100, total_material_points=100,

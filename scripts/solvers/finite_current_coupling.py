@@ -17,7 +17,8 @@ import numpy as np
 
 from compare_reduced_fields import completed_receipt
 from finite_current_quadrature import check_rules, material_layout, source_components, weighted_rule_values
-from finite_current_zero_bias import magnetic_regions, reaction_form
+from finite_current_zero_bias import magnetic_regions, reaction_form, posed_model
+from finite_current_pose_inputs import pose_forces
 from finite_current_scalar import scalar_form, magnetization_h
 from ngsolve_material_motion import translated_source
 from pm_current_force import array_magnetization_force
@@ -60,13 +61,17 @@ def current_pairs(currents):
     return sorted({abs(x) for x in currents if x > 0 and -x in currents})
 
 
-def cache_mesh_path(cache, bias):
+def cache_mesh_path(cache, bias, bias_work=None, requested_model=None):
     path = str(Path(cache['mesh_work'])/'mesh.vol')
     # Netgen reserialization can change bytes without changing a loaded mesh.
     # Require the exact original mesh hash consumed by BOTH accepted jobs, and
     # load that original again. Do not infer identity from counts or geometry.
     digest = cache['input_hashes'].get(path)
-    if cache['model'] != bias['model'] or not digest or bias['input_hashes'].get(path) != digest:
+    consumed = bias['input_hashes'].get(path) == digest
+    produced = (bias_work is not None and Path(path) == Path(bias_work)/'mesh.vol'
+                and digest == bias.get('mesh_sha256'))
+    expected_model = cache['model'] if requested_model is None else requested_model
+    if expected_model != bias['model'] or not digest or not (consumed or produced):
         raise ValueError('Current cache and zero-current bias did not consume the same immutable mesh/model')
     return Path(path)
 
@@ -82,6 +87,8 @@ def main():
     parser.add_argument('--formulation', choices=['vector-b', 'scalar-h'], default='vector-b')
     parser.add_argument('--scalar-order', type=int, choices=[1, 2, 3], default=2)
     parser.add_argument('--vector-order', type=int, choices=[0, 1, 2])
+    parser.add_argument('--pm-offset-x', type=float, default=0.)
+    parser.add_argument('--pose-reference-work', type=Path)
     parser.add_argument('--max-dofs', type=int, default=200000)
     add_thread_option(parser)
     args = parser.parse_args()
@@ -107,7 +114,10 @@ def main():
         raise ValueError('Unaccepted actual finite current source')
     origin = Path(source['source_work'])
     original = json.loads((origin/'summary.json').read_text())
-    original_mesh = cache_mesh_path(cache, bias)
+    requested_model = posed_model(cache['model'], args.pm_offset_x)
+    if args.pm_offset_x and args.pose_reference_work is None:
+        raise ValueError('Shifted PMs require their own accepted finite-current bare-force reference')
+    original_mesh = cache_mesh_path(cache, bias, bias_work, requested_model)
     if bare['source_work'] != str(origin) or bare['source_summary_sha256'] != source['input_hashes'][str(origin/'summary.json')] or bare['source_solution_sha256'] != source['input_hashes'][str(origin/'dc-current-potential.sol')]:
         raise ValueError('Bare PM force belongs to a different physical winding current')
     # Reuse only an exactly matched source/pose, not a similarly named fixture.
@@ -123,6 +133,20 @@ def main():
               str(bare_path): sha(bare_path), str(models[0]): bare['model_summary_sha256'],
               str(source_work/'summary.json'): sha(source_work/'summary.json'),
               **source['input_hashes'], **cache['input_hashes']}
+    pose_values = None
+    if args.pose_reference_work:
+        pose_path = args.pose_reference_work.resolve()/'summary.json'
+        reference = json.loads(pose_path.read_text())
+        if not reference.get('command_receipt'):
+            raise ValueError('Whole successful pose-force receipt required')
+        completed_receipt(reference)
+        _, pose_pm, pose_copper = pose_forces(cache, bias, reference, args.pm_offset_x,
+            sha(source_work/'summary.json'), source['effective_loop_current_a'])
+        pose_values = pose_pm, pose_copper
+        if any(path in inputs and inputs[path] != digest for path, digest in reference['input_hashes'].items()):
+            raise ValueError('Bare-pose reference conflicts with immutable coupling input hashes')
+        inputs.update(reference['input_hashes'])
+        inputs[str(pose_path)] = sha(pose_path)
     for path, digest in inputs.items():
         if sha(Path(path)) != digest:
             raise ValueError('Immutable coupling input changed')
@@ -133,11 +157,13 @@ def main():
     loop = source['effective_loop_current_a']
     direct_pm = np.asarray(direct['pm_array_force_n'])/loop
     direct_copper = np.asarray(direct['copper_source_force_n'])/loop
+    if pose_values is not None:
+        direct_pm, direct_copper = pose_values
     import ngsolve as ng
     from ngsolve.nonlinearsolvers import NewtonMinimization
     if source['version'] != ng.__version__ or bias['version'] != ng.__version__:
         raise ValueError('Coupling engine differs from accepted source/bias')
-    model = control_model(cache['model'], args.mode)
+    model = control_model(requested_model, args.mode)
     mesh = ng.Mesh(str(original_mesh))
     degree = cache['request']['degree']
     order = bias['request']['order'] if args.vector_order is None else args.vector_order
@@ -164,6 +190,7 @@ def main():
     report = {'status': 'running', 'scope': __doc__, 'model': model, 'base_model': cache['model'], 'material_control': args.mode,
               'version': ng.__version__, 'execution': runtime_metadata(), 'input_hashes': inputs,
               'formulation': args.formulation, 'field_order': order if args.formulation == 'vector-b' else args.scalar_order,
+              'pm_offset_x_m': args.pm_offset_x,
               'currents_a': args.currents, 'current_pairs_a': pairs, 'dofs': space.ndof, 'tree_fixed_edges': tree_count,
               'degree': degree, 'source_storage': storage, 'states': {}, 'incremental_balance': {}, 'failures': [],
               'scope_limits': ['Recorded actual geometry/source/pose only; no arbitrary-CAD qualification',
@@ -172,7 +199,7 @@ def main():
                   'Stationary-force balance is combined winding+shield, not separately qualified body forces',
                   'No differential inductance, reversal, temperature, housing eddy loss or hardware rating'],
               'source_snapshots': capture(work, [Path(__file__), *[Path(__file__).with_name(n) for n in
-                   ['finite_current_zero_bias.py', 'finite_current_scalar.py', 'ngsolve_reduced.py', 'finite_current_quadrature.py', 'ngsolve_material_motion.py',
+                   ['finite_current_zero_bias.py', 'finite_current_pose_inputs.py', 'finite_current_scalar.py', 'ngsolve_reduced.py', 'finite_current_quadrature.py', 'ngsolve_material_motion.py',
                    'vector_material.py', 'tree_gauge.py', 'pm_current_force.py', 'volume_field_quadrature.py']]])}
     if os.environ.get('PCB_MOTOR_COMMAND_RECEIPT'):
         report['command_receipt'] = os.environ['PCB_MOTOR_COMMAND_RECEIPT']
