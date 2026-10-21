@@ -117,7 +117,7 @@
       "maximum_relative_storage_error": 5.9294610389669935e-15,
       "scope": "Exact physical material quadrature only; immutable snapshots and whole receipt passed. Acceleration checked against direct finite-cell fields at64declared points; not an independent current solve or force-convergence claim."
     },
-    "refined_material_preflight": "71070points, forecast1991.688s; passed2%/5%gates. Refined full cache launched under2400s cap.",
+    "refined_material_preflight": "71070points, forecast1991.688s; passed2%/5%gates. Full refined cache passed in709.119s under2400s cap, max pointwise opening change0.018800067783284708 and direct-reference difference0.0007672543843862286. Work dc-source-material-cache-refined-v1-20261021.",
     "degree10_preflight": "207360points, forecast5986.242s; passed2%/5%gates. Full degree10cache not yet launched.",
     "helper_verification": "343tests passed, zero skips,34.327s in dc-native-rule-repair-all-helpers-v1-20261021.log.",
     "remaining": "Whole accepted full-material cache, vacuum/linear/nonlinear current states, mover poses, source/force quadrature and mesh/domain refinement, independent magnetic formulation, supported geometry coverage and app integration."
@@ -182,6 +182,7 @@
       "scope": "Higher-order magnetic formulations agree, but the2%linear refinement gate is not established. Continue physical mesh/basis controls with unchanged parameters and source."
     },
     "vector_works": ["dc-finite-current-linear-vector-v2-20261021", "dc-finite-current-nonlinear-vector-v2-20261021"],
+    "refined_matrices_running": "Nonlinear vector/scalar and linear vector-order2/scalar-order3 on the accepted refined material mesh/source cache. Vector per-job cap480s, scalar600s based on prior114.660s/236.186s nonlinear runtimes and increased material-point/DOF count. None yet counted as accepted spatial force refinement.",
     "degree6_source_control": "Full degree6cache passed in251.877s under900s cap after672.771s forecast. Nonlinear vector degree6matrix and degree6/8force comparison passed. Degree10full-cache work remains unperformed, not silently counted.",
     "nonlinear_quadrature_control": {
       "report": "dc-finite-current-nonlinear-degree6-8-control-v1-20261021.json",
