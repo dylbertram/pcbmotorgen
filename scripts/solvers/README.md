@@ -409,16 +409,34 @@ unproven without an observed session. No new delivery bundle is produced.
 
 In **Simulate**, choose **3D fields & heat** to use the existing orbitable
 viewer. Its overlay selector offers Off, Magnetic fields, Copper heat/loss,
-and both. Layer/phase visibility, true-scale copper, camera reset and the
-display-only Z multiplier remain available. Changing Z or opacity does not
-resample physical data. Legends state the units and model limits.
+and both. The default field view is **Lines + slice**. Field lines follow the
+native XYZ vector grid, with magnitude colors and direction cues; a filled XZ
+slice shows the norm of the interpolated vector. **XZ field section** turns the
+camera square to that plane. The Y-slice control moves the slice and seed plane
+through the sampled volume. Lines may leave that plane as they follow the full
+3D vector. Field lines, magnitude slice and original sample arrows can also be
+selected separately. Layer/phase visibility, true-scale copper, camera reset and
+the display-only Z multiplier remain available. Changing Z, opacity, field
+style, section camera or Y slice does not resample physical data. Legends state
+the units and model limits. On narrow screens, settings and detailed legends
+collapse independently to leave the copper visible. PM-only scope and loss
+units remain visible, and loading/failure messages do not require expanding a
+legend.
 
 `sample_simulation_visualization` samples actual XYZ positions through the
 native magnetic adapter, not the older centre-line X-Z grid. The interactive
 field mode is explicitly **analytical permanent magnets only**, with image
 magnets disabled. It excludes winding reaction and nonlinear material response.
 It is not a coupled FEM field or a new force qualification. UI resolutions are
-240 or700 points, with a2048-point native cap and finite bounded coordinates.
+240, 700 or2016 points, with a2048-point native cap and finite bounded coordinates.
+The observation volume includes the actual mover and return-flux space around
+the winding rather than only its copper bounding box. Streamlines use bounded
+bidirectional midpoint integration of trilinearly interpolated native samples.
+They stop at the sampled boundary, magnet surfaces, field nulls, closed loops
+or the fixed step cap. They never extrapolate or generate a browser magnetic
+model. Lines and filled slices are display approximations, not additional
+physical resolution or a qualified near-field calculation. Seed density is
+not a quantitative flux-density encoding. Magnet interiors are unpainted.
 Requests use the actual mover position and preserve SI routing coordinates,
 PCB topZ=0. The renderer converts metres to the existing centered millimetre,
 Y-up scene once, including exact imported layer heights. Generated display
@@ -427,12 +445,19 @@ No saved project geometry is changed by that display correction.
 
 The heat overlay uses native resistor-network branch currents at the selected
 winding-phase peak current, converted to RMS by1/sqrt(2). It shows
-cycle-average I²R **W per displayed trace/via**, not a thermal hot-spot density.
+cycle-average I²R. Copper colors now encode **W/m of conductor**, not total
+watts per primitive. Each branch's watts are divided by the same physical
+piecewise-linear length used by the native resistor graph, including its arc
+chords. Consecutive via intervals accumulate both watts and actual barrel length.
+Thus a short bend does not look colder merely because it is shorter than its
+adjacent straight. Equal-current, equal-cross-section copper has equal loss
+per length even if split into different display pieces. No current crowding
+within bends or thermal hot-spot density is inferred.
 Resistances retain actual trace width, copper weight, via barrel intervals and
 saved winding temperature. The native graph's arc chord rule remains a stated
 approximation. Disconnected/unsupported networks are unavailable, never fitted
 to a whole-coil power value. Shape/layer/net identifiers map branch losses to
-the actual displayed copper; the mapped sum must preserve the native total.
+the actual displayed copper; the mapped watts must preserve the native total.
 Grey geometry has no mapped branch result. Visible and whole-geometry power
 are reported separately when phases/layers/vias are hidden. This is an
 electrical screening preview and does not waive finite-volume/local-contact

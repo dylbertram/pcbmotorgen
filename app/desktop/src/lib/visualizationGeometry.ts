@@ -4,9 +4,9 @@ import type { CoilScene } from "./coilScene";
 import type { CopperLossPreview, FieldPreview } from "./types/simulationVisualization";
 
 export const HEAT_PALETTE = ["#343c73", "#705680", "#aa6877", "#da8d60", "#f2c65c", "#fff1aa"];
-export const FIELD_PALETTE = ["#225b91", "#2aa9b4", "#9fcfdb", "#e5d4f5"];
+export const FIELD_PALETTE = ["#193b9c", "#168ed0", "#24c5a0", "#e3dc4b", "#ef892e", "#cf3045"];
 export function heatColor(value: number, maximum: number): string {
-  return HEAT_PALETTE[Math.max(0, Math.min(HEAT_PALETTE.length - 1, Math.floor(maximum > 0 ? value / maximum * (HEAT_PALETTE.length - 1) : 0)))];
+  return HEAT_PALETTE[Math.max(0, Math.min(HEAT_PALETTE.length - 1, Math.floor(maximum > 0 ? value / maximum * HEAT_PALETTE.length : 0)))];
 }
 
 /** Physics metres, XYZ up, to the existing centered mm, Y-up scene. */
@@ -26,8 +26,9 @@ function endsKey(a: { x: number; y: number }, b: { x: number; y: number }) {
 }
 
 /** Assign actual graph-edge W to the original display primitive, not a hot-spot interpolation. */
-export function mapCopperLoss(geometry: CadGeometry, heat: CopperLossPreview): Map<string, number> {
+export function mapCopperLoss(geometry: CadGeometry, heat: CopperLossPreview, quantity: "power" | "linear" = "power"): Map<string, number> {
   const result = new Map<string, number>();
+  const lengths = new Map<string, number>();
   const lookup = new Map<string, string[]>();
   const phase = (net: string) => geometry.coil_phases?.[net] ?? net;
   const add = (key: string, value: string) => lookup.set(key, [...(lookup.get(key) ?? []), value]);
@@ -54,9 +55,16 @@ export function mapCopperLoss(geometry: CadGeometry, heat: CopperLossPreview): M
     }
     if (matches.length !== 1) throw new Error("Current loss cannot be assigned uniquely to the active copper. No fitted map is shown.");
     result.set(matches[0], (result.get(matches[0]) ?? 0) + edge.loss_w);
+    // Use exactly the native resistor graph's piecewise-linear length, including
+    // its arc chords. Normalizing by a different display tessellation would
+    // reintroduce artificial bend contrast. Via intervals accumulate once each.
+    const length = edge.points_m.slice(1).reduce((sum, p, i) => sum + Math.hypot(...p.map((v, axis) => v - edge.points_m[i][axis])), 0);
+    if (!Number.isFinite(length) || length <= 0) throw new Error("Loss data has no finite physical conductor length");
+    lengths.set(matches[0], (lengths.get(matches[0]) ?? 0) + length);
   }
   const total = [...result.values()].reduce((a, b) => a + b, 0);
   if (Math.abs(total - heat.total_loss_w) > Math.max(1e-12, total * 1e-8)) throw new Error("Viewer loss mapping does not conserve native copper power");
+  if (quantity === "linear") for (const [key, power] of result) result.set(key, power / lengths.get(key)!);
   return result;
 }
 

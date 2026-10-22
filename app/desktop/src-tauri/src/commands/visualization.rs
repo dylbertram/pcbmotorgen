@@ -180,7 +180,7 @@ mod tests {
             tauri::async_runtime::block_on(super::super::physics::generate_coils(config.clone()))
                 .unwrap();
         let sim = config.to_core().to_simulation();
-        let r = VisualizationRequest {
+        let mut r = VisualizationRequest {
             request_id: "saved-design-native-viewer".into(),
             mover_position_m: 0.01,
             bounds_m: [
@@ -196,6 +196,18 @@ mod tests {
             fields: true,
             heat: true,
         };
+        // Explicit bounded interactive sampling for field-line/slice rendering
+        // checks. This never starts an offline source or force campaign.
+        if std::env::var_os("PCB_MOTOR_VISUALIZATION_EXPANDED_FIELD").is_some() {
+            let padding = sim.magnet_pitch_m * 0.6;
+            r.bounds_m[0] = [
+                (r.mover_position_m - sim.magnet_dims_m[0] / 2.).min(0.) - padding,
+                (r.mover_position_m + (sim.magnet_count - 1) as f64 * sim.magnet_pitch_m
+                    + sim.magnet_dims_m[0] / 2.).max(sim.active_area_length_m) + padding,
+            ];
+            r.bounds_m[2] = [-sim.pcb_thickness_m - padding, sim.air_gap_m + sim.magnet_dims_m[2] + padding];
+            r.counts = [28, 4, 18];
+        }
         let result = tauri::async_runtime::block_on(sample_simulation_visualization(
             config.clone(),
             saved.drive.clone(),

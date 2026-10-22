@@ -9,8 +9,9 @@
   import SimulationFieldGlyphs from "./SimulationFieldGlyphs.svelte";
   import type { FieldPreview } from "../../types/simulationVisualization";
   import { HEAT_PALETTE, heatColor } from "../../visualizationGeometry";
+  import type { FieldStyle } from "../../simulationFieldGeometry";
 
-  let { scene, paths, vias, terminals, traceMode, reset, command, zScale, field = null, heat = null, opacity = .8 }: {
+  let { scene, paths, vias, terminals, traceMode, reset, command, zScale, field = null, heat = null, opacity = .8, fieldStyle = "lines-slice", sliceFraction = .5, sectionView = false }: {
     scene: CoilScene;
     paths: CopperPath[];
     vias: CoilScene["vias"];
@@ -22,6 +23,9 @@
     field?: FieldPreview | null;
     heat?: Map<string, number> | null;
     opacity?: number;
+    fieldStyle?: FieldStyle;
+    sliceFraction?: number;
+    sectionView?: boolean;
   } = $props();
   const { size, invalidate } = useThrelte();
   let camera = $state.raw<OrthographicCamera>();
@@ -36,7 +40,7 @@
   let bounds = $state<Bounds>();
   // Fit new field extents and display-only Z exaggeration after geometry mounts.
   $effect(() => {
-    void scene; void zScale; void reset; void field;
+    void scene; void zScale; void reset; void field; void sectionView;
     let cancelled = false;
     void tick().then(() => { if (!cancelled) bounds?.fit(); });
     return () => { cancelled = true; };
@@ -55,8 +59,8 @@
   });
 </script>
 
-{#key reset}
-  <T.OrthographicCamera bind:ref={camera} makeDefault position={[12, 10, 14]} {zoom} near={0.01} far={1000}>
+{#key `${reset}:${sectionView}`}
+  <T.OrthographicCamera bind:ref={camera} makeDefault position={sectionView ? [0, 0, 14] : [12, 10, 14]} {zoom} near={0.01} far={1000}>
     <OrbitControls enableDamping minZoom={zoom / 20} maxZoom={zoom * 50} />
   </T.OrthographicCamera>
 {/key}
@@ -71,7 +75,7 @@
 {#each viaBatches as batch (batch.color)}
   <CoilCopperBatch paths={batch.paths} width={scene.width * 1.6} color={batch.color} {zScale} />
 {/each}
-{#if field}<SimulationFieldGlyphs {field} {scene} {zScale} {opacity} />{/if}
+{#if field}<SimulationFieldGlyphs {field} {scene} {zScale} {opacity} style={fieldStyle} {sliceFraction} />{/if}
 {#each terminals as terminal (terminal.key)}
   <T.Mesh position={[terminal.point.x, terminal.point.y * zScale, terminal.point.z]}>
     <T.SphereGeometry args={[Math.max(scene.width, 0.045), 12, 8]} />

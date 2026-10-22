@@ -72,6 +72,8 @@ test("real WebGL draws both scoped overlays and Z scale never resamples physics"
   await expect(viewer.getByLabel("Magnetic field legend")).toContainText("No winding or nonlinear material response");
   await viewer.getByRole("combobox", { name: "Field sample density", exact: true }).selectOption("dense");
   await expect(viewer).toHaveAttribute("data-field-samples", "700");
+  await expect(viewer).toHaveAttribute("data-field-style", "lines-slice");
+  await expect(viewer.getByLabel("Copper loss legend")).toContainText("W/m");
   await viewer.getByLabel("Magnetic field legend").getByText("PM-only model limits", { exact: true }).click();
   await viewer.getByLabel("Copper loss legend").getByText("Loss estimate, not a temperature map", { exact: true }).click();
   await page.screenshot({ path: info.outputPath("ui-fixture-3d-fields-and-loss-true-scale.png") });
@@ -127,28 +129,95 @@ if (process.env.PCB_MOTOR_NATIVE_VISUALIZATION_REPORT) {
       const { generatedTerminalGeometry } = await import(/* @vite-ignore */ "/src/lib/generatedTerminalGeometry.ts");
       const { mapCopperLoss } = await import(/* @vite-ignore */ "/src/lib/visualizationGeometry.ts");
       const { validateVisualization } = await import(/* @vite-ignore */ "/src/lib/simulationVisualizationController.ts");
+      const { buildCoilScene } = await import(/* @vite-ignore */ "/src/lib/coilScene.ts");
+      const { fieldLineGeometry, fieldSliceGeometry } = await import(/* @vite-ignore */ "/src/lib/simulationFieldGeometry.ts");
       validateVisualization(value.report, value.request);
       const c = value.config;
       const geometry = value.cad_geometry ?? generatedTerminalGeometry(value.coils, c.num_layers, c.pcb_thickness_m * 1000, c.trace_width_m * 1000);
       const mapping = mapCopperLoss(geometry, value.report.heat);
+      const densities = mapCopperLoss(geometry, value.report.heat, "linear");
+      const resistancePerLength: Record<number, number[]> = {};
+      for (const edge of value.report.heat.edges) {
+        if (edge.kind !== "trace") continue;
+        const length = edge.points_m.slice(1).reduce((sum: number, p: number[], i: number) => sum + Math.hypot(...p.map((v, axis) => v - edge.points_m[i][axis])), 0);
+        (resistancePerLength[edge.layers[0]] ??= []).push(edge.resistance_ohm / length);
+      }
+      const perLayerRelativeSpread = Object.values(resistancePerLength).map(values => (Math.max(...values) - Math.min(...values)) / Math.max(...values));
+      const scene = buildCoilScene(geometry);
+      const lines = fieldLineGeometry(value.report.field, scene, 1, .5), slice = fieldSliceGeometry(value.report.field, scene, 1, .5);
+      const lineVertices = lines.getAttribute("position").count, sliceVertices = slice.getAttribute("position").count;
+      const finite = [lines, slice].every(g => ["position", "color"].every(name => Array.from(g.getAttribute(name).array).every(Number.isFinite)));
+      lines.dispose(); slice.dispose();
       return { mapped: mapping.size, edges: value.report.heat.edges.length, total_w: [...mapping.values()].reduce((sum, power) => sum + power, 0),
-        reported_w: value.report.heat.total_loss_w, field_samples: value.report.field.samples.length, layer_z_mm: geometry.layer_z_mm };
+        reported_w: value.report.heat.total_loss_w, field_samples: value.report.field.samples.length, layer_z_mm: geometry.layer_z_mm,
+        lineVertices, sliceVertices, finite, density_w_per_m: [...densities.values()], perLayerRelativeSpread };
     }, native);
     expect(checked.mapped).toBeGreaterThan(0); expect(checked.edges).toBeGreaterThan(0);
-    expect(checked.total_w).toBeCloseTo(checked.reported_w, 10); expect(checked.field_samples).toBe(240);
+    expect(checked.total_w).toBeCloseTo(checked.reported_w, 10); expect(checked.field_samples).toBe(native.request.counts.reduce((a: number, b: number) => a * b, 1));
     expect(checked.layer_z_mm[0]).toBe(0);
+    expect(checked.lineVertices).toBeGreaterThan(0); expect(checked.sliceVertices).toBeGreaterThan(0); expect(checked.finite).toBe(true);
+    expect(checked.density_w_per_m.every(v => Number.isFinite(v) && v >= 0)).toBe(true);
+    expect(checked.perLayerRelativeSpread.every(v => v < 1e-10)).toBe(true);
     await info.attach("actual-native-viewer-mapping", { body: JSON.stringify(checked, null, 2), contentType: "application/json" });
+    await page.evaluate(async value => {
+      const { renderFrozenNativeReport } = await import(/* @vite-ignore */ "/e2e/fixtures/nativeVisualizationHarness.ts");
+      (window as any).closeNativeReport = renderFrozenNativeReport(value);
+    }, native);
+    await expect(page.getByTestId("frozen-native-visualization").locator("canvas")).toBeVisible();
+    await page.screenshot({ path: info.outputPath("actual-case-a-native-field-lines-and-slice.png") });
+    await page.evaluate(async () => { await (window as any).closeNativeReport(); });
   });
 }
 
-test("mobile overlays stay inside the viewer and use scrollable explicit legends", async ({ page }) => {
+test("mobile overlays stay inside the viewer and use scrollable explicit legends", async ({ page }, info) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await gotoDesignApp(page); await nativeFixture(page); const viewer = await show3D(page);
+  await viewer.getByRole("button", { name: "Field and loss settings", exact: true }).click();
   await viewer.getByRole("combobox", { name: "3D simulation overlay", exact: true }).selectOption("both");
+  await viewer.getByRole("button", { name: "Field and loss settings", exact: true }).click();
+  await viewer.getByRole("button", { name: "Legends and model limits", exact: true }).click();
   await expect(viewer.getByLabel("Copper loss legend")).toBeVisible();
+  await viewer.getByRole("button", { name: "Legends and model limits", exact: true }).click();
+  await expect(viewer.getByLabel("Copper loss legend")).toBeHidden();
   const box = (await viewer.boundingBox())!, controls = (await viewer.getByRole("group", { name: "3D simulation overlays" }).boundingBox())!;
   expect(controls.x).toBeGreaterThanOrEqual(box.x); expect(controls.x + controls.width).toBeLessThanOrEqual(box.x + box.width + 1);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  const legend = (await viewer.getByLabel("Simulation overlay legend").boundingBox())!;
+  expect(legend.y - (controls.y + controls.height)).toBeGreaterThan(100);
+  for (const colorScheme of ["light", "dark"] as const) {
+    await page.emulateMedia({ colorScheme });
+    await expect(page.locator("html")).toHaveAttribute("data-theme", colorScheme);
+    await page.screenshot({ path: info.outputPath(`mobile-field-slice-and-loss-${colorScheme}.png`) });
+  }
+  await page.evaluate(() => { (window as any).vizMode = "failed"; });
+  await viewer.getByRole("button", { name: "Field and loss settings", exact: true }).click();
+  await viewer.getByRole("combobox", { name: "Field sample density", exact: true }).selectOption("fine");
+  await viewer.getByRole("button", { name: "Field and loss settings", exact: true }).click();
+  await expect(viewer.getByRole("status").filter({ hasText: "Native visualization refused" })).toBeVisible();
+  await expect(viewer).toHaveAttribute("data-field-samples", "0");
+});
+
+test("field style, Y slice and opacity redraw native samples without requesting new physics", async ({ page }, info) => {
+  await gotoDesignApp(page); await nativeFixture(page); const viewer = await show3D(page);
+  await expect(viewer).toHaveAttribute("data-field-samples", "240");
+  const calls = await page.evaluate(() => (window as any).vizCalls.length);
+  const canvas = viewer.locator("canvas"), initial = await canvas.screenshot();
+  await viewer.getByRole("combobox", { name: "Field rendering style", exact: true }).selectOption("slice");
+  await expect(viewer).toHaveAttribute("data-field-style", "slice");
+  await expect.poll(async () => (await canvas.screenshot()).equals(initial)).toBe(false);
+  await viewer.getByRole("slider", { name: "Field slice position", exact: true }).fill("0.25");
+  await expect(viewer).toHaveAttribute("data-field-slice", "0.25");
+  await viewer.getByRole("combobox", { name: "Field rendering style", exact: true }).selectOption("lines");
+  await expect(viewer).toHaveAttribute("data-field-style", "lines");
+  await viewer.getByRole("combobox", { name: "Field rendering style", exact: true }).selectOption("arrows");
+  await expect(viewer).toHaveAttribute("data-field-style", "arrows");
+  await expect(viewer.getByRole("slider", { name: "Field slice position", exact: true })).toHaveCount(0);
+  await viewer.getByRole("combobox", { name: "Field rendering style", exact: true }).selectOption("lines-slice");
+  await viewer.getByRole("slider", { name: "Field overlay opacity", exact: true }).fill("0.5");
+  await viewer.getByRole("button", { name: "XZ field section", exact: true }).click();
+  await expect(viewer.getByRole("button", { name: "XZ field section", exact: true })).toHaveAttribute("aria-pressed", "true");
+  expect(await page.evaluate(() => (window as any).vizCalls.length)).toBe(calls);
+  await page.screenshot({ path: info.outputPath("ui-fixture-field-lines-and-slice.png") });
 });
 
 test("phase visibility filters the heat overlay without recalculating the physical loss", async ({ page }) => {

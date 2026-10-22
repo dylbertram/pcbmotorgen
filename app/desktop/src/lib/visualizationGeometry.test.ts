@@ -32,6 +32,40 @@ describe("physical visualization coordinates and conservative loss mapping", () 
     const changed = heat(); changed.total_loss_w *= 2; expect(() => mapCopperLoss(geometry(), changed)).toThrow("conserve");
     expect(heatColor(0, 0)).toBe(heatColor(0, 1));
   });
+  it("colors short bends and long straights by the same W/m, without changing their total watts", () => {
+    const g = geometry(); g.routing.vias = [];
+    g.routing.curves.push({ start: { x: 10, y: 0 }, mid: { x: 10.7, y: .3 }, end: { x: 11, y: 1 }, layer: 0, net: "A", is_active: true });
+    const h = heat(); h.edges.pop();
+    const points: [number, number, number][] = [[.01, 0, 0], [.0107, .0003, 0], [.011, .001, 0]];
+    const length = points.slice(1).reduce((sum, p, i) => sum + Math.hypot(...p.map((v, axis) => v - points[i][axis])), 0);
+    const power = length * 50;
+    h.edges.push({ net: "A", kind: "trace", layers: [0, 0], points_m: points, loss_w: power, rms_current_a: .5, resistance_ohm: power / .25 });
+    h.total_loss_w = .5 + power;
+    const colors = mapCopperLoss(g, h, "linear"), watts = mapCopperLoss(g, h);
+    expect(colors.get("segment-0")).toBeCloseTo(50, 10); expect(colors.get("arc-0")).toBeCloseTo(50, 10);
+    expect(heatColor(colors.get("segment-0")!, 50)).toBe(heatColor(colors.get("arc-0")!, 50));
+    expect([...watts.values()].reduce((a, b) => a + b, 0)).toBe(h.total_loss_w);
+    const changed = structuredClone(h); changed.edges.forEach(e => e.loss_w *= 4); changed.total_loss_w *= 4;
+    expect(mapCopperLoss(g, changed, "linear").get("arc-0")).toBeCloseTo(200, 10);
+  });
+  it("does not change density when straight copper is split into display pieces", () => {
+    const g = geometry(), h = heat(); g.routing.vias = []; h.edges.pop(); h.total_loss_w = .5;
+    const original = mapCopperLoss(g, h, "linear").get("segment-0")!;
+    g.routing.segments[0].end.x = 2;
+    g.routing.segments.push({ ...g.routing.segments[0], start: { x: 2, y: 0 }, end: { x: 10, y: 0 } });
+    h.edges[0].points_m[1][0] = .002; h.edges[0].loss_w = .1;
+    h.edges.push({ ...h.edges[0], points_m: [[.002, 0, 0], [.01, 0, 0]], loss_w: .4 });
+    expect([...mapCopperLoss(g, h, "linear").values()]).toEqual([original, original]);
+    const invalid = heat(); invalid.edges[0].points_m[1] = [...invalid.edges[0].points_m[0]];
+    expect(() => mapCopperLoss(geometry(), invalid, "linear")).toThrow();
+  });
+  it("normalizes aggregated via intervals by their actual total barrel length", () => {
+    const g = geometry(), h = heat(); g.layer_z_mm = [0, -.3, -.8]; g.routing.vias[0].to_layer = 2;
+    h.edges[1].layers = [0, 1]; h.edges[1].points_m[1][2] = -.0003; h.edges[1].loss_w = .09375;
+    h.edges.push({ ...h.edges[1], layers: [1, 2], points_m: [[.01, 0, -.0003], [.01, 0, -.0008]], loss_w: .15625 });
+    expect(mapCopperLoss(g, h, "linear").get("via-0")).toBeCloseTo(.25 / .0008, 10);
+    expect(mapCopperLoss(g, h).get("via-0")).toBe(.25);
+  });
   it("batches real vector shafts/heads while preserving physical magnitudes", () => {
     const scene = buildCoilScene(geometry())!;
     const field: FieldPreview = { method: "analytical-pm-only-xyz", scope: "unit-test data", magnets: [], samples: [
