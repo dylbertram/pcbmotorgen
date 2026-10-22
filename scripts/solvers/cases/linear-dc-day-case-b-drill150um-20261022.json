@@ -1,0 +1,30 @@
+{
+  "schema": "linear-dc-generated-case-declarations-v1",
+  "template": "linear-dc-day-generated-designs-v2-20261022/linear-star-five-strand-six-layer-board-inner-two-ounce.pmmotor",
+  "template_version_index": 1,
+  "template_sha256": "b829f8f92d1745e20c2f88bc45b1f5e29a28d00b19f945e3d6b33f58b6875040",
+  "scope": "Separate user-approved Case B simulation revision. Preserve the original 0.3 mm drill design and every failed/interrupted result. Change only the selected saved version's drill setting; do not reroute, reduce strands or change the stack, annular ring, plating, material placement or return.",
+  "physical_authorization": {
+    "user_statement": "For that design to work, the vias need to be 0.15mm drill with 0.1mm annular. That design would typically need to be 4 strand for more reasonable manufacturing. However, for the sake of simulation, it is fine to reduce the via sizing and go with your design.",
+    "drill_mm": 0.15,
+    "annular_ring_mm": 0.1,
+    "routing_strands": 5,
+    "unchanged_plating_m": 0.000025,
+    "derived_pad_diameter_mm": 0.35,
+    "gap_at_identified_0_4mm_centres_mm": 0.05,
+    "manufacturing": "Simulation-only approval. The saved 0.127 mm spacing setting is not changed, but 0.05 mm pad clearance does not satisfy it. No DRC/manufacturing suitability or four-strand redesign claim. Numerical and physical-contact gates remain mandatory."
+  },
+  "cases": [
+    {
+      "id": "linear-star-five-strand-six-layer-board-inner-two-ounce-drill150um",
+      "config_overrides": {"min_via_drill_mm": 0.15},
+      "drive_overrides": {},
+      "state_overrides": {},
+      "coverage": "Same five-strand case B, six declared layer planes with actual active layers 0/1, 70 um inner copper and explicit saved 12 mm pose. Production host must export and verify the actual routing and dimensions anew. Prior source fields and force caches are ineligible after this physical drill change."
+    }
+  ],
+  "acceptance_matrix": "scripts/solvers/cases/linear-dc-day-acceptance-matrix-20261022.json",
+  "compute_end_utc": "2026-10-22T19:59:49.742086Z",
+  "acceptance_reserve_starts_utc": "2026-10-22T18:29:49.742086Z",
+  "policy": "No gate relaxation, inherited qualification, automatic budget extension, push or bundle. No magnetic solve until the revised actual source passes applicable qualification."
+}

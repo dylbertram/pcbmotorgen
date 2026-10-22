@@ -33,6 +33,14 @@ class PadContactWitnessTest(unittest.TestCase):
         third['edges'][0]['geometry']['position_m']=[.0002,0.];fixture['networks'].append(third)
         self.assertEqual(witnesses(fixture,[0,0,0]),[])
 
+    def test_approved_smaller_drill_preserves_ring_and_removes_known_pad_witness(self):
+        fixture=self.fixture();before=deepcopy(fixture)
+        self.assertTrue(witnesses(fixture,[0,0,0]))
+        fixture['sim']['min_via_drill_m']=.00015
+        self.assertEqual(witnesses(fixture,[0,0,0]),[])
+        self.assertEqual(fixture['sim']['min_via_annular_ring_m'],before['sim']['min_via_annular_ring_m'])
+        self.assertEqual(fixture['networks'],before['networks'])
+
     def test_cylinder_distance_respects_finite_depth(self):
         self.assertEqual(cylinder_clearance(np.array([0.,0.,2.]),np.array([0.,0.]),1.,0.,1.),1.)
         self.assertLess(cylinder_clearance(np.array([0.,0.,.5]),np.array([0.,0.]),1.,0.,1.),0.)

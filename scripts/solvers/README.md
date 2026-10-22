@@ -275,6 +275,16 @@ The source campaign planner now defaults to serial execution and requires
 passing baseline active/passive/return/H1 gates before expensive refinements
 or an accepted RT0-export stage.
 
+The user subsequently approved a separate Case B simulation revision with a
+0.15 mm drill, unchanged 0.10 mm annular ring and five strands. Its declaration
+is `cases/linear-dc-day-case-b-drill150um-20261022.json`. The host confirms
+unchanged route positions/connectivity and all other physical settings; graph
+electrical values are recomputed for the smaller barrel. The resulting 0.35 mm
+pads remove the known contact witnesses, but their 0.05 mm gap at 0.40 mm
+centres is not manufacturing acceptance. Saved spacing settings are unchanged.
+Fresh CAD/source/force evidence is required, and no original 0.30 mm-drill
+field or cache is eligible. The original shorted design remains untouched.
+
 The experimental desktop worker is disabled unless its launch environment sets
 all three absolute host paths. This is a local installed-solver integration, not
 a redistributed or packaged solver. Install the pinned worker into a new
@@ -294,6 +304,15 @@ evidence is written. Do not set `PYTHONPATH`. The archive root is required
 evidence, not an optional cache. Other platforms remain unqualified.
 NGSolve/Netgen are LGPL-2.1 and OCCT LGPL-2.1 with exception; this local
 installation redistributes nothing.
+
+This installer covers the admitted fresh magnetic worker, not a complete
+new-design source-preparation environment. The current offline source pipeline
+also uses separately pinned PyAMG 5.3.0; that dependency and the long preparation
+lifecycle are not yet qualified as part of the app installer. The installed
+18-package license-file/metadata inventory is recorded separately in
+`linear-dc-day-worker-license-metadata-v1-20261022.json` under the evidence root.
+That inventory does not settle transitive native-library or redistribution
+requirements and is not approval to distribute a bundle.
 
 `DcJobs` admits one numerical job at a time, preserves a unique evidence directory
 under `dc-desktop-jobs`, and owns the worker's POSIX process group. The whole-job

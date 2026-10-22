@@ -1,0 +1,17 @@
+{
+  "schema": "actual-linear-dc-study-inputs-v1",
+  "design_archive": "linear-dc-day-case-b-drill150um-design-v1-20261022",
+  "scope": "User-approved 0.15 mm drill, unchanged 0.1 mm annular ring and five-strand Case B. New actual host snapshot, same declared external return and app-defined PM/material placement. Original shorted Case B remains preserved and unqualified.",
+  "physical_authorization": "scripts/solvers/cases/linear-dc-day-case-b-drill150um-20261022.json",
+  "cases": [
+    {
+      "id": "linear-star-five-strand-six-layer-board-inner-two-ounce-drill150um",
+      "source_project_sha256": "f0d51f023931a4445203be1deaa6abdf0e78c3915cd72e304a0b12cfba93b29d",
+      "snapshot_sha256": "8c0b29d79754a48635eda5ed9e73658450a1dcba5b91ec52316c90400eb4b366",
+      "host_export_log": "linear-star-five-strand-six-layer-board-inner-two-ounce-drill150um-host-export-v3-20261022.log",
+      "positive_phase": "A",
+      "negative_phase": "C",
+      "external_return_waypoints_m": [[-0.0315,0.005999999999999999,0.0012000000000000001],[-0.0315,0.005333333333333335,0.0012000000000000001]]
+    }
+  ]
+}

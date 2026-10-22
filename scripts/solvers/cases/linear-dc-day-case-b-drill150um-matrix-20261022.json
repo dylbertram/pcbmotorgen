@@ -1,0 +1,13 @@
+{
+  "schema": "declared-linear-dc-acceptance-matrix-v1",
+  "study_inputs": "scripts/solvers/cases/linear-dc-day-case-b-drill150um-study-20261022.json",
+  "applies_to": "Separately saved user-approved Case B drill150um revision only. All numerical controls and gates retained from the original case matrix. No prior physical source or force cache is reused.",
+  "currents_loop_a": [0.0,0.1,-0.1,0.5,-0.5],
+  "linear_offsets_x_m": [0.0,0.0001,-0.0001],
+  "source_controls": {"mesh_m":[0.0002,0.00015],"curvature_safety":[4.0,6.0],"port_fraction":[0.5,0.4],"independent_electrical":"H1 vs mixed HDiv on selected accepted mesh","local":"All eligible signed trace/via and passive sections;real stub controls only when physical stubs exist;return sections;no invented stub coverage"},
+  "magnetic_baseline": {"material_mesh_m":0.0012,"air_mesh_m":0.01,"air_radius_m":0.06,"vector_order":1,"quadrature_degree":8,"source_opening":0.075},
+  "isolated_magnetic_controls": {"material_mesh_m":0.0009,"air_radius_m":0.08,"quadrature_degree":10,"source_opening":0.0375,"higher_order_limit_control":2},
+  "coverage": "Full nonlinear5current/3pose matrix;zero/linear/vacuum limits;independent nonlinear formulation at all primary states;independent linear/vacuum nominal limits. Isolated mesh/domain/quadrature/opening controls compare full nonlinear state matrix. Source mesh/curvature/drive refinements must check relevant raw current/local sections and downstream field/force stability. All gates declared before numerical launch;resource failures preserved,not waived.",
+  "relative_refinement_gate":0.02,"relative_independent_gate":0.05,"force_vector_floor_n":1e-8,"field_floor_t":1e-12,"section_current_floor_per_loop_a":1e-8,
+  "jobs_policy": "Serial large source jobs,24Mpreassembly DOF cap and18GiB sampled native guard;magnetic DOF cap initially200000. Budgets derive from measured first case and must fit before18:29:49Z acceptance reserve. Any cap failure is not numerical acceptance."
+}

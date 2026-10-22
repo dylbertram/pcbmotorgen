@@ -68,7 +68,9 @@ def main():
     records=[];inputs={str(args.declaration.resolve()):sha(args.declaration),str(origin/'summary.json'):sha(origin/'summary.json')}
     for case in declaration['cases']:
         saved=by_name[case['id']];source=Path(saved['saved_project']);snapshot_path=origin/(case['id']+'-snapshot.json')
-        log=root/(case['id']+'-host-export-v2-20261022.log');receipt=Path(str(log)+'.command.json');completed_receipt({'command_receipt':str(receipt)})
+        log=(root/case.get('host_export_log',case['id']+'-host-export-v2-20261022.log')).resolve()
+        if not log.is_relative_to(root):raise ValueError('Declared host export log must remain inside evidence root')
+        receipt=Path(str(log)+'.command.json');completed_receipt({'command_receipt':str(receipt)})
         exports=host_exports(log.read_text())
         if len(exports)!=1 or exports[0]['imported'] or exports[0]['qualification_only']:raise ValueError('Actual production generated host export required')
         metadata=exports[0]

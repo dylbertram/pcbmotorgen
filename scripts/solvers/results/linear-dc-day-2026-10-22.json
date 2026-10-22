@@ -9,7 +9,8 @@
     "approved_at_utc": "2026-10-22T07:59:49.742086Z",
     "compute_end_utc": "2026-10-22T19:59:49.742086Z",
     "acceptance_reserve_starts_utc": "2026-10-22T18:29:49.742086Z",
-    "policy": "Each numerical job budget must fit before acceptance reserve, unless itself an acceptance job. No automatic extension. No push or bundles."
+    "policy": "Each numerical job budget must fit before acceptance reserve, unless itself an acceptance job. No automatic extension. No push or bundles.",
+    "case_b_drill_revision": "User explicitly approved retaining the five-strand simulation design with 0.15 mm drill and 0.10 mm annular ring, noting four strands would be more reasonable for manufacturing. Separate saved revision only. No other physical change, prior-field reuse or numerical gate relaxation. 0.35 mm pads leave 0.05 mm at the identified 0.40 mm centres; no manufacturing/DRC suitability claim."
   },
   "scope": {
     "linear": "Actual supported generated straight-trace finite copper with explicit layers,vias,connectivity,resistivity,returns and app-defined PM/planar magnetic materials. Exact admission envelope and two additional saved linear cases are being audited before qualification.",
@@ -19,7 +20,7 @@
   "plan_progress": {
     "step_1": "complete;new12h cutoff approved,765recorded evidence hashes verified,actual two new saved host designs exported,production descriptors and closed return graphs checked;nominal app-defined models and explicit returns prepared;vertical finite-extent separation proved before CAD;per-case source/force/control matrix and candidate/admission envelope recorded. No source/force qualification from preparation.",
     "steps_2_through_6": "not complete",
-    "step_2": "Imported port drive-length and Case A near-field/mesh/port/curvature controls pass. Case B fails local active/passive current checks because saved cross-phase via pads physically overlap. Case B remains unsupported; no gate waived and step not checked complete.",
+    "step_2": "Imported port drive-length and Case A near-field/mesh/port/curvature controls pass. Original Case B remains failed and unsupported. The user-approved drill150um revision has a new saved project and production host export; fresh CAD/source qualification is pending. No gate waived and step not checked complete.",
     "step_4": "in progress: exact per-design registry admission and active-design applicability inspection implemented. Real host rebuilds tested for recorded/A/B designs,with A/B correctly preparation-required. New cases register only after full audit;in-app preparation/qualification workflow and native interaction remain incomplete."
   },
   "source_gap": {
@@ -149,7 +150,7 @@
     "service_evidence": "linear-dc-day-detached-supervision-v1-20261022",
     "source_work": "dc-imported-star4-curvature4-port-control-v3-detached-day-20261022",
     "current_status": "Fresh v3 submitted with same physical source,portfraction0.4,curvature4,10800s cap,24MDOF preassembly cap,18GiB native guard. Original v1/v2 fields not imported. Actual worker identity verified;supervisor parent is launchd PID1,not conversation shell. Independent one-shot watcher bootstrapped separately.",
-    "health_task": "d87a98ed-ebb4-4779-b16d-e23d91b24c82 now runs every5min until approved cutoff,checks actual receipts/launcher/service/identity and disables itself after19:59:49Z. No background numerical acceptance from liveness.",
+    "health_task": "d87a98ed-ebb4-4779-b16d-e23d91b24c82 was originally configured every five minutes. At 12:40Z its current state was disabled, confirmed by schedule.list; it was left disabled rather than overriding an unexplained setting. Prompt updated for the approved drill revision. Local bounded launchd supervisors/watchers remain active, but periodic agent continuation is not claimed.",
     "tests": "406helpers passed,0skips,28.708s in linear-dc-day-one-shot-supervision-all-helpers-v2-20261022.log,including input/deadline/native memory/one-shot ownership policies. No application/native E2E qualification from supervision probe."
   },
   "case_a_source": {
@@ -240,7 +241,7 @@
       "historical_strategy_job": "case-b-fuse-strategy-v1 timed out under its3600s budget;its partial report is diagnostic-only,never source CAD. Final receipts/launcher must be checked before service cleanup."
     }
   },
-  "tests_latest": "446 helpers passed, zero skips, 38.349 s in linear-dc-day-pad-contact-gates-all-helpers-v1-20261022.log. Desktop 117 passed, 8 ignored, 41.66 s; frontend 471 passed, 1 existing skip; full browser 346 passed, zero skips/flakes, 322.920 s. Final real host inspection checks pass separately for recorded/A/B, with B explicitly unsupported after the contact guard.",
+  "tests_latest": "448 helpers passed, zero skips, 33.042 s in linear-dc-day-drill150um-all-helpers-v1-20261022.log. Desktop 117 passed, 8 ignored, 41.66 s; frontend 471 passed, 1 existing skip; full browser 346 passed, zero skips/flakes, 322.920 s at the preceding UI milestone. Additional actual-host/clean-worker inspection passes for the approved drill150um revision and correctly reports preparation-required, no force.",
   "app_integration": {
     "status": "implemented-per-design-registry-admission-recorded-case-registered-case-a-pending-audit",
     "request": "finite-dc-live-request-v2 from host; no host-pinned basis. Worker re-verifies every registered audit/evidence, requires exactly one exact match, else Qualification required with per-case reason before any solve.",
@@ -337,9 +338,55 @@
     "example": "A via edge 186 and B via edge 181, layer 0, point [-0.0247,0,0.0015] m. An 8.75 um radius ball is inside both non-star pads and outside every declared drill bore. Same overlap also exists on layer 1.",
     "interpretation": "The faithful exact union is connected but its contacts differ from the exported phase graphs. Union-volume, global residual, H1 resistance and return checks cannot establish correct circuit connectivity. Active and passive local gates correctly rejected it.",
     "app": "Applicability now rejects proved non-star cross-phase pad contacts as unsupported, with an actual geometry review reason. It does not offer refinement as a cure for physical overlap.",
-    "required_user_decision": "Original Case B is preserved and unqualified. Any routing, spacing, drill, pad, annular-ring or topology change is a physical change requiring explicit approval and a separately saved/audited derived design. No new easier case is substituted.",
+    "required_user_decision": "Historical decision gate: original Case B remains preserved and unqualified. The user subsequently approved only a separately saved drill150um revision with unchanged 0.10 mm ring and five strands. See case_b_drill150um_revision; do not rerun or overwrite the original shorted design.",
     "stop_evidence": "linear-dc-day-detached-supervision-v1-20261022/case-b-source-controls-v1-local-failure-stop.json",
     "planner_fix": "Future generated source campaigns emit the selected basis first, default to serial execution and gate RT0/control source solves on completed all-active, all-passive, return and H1 agreement checks. Bound declarations of old campaigns are unchanged."
+  },
+  "case_b_drill150um_revision": {
+    "status": "user-approved-separate-design-host-export-and-exact-cad-verified-fresh-source-running",
+    "physical_authorization": "scripts/solvers/cases/linear-dc-day-case-b-drill150um-20261022.json",
+    "study_declaration": "scripts/solvers/cases/linear-dc-day-case-b-drill150um-study-20261022.json",
+    "acceptance_matrix": "scripts/solvers/cases/linear-dc-day-case-b-drill150um-matrix-20261022.json",
+    "saved_project": "linear-dc-day-case-b-drill150um-design-v1-20261022/linear-star-five-strand-six-layer-board-inner-two-ounce-drill150um.pmmotor",
+    "source_project_sha256": "f0d51f023931a4445203be1deaa6abdf0e78c3915cd72e304a0b12cfba93b29d",
+    "host_snapshot_sha256": "8c0b29d79754a48635eda5ed9e73658450a1dcba5b91ec52316c90400eb4b366",
+    "approved_change_audit": "linear-dc-day-case-b-drill150um-design-v1-20261022/approved-drill-change-audit.json",
+    "unchanged": "All saved project values except selected-version min_via_drill_mm. Actual host trace/via positions, routing, graph nodes/edges/terminals, copper widths/depths/stack/plating/temperature, magnet/material placement and explicit return path are unchanged. Native graph current shares and equivalent/via resistances are recomputed, not forced equal.",
+    "new_drill_mm": 0.15,
+    "unchanged_annular_ring_mm": 0.1,
+    "new_pad_diameter_mm": 0.35,
+    "retained_routing_strands": 5,
+    "manufacturing": "Simulation-only approval. 0.05 mm gap at the identified 0.40 mm via spacing is below the saved 0.127 mm spacing setting; that setting is not silently changed and no DRC/manufacturing acceptance is claimed.",
+    "contact_check": "No midpoint witnesses with the new drill/pad dimensions; this removes the known 41 pad-contact witnesses but is not a full clearance or source pass.",
+    "host_export": "Fresh actual Rust host export succeeded with one passed test and no ignored tests in linear-star-five-strand-six-layer-board-inner-two-ounce-drill150um-host-export-v3-20261022.log. Initial v2 invocation failed before export because PCB_MOTOR_VERSION_INDEX was missing; failed log/receipt preserved. A subsequent shell comparison initially overconstrained recomputed graph electrical values; inspected differences and verified only approved physical descriptors changed.",
+    "prepared_study": "linear-dc-day-case-b-drill150um-study-v1-20261022/linear-star-five-strand-six-layer-board-inner-two-ounce-drill150um",
+    "copper_stack_vertical_separation_m": 0.001165,
+    "cad_job": {
+      "label": "com.pcbmotorgen.dc.20261022.case-b-drill150-copper-v1",
+      "work": "linear-dc-day-case-b-drill150um-copper-v1-20261022",
+      "timeout_s": 1800,
+      "native_guard_gib": 4,
+      "strategy": "per-kind-single-drill; same audited primitive construction, with only the explicitly approved drill/pad dimension change",
+      "launch_headroom": "Other numerical usage measured 0.701 GiB before CAD launch; independent own one-shot watcher attached.",
+      "completed_seconds": 131.3243130829651,
+      "volume_m3": 1.9857626415308534e-8,
+      "brep_sha256": "0cc6272a13fe807eb278064f8b4a3f2b637668939b5f3e501cb71b271cfe866d",
+      "analytic_union_relative_difference": 9.320375557120286e-5,
+      "verification": "One solid, unchanged explicit return with zero unintended contact, disjoint material/PM regions and all input/archive/BRep hashes verified. Final receipt exit0, launcher success and watcher chains-finished agreed with nonrunning services. Only these completed owned CAD labels unloaded; plists/logs preserved. CAD is not source/force acceptance."
+    },
+    "source_campaign": {
+      "declaration": "linear-dc-day-detached-supervision-v1-20261022/case-b-drill150-first-source-v1-campaign.json",
+      "label": "com.pcbmotorgen.dc.20261022.case-b-drill150-first-source-v1",
+      "jobs": 11,
+      "timeout_s": 16800,
+      "sum_nonprior_timeout_s": 10920,
+      "resource_order": "First fresh curvature6 source waits for successful revised CAD and completed Case A 10 GiB scalar-quadrature retry. Serial 8 GiB source, then all active/passive/return/H1 checks; RT0/material/near-field only after all baseline gates pass. Failed dependencies block, not bypass.",
+      "next_gates": "Fresh measured source/local qualification, independent mesh/port/curvature controls, full magnetic matrix and source-refinement forces. No original 300 um source/force cache is eligible. All explicit budgets fit before the unchanged acceptance reserve at launch.",
+      "observed_1243": "CAD and Case A large-job dependencies completed; fresh source-m200-c6-p50 launched. No numerical source or force qualification inferred from launch.",
+      "direct_watcher": "case-ab-current-inner-v1-watch observes the revised source and fresh Case A retry inner receipts independently of any quiet outer-runner alert."
+    },
+    "actual_host_inspection": "linear-dc-day-case-b-drill150um-real-host-inspection-v1-20261022.log: one passed, zero ignored, 1.62s, actual revised saved-project geometry through Rust and clean-installed Python with PYTHONPATH unset. Correct state is preparation-required, no force returned or original qualified source substituted.",
+    "helpers": "448 passed, zero skips, 33.042s in linear-dc-day-drill150um-all-helpers-v1-20261022.log. New tests preserve selected-version-only drill approval and unchanged ring/five strands; known pad witness disappears without claiming full clearance."
   },
   "applicability_integration": {
     "status": "implemented-and-tested-read-only-no-force-or-implicit-preparation",
@@ -364,7 +411,15 @@
     "observed_1143": "Originalcampaign59completed4failed1live8pending;serialretry linear-vector-refined-v3 completed243.51s,peak3.439GiB,next scalar-coarse running. Other failures remain pending rerun,not waived.",
     "completed_v3_retry": "3of4completed;scalar-refined-v3 exceeded6GiBguard at6794450704bytes. Failure preserved,notwaived. Outer failedexit1 and ownwatcherattention-required;bothfinishedlabels safelyunloaded,plists/logskept.",
     "v4_scalar_retry": "linear-dc-day-case-a-linear-scalar-refined-v4-20261022 passed all five states, no failures, in 427.5586 s with 8.42785 GiB measured peak under its 10 GiB guard. No changed orders, geometry or gates. Final audit uses case-a-magnetic-audit-plan-v4.json; v2/v3 failures remain preserved.",
-    "watching": "Old inner-v2/v4/v5 watchers finished with recorded failures and were unloaded safely. Replacement case-a-inner-v6-watch monitors remaining Case A inner jobs. Finished scalar-v4 and Case B diagnostic/campaign labels were unloaded after final receipt/launcher/watcher/service agreement. Logs and plists retained. Original Case A top-level worker/watcher remain live."
+    "watching": "Old inner-v2/v4/v5/v6 watchers finished with recorded failures and were unloaded safely. Original outer watch also produced a quiet-runner stall alert while independent inner jobs were busy; that finished watcher alone was unloaded. New case-a-inner-v7-watch observes original and fresh quadrature-retry inner receipts. Original numerical campaign remains live; no liveness claim is force acceptance.",
+    "quadrature_retries_v3": {
+      "declaration": "linear-dc-day-detached-supervision-v1-20261022/case-a-quadrature-retries-v3-campaign.json",
+      "label": "com.pcbmotorgen.dc.20261022.case-a-quadrature-retries-v3",
+      "audit_plan": "linear-dc-day-detached-supervision-v1-20261022/case-a-magnetic-audit-plan-v5.json",
+      "preserved_failures": "Original degree10 nonlinear scalar nominal/+100um jobs timed out at 1800 s with 3/4 partial states. Original linear scalar degree10 job exceeded 3 GiB. No partial fields are imported.",
+      "fresh_jobs": "Linear scalar quadrature: 5400 s/10 GiB first and alone within retry campaign; then fresh nonlinear scalar nominal/+100um: 5400 s/2.5 GiB each, at most two together. Whole wrapper 10980 s. Physical inputs, degree10, FE orders, states and gates unchanged. At12:42Z linear job completed, peak4.63366GiB; two fresh nonlinear jobs launched.",
+      "live_minus100um": "Original nonlinear scalar degree10 minus100um remained live and was not duplicated or extended. Check its own final receipt before any retry."
+    }
   },
   "case_a_curvature_extension": {
     "status": "passed-supplemental-source-control-no-force-admission",
@@ -380,6 +435,8 @@
     "limits": "Noevery-pointfield,interpolationorforceacceptance. Source-refinementdownstreamcoupled-forcecontrols remainapartfromthissource-onlycomparison."
   },
   "installed_worker": {
+    "license_inventory": "linear-dc-day-worker-license-metadata-v1-20261022.json records installed metadata and license-file hashes for all 18 pinned packages in the clean venv. NGSolve/Netgen metadata reports LGPL-2.1-only. This is not a full transitive native component/linkage/source/distribution audit or redistribution clearance; no bundle built.",
+    "source_preparation_dependency_gap": "The installed worker reproduces admitted fresh magnetic calculations and applicability checks. Offline new-source preparation additionally uses pinned PyAMG 5.3.0 from a separate developer path. A complete installed in-app preparation environment remains unqualified; do not infer it from the magnetic worker installation.",
     "status": "passed-clean-macos-arm64-pinned-install",
     "requirements": "scripts/solvers/requirements-dc-worker.txt (18 pinned distributions plus2comment lines, CPython3.12)",
     "installer": "scripts/solvers/install_dc_worker_macos.sh",
@@ -415,7 +472,7 @@
       "full_browser": "340passed,0skips,0unexpected,0flaky,319.759s;isolated port1453,artifacts linear-dc-day-full-browser-v1-20261022/report.json. Browser fixtures do not establish native WKWebView interaction."
     },
     "unmet_app_requirements": "Registry admission is still exact-case admission,not completion of actual per-request preparation/qualification in the app. Only recorded design registered;case A/B pending. New-design preparing/qualification lifecycle and actual native WKWebView interaction remain unproven. Desktop computer-use tools are unavailable here;manual observed native acceptance remains required.",
-    "schedule": "d87a98ed-ebb4-4779-b16d-e23d91b24c82 remains enabled before cutoff;prompt refreshed with current campaign/diagnostic labels. Schedule tools require canonical directory /Users/dylanbertram/Dev/projects_embedded/pcbmotorgen. Acceptance18:29:49.742086Z and compute19:59:49.742086Z unchanged;disable at compute end.",
+    "schedule": "At12:40Z task d87a98ed-ebb4-4779-b16d-e23d91b24c82 was disabled; left disabled and prompt refreshed. Local launchd watchers do not imply periodic agent continuation. Schedule tools require canonical directory /Users/dylanbertram/Dev/projects_embedded/pcbmotorgen. Acceptance18:29:49.742086Z and compute19:59:49.742086Z unchanged; no re-enable or automatic extension.",
     "memory_and_issue": "Near-field/single-drill/regression milestone mem_1792667945776_t7vz82flh stored and search-retrieved;correction mem_1792667534863_8tqc7b7ou also stored/retrieved. Kata#ytgr updated at11:19Z;issue stays open. No plan checkbox changed.",
     "service_cleanup_evidence": "linear-dc-day-completed-service-cleanup-v2-20261022.json preserves final receipt/launcher/watcher and launchctl status before unloading8own completed near-field/diagnostic labels. All logs/plists retained. Active numerical groups left unchanged."
   }
