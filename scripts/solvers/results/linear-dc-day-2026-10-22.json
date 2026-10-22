@@ -1,0 +1,71 @@
+{
+  "status": "implementation-in-progress-not-qualified",
+  "plan_id": "ab7e988f-ed3c-4e40-a43b-d7c7f84cbe89",
+  "issue": "pcbmotorgen#ytgr",
+  "branch": "simulation/add-femm-and-improve",
+  "approval": {
+    "user_request": "Implement the Complete the remaining linear static-DC app work today plan, updating checks as work finishes.",
+    "compute_window_choice": "12 hours (Recommended), explicitly selected by user",
+    "approved_at_utc": "2026-10-22T07:59:49.742086Z",
+    "compute_end_utc": "2026-10-22T19:59:49.742086Z",
+    "acceptance_reserve_starts_utc": "2026-10-22T18:29:49.742086Z",
+    "policy": "Each numerical job budget must fit before acceptance reserve, unless itself an acceptance job. No automatic extension. No push or bundles."
+  },
+  "scope": {
+    "linear": "Actual supported generated straight-trace finite copper with explicit layers,vias,connectivity,resistivity,returns and app-defined PM/planar magnetic materials. Exact admission envelope and two additional saved linear cases are being audited before qualification.",
+    "deferred": "Imported PM/ferrite/housing geometry;rotary torque/angular/commutation;inductance,true reversal,temperature,hardware,AC/PWM. Existing generated-case approval never transfers silently.",
+    "preservation": "Existing housing screening,merged UI,original root designs,historical failures and Mutagen."
+  },
+  "plan_progress": {
+    "step_1": "in-progress;worktree and shared plan read,new compute cutoff approved;case/envelope/evidence audit pending",
+    "steps_2_through_6": "not complete"
+  },
+  "source_gap": {
+    "work": "dc-imported-star4-curvature4-port-control-v2-day-20261022",
+    "purpose": "Generic electrical drive-length control only,not imported magnetic coupling or app admission",
+    "status": "interrupted-before-saved-mesh",
+    "observed_at_utc": "2026-10-22T08:18:00Z",
+    "interrupted_seconds": 618.7470707920147,
+    "liveness": "Receipt supervisor33397 and watcher33815 absent; no matching solver or watcher processes. Numerical running summary is stale. Cause unknown. No duplicate launched from stale state.",
+    "source_work": "dc-imported-star4-curvature4-dc-v1-20261021",
+    "port_fraction": 0.4,
+    "curvature_safety": 4,
+    "timeout_s": 10800,
+    "max_dofs": 24000000,
+    "native_footprint_limit_bytes": 19327352832,
+    "threads": 2
+  },
+  "reused_evidence_audit": {
+    "recorded_matrix_sha256": "6cfab100944bc80d3312da9bd6b3f5e66b2afa3c623f56e8d643b214a1dedb9f",
+    "evidence_hashes_verified": 765,
+    "magnetic_jobs": 37,
+    "saved_states": 185,
+    "control_pairs": 44
+  },
+  "case_preparation": {
+    "declaration": "scripts/solvers/cases/linear-dc-day-generated-cases-20261022-v2.json",
+    "saved_design_archive": "linear-dc-day-generated-designs-v2-20261022",
+    "host_exports": "Both actual saved designs exported through production prepare_dc_winding_geometry via the explicit Rust host export test,one passed/zero ignored per invocation. No fixture copper substitution.",
+    "case_a": "Compact two-strand four-layer board:77segments/54vias,active0/1,blind0-to-1,0.4mm depth,new declared saved pose6mm.",
+    "case_b": "Five-strand six-layer board:545segments/384vias,active0/1,blind0-to-1,0.3mm depth,70um inner copper,new declared saved pose12mm.",
+    "preserved_v1": "Inherited41.4mm mover position fell outside new travel in both v1 derived designs. Original/v1 files untouched;v2 explicitly declares valid new design poses with no automatic clamp. Unused declared layers are not called active coverage."
+  },
+  "memory_verification": {
+    "tool": "opencode-mem memory MCP",
+    "canonical_project": "/Users/dylanbertram/Dev/projects_embedded/pcbmotorgen",
+    "scope_hash": "c50ca0bbde64bb9c",
+    "status": "Initially no project memories. State,evidence,interruption and recovery memories now explicitly stored and retrieved. list-shards verified the first3memories/3vectors in current canonical project shard;fourth recovery memory separately search-verified. Not an orphaned worktree. Explicit persistence/retrieval is proven,not automatic capture of every turn."
+  },
+  "supervision_recovery": {
+    "probe_v1": "launchctl submit restarted the completed probe. Exclusive report reservation prevented duplicate execution; repeated starts failed. Label removed,all evidence preserved. Do not use submit for one-shot solver ownership.",
+    "probe_v2": "Explicit plist KeepAlive=false/RunAtLoad=true,bootstrapped from evidence directory,not a login/startup location. Probe completed exit0,launchctl print shows runs=1,last exit0,no stderr and no active instance. This tests ownership/runner,not numerical physics.",
+    "worker_label": "com.pcbmotorgen.dc.20261022.port-v3",
+    "watcher_label": "com.pcbmotorgen.dc.20261022.port-v3-watch",
+    "domain": "gui/501",
+    "service_evidence": "linear-dc-day-detached-supervision-v1-20261022",
+    "source_work": "dc-imported-star4-curvature4-port-control-v3-detached-day-20261022",
+    "current_status": "Fresh v3 submitted with same physical source,portfraction0.4,curvature4,10800s cap,24MDOF preassembly cap,18GiB native guard. Original v1/v2 fields not imported. Actual worker identity verified;supervisor parent is launchd PID1,not conversation shell. Independent one-shot watcher bootstrapped separately.",
+    "health_task": "d87a98ed-ebb4-4779-b16d-e23d91b24c82 now runs every5min until approved cutoff,checks actual receipts/launcher/service/identity and disables itself after19:59:49Z. No background numerical acceptance from liveness.",
+    "tests": "406helpers passed,0skips,28.708s in linear-dc-day-one-shot-supervision-all-helpers-v2-20261022.log,including input/deadline/native memory/one-shot ownership policies. No application/native E2E qualification from supervision probe."
+  }
+}

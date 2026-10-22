@@ -371,6 +371,24 @@ under the original 2% gate without rescaling. It took 247.17 s with a 3.05 GB
 maximum resident set. This confirms drive-profile invariance on that mesh, not
 acceptance of its failing barrel areas.
 
+Daytime supervision recovery: a conversation-owned solver and its watcher were
+both interrupted again after about 619 seconds. Actual process identities were
+absent despite stale `running`/`watching` files. The cause is not established.
+For offline jobs that must outlive conversation cancellation, use an explicit
+bounded declaration with `run_declared_solver_job.py` and `one_shot_launchd.py`.
+The latter bootstraps `KeepAlive=false`, `RunAtLoad=true` plists from the evidence
+directory, never installs them in a login/startup directory. Solver and read-only
+watcher have separate owned labels. Do not use `launchctl submit`: its probe
+restarted after completion; exclusive evidence creation prevented duplicate work
+and the probe label was removed. The corrected probe ran once and exited zero.
+Check the command receipt, launcher report and actual service/process identities;
+unload only completed owned labels and retain all evidence. The wrapper enforces
+immutable input hashes, full-budget-before-cutoff and the sampled native-memory
+guard. It never accepts a numerical result or retries automatically. This is not
+a guarantee across logout/reboot. Independent five-minute session checks catch
+ended jobs when OpenChamber is available. Production desktop jobs retain their
+existing managed ownership; this offline recovery does not change app admission.
+
 Long runs need both an explicit whole-job timeout and a background
 `watch_solver_jobs.py` observation configured with their actual supervisor process
 identity and receipt patterns. The read-only watcher checks receipts, new error
