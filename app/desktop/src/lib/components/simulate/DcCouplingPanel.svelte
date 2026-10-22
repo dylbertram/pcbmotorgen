@@ -3,7 +3,7 @@
   import type { ConfigStore } from "../../stores/config.svelte";
   import type { CadGeometry, LinearMotorConfig, DriveSettings } from "../../types";
   import type { DcApplicability, DcCapability, DcQualifiedCase, DcStudy } from "../../types/dcCoupling";
-  import { dcCouplingCapability, inspectDcCoupling, startDcCoupling, dcCouplingStatus, cancelDcCoupling } from "../../ipc/dcJobs";
+  import { dcCouplingCapability, inspectDcCoupling, startDcCoupling, startDcPreparation, dcCouplingStatus, cancelDcCoupling } from "../../ipc/dcJobs";
   import { DcJobController, type DcViewState } from "../../dcJobController";
 
   let { config, cadGeometry = null, active }: { config: ConfigStore; cadGeometry?: CadGeometry | null; active: boolean } = $props();
@@ -13,18 +13,24 @@
   let current = $state(0);
   let offset = $state(0);
   let acknowledged = $state(false);
+  let preparationAcknowledged = $state(false);
+  let operation = $state<"force" | "preparation">("force");
   let inputError = $state<string | null>(null);
   let applicability = $state<DcApplicability | null>(null);
   let inspecting = $state(false);
   let inspectionEpoch = 0;
   const busy = $derived(["starting", "running", "cancelling"].includes(view.phase));
   const force = $derived(view.phase === "completed" ? view.job?.result?.pm_array_force_n : null);
+  const preparationStages = { geometry: "Exact copper and material separation", source: "Fresh 1 V current solve",
+    active: "Active winding sections", passive: "Passive and stub sections", return: "Finite return sections",
+    independent: "Independent current reference", rt0: "Exact finite-current source export" };
   let destroyed = false;
-  let submitted: { config: LinearMotorConfig; drive: DriveSettings; cad: CadGeometry | null; study: DcStudy } | null = null;
+  let submitted: { config: LinearMotorConfig; drive: DriveSettings; cad: CadGeometry | null; study: DcStudy; operation: "force" | "preparation" } | null = null;
   const controller = new DcJobController({
     start: () => {
       const request = submitted!;
-      return startDcCoupling(request.config, request.drive, request.cad, request.study);
+      return request.operation === "preparation" ? startDcPreparation(request.config, request.drive, request.cad, request.study, 14400)
+        : startDcCoupling(request.config, request.drive, request.cad, request.study);
     },
     poll: dcCouplingStatus,
     cancel: cancelDcCoupling,
@@ -35,7 +41,7 @@
   $effect.pre(() => {
     void JSON.stringify(config.toIpc());void JSON.stringify(config.drive);void JSON.stringify(cadGeometry);
     void declaration;void current;void offset;void acknowledged;void active;
-    untrack(() => { inputError = null;applicability = null;inspectionEpoch++;inspecting = false;void controller.invalidate(); });
+    untrack(() => { inputError = null;applicability = null;preparationAcknowledged = false;inspectionEpoch++;inspecting = false;void controller.invalidate(); });
   });
   $effect(() => {
     if (!active) return;
@@ -91,12 +97,16 @@
     }
   }
 
-  async function calculate() {
+  async function calculate(nextOperation: "force" | "preparation" = "force") {
     inputError = null;
     try {
+      if (nextOperation === "preparation" && (!preparationAcknowledged || applicability?.state !== "preparation-required")) {
+        throw new Error("Check this design and explicitly confirm the separate preparation budget first.");
+      }
+      operation = nextOperation;
       const study = readStudy();
       submitted = { config: $state.snapshot(config.toIpc()), drive: $state.snapshot(config.drive),
-        cad: $state.snapshot(cadGeometry), study };
+        cad: $state.snapshot(cadGeometry), study, operation: nextOperation };
       await controller.start(study.request_id);
     } catch (error) {
       await controller.invalidate();inputError = String(error);
@@ -142,20 +152,25 @@
     <textarea bind:value={declaration} rows="5" spellcheck="false" placeholder={'{"material_model": {...}, "return_geometry": {...}}'}
       class="w-full rounded border border-slate-600 bg-slate-950 p-2 font-mono text-xs text-slate-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400"></textarea>
   </label>
-  <p class="text-slate-400">Use the full physical model and declared return from that design's qualified study. Copper is rebuilt from the active design, not this JSON. No automatic clearance correction or invented return. Unlisted designs need offline qualification before they can run here.</p>
+   <p class="text-slate-400">Provide the full explicit physical model and finite return. Copper is rebuilt from the active design, not this JSON. No automatic clearance correction or invented return. Source preparation alone does not qualify a force; unlisted designs still need complete refinement and magnetic qualification.</p>
   <label class="flex items-start gap-2">
     <input type="checkbox" bind:checked={acknowledged} class="mt-0.5" />
     <span>I acknowledge this explicit physical material placement and finite return. This does not modify the saved design or approve corrections for other designs.</span>
   </label>
   <div class="flex flex-wrap items-center gap-3">
-    <button type="button" disabled={!capability.available || !acknowledged || !declaration.trim() || busy || inspecting || !active} onclick={inspectDesign}
+    <button type="button" disabled={(!capability.available && !capability.preparation_available) || !acknowledged || !declaration.trim() || busy || inspecting || !active} onclick={inspectDesign}
       class="rounded border border-slate-600 px-3 py-1.5 hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400">Check this design</button>
-    <button type="button" disabled={!capability.available || !acknowledged || !declaration.trim() || busy || inspecting || !active || (applicability !== null && applicability.state !== "qualified")} onclick={calculate}
+    <button type="button" disabled={!capability.available || !acknowledged || !declaration.trim() || busy || inspecting || !active || (applicability !== null && applicability.state !== "qualified")} onclick={() => calculate()}
       class="rounded border border-emerald-600 px-3 py-1.5 text-emerald-200 hover:bg-emerald-950 disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400">Calculate static DC force</button>
     {#if busy}
       <button type="button" onclick={() => { void controller.cancel(); }} disabled={view.phase === "cancelling"}
         class="rounded border border-slate-600 px-3 py-1.5 hover:bg-slate-800 disabled:opacity-40">Cancel DC job</button>
-      <p role="status" class="text-slate-400">{view.phase === "cancelling" ? "Waiting for the desktop worker to stop. No force is displayed." : "Calculating fresh fields. Qualified-design solves take about 1–2 minutes; the whole job is capped at 360 s."}</p>
+      <p role="status" class="text-slate-400">{view.phase === "cancelling" ? "Waiting for the desktop worker to stop. No force is displayed." : operation === "preparation"
+        ? "Preparing actual copper and a fresh current source. This separate job can take hours, stops at 14,400 s and remains unqualified for force."
+        : "Calculating fresh fields. Qualified-design solves take about 1–2 minutes; the whole job is capped at 360 s."}</p>
+      {#if operation === "preparation" && view.job?.preparation_progress}
+        <p role="status" class="text-slate-400">Current stage: {preparationStages[view.job.preparation_progress.stage]}. Stage hard limit: {view.job.preparation_progress.stage_timeout_s} s.</p>
+      {/if}
     {/if}
   </div>
   {#if inspecting}
@@ -166,6 +181,25 @@
       <p class="text-slate-400">{applicability.reason}</p>
       <p class="text-slate-400">Current source: {applicability.source_status === "qualified-exact-basis" ? "verified for this exact geometry" : "unqualified"}. Force scope: {applicability.force_status === "qualified-sampled-states" ? "sampled current and pose states only" : "unqualified"}.</p>
       {#if applicability.qualified_case}<p class="text-slate-400">{applicability.qualified_case.label}</p>{/if}
+    </div>
+  {/if}
+  {#if applicability?.state === "preparation-required" && view.phase !== "prepared"}
+    <div aria-label="Source preparation" class="space-y-2 rounded border border-slate-700 p-2">
+      <p class="text-slate-200">Prepare the active design's current source</p>
+      <p class="text-slate-400">Generated straight-trace designs only. CAD, fresh 1 V current, all local sections, independent current agreement and exact source export run serially. Estimated preparation: hours, with substantial design-dependent uncertainty. Hard limit: 4 hours and a sampled 13 GiB native-memory guard. Edits, tab departure and cancellation stop the owned job.</p>
+      <p class="text-amber-200">This stage does not run the complete source refinements or magnetic qualification. It cannot register a case or return a force.</p>
+      {#if capability.preparation_available}
+        <label class="flex items-start gap-2"><input type="checkbox" bind:checked={preparationAcknowledged} disabled={busy} class="mt-0.5" /><span>I confirm the separate 14,400 s preparation budget. Source completion will still require refinement and force qualification.</span></label>
+        <button type="button" disabled={!preparationAcknowledged || busy || inspecting || !active || cadGeometry !== null} onclick={() => calculate("preparation")}
+          class="rounded border border-slate-600 px-3 py-1.5 hover:bg-slate-800 disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400">Prepare current source</button>
+      {:else}<p class="text-slate-400">{capability.preparation_reason ?? "A separately pinned source-preparation worker must be configured on this host."}</p>{/if}
+    </div>
+  {/if}
+  {#if view.phase === "prepared" && view.job?.preparation}
+    <div aria-label="Prepared unqualified current source" class="space-y-1 rounded border border-slate-700 p-2">
+      <p class="text-slate-200">Current source prepared. Force remains unqualified.</p>
+      <ul class="list-disc pl-4 text-slate-400">{#each view.job.preparation.remaining as remaining (remaining)}<li>{remaining}</li>{/each}</ul>
+      <p class="break-all text-slate-400">Evidence: {view.job.evidence_directory}</p>
     </div>
   {/if}
   {#if inputError || view.error}

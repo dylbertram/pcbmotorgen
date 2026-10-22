@@ -7,6 +7,22 @@ import check_dc_worker
 
 
 class PinnedWorkerEnvironmentTest(unittest.TestCase):
+    def test_preparation_mode_adds_only_the_explicitly_pinned_source_dependency(self):
+        path=check_dc_worker.HERE/'requirements-dc-worker.txt'
+        magnetic=check_dc_worker.required_packages(path)
+        preparation=check_dc_worker.required_packages(path,True)
+        self.assertNotIn('pyamg',magnetic)
+        self.assertEqual(preparation,magnetic|{'pyamg':'5.3.0'})
+
+    def test_magnetic_only_install_does_not_claim_source_preparation(self):
+        def version(name):
+            if name=='pyamg':raise check_dc_worker.metadata.PackageNotFoundError(name)
+            return check_dc_worker.pins(check_dc_worker.HERE/'requirements-dc-worker.txt')[name]
+        with mock.patch('check_dc_worker.metadata.version',side_effect=version):
+            self.assertEqual(check_dc_worker.problems(check_dc_worker.required_packages(check_dc_worker.HERE/'requirements-dc-worker.txt')),[])
+            found=check_dc_worker.problems(check_dc_worker.required_packages(check_dc_worker.HERE/'requirements-dc-worker.txt',True))
+        self.assertEqual(found,['missing pyamg==5.3.0'])
+
     def test_pins_parse_exact_versions_and_mismatches_are_named(self):
         with tempfile.TemporaryDirectory() as folder:
             path = Path(folder)/'pins.txt'

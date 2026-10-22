@@ -31,6 +31,7 @@ pub mod equilibrium;
 pub mod physics;
 pub mod stackup;
 pub mod units;
+pub mod visualization;
 
 // Re-export public types from the moved modules.
 pub use magnetic::{CommutationMode, ForceEvaluator, ForceResult, MagnetArray, BFieldSample2D};

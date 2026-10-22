@@ -48,6 +48,7 @@ export function buildCoilScene(geometry: CadGeometry | null) {
   for (const path of [...paths, ...vias]) for (const p of path.points) p.sub(center).multiplyScalar(scale);
   for (const t of terminals) t.point.sub(center).multiplyScalar(scale);
   return { paths, vias, terminals, width: Math.max(g.trace_width_mm, 0.01) * scale,
+    centerMm: center.toArray() as [number, number, number], scale,
     nets: [...new Set([...paths, ...vias].map(p => p.net))].sort() };
 }
 

@@ -1,13 +1,16 @@
 <script lang="ts">
   import { T, useThrelte } from "@threlte/core";
   import { Bounds, OrbitControls } from "@threlte/extras";
-  import { untrack } from "svelte";
+  import { untrack, tick } from "svelte";
   import type { OrthographicCamera } from "three";
   import type { CoilScene, CopperPath } from "../../coilScene";
   import { PHASE_COLORS } from "./coilPreviewCanvas";
   import CoilCopperBatch from "./CoilCopperBatch.svelte";
+  import SimulationFieldGlyphs from "./SimulationFieldGlyphs.svelte";
+  import type { FieldPreview } from "../../types/simulationVisualization";
+  import { HEAT_PALETTE, heatColor } from "../../visualizationGeometry";
 
-  let { scene, paths, vias, terminals, traceMode, reset, command, zScale }: {
+  let { scene, paths, vias, terminals, traceMode, reset, command, zScale, field = null, heat = null, opacity = .8 }: {
     scene: CoilScene;
     paths: CopperPath[];
     vias: CoilScene["vias"];
@@ -16,11 +19,28 @@
     reset: number;
     command: { id: number; zoom: number };
     zScale: number;
+    field?: FieldPreview | null;
+    heat?: Map<string, number> | null;
+    opacity?: number;
   } = $props();
   const { size, invalidate } = useThrelte();
   let camera = $state.raw<OrthographicCamera>();
   let zoom = $derived(Math.max(1, Math.min($size.width, $size.height) / 14));
-  let batches = $derived(scene.nets.map((net, idx) => ({ net, color: PHASE_COLORS[idx % PHASE_COLORS.length], paths: paths.filter(p => p.net === net) })));
+  const maximumLoss = $derived(heat ? Math.max(0, ...heat.values()) : 0);
+  let batches = $derived(heat ? [...HEAT_PALETTE, "#64748b"].map(color => ({ net: color, color,
+    paths: paths.filter(p => (heat.has(p.key) ? heatColor(heat.get(p.key)!, maximumLoss) : "#64748b") === color) }))
+    : scene.nets.map((net, idx) => ({ net, color: PHASE_COLORS[idx % PHASE_COLORS.length], paths: paths.filter(p => p.net === net) })));
+  const viaBatches = $derived(heat ? [...HEAT_PALETTE, "#64748b"].map(color => ({ color,
+    paths: vias.filter(p => (heat.has(p.key) ? heatColor(heat.get(p.key)!, maximumLoss) : "#64748b") === color) }))
+    : [{ color: "#fbbf24", paths: vias }]);
+  let bounds = $state<Bounds>();
+  // Fit new field extents and display-only Z exaggeration after geometry mounts.
+  $effect(() => {
+    void scene; void zScale; void reset; void field;
+    let cancelled = false;
+    void tick().then(() => { if (!cancelled) bounds?.fit(); });
+    return () => { cancelled = true; };
+  });
 
   // Button zoom is relative to the current camera, including wheel/pinch changes.
   $effect(() => {
@@ -44,11 +64,14 @@
 <T.DirectionalLight position={[5, 10, 8]} intensity={2} />
 
 {#key scene}
-<Bounds animate={false} margin={1.25}>
+<Bounds bind:this={bounds} animate={false} margin={1.25}>
 {#each batches as batch (batch.net)}
   <CoilCopperBatch paths={batch.paths} width={scene.width} color={batch.color} {zScale} centerlines={traceMode === "centerlines"} />
 {/each}
-<CoilCopperBatch paths={vias} width={scene.width * 1.6} color="#fbbf24" {zScale} />
+{#each viaBatches as batch (batch.color)}
+  <CoilCopperBatch paths={batch.paths} width={scene.width * 1.6} color={batch.color} {zScale} />
+{/each}
+{#if field}<SimulationFieldGlyphs {field} {scene} {zScale} {opacity} />{/if}
 {#each terminals as terminal (terminal.key)}
   <T.Mesh position={[terminal.point.x, terminal.point.y * zScale, terminal.point.z]}>
     <T.SphereGeometry args={[Math.max(scene.width, 0.045), 12, 8]} />

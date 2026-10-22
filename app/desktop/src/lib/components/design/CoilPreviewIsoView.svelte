@@ -1,12 +1,14 @@
 <script lang="ts">
   import type { CadGeometry } from "../../types";
   import type { CoilPreviewViewState } from "./coilPreviewViewState.svelte";
+  import type { VisualizationInput } from "../../types/simulationVisualization";
 
-  let { geometry, view, isVisible = () => true, showTerminals = true }: {
+  let { geometry, view, isVisible = () => true, showTerminals = true, simulation = null }: {
     geometry: CadGeometry | null;
     view: CoilPreviewViewState;
     isVisible?: (coil: string, layer: number) => boolean;
     showTerminals?: boolean;
+    simulation?: VisualizationInput | null;
   } = $props();
 
   // Keep Three.js and Threlte out of the initial, top-down app bundle.
@@ -16,7 +18,7 @@
 {#await viewer}
   <div class="flex h-full items-center justify-center text-sm text-slate-400" role="status">Loading 3D viewer…</div>
 {:then { default: Viewer }}
-  <Viewer {geometry} {view} {isVisible} {showTerminals} />
+  <Viewer {geometry} {view} {isVisible} {showTerminals} {simulation} />
 {:catch}
   <div class="flex h-full items-center justify-center text-sm text-slate-400" role="status">Could not load the 3D viewer. Switch to Top-down to view this geometry.</div>
 {/await}

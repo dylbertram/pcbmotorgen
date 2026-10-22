@@ -69,6 +69,7 @@
 
 pub mod cad_source;
 pub mod dc_jobs;
+pub mod visualization;
 pub mod dxf;
 pub mod kicad;
 pub mod physics;

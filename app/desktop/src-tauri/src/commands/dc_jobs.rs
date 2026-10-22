@@ -5,7 +5,7 @@ use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use std::{
     fs::{self, File},
-    io::Write,
+    io::{Read, Write},
     path::{Path, PathBuf},
     process::{Command, Stdio},
     sync::{
@@ -16,6 +16,7 @@ use std::{
 };
 
 const TIMEOUT: Duration = Duration::from_secs(360);
+const PREPARATION_TIMEOUT: Duration = Duration::from_secs(14_400);
 /// Written only by the offline registration of a case whose whole force-matrix
 /// audit passed. The worker re-verifies every entry; the host only lists them.
 const REGISTRY: &str = "dc-qualified-linear-cases-v1.json";
@@ -143,7 +144,15 @@ pub struct DcJobStatus {
     pub request_sha256: String,
     pub error: Option<String>,
     pub result: Option<Value>,
+    #[serde(default = "force_operation")]
+    pub operation: String,
+    #[serde(default)]
+    pub preparation: Option<Value>,
+    #[serde(default)]
+    pub preparation_progress: Option<Value>,
 }
+
+fn force_operation() -> String { "force".into() }
 
 impl DcJobStatus {
     fn active(&self) -> bool {
@@ -205,12 +214,89 @@ fn hash(bytes: &[u8]) -> String {
     format!("{:x}", Sha256::digest(bytes))
 }
 
+fn file_hash(path: &Path) -> Result<String, String> {
+    let mut file=File::open(path).map_err(|error| error.to_string())?;
+    let mut digest=Sha256::new();let mut buffer=[0u8;65536];
+    loop { let count=file.read(&mut buffer).map_err(|error| error.to_string())?;if count==0 {break;}digest.update(&buffer[..count]); }
+    Ok(format!("{:x}",digest.finalize()))
+}
+
 fn read_json(path: &Path) -> Result<Value, String> {
     if fs::metadata(path).map_err(|error| error.to_string())?.len() > 8_000_000 {
         return Err("DC report exceeds the declared 8 MB result cap".into());
     }
     serde_json::from_slice(&fs::read(path).map_err(|error| error.to_string())?)
         .map_err(|error| error.to_string())
+}
+
+fn preparation_runtime(mut runtime: Runtime) -> Result<Runtime, String> {
+    let python = PathBuf::from(std::env::var_os("PCB_MOTOR_DC_PREPARATION_PYTHON")
+        .ok_or("Source preparation is disabled: configure a separately pinned PCB_MOTOR_DC_PREPARATION_PYTHON")?);
+    if !python.is_absolute() || !python.is_file() { return Err("Preparation Python must be an existing absolute executable path".into()); }
+    // Preserve the virtualenv invocation path, not its base interpreter symlink.
+    runtime.python = python;
+    runtime.script = runtime.script.with_file_name("desktop_dc_preparation.py");
+    if !runtime.script.is_file() { return Err("Installed source-preparation worker is missing".into()); }
+    Ok(runtime)
+}
+
+fn verify_preparation(job: &Path, request: &Value, request_sha: &str) -> Result<Value, String> {
+    if hash(&fs::read(job.join("request.json")).map_err(|e| e.to_string())?) != request_sha {
+        return Err("Preparation request changed; stale source suppressed".into());
+    }
+    let receipt = read_json(&job.join("desktop-worker.log.command.json"))?;
+    let report = read_json(&job.join("result/summary.json"))?;
+    if receipt["status"] != "completed" || receipt["exit_code"].as_i64() != Some(0)
+        || report["status"] != "prepared-request-bound-current-source-not-qualified"
+        || report["input_request_sha256"] != request_sha || report["request_id"] != request["request_id"]
+        || report["force_status"] != "unqualified" || report["source_status"] != "prepared-baseline-needs-refinement"
+        || ["pm_array_force_n", "qualified_case", "force_n"].iter().any(|key| report.get(key).is_some())
+        || report["remaining"].as_array().map_or(true, |v| v.len() != 4)
+    { return Err("Source preparation lacks a successful bound unqualified report".into()); }
+    let root = job.canonicalize().map_err(|e| e.to_string())?;
+    let hashes = report["evidence_hashes"].as_object().ok_or("Prepared source has no evidence hashes")?;
+    if hashes.is_empty() { return Err("Prepared source evidence is empty".into()); }
+    for (name, digest) in hashes {
+        let path = PathBuf::from(name).canonicalize().map_err(|e| e.to_string())?;
+        if !path.starts_with(&root) || file_hash(&path)? != digest.as_str().ok_or("Invalid prepared evidence hash")? {
+            return Err("Prepared source evidence changed or escaped its immutable job".into());
+        }
+    }
+    let artifacts = report["artifacts"].as_object().ok_or("Prepared artifacts missing")?;
+    let expected = [("source", "source/summary.json"), ("active", "active.json"), ("passive", "passive.json"),
+        ("return", "return.json"), ("independent", "independent/summary.json"), ("rt0", "rt0/summary.json")];
+    if artifacts.len() != expected.len() { return Err("Incomplete source preparation artifacts".into()); }
+    for (name, relative) in expected {
+        let path = job.join("result").join(relative).canonicalize().map_err(|e| e.to_string())?;
+        if artifacts.get(name).and_then(Value::as_str) != Some(path.to_string_lossy().as_ref())
+            || !hashes.contains_key(path.to_string_lossy().as_ref()) {
+            return Err("Prepared artifacts are not bound to this job".into());
+        }
+    }
+    for (name, status) in [("active", "passed-finite-dc-all-eligible-winding-sections-only"),
+        ("passive", "passed-imported-passive-stub-zero-sections-only"), ("return", "passed-finite-dc-return-sections-only")] {
+        let value = read_json(Path::new(artifacts[name].as_str().ok_or("Invalid section artifact")?))?;
+        if value["status"] != status || value["failures"] != json!([])
+            || value["sections"].as_array().map_or(true, |v| v.is_empty() || v.iter().any(|section| section["passed"] != true)) {
+            return Err("Prepared source has failed or missing local-current gates".into());
+        }
+    }
+    if report["independent_current_agreement"]["passed"] != true
+        || report["independent_current_agreement"]["limit"] != 0.05 {
+        return Err("Prepared source lacks passing independent-current agreement".into());
+    }
+    for (name, expected) in [("source", "completed-finite-copper-closed-dc-basis-unqualified"),
+        ("independent", "completed-independent-primal-dc-check-unqualified"), ("rt0", "passed-affine-rt0-source-export-only")] {
+        let value=read_json(Path::new(artifacts[name].as_str().ok_or("Invalid source artifact")?))?;
+        if value["status"]!=expected {return Err("Prepared source contains an incomplete or unaccepted numerical artifact".into());}
+    }
+    let stages=report["stages"].as_object().ok_or("Preparation stage receipts missing")?;
+    let expected=[("geometry",1800), ("source",5400), ("active",3600), ("passive",1800), ("return",300), ("independent",600), ("rt0",600)];
+    if stages.len()!=expected.len() || expected.iter().any(|(name,seconds)| report["stages"][*name]["state"]!="completed"
+        || report["stages"][*name]["hard_timeout_s"].as_u64()!=Some(*seconds)) {
+        return Err("Preparation must complete every declared bounded stage".into());
+    }
+    Ok(report)
 }
 
 fn verify_result(job: &Path, request: &Value, request_sha: &str) -> Result<Value, String> {
@@ -323,6 +409,11 @@ impl DcJobs {
         request: Value,
         timeout: Duration,
     ) -> Result<DcJobStatus, String> {
+        self.launch_operation(runtime, request, timeout, "force")
+    }
+
+    fn launch_operation(&self, runtime: Runtime, request: Value, timeout: Duration, operation: &'static str) -> Result<DcJobStatus, String> {
+        if !["force", "preparation"].contains(&operation) { return Err("Unknown DC operation".into()); }
         let bytes = serde_json::to_vec_pretty(&request).map_err(|error| error.to_string())?;
         if bytes.len() > 8_000_000 {
             return Err("DC request exceeds the declared 8 MB input cap".into());
@@ -373,8 +464,12 @@ impl DcJobs {
             request_sha256: hash(&bytes),
             error: None,
             result: None,
+            operation: operation.into(),
+            preparation: None,
+            preparation_progress: None,
         };
         let mut command = runtime.command(&request_path, &job);
+        if operation == "preparation" { command.env_remove("PYTHONPATH"); }
         let log = File::options()
             .write(true)
             .create_new(true)
@@ -415,9 +510,14 @@ impl DcJobs {
                 let mut final_status = initial_thread;
                 let request_sha = final_status.request_sha256.clone();
                 let mut finish = |state: &str, error: Option<String>, result: Option<Value>| {
+                    let cancelled = cancel_thread.load(Ordering::SeqCst) && ["completed", "prepared"].contains(&state);
+                    let (state,error,result)=if cancelled { ("cancelled",Some("DC request cancelled during result verification; no result returned".into()),None) }
+                        else { (state,error,result) };
                     final_status.state = state.into();
                     final_status.error = error;
-                    final_status.result = result;
+                    if operation == "preparation" { final_status.preparation = result;final_status.result = None; }
+                    else { final_status.result = result;final_status.preparation = None; }
+                    final_status.preparation_progress = None;
                     final_status.elapsed_seconds = start.elapsed().as_secs_f64();
                     if let Ok(mut slot) = shared.job.lock() {
                         if slot
@@ -469,13 +569,16 @@ impl DcJobs {
                                     None,
                                 );
                             } else if exit.success() {
-                                match verify_result(&job, &request, &request_sha) {
-                                    Ok(result) => finish("completed", None, Some(result)),
+                                let verified = if operation == "preparation" { verify_preparation(&job, &request, &request_sha) }
+                                    else { verify_result(&job, &request, &request_sha) };
+                                match verified {
+                                    Ok(result) => finish(if operation == "preparation" { "prepared" } else { "completed" }, None, Some(result)),
                                     Err(error) => finish("failed", Some(error), None),
                                 }
                             } else {
-                                let detail = fs::read_to_string(job.join("desktop-worker.log"))
+                                let mut detail = fs::read_to_string(job.join("desktop-worker.log"))
                                     .unwrap_or_default();
+                                if detail.trim().is_empty() { detail = fs::read_to_string(job.join("desktop.log")).unwrap_or_default(); }
                                 let tail: String = detail
                                     .chars()
                                     .rev()
@@ -530,7 +633,18 @@ impl DcJobs {
             .as_ref()
             .filter(|job| job.status.job_id == id)
             .ok_or("Unknown or superseded DC job")?;
-        Ok(job.status.clone())
+        let mut status=job.status.clone();
+        if status.active() && status.operation=="preparation" {
+            if let Ok(report)=read_json(&Path::new(&status.evidence_directory).join("result/summary.json")) {
+                if report["input_request_sha256"]==status.request_sha256 && report["request_id"]==status.request_id {
+                    let stages=["geometry","source","active","passive","return","independent","rt0"];
+                    if let Some(stage)=stages.iter().find(|stage| report["stages"][**stage]["state"]=="running") {
+                        status.preparation_progress=Some(json!({"stage":stage,"stage_timeout_s":report["stages"][*stage]["hard_timeout_s"]}));
+                    }
+                }
+            }
+        }
+        Ok(status)
     }
 
     pub fn cancel(&self, id: &str) -> Result<DcJobStatus, String> {
@@ -543,6 +657,7 @@ impl DcJobs {
             job.cancel.store(true, Ordering::SeqCst);
             job.status.state = "cancelling".into();
             job.status.result = None;
+            job.status.preparation = None;
         }
         Ok(job.status.clone())
     }
@@ -680,16 +795,38 @@ pub async fn inspect_dc_coupling(
 
 #[tauri::command]
 pub fn dc_coupling_capability() -> Value {
+    let preparation = Runtime::from_env().and_then(preparation_runtime);
+    let preparation_available = preparation.is_ok();
+    let preparation_reason = preparation.err();
     match Runtime::from_env().and_then(|runtime| qualified_cases(&runtime.archive)) {
         Ok(cases) if cases.is_empty() => {
-            json!({"available":false,"reason":"No qualified linear DC case is registered on this host; designs need offline qualification first"})
+            json!({"available":false,"reason":"No qualified linear DC case is registered on this host; designs need complete qualification first",
+                "preparation_available":preparation_available,"preparation_reason":preparation_reason,"preparation_timeout_s":PREPARATION_TIMEOUT.as_secs()})
         }
         Ok(cases) => {
             json!({"available":true,"qualified_cases":cases,
+                "preparation_available":preparation_available,"preparation_reason":preparation_reason,"preparation_timeout_s":PREPARATION_TIMEOUT.as_secs(),
                 "scope":"Registered individually qualified linear designs and their sampled current/pose states only; provisional reversible material law; no interpolation or hardware qualification"})
         }
-        Err(error) => json!({"available":false,"reason":error}),
+        Err(error) => json!({"available":false,"reason":error,"preparation_available":false,"preparation_reason":preparation_reason}),
     }
+}
+
+#[tauri::command]
+pub async fn start_dc_preparation(
+    jobs: tauri::State<'_, DcJobs>,
+    config: crate::ipc::LinearMotorConfigIpc,
+    drive_settings: pcbmotorgen_simulation::drive::DriveSettings,
+    cad_geometry: Option<pcbmotorgen_export::cad_dxf::CadGeometry>,
+    study: DcStudy,
+    confirmed_timeout_s: u64,
+) -> Result<DcJobStatus, String> {
+    if confirmed_timeout_s != PREPARATION_TIMEOUT.as_secs() { return Err("Explicitly confirm the separate 14400 s preparation budget before launching".into()); }
+    study.validate()?;
+    if cad_geometry.is_some() { return Err("In-app preparation currently accepts actual generated linear copper only; imported preparation remains separate".into()); }
+    let runtime = preparation_runtime(Runtime::from_env()?)?;
+    let winding = super::physics::prepare_dc_winding_geometry(config, drive_settings, cad_geometry).await?;
+    jobs.launch_operation(runtime, study.request(winding), PREPARATION_TIMEOUT, "preparation")
 }
 
 #[tauri::command]
@@ -726,6 +863,110 @@ pub fn cancel_dc_coupling(
 #[cfg(all(test, unix))]
 mod tests {
     use super::*;
+
+    #[test]
+    fn preparation_shares_owned_job_shutdown_and_never_returns_a_force() {
+        let dir = tempfile::tempdir().unwrap();let jobs = DcJobs::default();
+        let rt = runtime(dir.path(), "import time\ntime.sleep(30)\n");
+        let initial = jobs.launch_operation(rt.clone(), json!({"request_id":"prepare"}), Duration::from_secs(10), "preparation").unwrap();
+        assert_eq!(initial.operation, "preparation");assert!(initial.preparation.is_none());
+        assert!(jobs.launch(rt, json!({"request_id":"force"}), TIMEOUT).is_err());assert!(jobs.begin_inspection().is_err());
+        jobs.shutdown();let ended=wait(&jobs,&initial.job_id);
+        assert_eq!(ended.state,"cancelled");assert!(ended.result.is_none());assert!(ended.preparation.is_none());
+    }
+
+    #[test]
+    fn successful_exit_with_a_force_cannot_complete_source_preparation() {
+        let dir = tempfile::tempdir().unwrap();let jobs=DcJobs::default();
+        let rt=runtime(dir.path(), "import json\nfrom pathlib import Path\nPath('result').mkdir()\nPath('result/summary.json').write_text(json.dumps({'status':'prepared-request-bound-current-source-not-qualified','pm_array_force_n':[1,2,3]}))\nPath('desktop-worker.log.command.json').write_text(json.dumps({'status':'completed','exit_code':0}))\n");
+        let initial=jobs.launch_operation(rt,json!({"request_id":"unqualified"}),Duration::from_secs(10),"preparation").unwrap();
+        let ended=wait(&jobs,&initial.job_id);assert_eq!(ended.state,"failed");assert!(ended.result.is_none());assert!(ended.preparation.is_none());
+    }
+
+    #[test]
+    fn preparation_verifier_preserves_source_only_scope_and_checks_every_artifact() {
+        // Host contract fixture only. No source/mesh/field calculation is
+        // represented as numerical evidence by this unit test.
+        let folder=tempfile::tempdir().unwrap();let job=folder.path().canonicalize().unwrap();
+        let request=json!({"request_id":"source-contract"});let bytes=serde_json::to_vec_pretty(&request).unwrap();
+        fs::write(job.join("request.json"),&bytes).unwrap();let digest=hash(&bytes);fs::create_dir(job.join("result")).unwrap();
+        fs::write(job.join("desktop-worker.log.command.json"),serde_json::to_vec(&json!({"status":"completed","exit_code":0})).unwrap()).unwrap();
+        let mut artifacts=serde_json::Map::new();let mut hashes=serde_json::Map::new();
+        for (name,path,status) in [("source","source/summary.json","completed-finite-copper-closed-dc-basis-unqualified"),
+            ("active","active.json","passed-finite-dc-all-eligible-winding-sections-only"),
+            ("passive","passive.json","passed-imported-passive-stub-zero-sections-only"),
+            ("return","return.json","passed-finite-dc-return-sections-only"),
+            ("independent","independent/summary.json","completed-independent-primal-dc-check-unqualified"),
+            ("rt0","rt0/summary.json","passed-affine-rt0-source-export-only")] {
+            let path=job.join("result").join(path);fs::create_dir_all(path.parent().unwrap()).unwrap();
+            fs::write(&path,serde_json::to_vec(&json!({"status":status,"failures":[],"sections":[{"passed":true}]})).unwrap()).unwrap();
+            artifacts.insert(name.into(),json!(path));hashes.insert(path.to_string_lossy().into(),json!(file_hash(&path).unwrap()));
+        }
+        let mut stages=serde_json::Map::new();
+        for (name,seconds) in [("geometry",1800),("source",5400),("active",3600),("passive",1800),("return",300),("independent",600),("rt0",600)] {
+            stages.insert(name.into(),json!({"state":"completed","hard_timeout_s":seconds}));
+        }
+        let report=json!({"status":"prepared-request-bound-current-source-not-qualified","request_id":"source-contract",
+            "input_request_sha256":digest,"force_status":"unqualified","source_status":"prepared-baseline-needs-refinement",
+            "remaining":["source","fields","forces","admission"],"artifacts":artifacts,"evidence_hashes":hashes,"stages":stages,
+            "independent_current_agreement":{"passed":true,"limit":0.05}});
+        let path=job.join("result/summary.json");fs::write(&path,serde_json::to_vec(&report).unwrap()).unwrap();
+        assert!(verify_preparation(&job,&request,&digest).is_ok());
+        for change in ["force","stage","hash","scope","state"] {
+            let mut value=report.clone();
+            match change {
+                "force"=>value["pm_array_force_n"]=json!([1,2,3]),
+                "stage"=>value["stages"]["active"]["state"]=json!("running"),
+                "hash"=>value["evidence_hashes"][job.join("result/source/summary.json").to_string_lossy().as_ref()]=json!("stale"),
+                "scope"=>value["force_status"]=json!("qualified"),
+                _=>value["status"]=json!("running"),
+            }
+            fs::write(&path,serde_json::to_vec(&value).unwrap()).unwrap();
+            assert!(verify_preparation(&job,&request,&digest).is_err(),"{change}");
+        }
+    }
+
+    #[test]
+    #[ignore = "Explicit real saved-design source-preparation cancellation; requires configured clean preparation worker/project/study"]
+    fn real_saved_design_preparation_stops_before_current_solve() {
+        let runtime=preparation_runtime(Runtime::from_env().unwrap()).unwrap();
+        let project=read_json(Path::new(&std::env::var("PCB_MOTOR_PROJECT_PATH").unwrap())).unwrap();
+        let state=&project["versions"][1]["state"];
+        let config:crate::ipc::ProjectConfigStateIpc=serde_json::from_value(state["config"].clone()).unwrap();
+        let cad=serde_json::from_value(state["cad_geometry"].clone()).unwrap();
+        let explicit=read_json(Path::new(&std::env::var("PCB_MOTOR_DC_STUDY_REQUEST_PATH").unwrap())).unwrap();
+        let winding=tauri::async_runtime::block_on(super::super::physics::prepare_dc_winding_geometry(
+            config.to_linear_motor_ipc(),config.drive,cad)).unwrap();
+        let study=DcStudy{request_id:format!("preparation-cancel-{}",std::process::id()),material_model:explicit["material_model"].clone(),
+            return_geometry:explicit["return_geometry"].clone(),current_a:0.1,pm_offset_x_m:0.,placement_acknowledged:true};
+        let jobs=DcJobs::default();
+        // The acceptance probe itself has a30s whole-host cap and cancels as
+        // soon as CAD starts. It never launches or repeats an accepted source.
+        let initial=jobs.launch_operation(runtime,study.request(winding),Duration::from_secs(30),"preparation").unwrap();
+        let evidence=PathBuf::from(&initial.evidence_directory);println!("Real preparation cancellation evidence: {}",evidence.display());
+        let start=Instant::now();
+        loop {
+            if let Ok(report)=read_json(&evidence.join("result/summary.json")) {
+                if report["stages"]["geometry"]["state"]=="running" { break; }
+            }
+            let status=jobs.status(&initial.job_id).unwrap();assert!(status.active(),"{:?}",status.error);
+            assert!(start.elapsed()<Duration::from_secs(15));std::thread::sleep(Duration::from_millis(10));
+        }
+        assert!(!evidence.join("result/source").exists());jobs.cancel(&initial.job_id).unwrap();
+        let stopped=wait(&jobs,&initial.job_id);assert_eq!(stopped.state,"cancelled");
+        assert!(stopped.result.is_none());assert!(stopped.preparation.is_none());
+        let launch=read_json(&evidence.join("desktop-launch.json")).unwrap();let pid=launch["pid"].as_i64().unwrap() as i32;
+        let start=Instant::now();
+        loop {
+            let output=Command::new("/bin/ps").args(["-axo","pgid=,stat="]).output().unwrap();
+            let live=String::from_utf8(output.stdout).unwrap().lines().any(|line| {
+                let fields:Vec<_>=line.split_whitespace().collect();fields.len()==2&&fields[0].parse::<i32>().ok()==Some(pid)&&!fields[1].starts_with('Z')
+            });
+            if !live {break;}
+            assert!(start.elapsed()<Duration::from_secs(3),"Live preparation child survived cancellation");std::thread::sleep(Duration::from_millis(20));
+        }
+        assert!(!evidence.join("result/source").exists());
+    }
 
     fn runtime(directory: &Path, script: &str) -> Runtime {
         let path = directory.join("test-worker.py");

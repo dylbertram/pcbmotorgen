@@ -29,6 +29,14 @@ export async function inspectDcCoupling(
   return invoke<DcApplicability>("inspect_dc_coupling", { config, driveSettings, cadGeometry, study });
 }
 
+export async function startDcPreparation(
+  config: LinearMotorConfig, driveSettings: DriveSettings, cadGeometry: CadGeometry | null, study: DcStudy,
+  confirmedTimeoutS: number,
+): Promise<DcJobStatus> {
+  requireDesktop();assertCadMapping(cadGeometry, config);
+  return invoke<DcJobStatus>("start_dc_preparation", { config, driveSettings, cadGeometry, study, confirmedTimeoutS });
+}
+
 export async function dcCouplingStatus(jobId: string): Promise<DcJobStatus> {
   requireDesktop();return invoke<DcJobStatus>("dc_coupling_status", { jobId });
 }

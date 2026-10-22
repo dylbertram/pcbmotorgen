@@ -11,7 +11,7 @@ export interface DcJobTransport {
 }
 
 export interface DcViewState {
-  phase: "idle" | "starting" | "running" | "cancelling" | "completed" | "failed" | "cancelled";
+  phase: "idle" | "starting" | "running" | "cancelling" | "completed" | "prepared" | "failed" | "cancelled";
   job: DcJobStatus | null;
   error: string | null;
 }
@@ -125,9 +125,20 @@ export class DcJobController {
       this.update({phase:this.busy ? "cancelling" : "cancelled",job:null,error:job.error});
       return;
     }
+    if (job.state === "prepared") {
+      const prepared = job.preparation;
+      if (job.operation !== "preparation" || job.result !== null || !prepared
+        || prepared.status !== "prepared-request-bound-current-source-not-qualified"
+        || prepared.input_request_sha256 !== job.request_sha256 || prepared.request_id !== job.request_id
+        || prepared.force_status !== "unqualified" || prepared.source_status !== "prepared-baseline-needs-refinement"
+        || prepared.remaining.length !== 4 || Object.keys(prepared.artifacts).sort().join(",") !== "active,independent,passive,return,rt0,source"
+        || Object.keys(prepared.evidence_hashes).length === 0 || "pm_array_force_n" in prepared || "qualified_case" in prepared) {
+        throw new Error("Unverified or improperly qualified DC preparation response");
+      }
+    } else if (job.preparation != null) throw new Error("Non-prepared DC job returned source artifacts");
     if (job.state === "completed") {
       const result = job.result;
-      if (!result || result.status !== "passed-fresh-qualified-geometry-dc-request-only"
+      if (job.operation === "preparation" || !result || result.status !== "passed-fresh-qualified-geometry-dc-request-only"
         || result.input_request_sha256 !== job.request_sha256
         || result.eligibility.request_id !== job.request_id
         || typeof result.qualified_case?.case_id !== "string"
@@ -138,6 +149,6 @@ export class DcJobController {
     } else if (job.result !== null) throw new Error("Non-completed DC job returned a force");
     this.job = job;this.busy = active(job);
     this.update({ phase: active(job) ? job.state as "running" | "cancelling" : job.state === "completed" ? "completed"
-      : job.state === "cancelled" ? "cancelled" : "failed", job: job.state === "completed" || active(job) ? job : null, error: job.error });
+      : job.state === "prepared" ? "prepared" : job.state === "cancelled" ? "cancelled" : "failed", job: job.state === "completed" || job.state === "prepared" || active(job) ? job : null, error: job.error });
   }
 }

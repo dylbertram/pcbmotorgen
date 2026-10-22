@@ -80,6 +80,7 @@
     bandRowInOnePeriod,
   } from "./coilPreviewCanvas";
   import { CoilPreviewViewState } from "./coilPreviewViewState.svelte";
+  import type { VisualizationInput } from "../../types/simulationVisualization";
 
   let {
     config,
@@ -88,6 +89,7 @@
     expanded = $bindable(false),
     workspace = false,
     active = true,
+    simulationActive = false,
     designSettings,
     sidePanel = $bindable<PreviewPanelId | null>(null),
     drive = null,
@@ -97,7 +99,7 @@
     onGeometryChange,
     camera,
     view = new CoilPreviewViewState(),
-  }: { config: ConfigStore; coils: CoilPathDto | null; motion: MotionStore; expanded?: boolean; workspace?: boolean; active?: boolean; designSettings?: Snippet<[DesignPanelId]>; sidePanel?: PreviewPanelId | null; drive?: DriveAnalysis | null; driveError?: string | null; drivePending?: boolean; importedGeometry?: CadGeometry | null; onGeometryChange?: (geometry: CadGeometry) => void; camera?: PreviewCamera; view?: CoilPreviewViewState } =
+  }: { config: ConfigStore; coils: CoilPathDto | null; motion: MotionStore; expanded?: boolean; workspace?: boolean; active?: boolean; simulationActive?: boolean; designSettings?: Snippet<[DesignPanelId]>; sidePanel?: PreviewPanelId | null; drive?: DriveAnalysis | null; driveError?: string | null; drivePending?: boolean; importedGeometry?: CadGeometry | null; onGeometryChange?: (geometry: CadGeometry) => void; camera?: PreviewCamera; view?: CoilPreviewViewState } =
     $props();
 
   export function showDesignSettings(section: DesignPanelId = "constraints"): void { sidePanel = section; }
@@ -292,6 +294,8 @@
   // fit always includes them so reset-view never clips an annotation.
   // -------------------------------------------------------------------
   let firstMagnetCentreX = $derived(magnetCenterX(visibleMagnets));
+  const visualizationInput = $derived<VisualizationInput | null>(active && simulationActive && firstMagnetCentreX !== null
+    ? { config: config.toIpc(), drive: config.drive, cadGeometry: importedGeometry, moverPositionM: firstMagnetCentreX } : null);
   let poleRuler = $derived(
     computePolePitchRuler(
       coils?.routing_dimensions,
@@ -562,7 +566,7 @@
          renderer (canvas.dataset in coilPreviewCanvas.ts), NOT bound
          reactively — see the counter comment there. -->
     {#if view.viewMode === "iso"}
-      <CoilPreviewIsoView geometry={terminalGeometry} {view} isVisible={isTerminalVisible} showTerminals={false} />
+      <CoilPreviewIsoView geometry={terminalGeometry} {view} isVisible={isTerminalVisible} showTerminals={false} simulation={visualizationInput} />
     {:else}
       <canvas bind:this={canvasRef} class="block h-full w-full"></canvas>
     {/if}
@@ -585,6 +589,7 @@
     <CoilPreviewLightbox
       embedded={inline}
       {active}
+      simulation={visualizationInput}
       {designSettings}
       bind:sidePanel
       bind:expanded

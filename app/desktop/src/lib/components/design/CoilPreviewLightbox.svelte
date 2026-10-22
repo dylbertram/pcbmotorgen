@@ -41,11 +41,13 @@
   import HoldingForceChart from "./HoldingForceChart.svelte";
   import PreviewStatus from "./PreviewStatus.svelte";
   import type { DriveAnalysis } from "../../types";
+  import type { VisualizationInput } from "../../types/simulationVisualization";
 
   let {
     expanded = $bindable(false),
     embedded = false,
     active = true,
+    simulation = null,
     designSettings,
     sidePanel = $bindable<PreviewPanelId | null>(null),
     height = PREVIEW_H,
@@ -82,6 +84,7 @@
     expanded?: boolean;
     embedded?: boolean;
     active?: boolean;
+    simulation?: VisualizationInput | null;
     designSettings?: Snippet<[DesignPanelId]>;
     sidePanel?: PreviewPanelId | null;
     height?: number;
@@ -221,7 +224,7 @@
             label={embedded ? "Coil preview" : "Coil preview — expanded"}>
             {#if view.viewMode === "iso"}
               <div class="absolute inset-y-0" style:left={`${leftDockWidth}px`} style:right={`${dockWidth + 44}px`}>
-                <CoilPreviewIsoView geometry={terminalGeometry ?? importedGeometry} {view} isVisible={isTerminalVisible} />
+                <CoilPreviewIsoView geometry={terminalGeometry ?? importedGeometry} {view} isVisible={isTerminalVisible} {simulation} />
               </div>
             {:else}
             <canvas bind:this={modalCanvasRef} class="block h-full w-full"

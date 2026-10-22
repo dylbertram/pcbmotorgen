@@ -8,7 +8,7 @@ async function openPanel(page: Page, bridge = true) {
     const w = window as any;
     w.dcMode = "completed"; w.dcInspectMode = "qualified"; w.dcCalls = [];
     w.__TAURI_INTERNALS__ = { invoke: async (command: string, args: any) => {
-      if (command === "dc_coupling_capability") return { available: true, scope: "UI fixture only", qualified_cases: [
+      if (command === "dc_coupling_capability") return { available: true, preparation_available:true, preparation_timeout_s:14400, scope: "UI fixture only", qualified_cases: [
         {case_id:"fixture-case",label:"Fixture qualified design",audit_sha256:"fixture-audit",
          declaration:{material_model:{fixture:true},return_geometry:{fixture:true}}}] };
       w.dcCalls.push({command,args});
@@ -22,15 +22,22 @@ async function openPanel(page: Page, bridge = true) {
         if (w.dcInspectMode === "delayed") return new Promise(resolve => {w.resolveDcInspection=()=>resolve(report);});
         return report;
       }
-      if (command === "start_dc_coupling") {
+      if (command === "start_dc_coupling" || command === "start_dc_preparation") {
         if (w.dcMode === "failed") throw new Error("Actual winding differs from qualified geometry");
         w.dcJob = {request_id:args.study.request_id,job_id:`job-${args.study.request_id}`,state:"running",
-          request_sha256:"fresh-content-hash",elapsed_seconds:0,evidence_directory:"/test-ui-only",error:null,result:null};
+          request_sha256:"fresh-content-hash",elapsed_seconds:0,evidence_directory:"/test-ui-only",error:null,result:null,
+          operation:command === "start_dc_preparation" ? "preparation" : "force"};
         if (w.dcMode === "start-delayed") return new Promise(resolve => {w.resolveDcStart=()=>resolve(w.dcJob);});
         return w.dcJob;
       }
       if (command === "cancel_dc_coupling") return {...w.dcJob,state:"cancelled",result:null};
       if (command === "dc_coupling_status") {
+        if(w.dcJob.operation === "preparation") {
+          if(w.dcMode === "pending")return w.dcJob;
+          return {...w.dcJob,state:"prepared",preparation:{status:"prepared-request-bound-current-source-not-qualified",input_request_sha256:"fresh-content-hash",
+            request_id:w.dcJob.request_id,source_status:"prepared-baseline-needs-refinement",force_status:"unqualified",
+            remaining:["source refinements","near fields","magnetic matrix","admission"],artifacts:{source:"ui-only",active:"ui-only",passive:"ui-only",return:"ui-only",independent:"ui-only",rt0:"ui-only"},evidence_hashes:{"ui-only":"not-numerical-evidence"}}};
+        }
         const qualified = {case_id:"fixture-case",label:"Fixture qualified design",audit_sha256:"fixture-audit"};
         const complete = {...w.dcJob,state:"completed",result:{status:"passed-fresh-qualified-geometry-dc-request-only",
           input_request_sha256:"fresh-content-hash",fresh_solution_sha256:"test-solution-hash",pm_array_force_n:[0.001,0.002,-1.1],
@@ -161,4 +168,31 @@ test("a late applicability check cannot qualify edited geometry",async({page})=>
   await page.evaluate(()=>{(window as any).resolveDcInspection();});
   await expect(panel.getByLabel("Active design DC applicability")).toHaveCount(0);
   await expect(panel.locator("dl")).toHaveCount(0);
+});
+
+test("source preparation requires a separate budget and never qualifies fixture forces",async({page})=>{
+  const panel=await openPanel(page);await declare(page);
+  await page.evaluate(()=>{(window as any).dcInspectMode="preparation";});
+  await panel.getByRole("button",{name:"Check this design",exact:true}).click();
+  await expect(panel.getByRole("button",{name:"Prepare current source",exact:true})).toBeDisabled();
+  await panel.getByRole("checkbox",{name:/I confirm the separate/}).check();
+  await panel.getByRole("button",{name:"Prepare current source",exact:true}).click();
+  await expect(panel.getByLabel("Prepared unqualified current source")).toContainText("Force remains unqualified");
+  await expect(panel.getByRole("button",{name:"Calculate static DC force",exact:true})).toBeDisabled();
+  await expect(panel.locator("dl")).toHaveCount(0);
+  const call=await page.evaluate(()=>(window as any).dcCalls.find((c:any)=>c.command==="start_dc_preparation"));
+  expect(call.args.confirmedTimeoutS).toBe(14400);
+  await panel.getByRole("combobox",{name:"Loop current (A)"}).selectOption("0.1");
+  await expect(panel.getByLabel("Prepared unqualified current source")).toHaveCount(0);
+});
+
+test("leaving a preparing source stops its owned job and clears late source status",async({page})=>{
+  const panel=await openPanel(page);await declare(page);
+  await page.evaluate(()=>{(window as any).dcInspectMode="preparation";(window as any).dcMode="pending";});
+  await panel.getByRole("button",{name:"Check this design",exact:true}).click();
+  await panel.getByRole("checkbox",{name:/I confirm the separate/}).check();
+  await panel.getByRole("button",{name:"Prepare current source",exact:true}).click();
+  await expect(panel).toContainText("Preparing actual copper and a fresh current source");
+  await page.getByRole("tab",{name:"Summary (live metrics)",exact:true}).click();
+  await expect.poll(()=>page.evaluate(()=>(window as any).dcCalls.filter((c:any)=>c.command==="cancel_dc_coupling").length)).toBeGreaterThan(0);
 });

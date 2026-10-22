@@ -344,10 +344,21 @@ evidence, not an optional cache. Other platforms remain unqualified.
 NGSolve/Netgen are LGPL-2.1 and OCCT LGPL-2.1 with exception; this local
 installation redistributes nothing.
 
-This installer covers the admitted fresh magnetic worker, not a complete
-new-design source-preparation environment. The current offline source pipeline
-also uses separately pinned PyAMG 5.3.0; that dependency and the long preparation
-lifecycle are not yet qualified as part of the app installer. The installed
+The default installer covers the admitted fresh magnetic worker. The optional
+source-preparation environment also pins PyAMG 5.3.0, without a developer
+`PYTHONPATH`, and exercises its installed compiled operations:
+
+```sh
+scripts/solvers/install_dc_worker_macos.sh "$HOME/.local/opt/pcbmotorgen-dc-source-worker" /opt/homebrew/bin/python3.12 --preparation
+export PCB_MOTOR_DC_PREPARATION_PYTHON="$HOME/.local/opt/pcbmotorgen-dc-source-worker/bin/python"
+```
+
+This is a new environment; the installer refuses to overwrite an existing one.
+`check_dc_worker.py --preparation` checks both requirement files and imports the
+preparation entrypoints. Same-machine clean installation, actual-request CAD
+and actual saved-host cancellation have been exercised. Full new-request source
+completion, isolated-user/machine reproduction and general qualification are
+still separate acceptance requirements. The installed magnetic worker's
 18-package license-file/metadata inventory is recorded separately in
 `linear-dc-day-worker-license-metadata-v1-20261022.json` under the evidence root.
 That inventory does not settle transitive native-library or redistribution
@@ -363,6 +374,26 @@ timed-out or mismatched jobs return no force. The host checks request identity a
 content, successful receipt, force vector, fresh magnetic report and solution
 hashes, and the selected fresh current state before publishing a result.
 
+**Prepare current source** is an explicitly acknowledged separate operation,
+not an extension of the 360 s force job. Its hard limit is14,400 s, with a
+sampled13 GiB native guard,8 GiB evidence cap and8 GiB free-disk reserve;
+16 GiB free disk is required before launch. Stage names and hard limits are
+reported separately. The actual host request supplies the copper and explicit
+placement/return, and serial stages preserve exact CAD, fresh baseline current,
+eligible active/passive/return checks, independent H1 agreement and exact RT0.
+All stage budgets must fit the remaining whole-job budget. No prior failed
+field is imported. It shares job ownership, cancellation, shutdown and stale
+result suppression with force jobs. Large evidence files are verified with
+streamed hashes rather than loading a complete mesh into the host's RAM.
+
+The completed source state is **prepared, not force-qualified**. It still
+requires source refinements, fixed near-field controls, the full magnetic and
+downstream source-force matrix and exact-case admission. The preparation worker
+cannot register a case or return a force. Unsupported imported preparation,
+ambiguous return endpoints, changed copper cross-section, unsupported shapes
+and failed numerical gates are rejected without geometry repair. The ordinary
+magnetic installation does not silently enable this longer operation.
+
 The explicit real-FEM Rust integration test is ignored in ordinary unit runs
 because it requires the pinned external installation and original project. Run
 it separately with `--ignored`; do not count the ordinary ignored inventory as
@@ -373,6 +404,73 @@ agreement or native WKWebView interaction. The panel lists registered cases and
 can fill a case's audited placement/return, but acknowledgement stays a separate
 user action and the copper still has to match. Native interaction remains
 unproven without an observed session. No new delivery bundle is produced.
+
+### Interactive 3D magnetic-field and copper-loss displays
+
+In **Simulate**, choose **3D fields & heat** to use the existing orbitable
+viewer. Its overlay selector offers Off, Magnetic fields, Copper heat/loss,
+and both. Layer/phase visibility, true-scale copper, camera reset and the
+display-only Z multiplier remain available. Changing Z or opacity does not
+resample physical data. Legends state the units and model limits.
+
+`sample_simulation_visualization` samples actual XYZ positions through the
+native magnetic adapter, not the older centre-line X-Z grid. The interactive
+field mode is explicitly **analytical permanent magnets only**, with image
+magnets disabled. It excludes winding reaction and nonlinear material response.
+It is not a coupled FEM field or a new force qualification. UI resolutions are
+240 or700 points, with a2048-point native cap and finite bounded coordinates.
+Requests use the actual mover position and preserve SI routing coordinates,
+PCB topZ=0. The renderer converts metres to the existing centered millimetre,
+Y-up scene once, including exact imported layer heights. Generated display
+depths now agree with the native host: layer0 atZ=0, subsequent layers negative.
+No saved project geometry is changed by that display correction.
+
+The heat overlay uses native resistor-network branch currents at the selected
+winding-phase peak current, converted to RMS by1/sqrt(2). It shows
+cycle-average I²R **W per displayed trace/via**, not a thermal hot-spot density.
+Resistances retain actual trace width, copper weight, via barrel intervals and
+saved winding temperature. The native graph's arc chord rule remains a stated
+approximation. Disconnected/unsupported networks are unavailable, never fitted
+to a whole-coil power value. Shape/layer/net identifiers map branch losses to
+the actual displayed copper; the mapped sum must preserve the native total.
+Grey geometry has no mapped branch result. Visible and whole-geometry power
+are reported separately when phases/layers/vias are hidden. This is an
+electrical screening preview and does not waive finite-volume/local-contact
+qualification, including original Case B's known physical shorts.
+
+No predicted temperature, transient thermal response, AC/PWM/core loss or
+housing/backplane heating is implied. A degrees-C value in the expanded legend
+is the saved temperature used for copper resistance, not a computed result.
+Housing motion heating keeps its separate existing model and region outputs.
+
+Every response binds its request, full physical inputs and selected native
+implementation/lockfile digest. The controller debounces edits, serializes
+sampling, discards superseded queued requests and clears old data immediately
+on physical/current/pose changes, modeOff, tab departure or unmount. Failed
+requests show no stale field or loss colors. Sampling has no browser-physics
+fallback. Browser test fixtures test rendering only; actual saved-design native
+data is checked separately across the Rust-to-viewer mapping. GPU geometries
+are disposed on replacement/unmount and rendering remains on demand. None of
+these checks is observed native WKWebView acceptance.
+
+### Overnight command preflight
+
+`preflight_linear_dc_campaign.py --campaign DECLARATION --start-utc START --output NEW_REPORT`
+checks the actual CLI parsers without running their bodies. It intercepts
+`parse_args` and the thread wrapper before NGSolve task setup, validates required
+arguments/types, output/log collisions, prior receipts, missing dependency
+producers and the complete declared-timeout schedule under one resource budget.
+It records input hashes and writes no solver output. In particular it rejects
+the historical `--first-sections`/`--second-sections` mistake; the real section
+comparison takes `--first-report`/`--second-report`. Auditors' input `--work`
+directories are not mistaken for new output writers. A failed or partial prior
+cannot become completed evidence through this audit.
+
+The schedule uses full hard budgets plus launch margins, not partial-field
+runtimes. It reports a necessary lower bound and a declared-order makespan,
+not an optimal scheduling proof or completion promise. Multiple campaigns may
+not independently spend the same18 GiB global reservation. Passing preflight
+does not authorize an early launch, relax a numerical gate or qualify a field.
 
 ### Broader imported source qualification
 

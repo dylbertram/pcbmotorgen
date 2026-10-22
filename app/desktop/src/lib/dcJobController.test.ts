@@ -11,6 +11,10 @@ const complete = (id="one"): DcJobStatus => ({...running(id),state:"completed",r
   status:"passed-fresh-qualified-geometry-dc-request-only",pm_array_force_n:[1,2,3],
   input_request_sha256:"content-hash",fresh_solution_sha256:"solution-hash",qualified_case:CASE,
   eligibility:{request_id:id,current_a:0.1,pm_offset_x_m:0,qualified_case:CASE}}});
+const prepared = (): DcJobStatus => ({...running(),operation:"preparation",state:"prepared",preparation:{
+  status:"prepared-request-bound-current-source-not-qualified",input_request_sha256:"content-hash",request_id:"one",
+  source_status:"prepared-baseline-needs-refinement",force_status:"unqualified",remaining:["source refinements","fields","magnetic matrix","admission"],
+  artifacts:{source:"actual",active:"actual",passive:"actual",return:"actual",independent:"actual",rt0:"actual"},evidence_hashes:{actual:"hash"}}});
 function setup() {
   const views:DcViewState[]=[];
   const transport = {start:vi.fn().mockResolvedValue(running()),poll:vi.fn().mockResolvedValue(complete()),
@@ -20,6 +24,34 @@ function setup() {
 }
 
 describe("managed DC request lifecycle",()=>{
+  it("keeps prepared sources unqualified and never renders them as force results",async()=>{
+    const {controller,transport,last}=setup();transport.start.mockResolvedValue({...running(),operation:"preparation"});
+    transport.poll.mockResolvedValue(prepared());await controller.start("one");await controller.poll();
+    expect(last().phase).toBe("prepared");expect(last().job?.result).toBeNull();expect(last().job?.preparation?.force_status).toBe("unqualified");
+    await controller.invalidate();expect(last().job).toBeNull();
+  });
+
+  it("rejects stale, incomplete or force-bearing preparation reports",async()=>{
+    for (const change of ["sha","force","qualified","missing","operation"]) {
+      const {controller,transport,last}=setup();await controller.start("one");const value=prepared();
+      if(change==="sha")value.preparation!.input_request_sha256="stale";
+      else if(change==="force")value.result=complete().result;
+      else if(change==="qualified")Object.assign(value.preparation!,{qualified_case:CASE});
+      else if(change==="missing")delete value.preparation!.artifacts.passive;
+      else value.operation="force";
+      transport.poll.mockResolvedValue(value);await controller.poll();expect(last().phase).toBe("failed");expect(last().job).toBeNull();
+    }
+  });
+
+  it("cancels late preparation starts and suppresses completion racing an edit",async()=>{
+    const {controller,transport,last}=setup();const start=deferred<DcJobStatus>();transport.start.mockReturnValue(start.promise);
+    const pending=controller.start("one");await controller.invalidate();start.resolve({...running(),operation:"preparation"});await pending;
+    expect(transport.cancel).toHaveBeenCalledWith("job-one");expect(last().job).toBeNull();
+    transport.start.mockResolvedValue({...running(),operation:"preparation"});await controller.start("one");
+    const poll=deferred<DcJobStatus>();transport.poll.mockReturnValue(poll.promise);const polling=controller.poll();
+    await controller.invalidate();poll.resolve(prepared());await polling;expect(last().phase).toBe("idle");expect(last().job).toBeNull();
+  });
+
   it("clears previous force immediately when a new calculation starts or fails",async()=>{
     const {controller,transport,last}=setup();
     await controller.start("one");await controller.poll();expect(last().phase).toBe("completed");

@@ -3,6 +3,92 @@
   "plan_id": "ab7e988f-ed3c-4e40-a43b-d7c7f84cbe89",
   "issue": "pcbmotorgen#ytgr",
   "branch": "simulation/add-femm-and-improve",
+  "daytime_app_visualization": {
+    "status": "3d-field-and-loss-features-implemented-bounded-integration-verified-native-and-general-preparation-gates-open",
+    "day_plan": "15235a51-0ca4-4ba6-90ee-3c3bd4faa529",
+    "day_plan_checks": "Field and heat/loss visualization steps checked. General preparation completion, complete acceptance and final handoff still unchecked. Parent acceptance remains1/6; no overnight gate is waived.",
+    "entry": "In Simulate select 3D fields & heat. Existing viewer offers Off, Magnetic fields, Copper heat/loss, or both, with240/700XYZ samples, opacity and physical-value legends. Camera/layer/net/Z-scale behavior retained.",
+    "field_scope": "Native analytical permanent-magnet-only XYZ sampling, maximum2048points. No image-magnet/backplane/housing or winding reaction and no nonlinear coupled FEM field. No Y-averaged2D extrusion. Field and magnet positions follow actual mover pose; unitsTesla. No browser-physics fallback.",
+    "heat_scope": "Native resistor-network branch I-squared-R, cycle-average at explicit winding-phase peak current divided bysqrt2 forRMS. Real trace/via coordinates, layer depths, copper weights/plating and saved winding-temperature resistivity. Native arc chord rule disclosed. W per displayed trace/via, total/visibleW separately; no continuous thermalhotspots,temperature prediction,AC/PWM/core orhousingheating. This graphpreview doesnot waivefinite-volume/contactqualification ororiginalBshorts.",
+    "mapping": "Shape/layer/net mapping from actual branch losses to original geometry;mappedtotalconservation checked. Generatedviewer layerorder corrected to matchnativehost layer0topZ0 andlaternegative depths;importeddepthsand saveddesignsunchanged. Display-onlyZexaggeration andopacity do notresamplephysics orchangevalues.",
+    "lifecycle": "Immutable requestID/inputSHA/nativeimplementation-lockfileSHA/appversion. Debounced, serialized native sampling withlatest-onlyqueuedrequest, immediateold-data clearing onphysical/current/pose/mode edits andtabdeparture/unmount. Failed/stale samplescannotshowoldcolors. On-demandrendering withGPUgeometry disposal. No archivedforce replay.",
+    "actual_saved_design_native_check": {
+      "input": "linear-dc-day-generated-designs-v2-20261022/linear-star-compact-two-strand-four-layer-board.pmmotor",
+      "report": "linear-dc-day-case-a-native-visualization-v2-20261022.json",
+      "log": "linear-dc-day-native-viewer-export-v2-20261022.log",
+      "field_samples": 240,
+      "native_branch_edges": 131,
+      "total_cycle_average_copper_loss_w": 0.5719979869125956,
+      "native_network_power_balance_relative_error": 2.350497927585931e-13,
+      "implementation_sha256": "e8edd99f13d557827a8b62284193b2fa282d04edfc7f8714daecc78d0551dbe8",
+      "meaning": "Actual savedproject rebuilt by Rust, native field and networklosssampling andRust-to-TSgeometry/lossmapping checked. This interactive-previewtest isnot a newFEMcampaign or nativeWKWebViewE2E. BrowserUI fixturesremainlabelednon-numericalevidence."
+    },
+    "preparation_integration": {
+      "state": "bounded-explicit-source-only-stage-implemented-not-general-qualification",
+      "entry": "Prepare current source requires actual-design applicability, placement/return acknowledgement and separate14400s confirmation. Currentstageandhardlimits exposed. Fullbaseline completion remainsunverified; no longsourcecampaign launchedtoday.",
+      "guards": "Separate pinned preparationPython withPyAMG5.3.0, no developerPYTHONPATH. OneownedPOSIXgroup,14400swholebudget,13GiBsamplednativeguard,8GiBevidencecap/8GiBfree-diskreserve. Serialstagesmustfitwholebudget; edits/tabdeparture/shutdowncancelandhideartifacts. Host verifiesrequest/artifacthashes/statuses/stagesandneveracceptsforcefrompreparation.",
+      "real_cancellation": "linear-dc-day-preparation-real-saved-host-cancel-final-v3-20261022.log passed1explicitrealtest0.97s, evidence dc-desktop-jobs/dc-Y97R7I. CancelledduringCAD beforecurrentlaunch; ownedgroupchildrenabsent andnoforce/sourcepublished.",
+      "current_saved_host_applicability": "linear-dc-day-case-a-current-app-applicability-v3-20261022.log passed1explicitrealtest2.04s withcleanworker andactualsavedCaseAcopper, correctlyqualified. No magneticfieldsolve orarchivedforce returned.",
+      "installer": "Fresh source-preparationvenv dc-source-worker-clean-install-v1-20261022 installedpinnedworker+PyAMGwithoutPYTHONPATH. FinalcheckerimportsprepentrypointsandcompiledAMGsmokepasses. Same-machinevenvisnotisolatedmacOSreproduction ortransitivenative/licenseclearance."
+    },
+    "overnight_preflight": {
+      "script": "scripts/solvers/preflight_linear_dc_campaign.py",
+      "method": "Actualscriptparse_args interceptioninchildPython,threadwrapperstoppedbeforeNGSolveTaskManager. CLIrequiredflags/types,DAG,output/logcollisions,priorreceipts,missingproducerdependenciesandfulltimeout/launchmargin/RAMscheduleinspectedwithoutsolverexecution.",
+      "draft": "linear-dc-day-detached-supervision-v1-20261022/night-case-b-source-recovery-v1-campaign.json",
+      "audit": "linear-dc-day-detached-supervision-v1-20261022/night-case-b-source-recovery-v1-prelaunch-v2.json",
+      "audit_status": "passed-nonnumerical-prelaunch-audit-only",
+      "declared_order_full_budget_seconds": 8370,
+      "checkpoint": "Port0.4endedmesh98bec7166e4cf2be5a2a0b03135089a3284a56af5d79953c124590586cc510b1 reverifiedwithfinalmemory-limitreceipt/absentidentities/physical-CAD-implementationhashes;onlyeligiblemesh,notafield.",
+      "prevention": "Correctfirst-report/second-reportflagsvalidatedagainstrealparser;meshcurrentnotrerunforCLI-onlyfailure. Fresh13GiBportzero-solve,active/passive/return/H1agreementandlocalchecksbeforeRT0/fixedfields. Initialnonnumericalauditmisclassifiedauditorinputworkasoutput;preservedfailedreport,correctedrulewithregressiontest,newv2auditpasses. Nocampaignhasbeenlaunchedtoday.",
+      "limit": "This8370srecovery-stagebudgetisnotafullCaseBovernightfit. Mandatorycacheforecastsstill18.34serialhoursbeforeforcecontrols;globalresource/criticalpathfitandallforcecoverage remainrequiredbeforelaunchingfullcampaign."
+    },
+    "verification": {
+      "helpers": "475passed,zeroskips,38.105s in linear-dc-day-visualization-preflight-helpers-v4-20261022.log;cleaninstalledsourceenvironment,noPYTHONPATH.",
+      "simulation": "201unit+7integrationpassed,2ignored,16.70s+0.07s in linear-dc-day-3d-visualization-simulation-v2-20261022.log.",
+      "frontend": "486passed,1existingskip in linear-dc-day-visualization-frontend-final-v3-20261022.log.",
+      "desktop": "122passed,10explicitlyignored external-environmenttests,37.11s in linear-dc-day-app-and-viewer-desktop-final-v5-20261022.log. The actualsavedhost cancellation andnativeviewerexport tests were runseparately, notinferredfromignoredcounts.",
+      "browser": "Finalfullv3passed364,zeroskips/flakes338.061s in linear-dc-day-3d-app-full-browser-v3-20261022/report.json;reportSHAc34b3c16336b62fdc44d09898ab0591ad5b7f8313bea7f1644bf667cb311b1f1. Includesactualnative-provenanceexportv2mapping,WebGLoverlayrendering,mobile/phasehiding/Z/stale/error/cancelchecks andexistinghousing/dock/importregressions. Fullv2also364passed345.779s. Earlierfullv1ended363passed1failed because nativeexportv1lackedtheaddedimplementationdigest;preservednotcountedasallpass.",
+      "native_build": "pnpm exec tauri build --debug --no-bundle --ci passed in linear-dc-day-3d-app-native-build-final-v4-20261022.log. NoZIP/appbundle/installercreated orobservedWKWebViewinteractionclaimed.",
+      "typecheck": "34errorsin3previouslyfailingfilesDocumentEditor.svelte,DriverSuitability.svelte,cadMapping.test.ts;noneonnewvisualizationlines ornewmodules. Samebaselinecountin linear-dc-day-visualization-svelte-check-final-v3-20261022.log,notatypecheckpass.",
+      "svelte_mcp": "Officialdocsconsulted;changedcomponentsautofixerreportsnoissues. Suggestionsreviewed:effectsownexternalIPC/cancellation,ThreeGPUcleanup,camerafitandrenderinvalidation,notderivednumericstate.",
+      "remaining": "Successfulfullnewrequestpreparation/generalqualification,observednativeWKWebViewinteraction,isolatedmacOSuser/machineandtransitivenative/licenseacceptanceunproven. OvernightCaseBsource/field/forceworkremainseparateandunqualified."
+    }
+  },
+  "user_directed_split_2026_10_22": {
+    "observed_at_utc": "2026-10-22T15:12:00Z",
+    "instruction": "No more offline simulation campaigns for the rest of today. Focus on integrating existing verified work into the app, verification, and heat/loss plus magnetic-field visualization in the existing 3D viewer when Simulate is selected. Defer long remaining source/field/Case B qualification work to a separately planned 12-hour overnight window.",
+    "parent_plan": "ab7e988f-ed3c-4e40-a43b-d7c7f84cbe89",
+    "daytime_plan": "15235a51-0ca4-4ba6-90ee-3c3bd4faa529",
+    "overnight_plan": "06b8f23f-1ae6-4dae-a5f0-13ed7eb22f42",
+    "overnight_duration_hours": 12,
+    "overnight_start_utc": "2026-10-22T18:00:00Z",
+    "overnight_end_utc": "2026-10-23T06:00:00Z",
+    "overnight_timezone": "Europe/Stockholm",
+    "overnight_start_task": "2b8157f3-c681-4b01-a897-1b205922f85c",
+    "launch_permission": "User confirmed both plans and supplied roughly8:00PM tonight. Stated assumption uses this Mac's Europe/Stockholm zone:20:00CEST through08:00CEST nextday. One start prompt scheduled into this session; it requires OpenChamber/host awake, preflight approval and job-budget fit. No numerical work launched early and old recurring task staysdisabled.",
+    "quiescence": "Scanned all detached job declarations and running receipts with live-worker identities; no live numerical worker. launchctl list showed no running owned com.pcbmotorgen.dc.20261022 services. Campaigns had already ended, so no worker needed cancellation.",
+    "case_b_source_controls_final": "16 completed, two failed, five blocked. Mesh150um active and fixed-field checks pass, but its local comparison used wrong flags. Port0.4 source hit its11GiB guard after saving an eligible candidate mesh; no accepted current solution. Preserve failures and verify checkpoint before any fresh zero solve tonight.",
+    "case_b_port_checkpoint": {
+      "work": "linear-dc-day-case-b-drill150um-controls-source-m200-c6-p40-v1-20261022",
+      "failure": "memory-limit at997.597777s;12,040,825,200bytes above11GiB guard",
+      "mesh_sha256": "98bec7166e4cf2be5a2a0b03135089a3284a56af5d79953c124590586cc510b1",
+      "elements": 3791787,
+      "estimated_dofs": 12366888,
+      "mesh_cad_relative_difference": 0.0008323106968071148,
+      "current_solution": "none; summary running state is stale and cannot qualify a field"
+    },
+    "case_b_magnetic_preflights_final": "Nine completed, bare-force900s timeout preserved, pose preflight blocked. All five fresh5GiB cache preflights pass; earlier2GiB failures remain failed.",
+    "cache_forecasts_seconds": {
+      "coarse": 5386.755492421083,
+      "domain": 5836.74256237445,
+      "refined": 10016.024636973549,
+      "opening": 20083.334017280104,
+      "quadrature": 24687.09236200058
+    },
+    "schedule_policy": "Five caches total18.34serial hours before source-refinement caches, bare/pose references and coupled solves. Overnight plan requires global RAM reservations and a full budgeted critical-path fit, not a serial12h promise or division by parallel count. Validate all actual argv/parser contracts and outputs before launch; local audit needs --first-report/--second-report.",
+    "visualization_policy": "Default heat means actual calculated loss, not temperature. Show model/units/provenance and distinguish PM-only analytical fields from solved coupled fields. Existing Y-averaged2D grid must not be extruded and presented as a solved3D field. No fabricated hot spots or unqualified CaseB forces.",
+    "progress_policy": "User confirmed both plans. Implement daytime app/3D visualization work now without offline campaigns; overnight tasks remain open until complete evidence. Parent physical/model/numerical/native/installation requirements remain in force."
+  },
   "approval": {
     "user_request": "Implement the Complete the remaining linear static-DC app work today plan, updating checks as work finishes.",
     "compute_window_choice": "12 hours (Recommended), explicitly selected by user",
@@ -20,8 +106,8 @@
   "plan_progress": {
     "step_1": "complete;new12h cutoff approved,765recorded evidence hashes verified,actual two new saved host designs exported,production descriptors and closed return graphs checked;nominal app-defined models and explicit returns prepared;vertical finite-extent separation proved before CAD;per-case source/force/control matrix and candidate/admission envelope recorded. No source/force qualification from preparation.",
     "steps_2_through_6": "not complete",
-    "step_2": "Imported port drive-length and Case A near-field/mesh/port/curvature controls pass. Original Case B remains failed and unsupported. The user-approved drill150um revision has a new saved project and production host export; fresh CAD/source qualification is pending. No gate waived and step not checked complete.",
-    "step_4": "Exact-case admission/applicability works: recorded qualified, A and revised B preparation-required, original shorted B unsupported. New-case admission now also requires completed downstream source-refinement forces and reverified electrical/field controls, not just 37 magnetic jobs. No new registration; full in-app preparation/qualification and native interaction remain incomplete."
+    "step_2": "Imported drive-length and CaseA source/field controls pass. Revised B baseline active/passive/return/H1/RT0 and27fixed near-field probes pass, curvature4 and mesh150um source/field controls pass. Remaining port drive-length and mesh-local audit deferred to tonight; original shorted B remains unsupported. No gate waived or step checked complete.",
+    "step_4": "Recorded and CaseA exact sampled cases are registered with actual saved-host fresh calculation evidence. Revised B is unqualified; original shorted B unsupported. Explicit bounded source-only app preparation has actual-request CAD and current-host cancellation/contract evidence, but full general qualification/completed newsource remain unverified. Daytime3D nativePMfield andnetworkJouleloss overlays areimplemented, withtwo daytimecheckscompleted; remaininggeneral/native/installationacceptance staysopen."
   },
   "source_gap": {
     "work": "dc-imported-star4-curvature4-port-control-v3-detached-day-20261022",
@@ -241,7 +327,7 @@
       "historical_strategy_job": "case-b-fuse-strategy-v1 timed out under its3600s budget;its partial report is diagnostic-only,never source CAD. Final receipts/launcher must be checked before service cleanup."
     }
   },
-  "tests_latest": "464 helpers passed, zero skips, 30.674s in linear-dc-day-qualified-a-b-controls-all-helpers-v1-20261022.log. Desktop117passed8ignored41.59s; CaseA actual saved-host clean-worker fresh/reject/cancel explicitly passed128.52s. Earlier unchanged frontend471passed1existing skip,browser346passedzero skips/flakes. Native no-bundle debug build37.20s passed, but native interaction and isolated installation unverified.",
+  "tests_latest": "475helperspassed0skips38.105s;desktop122passed10ignored37.11s;simulation201unit+7integrationpassed2ignored;frontend486passed1existingskip. Finalfullbrowser364passed0skips/flakes338.061s. Latestnative--no-bundlebuildpassed. ActualsavedCaseAnativePM/graphlossmapping,currentappqualifiedinspection2.04s andpreparationcancel0.97s passedwithoutofflinequalificationlaunch. Existingtypecheck34errors/3filesremain;nativeinteraction andisolatedinstallationunverified.",
   "app_integration": {
     "status": "implemented-per-design-registry-admission-recorded-case-registered-case-a-pending-audit",
     "request": "finite-dc-live-request-v2 from host; no host-pinned basis. Worker re-verifies every registered audit/evidence, requires exactly one exact match, else Qualification required with per-case reason before any solve.",

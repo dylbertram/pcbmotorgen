@@ -3,7 +3,7 @@ vi.mock("@tauri-apps/api/core",()=>({invoke:vi.fn()}));
 vi.mock("./core",()=>({isTauriAvailable:vi.fn()}));
 import { invoke } from "@tauri-apps/api/core";
 import { isTauriAvailable } from "./core";
-import { dcCouplingCapability, startDcCoupling, dcCouplingStatus, cancelDcCoupling } from "./dcJobs";
+import { dcCouplingCapability, startDcCoupling, startDcPreparation, dcCouplingStatus, cancelDcCoupling } from "./dcJobs";
 import type { LinearMotorConfig } from "../types";
 import { DEFAULT_DRIVE_SETTINGS } from "../types/drive";
 
@@ -16,9 +16,15 @@ describe("managed DC desktop IPC",()=>{
     vi.mocked(isTauriAvailable).mockReturnValue(false);
     expect((await dcCouplingCapability()).available).toBe(false);
     await expect(startDcCoupling(config,DEFAULT_DRIVE_SETTINGS,null,study)).rejects.toThrow("requires");
+    await expect(startDcPreparation(config,DEFAULT_DRIVE_SETTINGS,null,study,14400)).rejects.toThrow("requires");
     await expect(dcCouplingStatus("job")).rejects.toThrow("requires");
     await expect(cancelDcCoupling("job")).rejects.toThrow("requires");
     expect(invoke).not.toHaveBeenCalled();
+  });
+  it("uses a separate source-preparation command with an explicit long-budget confirmation",async()=>{
+    vi.mocked(invoke).mockResolvedValue({state:"running",operation:"preparation"});
+    await startDcPreparation(config,DEFAULT_DRIVE_SETTINGS,null,study,14400);
+    expect(invoke).toHaveBeenCalledWith("start_dc_preparation",{config,driveSettings:DEFAULT_DRIVE_SETTINGS,cadGeometry:null,study,confirmedTimeoutS:14400});
   });
   it("sends actual source design/settings and explicit study, not a caller winding snapshot",async()=>{
     vi.mocked(invoke).mockResolvedValue({state:"running"});

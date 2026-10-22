@@ -688,6 +688,7 @@
           >
             <div class="min-h-0 flex-1">
               <CoilPreview bind:this={coilPreview} workspace {config} coils={activeCoils} {motion}
+                simulationActive={active && activeTab === "simulate"}
                 active={active && !externalDialogOpen} designSettings={motorSettings}
                 bind:sidePanel={previewPanel} bind:expanded={coilPreviewExpanded} {drive} {driveError} {drivePending}
                 camera={session.camera} view={session.previewView} importedGeometry={projects.cadGeometry}
@@ -697,6 +698,7 @@
                 open={activeTab === "simulate"}
                 availableHeight={Math.max(0, motorWorkspaceHeight - motorStatusHeight)}
                 onConfigureWinding={() => coilPreview?.showDesignSettings("routing")}
+                onShow3D={() => { session.previewView.viewMode = "iso"; previewPanel = null; }}
                 {config}
                 active={active && activeTab === "simulate"}
                 {sweep}

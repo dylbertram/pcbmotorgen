@@ -39,7 +39,10 @@ export interface DcStudy {
 export interface DcJobStatus {
   request_id: string;
   job_id: string;
-  state: "running" | "cancelling" | "completed" | "cancelled" | "timed_out" | "failed";
+  state: "running" | "cancelling" | "completed" | "prepared" | "cancelled" | "timed_out" | "failed";
+  operation?: "force" | "preparation";
+  preparation?: DcPreparedSource | null;
+  preparation_progress?: { stage: "geometry" | "source" | "active" | "passive" | "return" | "independent" | "rt0"; stage_timeout_s: number } | null;
   elapsed_seconds: number;
   evidence_directory: string;
   request_sha256: string;
@@ -61,7 +64,21 @@ export interface DcQualifiedCase extends DcQualifiedCaseIdentity {
   declaration: { material_model: Record<string, unknown>; return_geometry: Record<string, unknown> };
 }
 
-export interface DcCapability { available: boolean; reason?: string; scope?: string; qualified_cases?: DcQualifiedCase[] }
+export interface DcPreparedSource {
+  status: "prepared-request-bound-current-source-not-qualified";
+  input_request_sha256: string;
+  request_id: string;
+  source_status: "prepared-baseline-needs-refinement";
+  force_status: "unqualified";
+  remaining: string[];
+  artifacts: Record<string, string>;
+  evidence_hashes: Record<string, string>;
+}
+
+export interface DcCapability {
+  available: boolean; reason?: string; scope?: string; qualified_cases?: DcQualifiedCase[];
+  preparation_available?: boolean; preparation_reason?: string; preparation_timeout_s?: number;
+}
 
 /** Read-only applicability, never a numerical force or implicit preparation. */
 export interface DcApplicability {
