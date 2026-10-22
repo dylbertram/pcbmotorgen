@@ -200,23 +200,40 @@ splines, IO fan-out, malformed depths and out-of-cap graphs are rejected without
 generated fallback or chord substitution. The IPC client has no browser mock.
 This command does not claim every prepared geometry is numerically qualified.
 
-`dc_request_contract.py` currently admits only exact recorded-case copper/graphs,
-explicit finite return/drive geometry and acknowledged disjoint material placement
-at the sampled current/pose points. It independently recalculates graph currents
-and resistance, checks nominal UI stack settings against the explicit material
-geometry/law, and rejects unsupported changes without rounding/interpolation.
-Eligibility output contains no force. Other source geometries need qualification
-and explicit registration before admission.
+`dc_request_contract.py` admits exact qualified-case copper/graphs, explicit finite
+return/drive geometry and acknowledged disjoint material placement at the sampled
+current/pose points. It independently recalculates graph currents and resistance,
+checks nominal UI stack settings against the explicit material geometry/law, and
+rejects unsupported changes without rounding/interpolation. Eligibility output
+contains no force. `finite-dc-live-request-v1` names the recorded source basis;
+`finite-dc-live-request-v2`, sent by the desktop host, names none.
+
+Admission is per design. `dc-qualified-linear-cases-v1.json` in the evidence root
+lists cases whose whole 37-job force-matrix audit passed. Write entries only with
+`register_linear_dc_case.py` (`--recorded`, or `--case-audit AUDIT --case-plan PLAN`
+for a declared case). Registration copies the live cache/bias/bare/pose inputs
+from the audited finest-opening job receipts and verifies the entry exactly as the
+worker does; entries are never rewritten. The registry is not trusted by itself:
+before each request the worker re-hashes every registered audit and its evidence.
 
 `recalculate_dc_request.py --request REQUEST --archive-root EVIDENCE --work NEW_JOB`
-is the restricted offline live-request worker. It pins the accepted aggregate
-case audit, verifies its immutable evidence and validates the actual request
-before launching any numerical job. It may reuse the exact-keyed, audited finite
-current basis and material rule, but recomputes the nonlinear reaction field and
-forces in a fresh job. It does not replay archived forces. Request-content changes
-or failed numerical/source-snapshot checks suppress results. The numerical child
-inherits the outer job's process group so cancellation cannot leave an orphaned
-solve; bounded process-cleanup and stale-content regressions cover that boundary.
+is the restricted live-request worker. Exactly one verified case must match the
+request; zero or several matches stop with `Qualification required` and the
+per-case reason before any numerical job. It reuses that case's exact-keyed,
+audited finite-current basis and material rule, but recomputes the nonlinear
+reaction field and forces in a fresh job. It does not replay archived forces.
+Request-content changes or failed numerical/source-snapshot checks suppress
+results. The numerical child inherits the outer job's process group so
+cancellation cannot leave an orphaned solve.
+
+A new design is qualified offline, never inside the 360 s app job: actual export
+and explicit study/return (`prepare_linear_dc_studies.py`), exact copper
+(`prepare_linear_dc_copper.py`, analytic union gate), source controls
+(`plan_linear_dc_source_campaign.py`), magnetic matrix
+(`plan_linear_dc_case_campaign.py`, both run by `run_linear_dc_campaign.py`), the
+aggregate `audit_dc_case_matrix.py --case-plan`, then registration. Case A of
+2026-10-22 took roughly 0.5 h of source work and several hours of magnetic
+caches; budget each design from its own measured preflights.
 
 The simulation dock now has a separate **Static DC (experimental)** tab. It takes
 only explicit `material_model` and `return_geometry` objects, sampled current and
@@ -229,13 +246,23 @@ request cancellation, including a start response that arrives after invalidation
 
 The experimental desktop worker is disabled unless its launch environment sets
 all three absolute host paths. This is a local installed-solver integration, not
-a redistributed or packaged solver:
+a redistributed or packaged solver. Install the pinned worker into a new
+virtualenv (macOS arm64, CPython 3.12; exact versions in
+`requirements-dc-worker.txt`):
 
 ```sh
+scripts/solvers/install_dc_worker_macos.sh "$HOME/.local/opt/pcbmotorgen-dc-worker" /opt/homebrew/bin/python3.12
 export PCB_MOTOR_DC_SOLVER_ROOT="$PWD/scripts/solvers"
-export PCB_MOTOR_DC_PYTHON="$HOME/.local/opt/solver-prototypes-macos/ngsolve-venv/bin/python"
+export PCB_MOTOR_DC_PYTHON="$HOME/.local/opt/pcbmotorgen-dc-worker/bin/python"
 export PCB_MOTOR_DC_ARCHIVE_ROOT="$HOME/.local/opt/solver-prototypes-macos"
 ```
+
+`check_dc_worker.py` and `desktop_dc_job.py` refuse a missing or differently
+versioned package, another Python series or another platform before any job
+evidence is written. Do not set `PYTHONPATH`. The archive root is required
+evidence, not an optional cache. Other platforms remain unqualified.
+NGSolve/Netgen are LGPL-2.1 and OCCT LGPL-2.1 with exception; this local
+installation redistributes nothing.
 
 `DcJobs` admits one numerical job at a time, preserves a unique evidence directory
 under `dc-desktop-jobs`, and owns the worker's POSIX process group. The whole-job
@@ -253,9 +280,10 @@ it separately with `--ignored`; do not count the ordinary ignored inventory as
 all-pass numerical evidence. It exercises a fresh saved-design job, rejection of
 changed copper depths, and cancellation after a real numerical state was saved.
 Browser tests use labelled UI fixtures only; those do not establish numerical
-agreement or native WKWebView interaction. Broader source-geometry qualification,
-native interaction and portable solver installation remain unfinished. No new
-delivery bundle is produced by this work.
+agreement or native WKWebView interaction. The panel lists registered cases and
+can fill a case's audited placement/return, but acknowledgement stays a separate
+user action and the copper still has to match. Native interaction remains
+unproven without an observed session. No new delivery bundle is produced.
 
 ### Broader imported source qualification
 

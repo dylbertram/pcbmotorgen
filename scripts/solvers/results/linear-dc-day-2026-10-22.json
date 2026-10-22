@@ -19,7 +19,8 @@
   "plan_progress": {
     "step_1": "complete;new12h cutoff approved,765recorded evidence hashes verified,actual two new saved host designs exported,production descriptors and closed return graphs checked;nominal app-defined models and explicit returns prepared;vertical finite-extent separation proved before CAD;per-case source/force/control matrix and candidate/admission envelope recorded. No source/force qualification from preparation.",
     "steps_2_through_6": "not complete",
-    "step_2": "source controls: imported port drive-length passed globally+locally; case-A source chain passed. Remaining: near-source field integration extension."
+    "step_2": "source controls: imported port drive-length passed globally+locally; case-A source chain passed. Remaining: near-source field integration extension.",
+    "step_4": "in progress: per-design registry admission implemented and exercised with recorded case; new cases register only after their audit passes."
   },
   "source_gap": {
     "work": "dc-imported-star4-curvature4-port-control-v2-day-20261022",
@@ -205,5 +206,62 @@
       "linear-dc-day-case-b-fuse-loss-v2-20261022.json (empty: serialization failure, preserved)"
     ]
   },
-  "tests_latest": "415 helpers passed,0 skips,29.567s (PCB_MOTOR_HOUSING_BINARY supplied) linear-dc-day-union-audit-all-helpers-v2-20261022.log"
+  "tests_latest": "415 helpers passed,0 skips,29.567s (PCB_MOTOR_HOUSING_BINARY supplied) linear-dc-day-union-audit-all-helpers-v2-20261022.log",
+  "app_integration": {
+    "status": "implemented-per-design-registry-admission-recorded-case-registered-case-a-pending-audit",
+    "request": "finite-dc-live-request-v2 from host; no host-pinned basis. Worker re-verifies every registered audit/evidence, requires exactly one exact match, else Qualification required with per-case reason before any solve.",
+    "registry": {
+      "path": "/Users/dylanbertram/.local/opt/solver-prototypes-macos/dc-qualified-linear-cases-v1.json",
+      "sha256": "4a6adbe880bc2bc59d8e8c78b417ac98840d06bfc99b399150c93724c34136f5",
+      "cases": [
+        "recorded-star2-two-layer-v1"
+      ],
+      "preserved_trial": "linear-dc-day-registry-trial-without-declaration-v1-20261022.json (first trial entry lacked UI declaration; set aside, not deleted)"
+    },
+    "real_host_jobs": {
+      "dev_venv": {
+        "evidence": "dc-desktop-jobs/dc-l50RuJ",
+        "seconds": 94.79,
+        "unsupported": "dc-desktop-jobs/dc-ttN11B",
+        "cancelled": "dc-desktop-jobs/dc-pluWWI"
+      },
+      "clean_install": {
+        "evidence": "dc-desktop-jobs/dc-6DtCX1",
+        "seconds": 95.34,
+        "unsupported": "dc-desktop-jobs/dc-ttzrqh",
+        "cancelled": "dc-desktop-jobs/dc-3lKBpD",
+        "force_n": [
+          -0.007311654370788881,
+          0.0007639403644975085,
+          -1.1333007823988988
+        ],
+        "note": "Bit-identical fresh force from dev and clean venv; recorded design rebuilt from star_2-layer.pmmotor sha 0ed215f6..."
+      }
+    },
+    "tests": {
+      "rust_dc_jobs": "6 passed,2 explicit ignored; ignored real-geometry test then run explicitly twice and passed (117-118 s)",
+      "vitest": "470 passed,1 skipped (pre-existing)",
+      "browser": "e2e/dc-coupling.spec.ts 14 passed (desktop-tauri+desktop-wide)",
+      "svelte_check": "34 pre-existing errors in DocumentEditor.svelte, cadMapping.test.ts, DriverSuitability.svelte; none in changed files",
+      "helpers": "427 passed,0 skips"
+    }
+  },
+  "installed_worker": {
+    "status": "passed-clean-macos-arm64-pinned-install",
+    "requirements": "scripts/solvers/requirements-dc-worker.txt (20 pinned dists, CPython3.12)",
+    "installer": "scripts/solvers/install_dc_worker_macos.sh",
+    "clean_venv": "dc-worker-clean-install-v1-20261022",
+    "install_seconds": 22.71,
+    "rejections": {
+      "missing": "dc-worker-reject-missing-v1-20261022.json: 18 missing dists",
+      "incompatible": "dc-worker-reject-incompatible-v1-20261022.json: numpy 2.4.5 differs from pinned 2.4.6",
+      "host": "desktop_dc_job.py refuses incompatible env before receipt/solve (only request.json in job dir)"
+    },
+    "scope": "Same machine, fresh venv, PYTHONPATH unset. Not a separate machine/user account; wheels may come from local pip cache. Other platforms unqualified."
+  },
+  "campaign_incident": {
+    "at_utc": "2026-10-22T10:13Z",
+    "what": "Outer campaign runner memory guard raised EPERM reading an unreaped zombie child, killed its group including inner supervisors; 5 cache solvers orphaned. Receipts left running (unusable).",
+    "action": "Stopped only the orphaned case-A cache groups; fixed solver_memory_budget.exited (zombie/vanished only) and per-job sessions in runner; relaunched stage2 as v2 names. v1 evidence preserved."
+  }
 }
