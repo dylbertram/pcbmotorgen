@@ -18,13 +18,14 @@
   },
   "plan_progress": {
     "step_1": "complete;new12h cutoff approved,765recorded evidence hashes verified,actual two new saved host designs exported,production descriptors and closed return graphs checked;nominal app-defined models and explicit returns prepared;vertical finite-extent separation proved before CAD;per-case source/force/control matrix and candidate/admission envelope recorded. No source/force qualification from preparation.",
-    "steps_2_through_6": "not complete"
+    "steps_2_through_6": "not complete",
+    "step_2": "source controls: imported port drive-length passed globally+locally; case-A source chain passed. Remaining: near-source field integration extension."
   },
   "source_gap": {
     "work": "dc-imported-star4-curvature4-port-control-v2-day-20261022",
     "purpose": "Generic electrical drive-length control only,not imported magnetic coupling or app admission",
-    "status": "interrupted-before-saved-mesh",
-    "observed_at_utc": "2026-10-22T08:18:00Z",
+    "status": "passed-global-and-local-drive-length-control",
+    "observed_at_utc": "2026-10-22T09:33:11Z",
     "interrupted_seconds": 618.7470707920147,
     "liveness": "Receipt supervisor33397 and watcher33815 absent; no matching solver or watcher processes. Numerical running summary is stale. Cause unknown. No duplicate launched from stale state.",
     "source_work": "dc-imported-star4-curvature4-dc-v1-20261021",
@@ -33,7 +34,29 @@
     "timeout_s": 10800,
     "max_dofs": 24000000,
     "native_footprint_limit_bytes": 19327352832,
-    "threads": 2
+    "threads": 2,
+    "v3": {
+      "work": "dc-imported-star4-curvature4-port-control-v3-detached-day-20261022",
+      "seconds": 3896.85,
+      "peak_physical_footprint_bytes": 15206396408,
+      "mesh_elements": 5433456,
+      "dofs": 18182860,
+      "resistance_ohm": 15.045397182749962,
+      "reference_resistance_ohm": 15.045399018902202,
+      "relative_difference": 1.220407954694025e-07,
+      "relative_power_balance": 7.038813976123492e-14,
+      "effective_loop_current_a": 0.0664655102057746,
+      "active_report": "dc-imported-star4-port-v3-all-active-v1-20261022.json",
+      "active_sha256": "9635bbb43fc88e5124a6723d799db7d3eda7535ace5f8767a24f677184b2e58f",
+      "active_sections": 1004,
+      "active_failures": 0,
+      "active_seconds": 903.67,
+      "local_refinement": "dc-imported-star4-port-v3-local-current-refinement-v1-20261022.json",
+      "local_refinement_sha256": "72bc3abeb4019abb22063b15a382804d00f57b766c865dfdbe20c636a6005670",
+      "local_failures": 0,
+      "services": "port-v3/port-v3-watch exited0 runs1, unloaded after nonrunning status; plists/logs kept. Watcher observed chains-finished."
+    },
+    "scope": "Generic imported electrical drive-length control only; no imported magnetic geometry, near-field or app admission."
   },
   "reused_evidence_audit": {
     "recorded_matrix_sha256": "6cfab100944bc80d3312da9bd6b3f5e66b2afa3c623f56e8d643b214a1dedb9f",
@@ -102,5 +125,85 @@
     "current_status": "Fresh v3 submitted with same physical source,portfraction0.4,curvature4,10800s cap,24MDOF preassembly cap,18GiB native guard. Original v1/v2 fields not imported. Actual worker identity verified;supervisor parent is launchd PID1,not conversation shell. Independent one-shot watcher bootstrapped separately.",
     "health_task": "d87a98ed-ebb4-4779-b16d-e23d91b24c82 now runs every5min until approved cutoff,checks actual receipts/launcher/service/identity and disables itself after19:59:49Z. No background numerical acceptance from liveness.",
     "tests": "406helpers passed,0skips,28.708s in linear-dc-day-one-shot-supervision-all-helpers-v2-20261022.log,including input/deadline/native memory/one-shot ownership policies. No application/native E2E qualification from supervision probe."
-  }
+  },
+  "case_a_source": {
+    "status": "passed-source-controls-curvature6-basis-no-magnetic-or-force-acceptance",
+    "copper": "linear-dc-day-case-a-copper-v1-20261022",
+    "union_audit": {
+      "report": "linear-dc-day-case-a-union-volume-v1-20261022.json",
+      "sha256": "39b94280f2cf3b4bb701189ba0d07a118d61bb7ecd3133576d0ce67d6b9932ce",
+      "primitives": 393,
+      "relative_difference": 0.00025686020057058556,
+      "gate": 0.005,
+      "mesh_coverage_min": 1.0,
+      "note": "New independent analytic declared-primitive union audit; recorded star2 copper also passes(5.02e-5,linear-dc-day-recorded-star2-union-volume-v1-20261022.json)."
+    },
+    "curvature4": {
+      "work": "linear-dc-day-case-a-source-m200-c4-p50-v1-20261022",
+      "resistance_ohm": 0.7789033277775826,
+      "active_status": "failed",
+      "active_failures": 16,
+      "cause": "via barrel section area2.2-3.0%>2% at curvature4; currents within1.4% of gate. Preserved, not waived."
+    },
+    "basis": {
+      "work": "linear-dc-day-case-a-source-m200-c6-p50-v1-20261022",
+      "mesh_m": 0.0002,
+      "curvature_safety": 6.0,
+      "port_fraction": 0.5,
+      "mesh_elements": 276596,
+      "resistance_ohm": 0.7782721787803403,
+      "effective_loop_current_a": 1.2848975297654064,
+      "summary_sha256": "f5100e499359421c1510bba2fd5aca3ec790f1daed4e6fb5247586ce9fb6716e",
+      "solution_sha256": "065c57ec66e1920beea9c3240fd084ca47c099811da221eab091b7e01ec2a90d",
+      "seconds": 63.3,
+      "volume_relative_difference": 0.0012625281542238964
+    },
+    "controls": {
+      "mesh_m150": 4.126491016887002e-06,
+      "port_p40": 9.607587192039801e-06,
+      "h1_agreement": 0.0035098009806531216,
+      "curvature_c4_c6_resistance": 0.0008109617874705322,
+      "curvature_c4_c6_max_current_gate_fraction": 0.02893465989334477,
+      "active_sections": 79,
+      "active_failures_c6": 0,
+      "local_mesh": "passed",
+      "local_port": "passed",
+      "passive_sections": 42,
+      "passive_failures": 0,
+      "stub_controls": "none: saved geometry records zero physical stubs (explicit --declared-no-stubs)",
+      "return_sections": 4,
+      "return_failures": 0,
+      "rt0": "passed-affine-rt0-source-export-only",
+      "rt0_work": "linear-dc-day-case-a-rt0-m200-c6-p50-v1-20261022"
+    },
+    "reports": [
+      "linear-dc-day-case-a-active-m150-c6-p50-v1-20261022.json",
+      "linear-dc-day-case-a-active-m200-c4-p50-v1-20261022.json",
+      "linear-dc-day-case-a-active-m200-c6-p40-v1-20261022.json",
+      "linear-dc-day-case-a-active-m200-c6-p50-v1-20261022.json",
+      "linear-dc-day-case-a-curvature-c4-c6-supplementary-v1-20261022.json",
+      "linear-dc-day-case-a-local-mesh-refinement-c6-v1-20261022.json",
+      "linear-dc-day-case-a-local-port-refinement-c6-v1-20261022.json",
+      "linear-dc-day-case-a-mesh-resistance-c6-v1-20261022.json",
+      "linear-dc-day-case-a-passive-m200-c6-p50-v1-20261022.json",
+      "linear-dc-day-case-a-port-resistance-c6-v1-20261022.json",
+      "linear-dc-day-case-a-primal-agreement-c6-v1-20261022.json",
+      "linear-dc-day-case-a-return-m200-c6-p50-v1-20261022.json",
+      "linear-dc-day-case-a-union-volume-v1-20261022.json"
+    ]
+  },
+  "case_b_union_diagnosis": {
+    "status": "blocked-exact-cad-construction",
+    "analytic_union_m3": 2.1395887861045515e-08,
+    "finding": "Pairwise OCC fuse loses volume silently: two faithful level-8 subtrees(1.538e-8,4.13e-9m3) fuse to9.30e-9m3 vs analytic1.92e-8 at level9, then empty at level10. Order swap,UnifySameDomain and Fuse([..]) also empty; Glue is a partition, not accepted. Exact case-B source remains blocked; no healing/substitution.",
+    "reports": [
+      "linear-dc-day-case-b-union-diagnostic-v1-20261022.json",
+      "linear-dc-day-case-b-union-diagnostic-v2-20261022.json",
+      "linear-dc-day-case-b-union-experiment-v1-20261022.json",
+      "linear-dc-day-case-b-union-volume-v1-20261022.json",
+      "linear-dc-day-case-b-fuse-loss-v1-20261022.json",
+      "linear-dc-day-case-b-fuse-loss-v2-20261022.json (empty: serialization failure, preserved)"
+    ]
+  },
+  "tests_latest": "415 helpers passed,0 skips,29.567s (PCB_MOTOR_HOUSING_BINARY supplied) linear-dc-day-union-audit-all-helpers-v2-20261022.log"
 }

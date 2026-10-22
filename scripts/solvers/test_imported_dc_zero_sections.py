@@ -27,3 +27,16 @@ class ImportedZeroSectionSelectionTest(unittest.TestCase):
         arc=next(value for value in values if value['label'].startswith('passive-arc:'))
         np.testing.assert_allclose(arc['normal'],[-root,root,0.])
         self.assertEqual(len(values),9)
+
+    def test_generated_design_without_stubs_needs_explicit_recorded_absence(self):
+        fixture=imported.ImportedPhysicalCopperTest().snapshot()
+        fixture['networks'].append(dict(net='B',edges=[dict(geometry=dict(kind='trace',layer=1,points_m=[[0.,0.],[.01,0.]]))]))
+        geometry=dict(translation_m=[0.,0.,0.],geometry=dict(full_physical_via_stubs=[]))
+        with self.assertRaisesRegex(ValueError,'stub controls'):probes(fixture,geometry,{'A':{'current_a':1.}})
+        selected=probes(fixture,geometry,{'A':{'current_a':1.}},declared_no_stubs=True)
+        self.assertFalse(any(value['label'].startswith('zero-stub:') for value in selected))
+        with self.assertRaisesRegex(ValueError,'zero physical stubs'):
+            probes(fixture,dict(translation_m=[0.,0.,0.],geometry={}),{'A':{'current_a':1.}},declared_no_stubs=True)
+        stub=dict(position_m=[.001,.002],full_centreplane_range_m=[-.0048,0.],electrical_landing_range_m=[-.0032,-.0016])
+        with self.assertRaisesRegex(ValueError,'zero physical stubs'):
+            probes(fixture,dict(translation_m=[0.,0.,0.],geometry=dict(full_physical_via_stubs=[stub])),{'A':{'current_a':1.}},declared_no_stubs=True)

@@ -21,7 +21,7 @@ from source_snapshot import capture
 from winding_oracle import edge_points
 
 
-def probes(fixture,geometry,phase_data,all_eligible=False):
+def probes(fixture,geometry,phase_data,all_eligible=False,declared_no_stubs=False):
     spec=dimensions(fixture);shift=np.asarray(geometry['translation_m']);passive=[];result=[];arcs=[]
     for network in fixture['networks']:
         if phase_data.get(network['net'],{}).get('current_a',0.):continue
@@ -49,6 +49,9 @@ def probes(fixture,geometry,phase_data,all_eligible=False):
     if not passive:raise ValueError('No eligible undriven phase traces')
     result.extend(passive if all_eligible else [passive[i] for i in np.unique(np.linspace(0,len(passive)-1,min(6,len(passive)),dtype=int))])
     result.extend(arcs)
+    # Generated designs may legitimately have no stub copper; never invent one.
+    if declared_no_stubs and geometry['geometry'].get('full_physical_via_stubs',None)!=[]:
+        raise ValueError('No-stub declaration requires saved geometry recording zero physical stubs')
     for index,stub in enumerate(geometry['geometry']['full_physical_via_stubs']):
         raw=stub['full_centreplane_range_m'];landed=stub['electrical_landing_range_m']
         if landed is None:raise ValueError('No graph landing reference for full isolated via')
@@ -58,7 +61,7 @@ def probes(fixture,geometry,phase_data,all_eligible=False):
                 raise ValueError('No isolated via stub section outside a pad/junction')
             result.append(dict(label=f'zero-stub:{index}:{side}',centre=[*stub['position_m'],(lo+hi)/2],
                 normal=[0.,0.,1.],radius=spec['via_outer_radius_m']*1.2,expected_area_m2=spec['via_barrel_area_m2']))
-    if not any(probe['label'].startswith('zero-stub:') for probe in result):
+    if not declared_no_stubs and not any(probe['label'].startswith('zero-stub:') for probe in result):
         raise ValueError('No actual full-via stub controls')
     return result
 
@@ -67,6 +70,7 @@ def main():
     parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('--work',type=Path,required=True)
     parser.add_argument('--output',type=Path,required=True)
     parser.add_argument('--all-eligible-passive',action='store_true',help='All undriven long-straight trace and barrel sections plus every physical stub; no FE-error-based selection')
+    parser.add_argument('--declared-no-stubs',action='store_true',help='Saved geometry records zero physical via stubs; no stub control exists or is claimed')
     add_thread_option(parser);args=parser.parse_args()
     if args.output.exists():parser.error('Preserve prior zero-current section audits')
     work=args.work.resolve();source=load(work,MIXED)
@@ -79,7 +83,7 @@ def main():
     fixture=fixture[0]
     if sha(geometry_path)!=source['input_hashes'][str(geometry_path)] or sha(fixture)!=geometry['input_hashes'][str(fixture)] or sha(returns[0])!=source['input_hashes'][str(returns[0])]:
         raise ValueError('Imported source geometry/return changed')
-    selected=probes(json.loads(fixture.read_text()),geometry,json.loads(returns[0].read_text())['closure']['phase_data'],args.all_eligible_passive)
+    selected=probes(json.loads(fixture.read_text()),geometry,json.loads(returns[0].read_text())['closure']['phase_data'],args.all_eligible_passive,args.declared_no_stubs)
     import ngsolve as ng
     if ng.__version__!=source['version'] or source['request']['geometry_order']!=1:raise ValueError('Changed or unsupported source discretization')
     mesh=ng.Mesh(str(work/'mesh.vol'));solution=ng.GridFunction(ng.HDiv(mesh,order=0)*ng.L2(mesh,order=0))
@@ -87,6 +91,7 @@ def main():
     inputs={str(path):sha(path) for path in [work/'summary.json',work/'mesh.vol',work/'dc-current-potential.sol',fixture,geometry_path,returns[0]]}
     report=dict(status='running',scope=__doc__,source_work=str(work),input_hashes=inputs,sections=[],failures=[],
         selection='all eligible passive traces/vias, native arc midsections and all full stubs' if args.all_eligible_passive else 'six deterministic passive traces, native arc midsections and all full stubs',
+        stub_controls='none: saved geometry records zero physical stubs' if args.declared_no_stubs else 'all actual full stubs',
         source_snapshots=capture(args.output.parent,[Path(__file__),*[Path(__file__).with_name(name) for name in
             ['audit_finite_dc_sections.py','finite_copper_geometry.py','finite_circular_copper.py','winding_oracle.py']]]))
     if os.environ.get('PCB_MOTOR_COMMAND_RECEIPT'):report['command_receipt']=os.environ['PCB_MOTOR_COMMAND_RECEIPT']
