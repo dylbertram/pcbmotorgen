@@ -1,7 +1,15 @@
 {
   "status": "user-approved-five-cache-stage-running-source-controls-verified-force-unqualified",
   "five_cache_stage": {
-    "status": "refined-and-domain-caches-verified-quadrature-opening-coarse-running",
+    "status": "four-baseline-caches-verified-quadrature-only-still-running",
+    "opening_and_coarse_verification": {
+      "reports":["five-caches-opening-final-verification.json","five-caches-coarse-final-verification.json"],
+      "verified_at_utc":"2026-10-22T22:40:39Z",
+      "points_each":119370,
+      "opening":{"maximum_opening_relative_change":0.00017835460113871225,"maximum_direct_reference_relative_difference":6.548728166386807e-6,"native_storage_error":5.715192818130096e-15,"archive_sha256":"2ea6bc0a85a3797f759dbc1a2fd92b7f481d74ef1d6ef9a7fcff2151838ba886"},
+      "coarse":{"maximum_opening_relative_change":0.0021640874226985475,"maximum_direct_reference_relative_difference":0.00014024829134724845,"native_storage_error":5.7156049907158194e-15,"archive_sha256":"185caa717f7126b0b5c26643e0a24401d3a346ba45be4d4a468f48fbe5f9cdeb"},
+      "result":"Eachwhole-jobreceipt/launcherpassed,44evidencehashespercache verified,all119370points atbothopenings,unchanged2%/5%gates/nativestorage/finitearchive checks pass. Exactsource/mesh/preflight/RT0bindings andownbaseline0.18693290585146136A normalization verified. Fouroffivebaselinecaches verified,quadrature remainslivePID18852withmatchingidentity. At22:40Zdirectmonitorwatching/noalerts,inputsunchanged,owned1.531GiB/free67.740GiB. No newlaunch/restart. Fullcache-plan/force/admission remainsincomplete,overnight2/6unchanged."
+    },
     "domain_cache_verification": {
       "report":"five-caches-domain-final-verification.json",
       "verified_at_utc":"2026-10-22T22:00:37.953279Z",
