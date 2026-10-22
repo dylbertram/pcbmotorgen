@@ -1,5 +1,14 @@
 {
-  "status": "reviewed-source-recovery-stage-running-full-qualification-not-admitted",
+  "status": "reviewed-source-recovery-stage-verified-complete-full-qualification-not-admitted",
+  "source_recovery_completion": {
+    "verified_at_utc": "2026-10-22T18:40:20Z",
+    "verification_report": "source-recovery-final-verification.json",
+    "cleanup_report": "source-recovery-cleanup-verification.json",
+    "result": "All11fresh declared jobs completed successfully, reports/receipts/archived implementations and70 evidence hashes verified. RT0 archive additionally verified explicitly. All504active/251passive/4return sections pass, independentH1 agreement0.2243936871943353%, port resistance refinement6.517079251810998e-7relative, all27fixed-probe field comparisons pass max2.1142530602816377e-7relative. Port own measured loop current0.18693302767711756A. Original2%/5% gates unchanged.",
+    "rt0_archive_sha256": "a7ae378e3224cafb81078a15e683536acd21e1379a8fa637e3b96d197c87f483",
+    "processes": "Outer receipt completed exit0, campaign finished-all-completed, watcher chains-finished-observed without alerts. Both matching owned service labels ended nonrunning exit0, their prior identities absent, then unloaded. Plists/logs/failures preserved; historical labels untouched.",
+    "remaining": "No force/cache campaign launched. Broader source inventory reconciliation remains before checking the complete source-plan step. Full material caches,37job185state44pair nonlinear matrix,nine downstream source-force controls,per-body requirements,case admission/saved-host acceptance and general/native/install/license gates remain open. Further numerical stage requires fresh reviewed deadline/resource/parser/hash/DAG preflight."
+  },
   "window": {"start_utc":"2026-10-22T18:00:00Z","audit_reserve_utc":"2026-10-23T05:00:00Z","hard_stop_utc":"2026-10-23T06:00:00Z","timezone":"Europe/Stockholm","extension_authorized":false},
   "branch": "simulation/add-femm-and-improve",
   "reviewed_code_commit": "d332879",
@@ -37,7 +46,7 @@
   "source_stage": {
     "campaign":"source-recovery-campaign.json",
     "campaign_name":"linear-dc-night-source-recovery-v2",
-    "status":"running-port-zero-solve-mesh-local-comparison-passed",
+    "status":"verified-complete-source-recovery-only",
     "launched_at_utc":"2026-10-22T18:20:25.723969Z",
     "last_verified_at_utc":"2026-10-22T18:21:30.969612Z",
     "launch_record":"launch-record.json",
