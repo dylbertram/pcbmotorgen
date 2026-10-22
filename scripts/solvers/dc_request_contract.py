@@ -136,9 +136,14 @@ def _validate_request(request, fixture, model, current_geometry, source_hash):
     # Parse every value before arithmetic: bool/NaN must never compare as a
     # sampled numeric state. No archive paths or commands come from this input.
     encoded(request)
+    # v1 names the recorded basis explicitly. v2 omits it: the worker selects
+    # the single registered case whose audited geometry matches exactly.
     required = {'schema', 'request_id', 'winding', 'material_model', 'return_geometry',
-                'source_basis_sha256', 'current_a', 'pm_offset_x_m', 'placement_acknowledged'}
-    if set(request) != required or request.get('schema') != 'finite-dc-live-request-v1':
+                'current_a', 'pm_offset_x_m', 'placement_acknowledged'}
+    version = request.get('schema')
+    if version == 'finite-dc-live-request-v1':
+        required = required | {'source_basis_sha256'}
+    if set(request) != required or version not in ['finite-dc-live-request-v1', 'finite-dc-live-request-v2']:
         raise UnsupportedDcRequest('Complete versioned live DC request required, with no unknown fields')
     if not isinstance(request['request_id'], str) or not 1 <= len(request['request_id']) <= 128:
         raise UnsupportedDcRequest('A bounded request identity is required')
@@ -149,7 +154,7 @@ def _validate_request(request, fixture, model, current_geometry, source_hash):
         raise UnsupportedDcRequest('Only sampled loop currents0,+/-0.1,+/-0.5A are currently qualified; no interpolation')
     if type(offset) not in [int, float] or offset not in [0., .0001, -.0001]:
         raise UnsupportedDcRequest('Only explicit sampled PM offsets0,+/-100um are currently qualified')
-    if request['source_basis_sha256'] != source_hash:
+    if version == 'finite-dc-live-request-v1' and request['source_basis_sha256'] != source_hash:
         raise UnsupportedDcRequest('Request selects a different or unqualified physical current basis')
     actual = geometry_descriptor(request['winding'])
     expected = geometry_descriptor(reference_snapshot(fixture))
@@ -166,7 +171,9 @@ def _validate_request(request, fixture, model, current_geometry, source_hash):
     if encoded(request['return_geometry']) != encoded(expected_return):
         raise UnsupportedDcRequest('Declared finite return/drive geometry differs from the qualified source; no closure invented')
     digest = hashlib.sha256(encoded(request).encode()).hexdigest()
-    return dict(status='eligible-for-recorded-geometry-live-recalculation-only', request_id=request['request_id'],
+    status = ('eligible-for-recorded-geometry-live-recalculation-only' if version == 'finite-dc-live-request-v1'
+              else 'eligible-for-qualified-geometry-live-recalculation-only')
+    return dict(status=status, request_id=request['request_id'],
                 request_sha256=digest, source_basis_sha256=source_hash, current_a=current, pm_offset_x_m=offset,
                 scope='Eligibility only, not a magnetic result. Rebuild/check physical geometry and solve fresh; do not replay archived forces.')
 

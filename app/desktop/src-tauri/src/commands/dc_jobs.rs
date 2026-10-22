@@ -15,8 +15,10 @@ use std::{
     time::{Duration, Instant},
 };
 
-const SOURCE_SHA: &str = "e2bcc3d0810f7d67cb60d2c7408e334fa04d3c27b285c85d4a9d9c65a9ac9aad";
 const TIMEOUT: Duration = Duration::from_secs(360);
+/// Written only by the offline registration of a case whose whole force-matrix
+/// audit passed. The worker re-verifies every entry; the host only lists them.
+const REGISTRY: &str = "dc-qualified-linear-cases-v1.json";
 
 #[derive(Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -55,9 +57,11 @@ impl DcStudy {
     }
 
     fn request(&self, winding: Value) -> Value {
-        json!({"schema":"finite-dc-live-request-v1", "request_id":self.request_id,
+        // v2 names no source basis: the worker must find exactly one registered,
+        // re-verified qualified case matching this rebuilt copper and placement.
+        json!({"schema":"finite-dc-live-request-v2", "request_id":self.request_id,
             "winding":winding, "material_model":self.material_model, "return_geometry":self.return_geometry,
-            "source_basis_sha256":SOURCE_SHA, "current_a":self.current_a,
+            "current_a":self.current_a,
             "pm_offset_x_m":self.pm_offset_x_m, "placement_acknowledged":self.placement_acknowledged})
     }
 }
@@ -213,7 +217,9 @@ fn verify_result(job: &Path, request: &Value, request_sha: &str) -> Result<Value
         return Err("DC worker has no successful supervisor receipt".into());
     }
     let result = read_json(&job.join("result/summary.json"))?;
-    if result["status"] != "passed-fresh-recorded-geometry-dc-request-only"
+    if result["status"] != "passed-fresh-qualified-geometry-dc-request-only"
+        || !result["qualified_case"]["case_id"].is_string()
+        || result["qualified_case"] != result["eligibility"]["qualified_case"]
         || result["input_request_sha256"] != request_sha
         || result["eligibility"]["request_id"] != request["request_id"]
         || result["eligibility"]["current_a"] != request["current_a"]
@@ -540,11 +546,36 @@ impl DcJobs {
     }
 }
 
+/// Registered qualified cases with their audited placement/return, for display
+/// and explicit acknowledgement only. Admission is decided by the worker.
+fn qualified_cases(archive: &Path) -> Result<Vec<Value>, String> {
+    let path = archive.join(REGISTRY);
+    if !path.exists() {
+        return Ok(vec![]);
+    }
+    let registry = read_json(&path)?;
+    if registry["schema"] != "dc-qualified-linear-cases-v1" {
+        return Err("Unrecognized qualified-case registry".into());
+    }
+    Ok(registry["cases"]
+        .as_array()
+        .ok_or("Malformed qualified-case registry")?
+        .iter()
+        .filter(|case| case["case_id"].is_string() && case["declaration"].is_object())
+        .map(|case| json!({"case_id":case["case_id"],"label":case["label"],"audit_sha256":case["audit_sha256"],
+            "declaration":case["declaration"]}))
+        .collect())
+}
+
 #[tauri::command]
 pub fn dc_coupling_capability() -> Value {
-    match Runtime::from_env() {
-        Ok(_) => {
-            json!({"available":true,"scope":"Recorded geometry and sampled states only; provisional reversible material law; no interpolation or hardware qualification"})
+    match Runtime::from_env().and_then(|runtime| qualified_cases(&runtime.archive)) {
+        Ok(cases) if cases.is_empty() => {
+            json!({"available":false,"reason":"No qualified linear DC case is registered on this host; designs need offline qualification first"})
+        }
+        Ok(cases) => {
+            json!({"available":true,"qualified_cases":cases,
+                "scope":"Registered individually qualified linear designs and their sampled current/pose states only; provisional reversible material law; no interpolation or hardware qualification"})
         }
         Err(error) => json!({"available":false,"reason":error}),
     }
@@ -723,8 +754,10 @@ mod tests {
         let child = serde_json::to_vec(&json!({"status":"passed-recorded-finite-current-static-pilot-only","failures":[],
             "states":{"0.1":{"solution":"state.sol","solution_sha256":hash(solution),"pm_array_force_n":[1.,2.,3.]}}})).unwrap();
         fs::write(job.join("result/fresh-magnetic-solve/summary.json"), &child).unwrap();
-        let result = json!({"status":"passed-fresh-recorded-geometry-dc-request-only","input_request_sha256":sha,
-            "eligibility":{"request_id":"binding","current_a":0.1,"pm_offset_x_m":0.0},"pm_array_force_n":[1.,2.,3.],
+        let case = json!({"case_id":"case","label":"fixture","audit_sha256":"audit"});
+        let result = json!({"status":"passed-fresh-qualified-geometry-dc-request-only","input_request_sha256":sha,
+            "qualified_case":case,
+            "eligibility":{"request_id":"binding","current_a":0.1,"pm_offset_x_m":0.0,"qualified_case":case},"pm_array_force_n":[1.,2.,3.],
             "fresh_solution":"fresh-magnetic-solve/state.sol","fresh_solution_sha256":hash(solution),"fresh_solve_summary_sha256":hash(&child)});
         let save = |value: &Value| {
             fs::write(
@@ -735,10 +768,12 @@ mod tests {
         };
         save(&result);
         assert!(verify_result(job, &request, &sha).is_ok());
-        for field in ["force", "current", "id", "solution", "childhash"] {
+        for field in ["force", "current", "id", "solution", "childhash", "case", "status"] {
             let mut changed = result.clone();
             match field {
                 "force" => changed["pm_array_force_n"][0] = json!(4.),
+                "case" => changed["qualified_case"]["case_id"] = json!("other-case"),
+                "status" => changed["status"] = json!("passed-fresh-recorded-geometry-dc-request-only"),
                 "current" => changed["eligibility"]["current_a"] = json!(0.5),
                 "id" => changed["eligibility"]["request_id"] = json!("old-request"),
                 "solution" => changed["fresh_solution"] = json!("../old-state.sol"),
@@ -762,6 +797,22 @@ mod tests {
         )
         .unwrap();
         assert!(verify_result(job, &request, &sha).is_err());
+    }
+
+    #[test]
+    fn capability_lists_only_registered_cases_with_declared_placement() {
+        let dir = tempfile::tempdir().unwrap();
+        assert!(qualified_cases(dir.path()).unwrap().is_empty());
+        fs::write(dir.path().join(REGISTRY), br#"{"schema":"other","cases":[]}"#).unwrap();
+        assert!(qualified_cases(dir.path()).is_err());
+        fs::write(dir.path().join(REGISTRY), serde_json::to_vec(&json!({"schema":"dc-qualified-linear-cases-v1","cases":[
+            {"case_id":"a","label":"A","audit_sha256":"x","declaration":{"material_model":{},"return_geometry":{}},"live":{"nominal":{}}},
+            {"case_id":"b","label":"undeclared"}]})).unwrap()).unwrap();
+        let cases = qualified_cases(dir.path()).unwrap();
+        assert_eq!(cases.len(), 1);
+        assert_eq!(cases[0]["case_id"], "a");
+        // Worker-side live inputs are never exposed through IPC.
+        assert!(cases[0].get("live").is_none());
     }
 
     #[test]

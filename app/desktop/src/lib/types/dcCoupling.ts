@@ -45,12 +45,20 @@ export interface DcJobStatus {
   request_sha256: string;
   error: string | null;
   result: null | {
-    status: "passed-fresh-recorded-geometry-dc-request-only";
+    status: "passed-fresh-qualified-geometry-dc-request-only";
     pm_array_force_n: [number, number, number];
     fresh_solution_sha256: string;
     input_request_sha256: string;
-    eligibility: { request_id: string; current_a: number; pm_offset_x_m: number };
+    qualified_case: DcQualifiedCaseIdentity;
+    eligibility: { request_id: string; current_a: number; pm_offset_x_m: number; qualified_case: DcQualifiedCaseIdentity };
   };
 }
 
-export interface DcCapability { available: boolean; reason?: string; scope?: string }
+export interface DcQualifiedCaseIdentity { case_id: string; label: string; audit_sha256: string }
+
+/** Audited explicit placement/return for one registered case. Listing it is not admission. */
+export interface DcQualifiedCase extends DcQualifiedCaseIdentity {
+  declaration: { material_model: Record<string, unknown>; return_geometry: Record<string, unknown> };
+}
+
+export interface DcCapability { available: boolean; reason?: string; scope?: string; qualified_cases?: DcQualifiedCase[] }

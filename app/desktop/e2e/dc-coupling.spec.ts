@@ -8,7 +8,9 @@ async function openPanel(page: Page, bridge = true) {
     const w = window as any;
     w.dcMode = "completed"; w.dcCalls = [];
     w.__TAURI_INTERNALS__ = { invoke: async (command: string, args: any) => {
-      if (command === "dc_coupling_capability") return { available: true, scope: "UI fixture only" };
+      if (command === "dc_coupling_capability") return { available: true, scope: "UI fixture only", qualified_cases: [
+        {case_id:"fixture-case",label:"Fixture qualified design",audit_sha256:"fixture-audit",
+         declaration:{material_model:{fixture:true},return_geometry:{fixture:true}}}] };
       w.dcCalls.push({command,args});
       if (command === "start_dc_coupling") {
         if (w.dcMode === "failed") throw new Error("Actual winding differs from qualified geometry");
@@ -19,9 +21,10 @@ async function openPanel(page: Page, bridge = true) {
       }
       if (command === "cancel_dc_coupling") return {...w.dcJob,state:"cancelled",result:null};
       if (command === "dc_coupling_status") {
-        const complete = {...w.dcJob,state:"completed",result:{status:"passed-fresh-recorded-geometry-dc-request-only",
+        const qualified = {case_id:"fixture-case",label:"Fixture qualified design",audit_sha256:"fixture-audit"};
+        const complete = {...w.dcJob,state:"completed",result:{status:"passed-fresh-qualified-geometry-dc-request-only",
           input_request_sha256:"fresh-content-hash",fresh_solution_sha256:"test-solution-hash",pm_array_force_n:[0.001,0.002,-1.1],
-          eligibility:{request_id:w.dcJob.request_id,current_a:0.1,pm_offset_x_m:0}}};
+          qualified_case:qualified,eligibility:{request_id:w.dcJob.request_id,current_a:0.1,pm_offset_x_m:0,qualified_case:qualified}}};
         if (w.dcMode === "pending") return w.dcJob;
         if (w.dcMode === "poll-delayed") return new Promise(resolve=>{w.resolveDcPoll=()=>resolve(complete);});
         return complete;
@@ -102,4 +105,20 @@ test("DC declaration rejects archived forces or incomplete input",async({page})=
   await panel.getByRole("button",{name:"Calculate static DC force",exact:true}).click();
   await expect(panel).toContainText("Do not include archived forces or winding snapshots");
   expect(await page.evaluate(()=>(window as any).dcCalls.filter((c:any)=>c.command==="start_dc_coupling").length)).toBe(0);
+});
+
+test("qualified designs fill only their audited placement and still need acknowledgement",async({page})=>{
+  const panel=await openPanel(page);
+  await expect(panel.getByRole("list",{name:"Qualified DC designs"})).toContainText("Fixture qualified design");
+  await panel.getByRole("checkbox").check();
+  await panel.getByRole("button",{name:"Use audited placement",exact:true}).click();
+  await expect(panel.getByRole("textbox")).toHaveValue(/"fixture": true/);
+  await expect(panel.getByRole("checkbox")).not.toBeChecked();
+  await expect(panel.getByRole("button",{name:"Calculate static DC force",exact:true})).toBeDisabled();
+  await panel.getByRole("checkbox").check();
+  await panel.getByRole("button",{name:"Calculate static DC force",exact:true}).click();
+  await expect(panel).toContainText("Qualified design: Fixture qualified design");
+  const start=await page.evaluate(()=>(window as any).dcCalls.find((c:any)=>c.command==="start_dc_coupling"));
+  expect(start.args.study.material_model).toEqual({fixture:true});
+  expect(Object.keys(start.args.study)).not.toContain("winding");
 });

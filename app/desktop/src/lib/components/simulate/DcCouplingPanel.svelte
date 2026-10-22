@@ -2,7 +2,7 @@
   import { onMount, onDestroy, untrack } from "svelte";
   import type { ConfigStore } from "../../stores/config.svelte";
   import type { CadGeometry, LinearMotorConfig, DriveSettings } from "../../types";
-  import type { DcCapability, DcStudy } from "../../types/dcCoupling";
+  import type { DcCapability, DcQualifiedCase, DcStudy } from "../../types/dcCoupling";
   import { dcCouplingCapability, startDcCoupling, dcCouplingStatus, cancelDcCoupling } from "../../ipc/dcJobs";
   import { DcJobController, type DcViewState } from "../../dcJobController";
 
@@ -47,6 +47,13 @@
   });
   onDestroy(() => { destroyed = true;void controller.invalidate(); });
 
+  // Fills only the audited explicit placement/return; acknowledgement stays a
+  // separate user action and the worker still checks the rebuilt copper.
+  function useDeclaration(entry: DcQualifiedCase) {
+    declaration = JSON.stringify(entry.declaration, null, 2);
+    acknowledged = false;
+  }
+
   async function calculate() {
     inputError = null;
     try {
@@ -72,10 +79,23 @@
 <section aria-label="Experimental static DC coupling" class="max-w-4xl space-y-3 text-xs text-slate-300">
   <div class="space-y-1">
     <h3 class="font-semibold text-slate-100">Static DC winding–magnet–shield coupling</h3>
-    <p class="max-w-3xl leading-relaxed text-amber-200">Restricted to the recorded, verified geometry and sampled current/pose states. Other designs are rejected, not approximated. The reversible ferrite law is provisional. No temperature, hardware rating, reversal cycle or differential inductance prediction.</p>
+    <p class="max-w-3xl leading-relaxed text-amber-200">Restricted to designs individually qualified on this host and their sampled current/pose states. Any other design is rejected as needing qualification, not approximated. The reversible ferrite law is provisional. No temperature, hardware rating, reversal cycle or differential inductance prediction.</p>
   </div>
   {#if !capability.available}
     <p role="status" class="text-slate-400">{capability.reason}</p>
+  {:else if capability.qualified_cases?.length}
+    <div class="space-y-1">
+      <p class="text-slate-400">Qualified designs on this host. The active design must match one exactly; nothing is matched approximately.</p>
+      <ul aria-label="Qualified DC designs" class="space-y-1">
+        {#each capability.qualified_cases as entry (entry.case_id)}
+          <li class="flex flex-wrap items-center justify-between gap-2 rounded border border-slate-700 px-2 py-1">
+            <span class="text-slate-200">{entry.label}</span>
+            <button type="button" onclick={() => useDeclaration(entry)} disabled={busy}
+              class="rounded border border-slate-600 px-2 py-0.5 hover:bg-slate-800 disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400">Use audited placement</button>
+          </li>
+        {/each}
+      </ul>
+    </div>
   {/if}
   <div class="grid gap-3 sm:grid-cols-2">
     <label class="flex items-center justify-between gap-2">Loop current (A)
@@ -94,7 +114,7 @@
     <textarea bind:value={declaration} rows="5" spellcheck="false" placeholder={'{"material_model": {...}, "return_geometry": {...}}'}
       class="w-full rounded border border-slate-600 bg-slate-950 p-2 font-mono text-xs text-slate-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400"></textarea>
   </label>
-  <p class="text-slate-400">Use the full physical model and declared return from an approved study. Copper is rebuilt from the active design, not this JSON. No automatic clearance correction or invented return. New geometry requires separate qualification.</p>
+  <p class="text-slate-400">Use the full physical model and declared return from that design's qualified study. Copper is rebuilt from the active design, not this JSON. No automatic clearance correction or invented return. Unlisted designs need offline qualification before they can run here.</p>
   <label class="flex items-start gap-2">
     <input type="checkbox" bind:checked={acknowledged} class="mt-0.5" />
     <span>I acknowledge this explicit physical material placement and finite return. This does not modify the saved design or approve corrections for other designs.</span>
@@ -105,7 +125,7 @@
     {#if busy}
       <button type="button" onclick={() => { void controller.cancel(); }} disabled={view.phase === "cancelling"}
         class="rounded border border-slate-600 px-3 py-1.5 hover:bg-slate-800 disabled:opacity-40">Cancel DC job</button>
-      <p role="status" class="text-slate-400">{view.phase === "cancelling" ? "Waiting for the desktop worker to stop. No force is displayed." : "Calculating fresh fields. The recorded-case solve takes about 90–100 s; the whole job is capped at 360 s."}</p>
+      <p role="status" class="text-slate-400">{view.phase === "cancelling" ? "Waiting for the desktop worker to stop. No force is displayed." : "Calculating fresh fields. Qualified-design solves take about 1–2 minutes; the whole job is capped at 360 s."}</p>
     {/if}
   </div>
   {#if inputError || view.error}
@@ -119,6 +139,7 @@
         <dt>PM-array force {axis}</dt><dd class="font-mono text-emerald-200">{force[index].toPrecision(6)} N</dd>
       {/each}
     </dl>
+    <p class="text-slate-400">Qualified design: {view.job?.result?.qualified_case.label}</p>
     <p class="text-slate-400">Force-vector norm gates: 2% refinement, 5% independent agreement, 1e-8 N floor. Componentwise relative accuracy and interpolation are not qualified.</p>
     <p class="break-all text-slate-400">Request SHA256: {view.job?.request_sha256}</p>
     <p class="break-all text-slate-400">Evidence: {view.job?.evidence_directory}</p>

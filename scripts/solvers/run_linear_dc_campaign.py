@@ -100,8 +100,10 @@ def main():
                 entry.update(status='not-launched-cutoff' if 'cutoff' in str(error) else 'not-launched-input',error=str(error));save();continue
             path=evidence/(spec['name']+'-'+job['name']+'-job.json')
             with path.open('x') as stream:stream.write(json.dumps(declaration,indent=2)+'\n')
+            # Own session per bounded job: stopping this runner must never strip a
+            # live solver of its own supervisor, timeout, guard and receipt.
             running[job['name']]=subprocess.Popen([python,str(HERE/'run_declared_solver_job.py'),'--declaration',str(path)],
-                stdout=subprocess.DEVNULL,stderr=(evidence/(spec['name']+'-'+job['name']+'.stderr.log')).open('x'))
+                stdout=subprocess.DEVNULL,stderr=(evidence/(spec['name']+'-'+job['name']+'.stderr.log')).open('x'),start_new_session=True)
             entry.update(status='launched',pid=running[job['name']].pid,declaration=str(path),declaration_sha256=sha(path),
                 launched_utc=datetime.now(timezone.utc).isoformat())
             print('launch',job['name'],flush=True);save()

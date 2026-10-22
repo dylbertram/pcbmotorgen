@@ -40,3 +40,21 @@ class NativeMemoryBudgetTest(unittest.TestCase):
             self.assertFalse((work/'budget.log.command.json.memory.json').exists())
             self.assertTrue((work/'budget.log.command.memory.json').exists())
             with self.assertRaises(ProcessLookupError):os.kill(receipt['pid'],0)
+
+
+class ExitedChildObservationTest(unittest.TestCase):
+    def test_unreaped_zombie_is_not_an_observation_failure_but_live_eperm_is(self):
+        import subprocess,sys,time
+        from unittest import mock
+        import solver_memory_budget as budget
+        child=subprocess.Popen([sys.executable,'-c','pass']);time.sleep(.5)
+        self.assertTrue(budget.exited(child.pid))
+        self.assertFalse(budget.exited(os.getpid()))
+        child.wait()
+        with mock.patch.object(budget,'exited',return_value=False),mock.patch('ctypes.get_errno',return_value=1):
+            fake=mock.Mock();fake.proc_pid_rusage.return_value=1
+            with mock.patch('ctypes.CDLL',return_value=fake):
+                with self.assertRaisesRegex(OSError,'Cannot observe'):budget.process_memory(12345)
+        with mock.patch.object(budget,'exited',return_value=True),mock.patch('ctypes.get_errno',return_value=1):
+            fake=mock.Mock();fake.proc_pid_rusage.return_value=1
+            with mock.patch('ctypes.CDLL',return_value=fake):self.assertIsNone(budget.process_memory(12345))

@@ -127,9 +127,11 @@ export class DcJobController {
     }
     if (job.state === "completed") {
       const result = job.result;
-      if (!result || result.status !== "passed-fresh-recorded-geometry-dc-request-only"
+      if (!result || result.status !== "passed-fresh-qualified-geometry-dc-request-only"
         || result.input_request_sha256 !== job.request_sha256
         || result.eligibility.request_id !== job.request_id
+        || typeof result.qualified_case?.case_id !== "string"
+        || result.qualified_case.case_id !== result.eligibility.qualified_case?.case_id
         || result.pm_array_force_n.length !== 3 || !result.pm_array_force_n.every(Number.isFinite)) {
         throw new Error("Unverified DC force response");
       }

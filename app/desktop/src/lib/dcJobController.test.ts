@@ -4,12 +4,13 @@ import type { DcJobStatus } from "./types/dcCoupling";
 
 function deferred<T>() { let resolve!: (value:T)=>void, reject!: (error:Error)=>void;
   const promise = new Promise<T>((ok,no)=>{resolve=ok;reject=no;});return {promise,resolve,reject}; }
+const CASE = {case_id:"case-a",label:"Case A",audit_sha256:"audit-hash"};
 const running = (id="one"): DcJobStatus => ({request_id:id,job_id:`job-${id}`,state:"running",elapsed_seconds:0,
   evidence_directory:"/evidence",request_sha256:"content-hash",error:null,result:null});
 const complete = (id="one"): DcJobStatus => ({...running(id),state:"completed",result:{
-  status:"passed-fresh-recorded-geometry-dc-request-only",pm_array_force_n:[1,2,3],
-  input_request_sha256:"content-hash",fresh_solution_sha256:"solution-hash",
-  eligibility:{request_id:id,current_a:0.1,pm_offset_x_m:0}}});
+  status:"passed-fresh-qualified-geometry-dc-request-only",pm_array_force_n:[1,2,3],
+  input_request_sha256:"content-hash",fresh_solution_sha256:"solution-hash",qualified_case:CASE,
+  eligibility:{request_id:id,current_a:0.1,pm_offset_x_m:0,qualified_case:CASE}}});
 function setup() {
   const views:DcViewState[]=[];
   const transport = {start:vi.fn().mockResolvedValue(running()),poll:vi.fn().mockResolvedValue(complete()),
@@ -59,7 +60,8 @@ describe("managed DC request lifecycle",()=>{
   it("rejects mismatched IDs, failed status, stale hashes and nonfinite forces",async()=>{
     const mutations:Array<(job:DcJobStatus)=>void> = [job=>{job.job_id="other";},job=>{job.request_id="other";},
       job=>{job.result!.input_request_sha256="changed";},job=>{job.result!.pm_array_force_n[0]=Number.NaN;},
-      job=>{job.state="failed";}];
+      job=>{job.state="failed";},job=>{job.result!.qualified_case={...CASE,case_id:"other-case"};},
+      job=>{(job.result as {status:string}).status="passed-fresh-recorded-geometry-dc-request-only";}];
     for (const mutate of mutations) {
       const {controller,transport,last}=setup();await controller.start("one");
       const bad=complete();mutate(bad);transport.poll.mockResolvedValue(bad);await controller.poll();

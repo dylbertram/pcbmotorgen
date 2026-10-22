@@ -16,7 +16,9 @@ import numpy as np
 from compare_reduced_fields import completed_receipt
 from dc_request_contract import geometry_descriptor
 from finite_copper_circuit import return_prism
+from audit_copper_union_volume import STANDARD_ERROR_GATE,VOLUME_GATE,primitives,union_estimate
 from finite_copper_geometry import build,fuse_all
+from finite_copper_grouped import grouped_build
 from post_project_force import sha
 from solver_threads import add_thread_option,threaded_main,runtime_metadata
 from source_snapshot import capture
@@ -46,6 +48,16 @@ def validate_copper_shape(copper):
         raise ValueError('Actual copper union must be one nonempty solid;no geometry repair or return-only substitute permitted')
 
 
+def union_gate(snapshot,shift,volume):
+    pieces,drills=primitives(snapshot,shift);estimate,error=union_estimate(pieces,drills,4000)
+    difference=abs(volume/estimate-1)
+    result=dict(primitives=len(pieces),drill_bores=len(drills),analytic_union_volume_m3=estimate,analytic_standard_error_m3=error,
+        cad_volume_m3=volume,relative_difference=difference,volume_gate=VOLUME_GATE,standard_error_gate=STANDARD_ERROR_GATE)
+    if error/estimate>STANDARD_ERROR_GATE or not difference<=VOLUME_GATE:
+        raise ValueError('Exact copper CAD differs from the analytic union of its declared primitives;no repair applied')
+    return result
+
+
 def closed_return(copper,spec,path):
     from netgen.occ import Box,Pnt
     validate_copper_shape(copper)
@@ -59,6 +71,9 @@ def closed_return(copper,spec,path):
     if not np.isfinite(overlap) or abs(overlap)>1e-18:raise ValueError('Declared return contacts copper outside saved terminal junction windows')
     whole=fuse_all([copper,returned])
     if len(whole.solids)!=1:raise ValueError('Declared finite return does not yield one connected conductor')
+    winding,closing,total=float(copper.mass),float(returned.mass),float(whole.mass)
+    if not winding*(1-1e-9)<=total<=(winding+closing)*(1+1e-9):
+        raise ValueError('Closing fuse lost or invented copper volume;no repair applied')
     return whole,dict(nonterminal_contact_volume_m3=overlap,terminal_audit_window_half_width_m=radius,
         scope='Only audit intersection is clipped at physical terminal windows;no copper/return geometry is removed or repaired.')
 
@@ -84,6 +99,8 @@ def partition_checks(copper,closed,model):
 def main():
     parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('--study-work',type=Path,required=True)
     parser.add_argument('--study-receipt',type=Path,required=True);parser.add_argument('--work',type=Path,required=True)
+    parser.add_argument('--fuse-strategy',choices=['pairwise','per-kind'],default='pairwise',
+        help='Boolean grouping only; identical primitives/drills, recorded and audited analytically')
     add_thread_option(parser);args=parser.parse_args();origin=args.study_work.resolve();work=args.work.resolve()
     if work.exists():parser.error('Preserve previous finite copper preparations')
     study,snapshot=load_study(origin,args.study_receipt)
@@ -91,13 +108,19 @@ def main():
     work.mkdir(parents=True);started=time.monotonic()
     report=dict(status='running',scope=__doc__,input_hashes=inputs,translation_m=study['translation_m'],
         actual_study_work=str(origin),execution=runtime_metadata(),failures=[],
+        fuse_strategy=args.fuse_strategy,
         source_snapshots=capture(work,[Path(__file__),*[Path(__file__).with_name(name) for name in
-            ['finite_copper_geometry.py','finite_copper_eligibility.py','finite_copper_circuit.py','winding_oracle.py']]]))
+            ['finite_copper_geometry.py','finite_copper_eligibility.py','finite_copper_circuit.py','winding_oracle.py',
+             'finite_copper_grouped.py','audit_copper_union_volume.py']]]))
     if os.environ.get('PCB_MOTOR_COMMAND_RECEIPT'):report['command_receipt']=os.environ['PCB_MOTOR_COMMAND_RECEIPT']
     def save():(work/'summary.json').write_text(json.dumps(report,indent=2,allow_nan=False)+'\n')
     save()
     try:
-        copper,spec=build(snapshot,study['translation_m']);validate_copper_shape(copper)
+        copper,spec=(grouped_build if args.fuse_strategy=='per-kind' else build)(snapshot,study['translation_m'])
+        validate_copper_shape(copper)
+        # Pairwise OCC fusion has silently dropped copper on a real design, so
+        # every build must match the analytic union of its declared primitives.
+        report['union_audit']=union_gate(snapshot,study['translation_m'],float(copper.mass));save()
         copper.WriteBrep(str(work/'copper.brep'))
         # The existing builder first rejects any raw/graph span discrepancy.
         # These generated cases therefore have no hidden unlanded physical stub.

@@ -24,6 +24,11 @@ class DarwinRusageV2(ctypes.Structure):
         'child_pageins','child_elapsed_abstime','diskio_bytesread','diskio_byteswritten']]
 
 
+def exited(pid):
+    state=subprocess.run(['ps','-o','stat=','-p',str(pid)],capture_output=True,text=True,timeout=5).stdout.strip()
+    return not state or state.startswith('Z')
+
+
 def process_memory(pid):
     if sys.platform!='darwin':raise ValueError('Native physical-footprint guard requires macOS; no silent RSS substitution')
     info=DarwinRusageV2();lib=ctypes.CDLL('/usr/lib/libproc.dylib',use_errno=True)
@@ -31,6 +36,9 @@ def process_memory(pid):
     if query(pid,2,ctypes.byref(info)):
         error=ctypes.get_errno()
         if error in [errno.ESRCH,errno.ENOENT]:return None
+        # An exited-but-unreaped child holds no memory, and macOS refuses its
+        # rusage with EPERM. Only a confirmed zombie or vanished PID is skipped.
+        if error==errno.EPERM and exited(pid):return None
         raise OSError(error,'Cannot observe native solver memory')
     return dict(pid=pid,resident_bytes=info.resident_size,physical_footprint_bytes=info.phys_footprint)
 
