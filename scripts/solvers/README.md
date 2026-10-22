@@ -431,6 +431,37 @@ must also remain within 2%. The imported 0.4-to-0.3 mm spatial control passes al
 equivalent to a 0.0757% relative change. This does not qualify every interior
 current value or the finite-source magnetic field.
 
+The imported spatial source subsequently passes all 1511 eligible local current
+and area checks, four return sections and the independent H1 resistance check,
+with 0.4035% disagreement under the 5% gate. Its exact affine RT0 export retains
+all 5,449,004 cells and radial terms. Reloaded power error is 1.93e-14 and the
+64-cell held-out affine identity error is 5.27e-15. No filament substitution,
+constant-cell smoothing or fitted current normalization is used.
+
+`audit_exterior_current_field.py` is a separate source-only integration pilot.
+It chooses two deterministic trace XY positions and places observations 1 and
+2 mm below the entire saved source. Those positions do not declare ferrite,
+housing, PMs or approved material clearances. Analytical cell-face integration
+is compared with tetrahedron volume quadrature orders 2, 4 and 6 under the
+unchanged 2% refinement and 5% agreement gates, with a 1e-12 T floor. Both the
+curvature4 baseline and spatial source pass these two-point pilots in about
+28 seconds each. They are not all-near-field or material-quadrature evidence.
+
+`audit_exterior_field_refinement.py` binds those pilots to the original current
+states and requires identical observations and isolated spatial controls. Both
+raw saved-1V and per-loop-A vector fields must pass the 2% gate. Per-A scaling
+divides only by the saved effective loop current, never a fitted scale. The
+maximum spatial difference is 1.067e-5 in the raw basis and 1.029e-5 per A. No
+force, saturation, imported app admission or general-CAD qualification follows.
+
+The drive-length trial was interrupted during native meshing without a saved
+mesh or current. Its watcher also stopped at 22:05 UTC; the cause is unknown.
+Neither a running summary nor the old watcher proves continuous overnight
+coverage. One-shot session health checks at 06:10 and 06:40 UTC supplement new
+shell watchers; scheduled execution still requires OpenChamber to be available.
+Keep the remaining drive-length verification distinct from drive-profile gauge
+invariance, and do not extend the compute window beyond 06:53:31 UTC.
+
 Evidence correction: earlier 306-test helper logs included four or five skipped
 tests, not 306 passes. Preserve those logs and historical delivery manifests.
 A fresh explicit NGSolve/PyAMG/Rust-entrypoint run covers the omitted checks.

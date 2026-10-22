@@ -610,6 +610,47 @@
               "scope": "Two completed all-eligible active reports bound to immutable actual sources, matching labels/physical planes/windows/reference signs; isolated mesh axis and fixed curvature checked.2%local-current gate with1e-8A-per-loop floor and2%area-difference gate pass. No full interior/finite-source-field/force acceptance."
             },
             "window_followup": "At05:55Z launched serial spatial03 all-active1200s,all-passive900s,return180s,H1reference300s and exact affine RT0 export900s stages with18GiB native-memory guard. Each stage must fit before06:53:31Z or remains unlaunched. No long port retry within insufficient remaining window. Source export is preparation only and cannot waive failed/pending local/refinement controls.",
+            "completed_spatial_followup": {
+              "status": "All five jobs completed; watcher caught chain completion06:19:48Z. Receipts,source/archive hashes verified. No new magnetic material or force acceptance.",
+              "passive_sections": 507,
+              "passive_failures": 0,
+              "passive_report_sha256": "d44e7fdf9410ead8628a754029eb6f6b9655d868731877c6e11f0ad13336294f",
+              "return_sections": 4,
+              "return_report_sha256": "53cf88c9ec64e36ca1e1dd8111cabdeef8433efacbf9aaefcf93e552959314bf",
+              "primal_resistance_ohm": 14.98493280485217,
+              "primal_seconds": 41.735792875057086,
+              "primal_summary_sha256": "3bc24a3b3478539c5eac76ad97c54321c309cc8c616757c0df1d69c1f2be48ca",
+              "agreement_relative": 0.004034640697825109,
+              "agreement_gate": 0.05,
+              "agreement_report_sha256": "c055bf82ae53a090f474a6cf72288abad6c6e55dba77982e6a96e3c5f1bb763d",
+              "rt0_export_work": "dc-imported-star4-spatial03-rt0-v1-20261022",
+              "rt0_export_summary_sha256": "170bcd3c96f43b4c1af15090ae6983c49a25ff25d948ba00782ae01a4d4d56b7",
+              "rt0_archive_sha256": "f2c1e35389611119adc5b7a0ace3f12350cf29d0d291d54ab97c89e1fa6631b8",
+              "rt0_cells": 5449004,
+              "rt0_seconds": 53.804359667003155,
+              "rt0_volume_relative_error": 1.199040866595169e-14,
+              "rt0_power_relative_error": 1.9317880628477724e-14,
+              "rt0_net_current_relative_error": 2.2081422377034126e-16,
+              "rt0_max_held_out_affine_identity_relative_error": 5.274267920874496e-15,
+              "scope": "Every affine RT0 cell preserved, including radial/divergence coefficient; no filament/constant-cell replacement. Export power/volume/current identities and64deterministic held-out cells pass. This is source preparation, not force or all-interior-field qualification."
+            },
+            "exterior_source_integration_pilots": {
+              "scope": "Explicit source-only observations1and2mm below entire saved source at deterministic lowest-layer trace XY. No ferrite/housing/PM material or clearance assumption. Analytical cell-face Green integration vs volume tetrahedron quadrature orders2,4,6 sharing exact original sources. Two points only, not a force/reference/material-band qualification.",
+              "spatial_report_sha256": "183fa96a5915b8de8be6a4be1285da2bf6f0d3b049a4fe3330d376c6b28d61ba",
+              "spatial_seconds": 27.78347600006964,
+              "spatial_max_quadrature_refinement_relative": 6.205913986146991e-10,
+              "spatial_max_integration_agreement_relative": 7.451610390717169e-12,
+              "curvature4_report_sha256": "3f6666f7ffb64b2502f1cf027d0c9ce811523e882b27c15027ff7b5a81862980",
+              "curvature4_seconds": 27.764620332978666,
+              "spatial_comparison_report_sha256": "a33ab437af010eb1e20bbac5742f9121893c81a2a8f7204b626249ec88aff505",
+              "spatial_comparison_max_raw_1v_relative_difference": 1.0670191870262149e-5,
+              "spatial_comparison_max_per_loop_a_relative_difference": 1.0294723615990163e-5,
+              "refinement_gate": 0.02,
+              "agreement_gate": 0.05,
+              "field_floor_t": 1e-12,
+              "normalization": "Per-loop division uses only each saved effective current; raw1V basis also independently passes. No fitted scale. Exact points must match; no interpolation."
+            },
+            "selected_spatial_drive_gauge_pending": "dc-imported-star4-spatial03-drive-gauge-v1-20261022 launched06:28Z with1200s whole-job cap,18GiB native-memory guard and30s spatial-gauge-watch. Budget checked within approved window. Fresh actual mesh/current with same1V EMF,6*s*(1-s)/L vs uniform; no fitted scaling. Not a substitute for unfinished drive-length refinement.",
             "watcher": "New spatial-followup-watch checks every30s. Added one-shot OpenChamber session health checks at06:10Z and06:40Z independent of shell watchers, task IDs3de8cf54-3354-49c4-b85a-15898dc8e155 and14e86b30-9741-48b5-9725-2149c094be4b. Scheduled execution still requires OpenChamber available; not a guarantee across app/host shutdown."
           }
         }
@@ -622,13 +663,13 @@
       "dc-imported-star4-exact-copper-v3: completed exact Boolean CAD in89.155s but failed final validation on a string/Path report bug. New v4 uses verified geometry checkpoint only, reruns all bindings/reload checks; v3 stays failed."
     ],
     "test_results": {
-      "python_helpers": "400passed/0skips in30.150s, dc-local-refinement-all-helpers-v1-20261022.log. Adds complete physical-inventory and2%local signed-current/area refinement gates with1e-8near-zero floor, plus existing isolated-input/native-memory/source controls. Actual spatial local-current comparison passes1004sections; port remains interrupted/unverified. Earlier398/396/393/392/390/388/387/386test inventories retained.",
+      "python_helpers": "403passed/0skips in29.597s, dc-exterior-refinement-all-helpers-v1-20261022.log. Adds exterior point selection and raw1V/per-A field-refinement gates, plus existing local-refinement/native-memory/source controls. Earlier401test v1 mistakenly omitted PYTHONPATH and skipped1pyamg control; preserved and corrected by401test v2 with pinned pyamg, then403test suite with0skips. Earlier400/398/396/393/392/390/388/387/386test inventories retained.",
       "rust_simulation": "199unit+7integration passed,2existing ignored; dc-imported-qualification-rust-simulation-v1-20261021.log. Production circular rejection and separate exact-primitive QA snapshot preservation tested.",
       "rust_desktop": "113passed/7ignored in42.08s, dc-imported-qualification-rust-desktop-v1-20261021.log. New external-project export test separately run1passed/0ignored; ignored in ordinary runs because it needs user source/pinned installation. No native-webview qualification.",
       "browser": "36DC/housing/periodic lifecycle regressions pass without skips in34.6s, dc-imported-geometry-browser-regressions-v1-20261021/report.json. UI fixtures only, not imported numerical-source acceptance.",
       "generated_case_regression": "dc-generated-baseline-after-import-guard-v1-20261021 validates the original registered source and entire pinned matrix evidence under current implementation; no new magnetic force computed or old forces replayed."
     },
-    "remaining": "Curvature4 baseline passes global electrical,all1511eligible local checks,4return sections,2%curvature R and5%H1 R agreement. Spatial trial passes global electrical and2%R gate; its full local/reference checks and exact RT0 export run within remaining window. Drive-length trial interrupted and remains unverified; no restart that cannot fit approved compute window. Coarse failures remain archived. Raw-current/finite-source field controls, applicable explicit material geometry, nonlinear current/polarity/pose and independent force/refinement matrix, and eventual live app registration remain unfinished. No imported source/force/general-CAD/hardware acceptance from current/local/R controls alone."
+    "remaining": "Curvature4 baseline and spatial source pass global electrical,all1511eligible local checks,return and5%H1 R agreement.2%curvature/spatial R,1004local spatial-current comparisons and two-point exterior spatial-field/integration gates pass. Exact spatial affine RT0 source exported. Selected spatial raw-current drive-gauge running; drive-length trial interrupted and unverified. Full finite-source integration/near-field/material-band controls, explicit applicable material/PM geometry, nonlinear current/polarity/pose and independent force/refinement matrix, and live app registration remain unfinished. No imported coupling/general-CAD/hardware acceptance from source-only pilots. No long jobs past approved window."
   },
   "managed_desktop_integration": {
     "scope": "Restricted installed-solver integration for exact registered actual geometry and sampled current/pose states only. This does not qualify arbitrary or broader generated/imported geometry; new geometry is rejected before numerical work. No continuous interpolation, componentwise relative-accuracy, differential-inductance, retained-history reversal, thermal or hardware claim.",
