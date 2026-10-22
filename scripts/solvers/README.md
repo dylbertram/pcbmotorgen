@@ -259,6 +259,22 @@ paths are exercised separately from UI fixtures. New designs still need the
 offline preparation and complete qualification workflow described above; this
 inspection does not complete the missing in-app preparation lifecycle.
 
+Applicability also rejects sufficient geometric proofs of non-star cross-phase
+via-pad contacts. `audit_linear_dc_pad_contacts.py` records a positive-radius
+contact witness inside both saved annular pads and outside every actual bore.
+No witness is not a clearance pass. Other contact types still need their own
+checks, and no geometry is repaired by this test.
+
+Case B exposed why the local gates matter: the exact copper union retained 41
+cross-phase pad contacts at 0.4 mm centre spacing with 0.5 mm diameter pads.
+All 82 layer witnesses lie in its solved copper mesh. Global residual/power,
+return-current and H1-resistance checks pass, but 500 of 504 active and 249 of
+251 passive sections fail. That design is unsupported, not awaiting a finer
+mesh. Its original geometry and failed/interrupted evidence remain preserved.
+The source campaign planner now defaults to serial execution and requires
+passing baseline active/passive/return/H1 gates before expensive refinements
+or an accepted RT0-export stage.
+
 The experimental desktop worker is disabled unless its launch environment sets
 all three absolute host paths. This is a local installed-solver integration, not
 a redistributed or packaged solver. Install the pinned worker into a new

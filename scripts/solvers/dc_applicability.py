@@ -11,6 +11,7 @@ import json
 from pathlib import Path
 
 from audit_dc_case_matrix import Evidence
+from audit_linear_dc_pad_contacts import witnesses
 from dc_qualified_cases import read_registry,verify_case
 from dc_request_contract import UnsupportedDcRequest,encoded,geometry_descriptor,check_stack_settings
 from recalculate_dc_request import select_case,unchanged_request_bytes
@@ -32,6 +33,10 @@ def inspect_request(request,cases):
             if type(request[key]) not in [int,float] or request[key] not in values:
                 raise UnsupportedDcRequest('Requested current or pose is outside the sampled qualification scope')
         actual=geometry_descriptor(request['winding'])
+        contacts=witnesses(request['winding'],[0.,0.,0.])
+        if contacts:
+            first=contacts[0]
+            raise UnsupportedDcRequest(f"Saved via pads overlap between phases {first['first']['net']} and {first['second']['net']} away from a declared star node. Review the actual geometry; numerical refinement cannot remove this contact.")
         if not isinstance(request['material_model'],dict) or not isinstance(request['return_geometry'],dict):
             raise UnsupportedDcRequest('Explicit material model and finite return objects required')
         if set(request['material_model'])!={'coordinate_convention','footprint_m','pcb_thickness_m','magnets','stack'} or set(request['return_geometry'])!={'return_path_m','return_width_m','return_thickness_m','drive_path_m'}:

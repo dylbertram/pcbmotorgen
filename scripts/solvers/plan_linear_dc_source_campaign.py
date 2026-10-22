@@ -22,7 +22,7 @@ def main():
     parser.add_argument('--basis-curvature',type=float,required=True);parser.add_argument('--declared-no-stubs',action='store_true')
     parser.add_argument('--source-memory-gib',type=float,default=6.);parser.add_argument('--source-timeout',type=float,default=5400.)
     parser.add_argument('--max-dofs',type=int,default=24000000);parser.add_argument('--resistivity',type=float,required=True)
-    parser.add_argument('--max-parallel',type=int,default=2);parser.add_argument('--memory-budget-gib',type=float,default=13.)
+    parser.add_argument('--max-parallel',type=int,default=1);parser.add_argument('--memory-budget-gib',type=float,default=13.)
     args=parser.parse_args();matrix=json.loads(Path(args.matrix).read_text());controls=matrix['source_controls']
     coarse_mesh,fine_mesh=max(controls['mesh_m']),min(controls['mesh_m'])
     base_port,other_port=controls['port_fraction'][0],controls['port_fraction'][1]
@@ -37,20 +37,30 @@ def main():
         solves[f'm{round(coarse_mesh*1e6)}-c{curvature:g}-p{round(base_port*100)}']=(coarse_mesh,curvature,base_port)
     solves[f'm{round(fine_mesh*1e6)}-c{args.basis_curvature:g}-p{round(base_port*100)}']=(fine_mesh,args.basis_curvature,base_port)
     solves[f'm{round(coarse_mesh*1e6)}-c{args.basis_curvature:g}-p{round(other_port*100)}']=(coarse_mesh,args.basis_curvature,other_port)
-    for tag,(mesh,curvature,port) in solves.items():
+    basis_tag=f'm{round(coarse_mesh*1e6)}-c{args.basis_curvature:g}-p{round(base_port*100)}'
+    basis='source-'+basis_tag
+    def source_jobs(tag,values,depends=()):
+        mesh,curvature,port=values
         job('source-'+tag,['solve_linear_dc_study.py','--geometry-work',copper,'--matrix',args.matrix,'--work',w('source-'+tag),
             '--mesh',str(mesh),'--curvature-safety',str(curvature),'--port-fraction',str(port),'--max-dofs',str(args.max_dofs),'--threads','2'],
-            inputs=[copper+'/summary.json',copper+'/copper.brep',args.matrix],timeout=args.source_timeout,memory=args.source_memory_gib)
+            depends,inputs=[copper+'/summary.json',copper+'/copper.brep',args.matrix],timeout=args.source_timeout,memory=args.source_memory_gib)
         job('active-'+tag,['audit_finite_dc_winding_sections.py','--work',w('source-'+tag),'--output',w('active-'+tag)+'.json','--all-eligible','--threads','1'],
             ['source-'+tag],[w('source-'+tag)+'/summary.json'],timeout=3600.,memory=args.source_memory_gib)
-    basis='source-'+f'm{round(coarse_mesh*1e6)}-c{args.basis_curvature:g}-p{round(base_port*100)}'
+    # A globally conservative field can still short phases or bypass branches.
+    # Do not spend hours refining a basis whose actual local currents failed.
+    source_jobs(basis_tag,solves[basis_tag])
     passive=['audit_imported_dc_zero_sections.py','--work',w(basis),'--output',w('passive-basis')+'.json','--all-eligible-passive','--threads','1']
     if args.declared_no_stubs:passive.insert(-2,'--declared-no-stubs')
     job('passive-basis',passive,[basis],[w(basis)+'/summary.json'],timeout=3600.,memory=args.source_memory_gib)
     job('return-basis',['audit_finite_dc_sections.py','--work',w(basis),'--output',w('return-basis')+'.json','--threads','1'],[basis],[w(basis)+'/summary.json'],memory=args.source_memory_gib)
     job('primal-basis',['finite_copper_primal.py','--mesh-work',w(basis),'--work',w('primal-basis'),'--resistivity',str(args.resistivity),
         '--max-dofs','4000000','--threads','2'],[basis],[w(basis)+'/summary.json'],timeout=3600.,memory=args.source_memory_gib)
-    job('rt0-basis',['export_rt0_current_source.py','--current-work',w(basis),'--work',w('rt0-basis')],[basis],[w(basis)+'/summary.json'],memory=args.source_memory_gib)
+    job('agreement-basis',['audit_finite_dc_controls.py','--first-work',w(basis),'--second-work',w('primal-basis'),
+        '--kind','agreement','--output',w('agreement-basis')+'.json'],['primal-basis'],[w(basis)+'/summary.json',w('primal-basis')+'/summary.json'],timeout=60.,memory=1.)
+    gates=['active-'+basis_tag,'passive-basis','return-basis','agreement-basis']
+    job('rt0-basis',['export_rt0_current_source.py','--current-work',w(basis),'--work',w('rt0-basis')],gates,[w(basis)+'/summary.json'],memory=args.source_memory_gib)
+    for tag,values in solves.items():
+        if tag!=basis_tag:source_jobs(tag,values,gates)
     spec=dict(schema='linear-dc-campaign-v1',name=args.prefix+'source-v1',scope=__doc__,cutoff_utc=args.cutoff,max_parallel=args.max_parallel,
         memory_budget_gib=args.memory_budget_gib,archive_root=str(ROOT),python=str(ROOT/'ngsolve-venv/bin/python'),matrix=args.matrix,
         basis=basis,jobs=jobs)

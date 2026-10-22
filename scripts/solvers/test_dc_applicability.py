@@ -1,5 +1,6 @@
 from copy import deepcopy
 import unittest
+from unittest.mock import patch
 
 from dc_applicability import inspect_request
 import test_dc_request_contract as fixtures
@@ -44,3 +45,10 @@ class ActualDcApplicabilityTest(unittest.TestCase):
         for key in ['material_model','return_geometry']:
             result=inspect_request(dict(request,**{key:{}}),cases)
             self.assertEqual(result['state'],'unsupported');self.assertIn('Complete physical',result['reason'])
+
+    def test_proved_nonstar_pad_contact_is_unsupported_not_preparation(self):
+        request,cases=self.inputs()
+        with patch('dc_applicability.witnesses',return_value=[dict(first=dict(net='A'),second=dict(net='B'))]):
+            result=inspect_request(request,cases)
+        self.assertEqual(result['state'],'unsupported');self.assertIn('Saved via pads overlap',result['reason'])
+        self.assertEqual(result['source_status'],'unqualified');self.assertIsNone(result['qualified_case'])
