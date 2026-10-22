@@ -1,7 +1,18 @@
 {
   "status": "user-approved-five-cache-stage-running-source-controls-verified-force-unqualified",
   "five_cache_stage": {
-    "status": "running-quadrature-opening-refined-domain-coarse-pending",
+    "status": "refined-cache-verified-quadrature-opening-domain-running-coarse-pending",
+    "refined_cache_verification": {
+      "report": "five-caches-refined-final-verification.json",
+      "verified_at_utc": "2026-10-22T21:00:46.478460Z",
+      "points":218316,
+      "maximum_opening_relative_change":0.0021639425969764035,
+      "maximum_direct_reference_relative_difference":0.00009824529545574489,
+      "native_storage_relative_error":5.025604457818167e-15,
+      "archive_sha256":"6e78d19ed21f98a3f58dcb7e5b19edeb92c86dbca2d2daa5a929940ea5109b0d",
+      "result":"Whole-job receipt/launcher successful,44evidence hashes including exactsource/mesh/preflight/RT0/cache archives verified. All218316points evaluated atbothopenings;unchanged2%opening/5%directreference gates pass;native storage andfinitearchive checks pass. Usesownbaseline0.18693290585146136A normalization. Oneoffivebaselinecaches only,notforcequalification orfullcache-plancompletion.",
+      "continuation":"Domain cache started automatically in approved freedslot,PID87033 start1792702399343540 verifiedlive. Quadrature/opening remainlive,coarsepending. At21:00Zwatcheractive/noalerts,frozeninputsunchanged,owned4.158GiB/free67.816GiB. No manual launch/restart/inputedit."
+    },
     "launched_at_utc": "2026-10-22T19:06:08.628194Z",
     "launch_record": "five-caches-approved-v1-launch-record.json",
     "postlaunch_verification": "five-caches-approved-v1-postlaunch-verification.json",
