@@ -579,8 +579,20 @@
             "max_dofs_per_stage": 24000000,
             "timeout_s_per_stage": 10800,
             "physical_footprint_limit_bytes": 19327352832,
-            "stage": "Sequential isolated spatial and drive-length trials launched after H1/local chain ended. Fresh meshes and fields. Three-hour stage budget checked against remaining approved compute window before each launch. No numerical acceptance from launch.",
-            "watcher": "isolated-refinements-watch checks every30s for failures/completion/stale identity/low-CPU stalls. If an alert exits it while second job continues, attach a new watcher to remaining job. Original chain completion notifications remain enabled."
+            "stage": "Spatial trial completed; drive-length trial interrupted during native meshing after264.53s, no mesh/field. Its running summary is unaccepted and interrupted whole-job receipt is authoritative. Cause not established. At05:54Z actual process checks show port leader absent, watcher absent; watcher latest observation stopped at22:05Z. Shell notifications/watchers did not survive this interruption reliably; do not claim uninterrupted overnight coverage.",
+            "spatial_summary_sha256": "11d7b2695604017528f9a86a3d145d502e76bb6314239b0853ba10c80172249e",
+            "spatial_solution_sha256": "0978f8b0d9d211f9107dbc3e31b6bb4a5325df176f78827dbb3d6fbffc21c4c7",
+            "spatial_mesh_elements": 5449004,
+            "spatial_mixed_dofs": 18239956,
+            "spatial_seconds": 3572.570940084057,
+            "spatial_resistance_ohm": 15.045391624600802,
+            "spatial_resistance_relative_difference": 4.914661968502543e-7,
+            "spatial_gate": 0.02,
+            "spatial_max_rss_bytes": 5794234368,
+            "spatial_peak_memory_footprint_bytes": 15338354176,
+            "spatial_verification": "load(MIXED) verifies completed receipt,physical inputs,mesh,solution and archived implementation; original electrical/global volume and isolated2%R gates pass. All local/raw-current checks on this new mesh remain pending.",
+            "window_followup": "At05:55Z launched serial spatial03 all-active1200s,all-passive900s,return180s,H1reference300s and exact affine RT0 export900s stages with18GiB native-memory guard. Each stage must fit before06:53:31Z or remains unlaunched. No long port retry within insufficient remaining window. Source export is preparation only and cannot waive failed/pending local/refinement controls.",
+            "watcher": "New spatial-followup-watch checks every30s. Added one-shot OpenChamber session health checks at06:10Z and06:40Z independent of shell watchers, task IDs3de8cf54-3354-49c4-b85a-15898dc8e155 and14e86b30-9741-48b5-9725-2149c094be4b. Scheduled execution still requires OpenChamber available; not a guarantee across app/host shutdown."
           }
         }
       }
@@ -598,7 +610,7 @@
       "browser": "36DC/housing/periodic lifecycle regressions pass without skips in34.6s, dc-imported-geometry-browser-regressions-v1-20261021/report.json. UI fixtures only, not imported numerical-source acceptance.",
       "generated_case_regression": "dc-generated-baseline-after-import-guard-v1-20261021 validates the original registered source and entire pinned matrix evidence under current implementation; no new magnetic force computed or old forces replayed."
     },
-    "remaining": "Refined source passes global electrical,all1511eligible active/passive/native-arc/stub,current/area checks,4return sections,2%curvature R and5%independent H1 electrical R controls. Coarse failures remain archived. Isolated spatial and drive-length refinements now running; verify fresh fields and relevant local/raw-current controls without fitting. Exact source export/field/force controls, applicable explicit material geometry, sampled nonlinear current/polarity/pose matrix and eventual live registration remain unfinished. No imported source/force/general-CAD/hardware acceptance from current/local/R controls alone."
+    "remaining": "Curvature4 baseline passes global electrical,all1511eligible local checks,4return sections,2%curvature R and5%H1 R agreement. Spatial trial passes global electrical and2%R gate; its full local/reference checks and exact RT0 export run within remaining window. Drive-length trial interrupted and remains unverified; no restart that cannot fit approved compute window. Coarse failures remain archived. Raw-current/finite-source field controls, applicable explicit material geometry, nonlinear current/polarity/pose and independent force/refinement matrix, and eventual live app registration remain unfinished. No imported source/force/general-CAD/hardware acceptance from current/local/R controls alone."
   },
   "managed_desktop_integration": {
     "scope": "Restricted installed-solver integration for exact registered actual geometry and sampled current/pose states only. This does not qualify arbitrary or broader generated/imported geometry; new geometry is rejected before numerical work. No continuous interpolation, componentwise relative-accuracy, differential-inductance, retained-history reversal, thermal or hardware claim.",
