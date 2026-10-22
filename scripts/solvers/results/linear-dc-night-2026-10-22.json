@@ -1,7 +1,18 @@
 {
   "status": "user-approved-five-cache-stage-running-source-controls-verified-force-unqualified",
   "five_cache_stage": {
-    "status": "refined-cache-verified-quadrature-opening-domain-running-coarse-pending",
+    "status": "refined-and-domain-caches-verified-quadrature-opening-coarse-running",
+    "domain_cache_verification": {
+      "report":"five-caches-domain-final-verification.json",
+      "verified_at_utc":"2026-10-22T22:00:37.953279Z",
+      "points":120934,
+      "maximum_opening_relative_change":0.002164169067360949,
+      "maximum_direct_reference_relative_difference":0.00012165207803985464,
+      "native_storage_relative_error":5.4379421093277065e-15,
+      "archive_sha256":"ee1a37dba40cc82648ac72716b0c641f859e0ede827806d552f088c73ff2183d",
+      "result":"Whole-job receipt/launcher successful,44evidence hashes verified,all120934points evaluated atbothopenings,unchanged2%/5% gates andnativestorage/finitearchive checks pass. Ownbaseline0.18693290585146136A normalization retained. Twooffivebaselinecaches verified;notforce orfullcache-plan completion.",
+      "continuation":"Coarse cache started automatically in approvedslot,PID18364 start1792705695461153verifiedlive. Quadrature/opening remainlive.22:00Zdirectmonitorwatching/noalerts,frozeninputsunchanged,owned4.243GiB/free67.933GiB. No manualnumericallaunch/restart/liveinputedit."
+    },
     "refined_cache_verification": {
       "report": "five-caches-refined-final-verification.json",
       "verified_at_utc": "2026-10-22T21:00:46.478460Z",
