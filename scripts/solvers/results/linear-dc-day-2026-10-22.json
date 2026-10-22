@@ -17,7 +17,7 @@
     "preservation": "Existing housing screening,merged UI,original root designs,historical failures and Mutagen."
   },
   "plan_progress": {
-    "step_1": "in-progress;worktree and shared plan read,new compute cutoff approved;case/envelope/evidence audit pending",
+    "step_1": "complete;new12h cutoff approved,765recorded evidence hashes verified,actual two new saved host designs exported,production descriptors and closed return graphs checked;nominal app-defined models and explicit returns prepared;vertical finite-extent separation proved before CAD;per-case source/force/control matrix and candidate/admission envelope recorded. No source/force qualification from preparation.",
     "steps_2_through_6": "not complete"
   },
   "source_gap": {
@@ -48,13 +48,48 @@
     "host_exports": "Both actual saved designs exported through production prepare_dc_winding_geometry via the explicit Rust host export test,one passed/zero ignored per invocation. No fixture copper substitution.",
     "case_a": "Compact two-strand four-layer board:77segments/54vias,active0/1,blind0-to-1,0.4mm depth,new declared saved pose6mm.",
     "case_b": "Five-strand six-layer board:545segments/384vias,active0/1,blind0-to-1,0.3mm depth,70um inner copper,new declared saved pose12mm.",
-    "preserved_v1": "Inherited41.4mm mover position fell outside new travel in both v1 derived designs. Original/v1 files untouched;v2 explicitly declares valid new design poses with no automatic clamp. Unused declared layers are not called active coverage."
+    "preserved_v1": "Inherited41.4mm mover position fell outside new travel in both v1 derived designs. Original/v1 files untouched;v2 explicitly declares valid new design poses with no automatic clamp. Unused declared layers are not called active coverage.",
+    "study_declaration": "scripts/solvers/cases/linear-dc-day-study-inputs-20261022.json",
+    "acceptance_matrix": "scripts/solvers/cases/linear-dc-day-acceptance-matrix-20261022.json",
+    "prepared_model_return_archive": "linear-dc-day-actual-study-inputs-v2-20261022",
+    "source_coordinate_mapping": "Rigid PCB-centering transform only,magnet centre derived from each actual saved first-magnet pose;nominal PCB-bottom stack unchanged. All source fixture bytes remain actual production host output.",
+    "case_a_vertical_copper_stack_separation_m": 0.0007825,
+    "case_b_vertical_copper_stack_separation_m": 0.001165,
+    "separation_scope": "Conservative exact finite trace/via Z intervals establish disjoint vertical extents. Actual CAD union/overlap/distance/tagging checks still required before coupling;no inherited35um clearance or geometry correction.",
+    "metadata_failure_preserved": "Study-input v1 rejected host log because Rust test prints metadata after a known test prefix;no geometry generated. Parser now accepts only standaloneJSON or exact known export-test prefix and checks path/version/hash provenance. v2 completed with all immutable input hashes verified.",
+    "tests": "412helpers passed,0skips,30.136s in linear-dc-day-study-source-all-helpers-v2-20261022.log,including declared curvature4/6 source controls and rejection of empty/disconnected winding CAD before return construction.",
+    "case_a_exact_cad": {
+      "canonical_archive": "linear-dc-day-case-a-copper-v1-20261022",
+      "status": "completed-finite-copper-geometry-only-unqualified",
+      "seconds": 8.192176749929786,
+      "bare_brep_sha256": "83fe58fa59c1cf9a04b7a477a40b03eaa930bd5da84b5fce3ecd940a96576b3f",
+      "bare_volume_m3": 3.5011945325895833e-09,
+      "nonterminal_return_contact_volume_m3": 0.0,
+      "closed_copper_ferrite_distance_m": 0.0007824999999999999,
+      "all_partition_overlap_volumes_m3": 0.0,
+      "preserved_repeat": "linear-dc-case-a-copper-v1-20261022 has identical bare BRep bytes;not independent physics evidence. Both receipts and launcher reports completed exit0. Completed owned worker/watcher labels unloaded;plists/logs retained."
+    },
+    "case_b_exact_cad": {
+      "archive": "linear-dc-day-case-b-copper-v1-20261022",
+      "status": "failed-no-geometry-or-source-acceptance",
+      "seconds": 70.57676345808432,
+      "receipt_exit_code": 1,
+      "launcher_status": "failed-or-interrupted",
+      "watcher_status": "attention-required",
+      "service_cleanup": "Worker final service exit1,watcher final service exit2 with attention-required report;both nonrunning,owned labels unloaded. All plist/log/receipt/diagnostic evidence preserved.",
+      "error": "StdFail_NotDone in copper/material BRep distance. Saved geometry reports zero winding solids and zero volume;188byte bare BRep cannot reload:Bnd_Box is void. Closed shape contains only return,not winding.",
+      "diagnostics": "linear-dc-day-case-b-partition-diagnostic-v1-20261022.log preserves reload failure;v2 diagnostic reports exact saved bare reload failure and return-only14face closed shape. Read-only diagnostics do not admit any geometry.",
+      "guard": "New preparer rejects empty/nonfinite/disconnected winding union before return construction. Fresh-source entry point independently rejects empty bare CAD. No Boolean healing,material moves,geometry corrections or automatic retries performed.",
+      "next_gate": "Investigate exact saved-primitive Boolean construction without physical changes. Case B cannot advance to source/force qualification until actual winding CAD is recovered and independently checked."
+    },
+    "fresh_source_entry": "scripts/solvers/solve_linear_dc_study.py explicitly supports declared curvature4/6,mesh and port controls,exact closed CAD provenance,2%volume gate,24Mpreassembly DOF cap and fresh1V mixed solve. Helper tests passed;no new-case source solve launched while live v3 occupies serial large-job slot. Passive no-stub audit and source/local/field/force gates remain incomplete."
   },
   "memory_verification": {
     "tool": "opencode-mem memory MCP",
     "canonical_project": "/Users/dylanbertram/Dev/projects_embedded/pcbmotorgen",
     "scope_hash": "c50ca0bbde64bb9c",
-    "status": "Initially no project memories. State,evidence,interruption and recovery memories now explicitly stored and retrieved. list-shards verified the first3memories/3vectors in current canonical project shard;fourth recovery memory separately search-verified. Not an orphaned worktree. Explicit persistence/retrieval is proven,not automatic capture of every turn."
+    "status": "Initially no project memories. State,evidence,interruption and recovery memories now explicitly stored and retrieved. list-shards verified the first3memories/3vectors in current canonical project shard;fourth recovery memory separately search-verified. Not an orphaned worktree. Explicit persistence/retrieval is proven,not automatic capture of every turn.",
+    "cad_source_milestone_memory": "mem_1792659860038_uimo5in1x stored and search-retrieved using linear-dc case-b188byte empty winding;412helper tests,case-A CAD,case-B failure,live-v3 identities and unchanged cutoff recorded."
   },
   "supervision_recovery": {
     "probe_v1": "launchctl submit restarted the completed probe. Exclusive report reservation prevented duplicate execution; repeated starts failed. Label removed,all evidence preserved. Do not use submit for one-shot solver ownership.",
