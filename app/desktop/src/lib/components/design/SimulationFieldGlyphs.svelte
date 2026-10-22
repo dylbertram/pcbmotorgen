@@ -3,7 +3,7 @@
   import { DoubleSide } from "three";
   import type { CoilScene } from "../../coilScene";
   import type { FieldPreview } from "../../types/simulationVisualization";
-  import { fieldGlyphGeometry, physicalToScene } from "../../visualizationGeometry";
+  import { fieldGlyphGeometry } from "../../visualizationGeometry";
   import { fieldLineGeometry, fieldSliceGeometry, type FieldStyle } from "../../simulationFieldGeometry";
 
   let { field, scene, zScale, opacity, style, sliceFraction }: { field: FieldPreview; scene: CoilScene; zScale: number; opacity: number; style: FieldStyle; sliceFraction: number } = $props();
@@ -23,10 +23,3 @@
   <T.LineBasicMaterial vertexColors transparent {opacity} depthWrite={false} />
 </T.LineSegments>
 {/if}
-{#each field.magnets as magnet, i (i)}
-  {@const at = physicalToScene(magnet.center_m, scene, zScale)}
-  <T.Mesh position={[at.x, at.y, at.z]}>
-    <T.BoxGeometry args={[magnet.size_m[0] * 1000 * scene.scale, magnet.size_m[2] * 1000 * scene.scale * zScale, magnet.size_m[1] * 1000 * scene.scale]} />
-    <T.MeshStandardMaterial color={magnet.positive_z ? "#e78955" : "#5484bd"} transparent opacity={opacity * .35} depthWrite={false} />
-  </T.Mesh>
-{/each}

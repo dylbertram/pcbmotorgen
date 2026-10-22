@@ -7,11 +7,12 @@
   import { PHASE_COLORS } from "./coilPreviewCanvas";
   import CoilCopperBatch from "./CoilCopperBatch.svelte";
   import SimulationFieldGlyphs from "./SimulationFieldGlyphs.svelte";
+  import SimulationMagnets from "./SimulationMagnets.svelte";
   import type { FieldPreview } from "../../types/simulationVisualization";
   import { HEAT_PALETTE, heatColor } from "../../visualizationGeometry";
   import type { FieldStyle } from "../../simulationFieldGeometry";
 
-  let { scene, paths, vias, terminals, traceMode, reset, command, zScale, field = null, heat = null, opacity = .8, fieldStyle = "lines-slice", sliceFraction = .5, sectionView = false }: {
+  let { scene, paths, vias, terminals, traceMode, reset, command, zScale, field = null, heat = null, opacity = .8, fieldStyle = "lines-slice", sliceFraction = .5, sectionView = false, magnets = [] }: {
     scene: CoilScene;
     paths: CopperPath[];
     vias: CoilScene["vias"];
@@ -26,6 +27,7 @@
     fieldStyle?: FieldStyle;
     sliceFraction?: number;
     sectionView?: boolean;
+    magnets?: FieldPreview["magnets"];
   } = $props();
   const { size, invalidate } = useThrelte();
   let camera = $state.raw<OrthographicCamera>();
@@ -76,6 +78,7 @@
   <CoilCopperBatch paths={batch.paths} width={scene.width * 1.6} color={batch.color} {zScale} />
 {/each}
 {#if field}<SimulationFieldGlyphs {field} {scene} {zScale} {opacity} style={fieldStyle} {sliceFraction} />{/if}
+<SimulationMagnets {magnets} {scene} {zScale} />
 {#each terminals as terminal (terminal.key)}
   <T.Mesh position={[terminal.point.x, terminal.point.y * zScale, terminal.point.z]}>
     <T.SphereGeometry args={[Math.max(scene.width, 0.045), 12, 8]} />

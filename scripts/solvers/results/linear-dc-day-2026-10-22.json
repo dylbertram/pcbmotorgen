@@ -3,6 +3,22 @@
   "plan_id": "ab7e988f-ed3c-4e40-a43b-d7c7f84cbe89",
   "issue": "pcbmotorgen#ytgr",
   "branch": "simulation/add-femm-and-improve",
+  "magnet_visibility_and_contribution": {
+    "status": "implemented-and-verified-independent-display-and-free-space-contribution-controls",
+    "user_request": "Show/hide magnets in the 3D viewer independently of adding/removing their contribution to the field calculation.",
+    "controls": "Show magnets in 3D changes only solid visibility and never samples or changes B. Solids come from active config/mover pose even without field results or with overlays Off. Include magnets in B-field defaults off for coil mode. When enabled, analytical PMs are sampled natively at exactly the existing coil XYZ grid, then vectors are added componentwise and magnitudes recomputed. Removing PMs restores the existing coil-only result without rerunning the finite-copper source. Selecting PM-only explicitly enables PM contribution; disabling it there leaves no active field source. No saved design is edited.",
+    "scope": "Coils plus magnets is explicitly free-space linear superposition of a prescribed audited finite-copper DC current source and analytical permanent magnets. No nonlinear material reaction, coupled-FEM qualification, arbitrary-design coil fallback or new source/cache/force campaign. Qualified-source restrictions remain. No addition of magnitudes or interpolation between different grids. Hidden magnet solids do not change numerical samples or the field-rendering masks.",
+    "lifecycle": "Separate latest-only native PM controller for the coil grid, immediate combined-display clearing while loading/on failure, invalidation on include/source/physical/tab changes, no old combined result publication. Showing/hiding solids does not touch either sampler. Coil sampling is not repeated for visibility or contribution changes.",
+    "verification": {
+      "frontend": "498 passed, 1 existing skipped, 56 files in linear-dc-magnet-controls-frontend-v2.log. Initial added unit test used strict equality between hypot and sqrt and failed by one floating-point ULP; corrected numeric assertion to 14 decimal digits. Vector addition/cancellation, input preservation and mismatched-grid refusal verified.",
+      "targeted_browser": "26 passed, zero skips/unexpected/flaky, 38.737s in linear-dc-magnet-controls-browser-v2/report.json. Independent visibility/contribution combinations, no source resampling, restoration of coil-only samples, PM-only exclusion and existing lifecycle/mobile tests pass.",
+      "full_browser": "376 passed, zero skips/unexpected/flaky, 354.140s in linear-dc-magnet-controls-full-browser-v1/report.json. SHA256 1114362b15fd535ba785b3cdb59bf09ae7a9c04188ff04f34aff5cb4bf0a06d8.",
+      "native_data": "Fresh bounded native PM export at the actual saved Case A coil grid: linear-dc-magnet-controls-paired-native-v1.json, produced by explicitly executed saved-design Rust export test, linear-dc-magnet-controls-native-export-v1.log. Actual PM samples and prior verified finite-copper coil samples have matching 96 XYZ observations; browser test verifies componentwise superposition residual below 1e-14 T and changed combined magnitude. No finite-current/force/source campaign rerun.",
+      "native_build": "pnpm exec tauri build --debug --no-bundle --ci passed, linear-dc-magnet-controls-native-build-v1.log. No push or installer/delivery bundle.",
+      "typecheck": "34 existing errors in the same 3 baseline files, linear-dc-magnet-controls-typecheck-final-v2.log; none in new magnet controls, vector combination or rendering components.",
+      "gates": "Original native WKWebView, arbitrary-design/current-source, AC phase, material-response, Case B and installation/license gates remain open. Parent/daytime checks unchanged."
+    }
+  },
   "daytime_app_visualization": {
     "status": "3d-field-and-loss-features-implemented-bounded-integration-verified-native-and-general-preparation-gates-open",
     "day_plan": "15235a51-0ca4-4ba6-90ee-3c3bd4faa529",

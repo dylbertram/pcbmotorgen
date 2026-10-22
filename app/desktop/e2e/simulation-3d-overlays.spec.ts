@@ -99,6 +99,22 @@ test("qualified coil controls bind the DC loop, render winding-only data and cle
   await expect(viewer.getByLabel("Magnetic field legend")).toContainText("A: 0.1 A");
   await expect(viewer.getByLabel("Magnetic field legend")).toContainText("C: -0.1 A");
   expect(await page.evaluate(()=>(window as any).vizCalls.length)).toBe(0);
+  const starts = await page.evaluate(() => (window as any).coilStarts.length);
+  await viewer.getByRole("checkbox", { name: "Show magnets in 3D", exact: true }).uncheck();
+  await expect(viewer).toHaveAttribute("data-visible-magnets", "0");
+  await expect(viewer).toHaveAttribute("data-field-samples", "96");
+  expect(await page.evaluate(() => (window as any).vizCalls.length)).toBe(0);
+  await viewer.getByRole("checkbox", { name: "Include magnets in B-field", exact: true }).check();
+  await expect(viewer.getByLabel("Magnetic field legend")).toContainText("Coils + magnets, free-space sum");
+  await expect(viewer).toHaveAttribute("data-visible-magnets", "0");
+  expect(await page.evaluate(() => (window as any).coilStarts.length)).toBe(starts);
+  const pmCalls = await page.evaluate(() => (window as any).vizCalls.length);
+  await viewer.getByRole("checkbox", { name: "Show magnets in 3D", exact: true }).check();
+  await expect(viewer).toHaveAttribute("data-visible-magnets", "12");
+  expect(await page.evaluate(() => (window as any).vizCalls.length)).toBe(pmCalls);
+  await viewer.getByRole("checkbox", { name: "Include magnets in B-field", exact: true }).uncheck();
+  await expect(viewer.getByLabel("Magnetic field legend")).not.toContainText("Coils + magnets");
+  await expect(viewer).toHaveAttribute("data-field-samples", "96");
   await viewer.getByText("Qualified coil source and DC drive",{exact:true}).click();
   await viewer.getByRole("combobox",{name:"Coil DC loop current",exact:true}).selectOption("-0.1");
   await expect(viewer).toHaveAttribute("data-field-samples","0");
@@ -129,6 +145,38 @@ if(process.env.PCB_MOTOR_NATIVE_WINDING_FIELD_REPORT && process.env.PCB_MOTOR_NA
     await page.evaluate(async()=>{await (window as any).closeWinding();});
   });
 }
+
+if (process.env.PCB_MOTOR_NATIVE_PAIRED_PM_REPORT && process.env.PCB_MOTOR_NATIVE_WINDING_FIELD_REPORT) {
+  test("actual native coil and magnet vectors superpose only on identical physical observations", async ({ page }, info) => {
+    const pm = JSON.parse(readFileSync(process.env.PCB_MOTOR_NATIVE_PAIRED_PM_REPORT!, "utf8"));
+    const winding = JSON.parse(readFileSync(process.env.PCB_MOTOR_NATIVE_WINDING_FIELD_REPORT!, "utf8"));
+    await gotoDesignApp(page);
+    const checked = await page.evaluate(async ({ pm, winding }) => {
+      const { validateVisualization } = await import(/* @vite-ignore */ "/src/lib/simulationVisualizationController.ts");
+      const { combineVisualizationFields } = await import(/* @vite-ignore */ "/src/lib/combineVisualizationFields.ts");
+      validateVisualization(pm.report, pm.request);
+      const sum = combineVisualizationFields(winding.field, pm.report.field);
+      const residual = Math.max(...sum.samples.flatMap((s: any, i: number) => s.b_t.map((v: number, axis: number) => Math.abs(v - winding.field.samples[i].b_t[axis] - pm.report.field.samples[i].b_t[axis]))));
+      return { count: sum.samples.length, residual, maxCombined: Math.max(...sum.samples.map((s: any) => s.magnitude_t)), maxCoil: Math.max(...winding.field.samples.map((s: any) => s.magnitude_t)) };
+    }, { pm, winding });
+    expect(checked.count).toBe(96); expect(checked.residual).toBeLessThan(1e-14); expect(checked.maxCombined).not.toBe(checked.maxCoil);
+    await info.attach("actual-native-vector-superposition", { body: JSON.stringify(checked), contentType: "application/json" });
+  });
+}
+
+test("PM contribution can be disabled while magnet solids remain visible", async ({ page }) => {
+  await gotoDesignApp(page); await nativeFixture(page); const viewer = await show3D(page);
+  await expect(viewer).toHaveAttribute("data-field-samples", "240");
+  await viewer.getByRole("checkbox", { name: "Include magnets in B-field", exact: true }).uncheck();
+  await expect(viewer).toHaveAttribute("data-field-samples", "0");
+  await expect(viewer).toHaveAttribute("data-visible-magnets", "12");
+  await expect(viewer).toContainText("No active field source");
+  await viewer.getByRole("checkbox", { name: "Show magnets in 3D", exact: true }).uncheck();
+  await expect(viewer).toHaveAttribute("data-visible-magnets", "0");
+  await viewer.getByRole("checkbox", { name: "Include magnets in B-field", exact: true }).check();
+  await expect(viewer).toHaveAttribute("data-field-samples", "240");
+  await expect(viewer).toHaveAttribute("data-visible-magnets", "0");
+});
 
 test("3D simulation overlays never fabricate browser fields or heat", async ({ page }) => {
   await gotoDesignApp(page); const viewer = await show3D(page);

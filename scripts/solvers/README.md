@@ -442,6 +442,27 @@ mistaken for numerical reports requiring solver receipts.
 **Permanent magnets only** remains an explicitly selected comparison source,
 with 240/700/2016 samples. There is no automatic PM fallback for coils.
 
+Magnet visibility and contribution are independent controls. **Show magnets in
+3D** changes only the translucent solids, including when no field is loaded or
+overlays are Off. It never starts a sample request or changes B. **Include
+magnets in B-field** includes/excludes the analytical free-space PM contribution.
+In coil mode, it samples the PMs at the exact coil observation grid, adds the
+native B vectors component by component, then recomputes the magnitude. It never
+adds magnitudes or interpolates between mismatched grids. The coil source is
+not rerun when this switch changes; missing/unqualified coil data cannot be
+silently replaced by PMs. Pending or failed PM requests clear the combined
+display, and late responses cannot overwrite a changed source or tab. Turning
+PMs off restores the existing coil-only result. In PM-only mode, excluding PMs
+leaves no active field source. Selecting PM-only explicitly enables its PM
+contribution. Neither control edits the saved physical design.
+
+The combined legend says **Coils + magnets, free-space sum**. This is linear
+superposition of the prescribed finite-current source and analytical permanent
+magnets, not a newly solved coupled magnetic-material system. Magnet masks for
+field-line/slice rendering follow the calculation, not solid visibility, so
+hiding a solid cannot change the calculated samples. The visible magnet solids
+use the active configuration and mover position independently of sample results.
+
 The default field view is **Lines + slice**. Field lines follow the
 native XYZ vector grid, with magnitude colors and direction cues; a filled XZ
 slice shows the norm of the interpolated vector. **XZ field section** turns the

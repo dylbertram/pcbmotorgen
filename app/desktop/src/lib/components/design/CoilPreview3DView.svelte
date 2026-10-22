@@ -13,6 +13,7 @@
   import type { FieldStyle } from "../../simulationFieldGeometry";
   import type { DcWindingFieldResult } from "../../types/dcCoupling";
   import QualifiedCoilFieldControls from "./QualifiedCoilFieldControls.svelte";
+  import { combineVisualizationFields } from "../../combineVisualizationFields";
 
   let { geometry, view, isVisible = () => true, showTerminals = true, simulation = null }: {
     geometry: CadGeometry | null;
@@ -40,9 +41,26 @@
   let legendsOpen = $state(false);
   let fieldSource = $state("coils");
   let coilField = $state<DcWindingFieldResult | null>(null);
+  let showMagnets = $state(true);
+  let includeMagnets = $state(false);
+  let magnetContribution = $state<VisualizationView>({ phase: "idle", report: null, error: null });
+  const magnetController = new SimulationVisualizationController(sampleSimulationVisualization, next => { magnetContribution = next; });
   let visualization = $state<VisualizationView>({ phase: "idle", report: null, error: null });
   const controller = new SimulationVisualizationController(sampleSimulationVisualization, next => { visualization = next; });
-  const field = $derived(simulation ? fieldSource === "coils" ? coilField?.field ?? null : visualization.report?.field ?? null : null);
+  const field = $derived.by(() => {
+    if (!simulation) return null;
+    if (fieldSource === "pm") return includeMagnets ? visualization.report?.field ?? null : null;
+    if (!coilField) return null;
+    if (!includeMagnets) return coilField.field;
+    const pm = magnetContribution.report?.field;
+    return pm ? combineVisualizationFields(coilField.field, pm) : null;
+  });
+  // Visible solids are independent of the selected field and its availability.
+  const visibleMagnets = $derived(simulation && showMagnets ? Array.from({ length: simulation.config.magnet_count }, (_, i) => ({
+    center_m: [simulation.moverPositionM + i * simulation.config.magnet_pitch_m, simulation.config.board_width_m / 2,
+      simulation.config.air_gap_m + simulation.config.magnet_height_m / 2] as [number, number, number],
+    size_m: [simulation.config.magnet_width_m, simulation.config.magnet_cross_width_m, simulation.config.magnet_height_m] as [number, number, number], positive_z: i % 2 === 0,
+  })) : []);
   const heatMapping = $derived.by(() => {
     const heat = simulation ? visualization.report?.heat : null;
     if (!heat || !geometry) return { values: null, power: null, error: null };
@@ -58,10 +76,11 @@
     // display-only Z scaling do not resample physics. Edits clear colors now.
     const input = simulation ? $state.snapshot(simulation) : null;
     const physical = geometry ? $state.snapshot(geometry) : null;
-    const selected = mode, resolution = density, source = fieldSource;
+    const selected = mode, resolution = density, source = fieldSource, pmEnabled = includeMagnets;
     untrack(() => controller.invalidate());
     if (!input || !physical || selected === "off") return;
     if (source === "coils" && selected === "fields") return;
+    if (source === "pm" && !pmEnabled && selected === "fields") return;
     const positions = [...physical.routing.segments.flatMap(s => [s.start, s.end]), ...physical.routing.curves.flatMap(c => [c.start, c.mid, c.end])];
     if (!positions.length) return;
     const xs = positions.map(p => p.x * .001), ys = positions.map(p => p.y * .001);
@@ -75,22 +94,33 @@
       bounds_m: [[Math.min(...xs, magnetStart) - pitch * .6, Math.max(...xs, magnetEnd) + pitch * .6], [Math.min(...ys) - .001, Math.max(...ys) + .001],
         [Math.min(...physical.layer_z_mm) * .001 - pitch * .6, input.config.air_gap_m + input.config.magnet_height_m + pitch * .6]],
       counts: resolution === "fine" ? [28, 4, 18] : resolution === "dense" ? [20, 5, 7] : [12, 4, 5], phase_peak_a: input.config.max_current_a,
-      fields: source === "pm" && (selected === "fields" || selected === "both"), heat: selected === "heat" || selected === "both" };
+      fields: source === "pm" && pmEnabled && (selected === "fields" || selected === "both"), heat: selected === "heat" || selected === "both" };
     const timer = setTimeout(() => { void controller.sample(input, request); }, 150);
     return () => { clearTimeout(timer); controller.invalidate(); };
   });
-  onDestroy(() => controller.invalidate());
+  $effect.pre(() => {
+    const input = simulation ? $state.snapshot(simulation) : null;
+    const coil = coilField ? $state.snapshot(coilField) : null;
+    const enabled = includeMagnets && fieldSource === "coils" && (mode === "fields" || mode === "both");
+    untrack(() => magnetController.invalidate());
+    if (!enabled || !input || !coil) return;
+    const request: VisualizationRequest = { request_id: crypto.randomUUID(), mover_position_m: input.moverPositionM,
+      ...coil.sampling, phase_peak_a: input.config.max_current_a, fields: true, heat: false };
+    void magnetController.sample(input, request);
+    return () => magnetController.invalidate();
+  });
+  onDestroy(() => { controller.invalidate(); magnetController.invalidate(); });
 </script>
 
 <div class="coil-3d relative h-full w-full bg-slate-950" role="img" aria-label="Coil preview — isometric"
   data-testid="coil-iso" data-layers={geometry?.layer_z_mm.filter((_, i) => view.isLayerVisible(i)).length ?? 0}
   data-segments={paths.length} data-vias={vias.length} data-terminals={terminals.length} data-trace-mode={view.traceMode} data-z-scale={view.zScale}
-  data-field-samples={field?.samples.length ?? 0} data-field-source={fieldSource} data-field-style={fieldStyle} data-field-slice={sliceFraction} data-heat-unit="W/m" data-settings-open={settingsOpen} data-legends-open={legendsOpen} data-heat-paths={heatMapping.values?.size ?? 0} data-visualization-state={visualization.phase}>
+  data-field-samples={field?.samples.length ?? 0} data-visible-magnets={visibleMagnets.length} data-include-magnets={includeMagnets} data-field-source={fieldSource} data-field-style={fieldStyle} data-field-slice={sliceFraction} data-heat-unit="W/m" data-settings-open={settingsOpen} data-legends-open={legendsOpen} data-heat-paths={heatMapping.values?.size ?? 0} data-visualization-state={visualization.phase}>
   {#if scene}
     <svelte:boundary>
       <Canvas renderMode="on-demand">
         <CoilPreviewScene {scene} {paths} {vias} {terminals} {reset} {command} zScale={view.zScale} traceMode={view.traceMode}
-           {field} heat={heatMapping.values} {opacity} {fieldStyle} {sliceFraction} {sectionView} />
+           {field} heat={heatMapping.values} {opacity} {fieldStyle} {sliceFraction} {sectionView} magnets={visibleMagnets} />
       </Canvas>
       {#snippet failed()}
         <div class="flex h-full items-center justify-center p-4 text-sm text-slate-400" role="status">
@@ -112,8 +142,10 @@
             <option value="off">Off</option><option value="fields">Magnetic fields</option><option value="heat">Copper heat / loss</option><option value="both">Fields and heat</option>
           </select>
         </label>
+        <label class="flex items-center gap-1"><input type="checkbox" aria-label="Show magnets in 3D" bind:checked={showMagnets} /> Show magnets in 3D</label>
         {#if mode === "fields" || mode === "both"}
-          <label class="flex items-center gap-1">Field source <select aria-label="Magnetic field source" bind:value={fieldSource} class="rounded border border-slate-600 bg-slate-800 p-1"><option value="coils">Coil currents, qualified DC</option><option value="pm">Permanent magnets only</option></select></label>
+          <label class="flex items-center gap-1">Field source <select aria-label="Magnetic field source" bind:value={fieldSource} onchange={event => { if (event.currentTarget.value === "pm") includeMagnets = true; }} class="rounded border border-slate-600 bg-slate-800 p-1"><option value="coils">Coil currents, qualified DC</option><option value="pm">Permanent magnets only</option></select></label>
+          <label class="flex items-center gap-1"><input type="checkbox" aria-label="Include magnets in B-field" bind:checked={includeMagnets} /> Include magnets in B-field</label>
           <label class="flex items-center gap-1">Field view <select aria-label="Field rendering style" bind:value={fieldStyle} class="rounded border border-slate-600 bg-slate-800 p-1"><option value="lines-slice">Lines + slice</option><option value="lines">Field lines</option><option value="slice">Magnitude slice</option><option value="arrows">Sample arrows</option></select></label>
           <button class="rounded border border-slate-600 text-slate-300 hover:bg-slate-800 hover:text-emerald-300" type="button" aria-pressed={sectionView} onclick={() => sectionView = !sectionView}>XZ field section</button>
           {#if fieldSource === "pm"}<label class="flex items-center gap-1">Samples <select aria-label="Field sample density" bind:value={density} class="rounded border border-slate-600 bg-slate-800 p-1"><option value="sparse">240</option><option value="dense">700</option><option value="fine">2016</option></select></label>{/if}
@@ -131,23 +163,27 @@
         <div class="overlay-legends pointer-events-auto absolute bottom-8 left-16 right-3 flex flex-wrap gap-2 overflow-y-auto text-[10px]" aria-label="Simulation overlay legend">
           {#if visualization.phase === "loading"}<p role="status" class="rounded bg-slate-900/95 p-2 text-slate-300">Sampling the active design. Previous visualization cleared.</p>{/if}
           {#if visualization.error}<p role="status" class="rounded bg-slate-900/95 p-2 text-amber-200">{visualization.error}</p>{/if}
-          {#if fieldSource === "coils" && (mode === "fields" || mode === "both") && !field}<p role="status" class="rounded bg-slate-900/95 p-2 text-slate-300">Coil B-field requires an exact qualified source. Open field settings, choose the audited source and acknowledge its finite return, then sample. No magnet-field substitute is shown.</p>{/if}
+          {#if magnetContribution.phase === "loading"}<p role="status" class="rounded bg-slate-900/95 p-2 text-slate-300">Sampling magnet contribution on the coil observation grid. Combined field cleared.</p>{/if}
+          {#if magnetContribution.error}<p role="status" class="rounded bg-slate-900/95 p-2 text-amber-200">Combined field unavailable: {magnetContribution.error}</p>{/if}
+          {#if fieldSource === "pm" && !includeMagnets}<p role="status" class="rounded bg-slate-900/95 p-2 text-slate-300">Magnets excluded from calculation. No active field source.</p>{/if}
+          {#if fieldSource === "coils" && (mode === "fields" || mode === "both") && !coilField}<p role="status" class="rounded bg-slate-900/95 p-2 text-slate-300">Coil B-field requires an exact qualified source. Open field settings, choose the audited source and acknowledge its finite return, then sample. No magnet-field substitute is shown.</p>{/if}
           {#if visualization.report?.heat_unavailable_reason || heatMapping.error}
             <p role="status" class="max-w-md rounded bg-slate-900/95 p-2 text-amber-200">Heat/loss unavailable: {heatMapping.error ?? visualization.report?.heat_unavailable_reason}</p>
           {/if}
           <div class="compact-overlay-toggle w-full rounded border border-slate-700 bg-slate-900/95 p-1 text-slate-300">
-            <p>{mode === "heat" ? "Loss W/m, not temperature" : `${fieldSource === "coils" ? "DC coil-current" : "PM-only"} field · |B| in T${mode === "both" ? " · Loss W/m" : ""}`}</p>
+            <p>{mode === "heat" ? "Loss W/m, not temperature" : `${fieldSource === "coils" ? includeMagnets ? "Coils + PM, free-space sum" : "DC coil-current" : "PM-only"} field · |B| in T${mode === "both" ? " · Loss W/m" : ""}`}</p>
             <button type="button" aria-expanded={legendsOpen} onclick={() => legendsOpen = !legendsOpen}>Legends and model limits</button>
           </div>
           <div class="overlay-legends-body flex flex-wrap gap-2">
           {#if field}
             <div class="max-w-64 space-y-1 rounded border border-slate-700 bg-slate-900/95 p-2 text-slate-300" aria-label="Magnetic field legend">
-              <p>{fieldSource === "coils" ? "Coil-current" : "PM"} field magnitude |B| · T</p><div class="h-1.5 rounded" style:background={`linear-gradient(to right, ${FIELD_PALETTE.join(",")})`}></div>
+              <p>{fieldSource === "coils" ? includeMagnets ? "Coils + magnets, free-space sum" : "Coil-current" : "PM"} field magnitude |B| · T</p><div class="h-1.5 rounded" style:background={`linear-gradient(to right, ${FIELD_PALETTE.join(",")})`}></div>
               <p class="flex justify-between font-mono"><span>0 T</span><span>{maximumField.toPrecision(3)} T</span></p>
               <p>{fieldStyle === "arrows" ? "Native XYZ sample arrows" : "Interpolated XYZ field lines / XZ slice"}</p>
               {#if fieldSource === "coils"}
+                {#if includeMagnets}<p>Vector superposition of native coil and PM samples at identical XYZ points. No magnetic-material reaction or coupled FEM solution.</p>{/if}
                 <p>{coilField?.loop_current_a} A audited DC loop, including declared finite return. {Object.entries(coilField?.phase_currents_a ?? {}).map(([net, amps]) => `${net}: ${amps} A`).join(", ")}</p>
-                <details><summary class="cursor-pointer">Finite-copper coil-field limits</summary><p>Direct exterior integration of the exact audited finite-copper current basis. No magnets or material reaction, independent AC phase drive, wire substitute or newly qualified field-refinement claim. Lines and slice interpolate the new native samples. Seed density is not flux density. Heat uses a separate cycle-average phase-current model.</p></details>
+                <details><summary class="cursor-pointer">Finite-copper coil-field limits</summary><p>Direct exterior integration of the exact audited finite-copper current basis. {includeMagnets ? "Analytical PM field added in free space." : "No magnet contribution."} No material reaction, independent AC phase drive, wire substitute or newly qualified field-refinement claim. Lines and slice interpolate the new native samples. Seed density is not flux density. Heat uses a separate cycle-average phase-current model. Magnet visibility does not change calculated values.</p></details>
               {:else}
                 <details><summary class="cursor-pointer">PM-only model limits</summary><p>Analytical permanent magnets only. No winding or nonlinear material response. Lines follow the interpolated native vector grid and stop at magnets or the sampled boundary. Seed density is not flux density. Interpolation is a display approximation, not added physical resolution.</p></details>
               {/if}

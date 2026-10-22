@@ -208,6 +208,11 @@ mod tests {
             r.bounds_m[2] = [-sim.pcb_thickness_m - padding, sim.air_gap_m + sim.magnet_dims_m[2] + padding];
             r.counts = [28, 4, 18];
         }
+        if let Some(path) = std::env::var_os("PCB_MOTOR_VISUALIZATION_GRID_REQUEST_PATH") {
+            let value: serde_json::Value = serde_json::from_slice(&std::fs::read(path).unwrap()).unwrap();
+            r.bounds_m = serde_json::from_value(value["sampling"]["bounds_m"].clone()).unwrap();
+            r.counts = serde_json::from_value(value["sampling"]["counts"].clone()).unwrap();
+        }
         let result = tauri::async_runtime::block_on(sample_simulation_visualization(
             config.clone(),
             saved.drive.clone(),
