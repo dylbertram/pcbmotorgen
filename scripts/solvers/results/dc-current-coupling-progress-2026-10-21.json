@@ -665,7 +665,17 @@
               "peak_memory_footprint_bytes": 12974434840,
               "scope": "Fresh selected spatial mesh/current, same1V EMF with6*s*(1-s)/L vs uniform. Raw full-current and loop-current invariance pass2%gate without fitted scaling. Completed receipt,actual inputs,saved solution and archived implementation hashes verified. Not a substitute for interrupted drive-length refinement."
             },
-            "watcher": "New spatial-followup-watch checks every30s. Added one-shot OpenChamber session health checks at06:10Z and06:40Z independent of shell watchers, task IDs3de8cf54-3354-49c4-b85a-15898dc8e155 and14e86b30-9741-48b5-9725-2149c094be4b. Scheduled execution still requires OpenChamber available; not a guarantee across app/host shutdown."
+            "watcher": "New spatial-followup-watch checks every30s. Added one-shot OpenChamber session health checks at06:10Z and06:40Z independent of shell watchers, task IDs3de8cf54-3354-49c4-b85a-15898dc8e155 and14e86b30-9741-48b5-9725-2149c094be4b. Scheduled execution still requires OpenChamber available; not a guarantee across app/host shutdown.",
+            "final_window_health_observation": {
+              "observed_at_utc": "2026-10-22T06:41:40Z",
+              "active_qualification_jobs": 0,
+              "active_watchers": 0,
+              "source_followup": "All five spatial active/passive/return/H1/export receipts completed with exit0; selected-source drive-gauge also completed exit0. Original worker identities absent. No processes remained in recorded owned groups.",
+              "watchers": "Spatial-followup and spatial-gauge watchers completed normally at06:19:48Z and06:39:45Z. Older isolated-refinements watcher is absent despite stale watching checkpoint from22:05Z; not live monitoring.",
+              "preserved_failure": "Drive-length receipt remains interrupted, original leader absent, no saved mesh/current. No acceptance inferred from its stale running summary.",
+              "launch_decision": "No new numerical jobs launched during final health check. Approved window ends06:53:31Z. Do not extend the window or restart the long port job without further authorization.",
+              "exact_next_work": "Complete isolated drive-length meshing/solve and relevant local/raw-current controls under a newly authorized sufficient budget. Then extend exact-source integration/near-field checks beyond two pilot points. Establish explicit applicable imported PM/ferrite/housing geometry and seek approval before any physical correction. Verify nonlinear current/polarity/pose,limits,balance,2%refinements and5%independent forces before imported app registration/tests. Existing generated-case capability remains separate."
+            }
           }
         }
       }
