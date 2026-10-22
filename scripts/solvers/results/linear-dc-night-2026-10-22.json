@@ -1,5 +1,24 @@
 {
   "status": "reviewed-source-recovery-stage-verified-complete-full-qualification-not-admitted",
+  "next_bounded_stage_proposal": {
+    "status": "preflight-passed-awaiting-bounded-stage-agreement-not-launched",
+    "campaign": "five-caches-proposal-v1-campaign.json",
+    "preflight": "five-caches-proposal-v1-prelaunch.json",
+    "scope": "Five required baseline finite-copper material-source caches only. Full force qualification still cannot fit and is not promised. No bare/pose/magnetic/source-force/admission gate removed.",
+    "whole_budget_seconds_including_margins":31230,
+    "compute_seconds_available_at_review":36131.795083,
+    "resource_review": "Atmost3x5GiBjobs=15GiBcompute plus2GiBsupervision reserve=17GiBbelow18GiBglobaltarget. Prior5GiBpreflights reverified, observedpeak2.153-2.189GiB each. Parallelcontention can cause timeout; no completion guaranteed. No overlapping campaign allowed.",
+    "schedule": "Startquadrature/opening/refined,then domain/coarse in freedslots. Whole declared budget8h40m30s fits before05:00Z reserve atreview. Must refresh clock/quiescence/hash/output/resource checks and establishone-shot/directmonitor coverage before any agreed launch.",
+    "authorization": "Plan requires agreement on bounded work when fullqualification cannotfit. New stage proposal prepared butnotlaunched; askuser before expanding beyondcompletedsource stage."
+  },
+  "complete_source_step_review": {
+    "report": "complete-source-step-verification.json",
+    "result": "27 distinct completed reports and146 evidence hashes reverified across baseline,curvature4,mesh150um andport0.4. Actual mesh/BRep/solution andfour RT0 archive hashes checked. Four504-section signed active inventories, baseline251passive/4return/H1 andfresh port counterparts pass. Curvature coarse/fine ordering checked; unchanged27physical probes and2% gate verified for allthree refinements. Existing validate_control confirms mesh-only change andport numerical drive change withunchanged physical copper/return. Eachbasis usesitsown measured loop current.",
+    "basis_loop_currents_a": {"baseline":0.18693290585146136,"curvature":0.18684275882430515,"mesh":0.18693218002111175,"port":0.18693302767711756},
+    "plan": "Overnight source/local step now checked,2/6. Cache,force,admission,end-window audit steps remain unchecked;parent/daytime unchanged.",
+    "scope": "Declared eligible signed trace/native-via paths andpassive/return sections only. Original nearzero/short/junction interior exclusions preserved. Not source-force,perbody,general/app admission.",
+    "supervision_correction": "After stagecompletion, repeated checks of ended jobs did not advance the remaining plan. Source inventory reconciliation is now complete. No new cache/force stage has yet passed a fresh reviewed preflight or been launched."
+  },
   "source_recovery_completion": {
     "verified_at_utc": "2026-10-22T18:40:20Z",
     "verification_report": "source-recovery-final-verification.json",
