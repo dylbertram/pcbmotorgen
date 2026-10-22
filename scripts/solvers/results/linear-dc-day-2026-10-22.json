@@ -3,6 +3,7 @@
   "plan_id": "ab7e988f-ed3c-4e40-a43b-d7c7f84cbe89",
   "issue": "pcbmotorgen#ytgr",
   "branch": "simulation/add-femm-and-improve",
+  "overnight_continuation_manifest": "scripts/solvers/results/linear-dc-night-2026-10-22.json",
   "magnet_visibility_and_contribution": {
     "status": "implemented-and-verified-independent-display-and-free-space-contribution-controls",
     "user_request": "Show/hide magnets in the 3D viewer independently of adding/removing their contribution to the field calculation.",
