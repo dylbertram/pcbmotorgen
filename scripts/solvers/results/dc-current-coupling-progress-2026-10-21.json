@@ -650,7 +650,21 @@
               "field_floor_t": 1e-12,
               "normalization": "Per-loop division uses only each saved effective current; raw1V basis also independently passes. No fitted scale. Exact points must match; no interpolation."
             },
-            "selected_spatial_drive_gauge_pending": "dc-imported-star4-spatial03-drive-gauge-v1-20261022 launched06:28Z with1200s whole-job cap,18GiB native-memory guard and30s spatial-gauge-watch. Budget checked within approved window. Fresh actual mesh/current with same1V EMF,6*s*(1-s)/L vs uniform; no fitted scaling. Not a substitute for unfinished drive-length refinement.",
+            "selected_spatial_drive_gauge": {
+              "work": "dc-imported-star4-spatial03-drive-gauge-v1-20261022",
+              "status": "passed-original-mesh-unit-emf-gauge-control-only",
+              "summary_sha256": "645598f20ec1b7937f99a9bc6c20e2255aa641090ce2b5cb29e813c878ab9f6c",
+              "solution_sha256": "a358955675a92e26bb130ab9a4a9515fdcc43266c78d09cf954635d506a0c58d",
+              "raw_rho_l2_current_relative_difference": 4.609158674219861e-12,
+              "unit_emf_loop_current_relative_difference": 8.43769498715119e-15,
+              "gate": 0.02,
+              "relative_equation_residual": 1.2335307715718092e-13,
+              "relative_power_balance": 1.0436096431476471e-14,
+              "seconds": 678.7950794580393,
+              "max_rss_bytes": 6100287488,
+              "peak_memory_footprint_bytes": 12974434840,
+              "scope": "Fresh selected spatial mesh/current, same1V EMF with6*s*(1-s)/L vs uniform. Raw full-current and loop-current invariance pass2%gate without fitted scaling. Completed receipt,actual inputs,saved solution and archived implementation hashes verified. Not a substitute for interrupted drive-length refinement."
+            },
             "watcher": "New spatial-followup-watch checks every30s. Added one-shot OpenChamber session health checks at06:10Z and06:40Z independent of shell watchers, task IDs3de8cf54-3354-49c4-b85a-15898dc8e155 and14e86b30-9741-48b5-9725-2149c094be4b. Scheduled execution still requires OpenChamber available; not a guarantee across app/host shutdown."
           }
         }
@@ -669,7 +683,7 @@
       "browser": "36DC/housing/periodic lifecycle regressions pass without skips in34.6s, dc-imported-geometry-browser-regressions-v1-20261021/report.json. UI fixtures only, not imported numerical-source acceptance.",
       "generated_case_regression": "dc-generated-baseline-after-import-guard-v1-20261021 validates the original registered source and entire pinned matrix evidence under current implementation; no new magnetic force computed or old forces replayed."
     },
-    "remaining": "Curvature4 baseline and spatial source pass global electrical,all1511eligible local checks,return and5%H1 R agreement.2%curvature/spatial R,1004local spatial-current comparisons and two-point exterior spatial-field/integration gates pass. Exact spatial affine RT0 source exported. Selected spatial raw-current drive-gauge running; drive-length trial interrupted and unverified. Full finite-source integration/near-field/material-band controls, explicit applicable material/PM geometry, nonlinear current/polarity/pose and independent force/refinement matrix, and live app registration remain unfinished. No imported coupling/general-CAD/hardware acceptance from source-only pilots. No long jobs past approved window."
+    "remaining": "Curvature4 baseline and spatial source pass global electrical,all1511eligible local checks,return and5%H1 R agreement.2%curvature/spatial R,1004local spatial-current comparisons,two-point exterior spatial-field/integration and selected raw-current drive-gauge gates pass. Exact spatial affine RT0 source exported. Drive-length trial interrupted and unverified. Full finite-source integration/near-field/material-band controls, explicit applicable material/PM geometry, nonlinear current/polarity/pose and independent force/refinement matrix, and live app registration remain unfinished. No imported coupling/general-CAD/hardware acceptance from source-only pilots. No long jobs past approved window."
   },
   "managed_desktop_integration": {
     "scope": "Restricted installed-solver integration for exact registered actual geometry and sampled current/pose states only. This does not qualify arbitrary or broader generated/imported geometry; new geometry is rejected before numerical work. No continuous interpolation, componentwise relative-accuracy, differential-inductance, retained-history reversal, thermal or hardware claim.",

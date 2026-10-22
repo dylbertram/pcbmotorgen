@@ -461,6 +461,11 @@ coverage. One-shot session health checks at 06:10 and 06:40 UTC supplement new
 shell watchers; scheduled execution still requires OpenChamber to be available.
 Keep the remaining drive-length verification distinct from drive-profile gauge
 invariance, and do not extend the compute window beyond 06:53:31 UTC.
+The selected spatial source's fresh drive-profile control now passes in 678.80 s:
+raw resistivity-weighted L2 current difference is 4.609e-12 and loop-current
+difference is 8.438e-15, both below the original 2% gate without rescaling.
+Peak physical footprint is 12.974 GB. This does not complete drive-length
+verification or qualify imported coupled forces.
 
 Evidence correction: earlier 306-test helper logs included four or five skipped
 tests, not 306 passes. Preserve those logs and historical delivery manifests.
