@@ -19,6 +19,7 @@ from finite_copper_circuit import return_prism
 from audit_copper_union_volume import STANDARD_ERROR_GATE,VOLUME_GATE,primitives,union_estimate
 from finite_copper_geometry import build,fuse_all
 from finite_copper_grouped import grouped_build
+from finite_copper_single_drill import build as single_drill_build
 from post_project_force import sha
 from solver_threads import add_thread_option,threaded_main,runtime_metadata
 from source_snapshot import capture
@@ -99,7 +100,7 @@ def partition_checks(copper,closed,model):
 def main():
     parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('--study-work',type=Path,required=True)
     parser.add_argument('--study-receipt',type=Path,required=True);parser.add_argument('--work',type=Path,required=True)
-    parser.add_argument('--fuse-strategy',choices=['pairwise','per-kind'],default='pairwise',
+    parser.add_argument('--fuse-strategy',choices=['pairwise','per-kind','per-kind-single-drill'],default='pairwise',
         help='Boolean grouping only; identical primitives/drills, recorded and audited analytically')
     add_thread_option(parser);args=parser.parse_args();origin=args.study_work.resolve();work=args.work.resolve()
     if work.exists():parser.error('Preserve previous finite copper preparations')
@@ -111,12 +112,13 @@ def main():
         fuse_strategy=args.fuse_strategy,
         source_snapshots=capture(work,[Path(__file__),*[Path(__file__).with_name(name) for name in
             ['finite_copper_geometry.py','finite_copper_eligibility.py','finite_copper_circuit.py','winding_oracle.py',
-             'finite_copper_grouped.py','audit_copper_union_volume.py']]]))
+             'finite_copper_grouped.py','finite_copper_single_drill.py','audit_copper_union_volume.py']]]))
     if os.environ.get('PCB_MOTOR_COMMAND_RECEIPT'):report['command_receipt']=os.environ['PCB_MOTOR_COMMAND_RECEIPT']
     def save():(work/'summary.json').write_text(json.dumps(report,indent=2,allow_nan=False)+'\n')
     save()
     try:
-        copper,spec=(grouped_build if args.fuse_strategy=='per-kind' else build)(snapshot,study['translation_m'])
+        builder={'pairwise':build,'per-kind':grouped_build,'per-kind-single-drill':single_drill_build}[args.fuse_strategy]
+        copper,spec=builder(snapshot,study['translation_m'])
         validate_copper_shape(copper)
         # Pairwise OCC fusion has silently dropped copper on a real design, so
         # every build must match the analytic union of its declared primitives.

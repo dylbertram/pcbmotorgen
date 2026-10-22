@@ -55,13 +55,15 @@ def grouped_build(fixture,shift):
     if shift.shape!=(3,) or not np.isfinite(shift).all():raise ValueError('Invalid rigid copper translation')
     pieces,groups,_=build_groups(fixture,shift)
     names=sorted({kind(g['label']) for g in groups})
-    parts=[fuse_all([p for p,g in zip(pieces,groups) if kind(g['label'])==name]) for name in names]
-    copper=fuse_all(parts)
+    parts={name:fuse_all([p for p,g in zip(pieces,groups) if kind(g['label'])==name]) for name in names}
     bores=[g for g in groups if g['label'].startswith('barrel:')]
     _,drills=primitives(fixture,shift)
-    for drill in drills:
-        (x,y),(low,high)=drill['centre'],drill['z']
-        copper=copper-Cylinder(Pnt(x,y,low),Dir(0,0,1),spec['via_inner_radius_m'],high-low)
+    if drills:
+        # (A-D)+(B-D) equals (A+B)-D for any parts, so cutting each kind once
+        # with the fused bores replaces hundreds of cuts on the whole union.
+        bore=fuse_all([Cylinder(Pnt(d['centre'][0],d['centre'][1],d['z'][0]),Dir(0,0,1),spec['via_inner_radius_m'],d['z'][1]-d['z'][0]) for d in drills])
+        parts={name:part-bore for name,part in parts.items()}
+    copper=fuse_all([parts[name] for name in names])
     copper.mat('copper');copper.faces.name='copper_surface'
     traces=sum(1 for g in groups if g['label'].startswith('trace:'))
     return copper,dict(spec,trace_edges=traces,distinct_via_positions=len(bores),solid_components=len(copper.solids),

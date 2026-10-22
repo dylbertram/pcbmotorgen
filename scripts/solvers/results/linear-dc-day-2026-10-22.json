@@ -204,9 +204,18 @@
       "linear-dc-day-case-b-union-volume-v1-20261022.json",
       "linear-dc-day-case-b-fuse-loss-v1-20261022.json",
       "linear-dc-day-case-b-fuse-loss-v2-20261022.json (empty: serialization failure, preserved)"
-    ]
+    ],
+    "drilling_followup": {
+      "case_b_copper_v2": "linear-dc-day-case-b-copper-v2-20261022: bounded1800s timeout,final launcher failed-or-interrupted;geometry summary remains running and is not success. Completed own labels unloaded;all evidence preserved.",
+      "case_b_copper_v3": "linear-dc-day-case-b-copper-v3-20261022: failed268.70s/exit1;drill-each-kind-then-fuse yields4solids and volume2.1096512919552742e-8m3 versus analytic drilled union2.1395887861045515e-8m3. Nonempty-single-solid guard rejected it;no winding/source admission.",
+      "important_distinction": "The undrilled per-kind fuse matched the undrilled analytic union. That is NOT a successful final drilled winding and must not be called case-B recovery. Per-kind grouped builder remains experimental;guards reject failed final topology/volume.",
+      "case_a_crosscheck": "linear-dc-day-case-a-copper-perkind-v1-20261022 completed16.56s/exit0;volume3.5011945365730746e-9m3 versus canonical3.5011945325895833e-9. No independent current/force evidence and no replacement of canonical case-A source.",
+      "active_diagnostic": "linear-dc-day-case-b-single-drill-v1-20261022 completed exit0 with final launcher success. One drilled solid,volume2.1396137874462557e-8m3,relative analytic-union difference1.1685115320458905e-5. Single cut completed at476.65s. Diagnostic only,no downstream CAD. Earlier conversation-shell drill-v2 diagnostic was interrupted and produced no report or surviving worker.",
+      "production_v4": "linear-dc-day-case-b-copper-v4-20261022 launched with explicit per-kind-single-drill strategy,1800s/4GiB budget and own independent one-shot watcher. Same declared primitives/bores,only Boolean ordering changes. Must pass exact union,connectivity,return and partition gates before any source launch;not yet admitted.",
+      "historical_strategy_job": "case-b-fuse-strategy-v1 timed out under its3600s budget;its partial report is diagnostic-only,never source CAD. Final receipts/launcher must be checked before service cleanup."
+    }
   },
-  "tests_latest": "415 helpers passed,0 skips,29.567s (PCB_MOTOR_HOUSING_BINARY supplied) linear-dc-day-union-audit-all-helpers-v2-20261022.log",
+  "tests_latest": "434 helpers passed,0 skips,32.323s (PCB_MOTOR_HOUSING_BINARY supplied) linear-dc-day-single-drill-near-field-all-helpers-v1-20261022.log",
   "app_integration": {
     "status": "implemented-per-design-registry-admission-recorded-case-registered-case-a-pending-audit",
     "request": "finite-dc-live-request-v2 from host; no host-pinned basis. Worker re-verifies every registered audit/evidence, requires exactly one exact match, else Qualification required with per-case reason before any solve.",
@@ -263,5 +272,27 @@
     "at_utc": "2026-10-22T10:13Z",
     "what": "Outer campaign runner memory guard raised EPERM reading an unreaped zombie child, killed its group including inner supervisors; 5 cache solvers orphaned. Receipts left running (unusable).",
     "action": "Stopped only the orphaned case-A cache groups; fixed solver_memory_budget.exited (zombie/vanished only) and per-job sessions in runner; relaunched stage2 as v2 names. v1 evidence preserved."
+  },
+  "continuation_2026_10_22_1109": {
+    "case_a_campaign": "com.pcbmotorgen.dc.20261022.case-a-mag-stage2-v2 actual worker23838,runner23840,supervisor23820 and watcher23824 live with matching identities,one launch. State at11:05:15Z:43completed,6launched,23pending. No full force-matrix acceptance or registration yet.",
+    "campaign_inner_watch": "Additional independent case-a-mag-inner-v2-watch checks every inner v2 job receipt directly,not just top-level runner. Launchd KeepAlive=false/RunAtLoad=true,30s observations,ends at acceptance reserve. Top-level watch remains separate.",
+    "case_a_partial_review": "At11:14:32Z campaign45completed/6launched/21pending. Read-only inspection of12completed coupling jobs and11available control pairs found no failed gates;maximum available refinement relative difference0.00467012 and independent-formulation0.0127330. Partial inspection is not37-job/44-pair acceptance.",
+    "near_field": {
+      "declaration": "scripts/solvers/audit_linear_dc_near_field.py:21fixed points,including6probes25/100um below first/middle/last lowest-layer trace surfaces and15interior probes in actual stack/magnet bodies. Same physical points and unchanged2%refinement/5%reference/1e-12T-per-loop-A floor. All affine RT0 terms retained.",
+      "v1": "linear-dc-day-case-a-near-field-v1-20261022 failed91.91s. Degrees6->10volume refinement maximum0.0697780614 exceeds2%;analytical/degree10maximum0.00791435 passes5%,tree-opening maximum6.60e-6 passes2%,tight-tree/analytical maximum3.24e-7 passes5%. Historical failure preserved;not all-near-field admission.",
+      "v2": "linear-dc-day-case-a-near-field-v2-20261022 passed285.54s,receipt completed exit0 and launcher success. Same21points,degrees10/12:maximum volume refinement0.0126163313,analytical/volume0.00469217172,opening6.5973e-6,tree/analytical3.23355e-7. No probe relocation,softening or relaxed gate. Sampled controls only,not every-point field qualification.",
+      "source_refinement": "case-a-near-refinement-v1 completed all4jobs by11:16:22Z. At identical accepted21probes,exact affine source-mesh comparison maximum0.000300286184 and source-port comparison0.00000303135902 both pass unchanged2%gate. Export6.16s/7.32s,comparison6.61s/6.44s. Shared physical input hashes and isolated numerical axis verified;each basis uses its own actual1V loop current."
+    },
+    "port_v3_remaining_checks": "linear-dc-day-port-v3-followup-v1 campaign launched after measured case-A active groups3.56GiB and native free54%. Serial passive1200s,return300s,H1reference600s,8GiB per job,2400s outer budget. New changed-mesh checks,not repetition of unchanged source evidence. No full source-step completion yet.",
+    "regressions": {
+      "helpers": "434passed,0skips,32.323s in linear-dc-day-single-drill-near-field-all-helpers-v1-20261022.log,including quadrature-order policy and exact single-drill geometry regression. Earlier432/32.665s run preserved.",
+      "simulation_rust": "199unit+7integration passed,2ignored,18.42s+0.08s;linear-dc-day-simulation-rust-v1-20261022.log",
+      "desktop_rust": "114passed,7ignored,46.12s;linear-dc-day-desktop-rust-v1-20261022.log. Explicit real-FEM runs are separately recorded under app_integration.",
+      "full_browser": "340passed,0skips,0unexpected,0flaky,319.759s;isolated port1453,artifacts linear-dc-day-full-browser-v1-20261022/report.json. Browser fixtures do not establish native WKWebView interaction."
+    },
+    "unmet_app_requirements": "Registry admission is still exact-case admission,not completion of actual per-request preparation/qualification in the app. Only recorded design registered;case A/B pending. New-design preparing/qualification lifecycle and actual native WKWebView interaction remain unproven. Desktop computer-use tools are unavailable here;manual observed native acceptance remains required.",
+    "schedule": "d87a98ed-ebb4-4779-b16d-e23d91b24c82 remains enabled before cutoff;prompt refreshed with current campaign/diagnostic labels. Schedule tools require canonical directory /Users/dylanbertram/Dev/projects_embedded/pcbmotorgen. Acceptance18:29:49.742086Z and compute19:59:49.742086Z unchanged;disable at compute end.",
+    "memory_and_issue": "Near-field/single-drill/regression milestone mem_1792667945776_t7vz82flh stored and search-retrieved;correction mem_1792667534863_8tqc7b7ou also stored/retrieved. Kata#ytgr updated at11:19Z;issue stays open. No plan checkbox changed.",
+    "service_cleanup_evidence": "linear-dc-day-completed-service-cleanup-v2-20261022.json preserves final receipt/launcher/watcher and launchctl status before unloading8own completed near-field/diagnostic labels. All logs/plists retained. Active numerical groups left unchanged."
   }
 }
