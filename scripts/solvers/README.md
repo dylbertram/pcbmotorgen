@@ -467,6 +467,15 @@ difference is 8.438e-15, both below the original 2% gate without rescaling.
 Peak physical footprint is 12.974 GB. This does not complete drive-length
 verification or qualify imported coupled forces.
 
+User scope update, 2026-10-22: imported PM/ferrite/housing geometry is deferred
+until supported in the app; rotary-specific qualification waits for rotary app
+expansion. The evidence inventory, failed/passing controls, applicability limits
+and pickup conditions are in
+[`results/rotary-dc-qualification-handoff-2026-10-22.md`](results/rotary-dc-qualification-handoff-2026-10-22.md).
+Kata `pcbmotorgen#rxjp` tracks rotary app support; child `pcbmotorgen#dtcv` tracks
+deferred qualification. Generic unfinished linear-source checks remain separate
+under `pcbmotorgen#ytgr`. Deferral does not qualify imported coupled forces.
+
 Evidence correction: earlier 306-test helper logs included four or five skipped
 tests, not 306 passes. Preserve those logs and historical delivery manifests.
 A fresh explicit NGSolve/PyAMG/Rust-entrypoint run covers the omitted checks.

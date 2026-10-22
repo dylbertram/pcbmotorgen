@@ -1,8 +1,18 @@
 {
-  "status": "recorded-case-integrated-imported-cad-verified-source-controls-in-progress",
+  "status": "recorded-case-integrated-source-evidence-preserved-imported-magnetic-and-rotary-work-deferred",
   "goal": "Qualify static DC winding-magnet-shield coupling from actual supported generated/imported geometry, then integrate only qualified capabilities.",
   "archive_root": "$HOME/.local/opt/solver-prototypes-macos",
   "current_branch": "simulation/add-femm-and-improve",
+  "user_scope_deferral_2026_10_22": {
+    "decision": "User defers imported magnet/ferrite/housing geometry until app support, and remaining rotary-specific tests until rotary app expansion. Deferral is not physics acceptance or completion.",
+    "rotary_app_issue": "pcbmotorgen#rxjp",
+    "deferred_handoff_issue": "pcbmotorgen#dtcv",
+    "related_linear_and_simulation_issue": "pcbmotorgen#ytgr",
+    "handoff": "scripts/solvers/results/rotary-dc-qualification-handoff-2026-10-22.md",
+    "deferred": "Imported PM/material geometry audit and coupled forces until corresponding app input support; actual angular/rotary topology,torque/angle/commutation qualification until rotary design support.",
+    "not_automatically_deferred": "Imported copper/native arcs do not imply rotary topology. Generic linear-source drive-length,near-field and broader supported-linear geometry checks stay unverified under ytgr when required. Do not close those gates or relabel them as rotary-only.",
+    "preserved": "Recorded generated-case qualification/restricted app, imported copper-source tests, exact RT0 export, numerical pilots and all historical failures. No new geometry corrections,app exposure,simulations,push or bundles."
+  },
   "priorities": {
     "DC03": "User approved35um nominal copper-surface/ferrite clearance without explicit soldermask and moving ferrite/housing together. Derived geometry passes zero-overlap, exact BRep distance, unchanged layer-volume/internal-gap checks. Recorded FE material-volume/interface tagging now passes.",
     "current_source": "All501eligible signed winding sections pass unchanged2%area/5%graph-current gates. Exact affine RT0 export and six-point finite-volume magnetic integration pilot pass. This is recorded-case source evidence, not arbitrary geometry or every local/junction field.",
@@ -693,7 +703,7 @@
       "browser": "36DC/housing/periodic lifecycle regressions pass without skips in34.6s, dc-imported-geometry-browser-regressions-v1-20261021/report.json. UI fixtures only, not imported numerical-source acceptance.",
       "generated_case_regression": "dc-generated-baseline-after-import-guard-v1-20261021 validates the original registered source and entire pinned matrix evidence under current implementation; no new magnetic force computed or old forces replayed."
     },
-    "remaining": "Curvature4 baseline and spatial source pass global electrical,all1511eligible local checks,return and5%H1 R agreement.2%curvature/spatial R,1004local spatial-current comparisons,two-point exterior spatial-field/integration and selected raw-current drive-gauge gates pass. Exact spatial affine RT0 source exported. Drive-length trial interrupted and unverified. Full finite-source integration/near-field/material-band controls, explicit applicable material/PM geometry, nonlinear current/polarity/pose and independent force/refinement matrix, and live app registration remain unfinished. No imported coupling/general-CAD/hardware acceptance from source-only pilots. No long jobs past approved window."
+    "remaining": "Curvature4 baseline and spatial source pass global electrical,all1511eligible local checks,return,H1agreement,curvature/spatial/local-current,two exterior field pilots and selected drive-profile gauge. Exact spatial RT0 exported. Generic linear-source drive-length remains interrupted/unverified;broader near-field and supported-linear generalization remain unverified when needed under ytgr. USER-DEFER imported PM/ferrite/housing geometry and corresponding coupling until app input support;rotary-only torque/angular qualification waits for rotary feature rxjp,child dtcv. Preserve all evidence for pickup via rotary-dc-qualification-handoff-2026-10-22.md. No imported force/app/general-CAD/hardware acceptance and no renewed compute allocation."
   },
   "managed_desktop_integration": {
     "scope": "Restricted installed-solver integration for exact registered actual geometry and sampled current/pose states only. This does not qualify arbitrary or broader generated/imported geometry; new geometry is rejected before numerical work. No continuous interpolation, componentwise relative-accuracy, differential-inductance, retained-history reversal, thermal or hardware claim.",
