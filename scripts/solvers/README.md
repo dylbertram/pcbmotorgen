@@ -421,6 +421,16 @@ uses a fresh saved/reloaded mesh and fresh unit-EMF solve, and applies the exist
 changes. `--mesh-only` stops before assembly. Input-policy tests pass, but each
 actual trial needs its own completed receipt and local/refinement evidence.
 
+`audit_dc_section_refinement.py` compares completed all-eligible active reports
+bound to their immutable source solutions. It requires identical physical
+section labels, centres, normals, windows and signed references, plus an isolated
+mesh or port axis with fixed curvature. The local-current refinement gate is 2%
+of the larger current magnitude with a 1e-8 A-per-loop floor; section-area change
+must also remain within 2%. The imported 0.4-to-0.3 mm spatial control passes all
+1004 comparisons. The largest current difference uses 3.79% of that gate,
+equivalent to a 0.0757% relative change. This does not qualify every interior
+current value or the finite-source magnetic field.
+
 Evidence correction: earlier 306-test helper logs included four or five skipped
 tests, not 306 passes. Preserve those logs and historical delivery manifests.
 A fresh explicit NGSolve/PyAMG/Rust-entrypoint run covers the omitted checks.

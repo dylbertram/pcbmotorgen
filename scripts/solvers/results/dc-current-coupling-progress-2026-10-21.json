@@ -590,7 +590,25 @@
             "spatial_gate": 0.02,
             "spatial_max_rss_bytes": 5794234368,
             "spatial_peak_memory_footprint_bytes": 15338354176,
-            "spatial_verification": "load(MIXED) verifies completed receipt,physical inputs,mesh,solution and archived implementation; original electrical/global volume and isolated2%R gates pass. All local/raw-current checks on this new mesh remain pending.",
+            "spatial_verification": "load(MIXED) verifies completed receipt,physical inputs,mesh,solution and archived implementation; original electrical/global volume and isolated2%R gates pass. All1004active and2%local signed-current/area comparisons now pass. Passive/return/H1/export chain remains in progress as of06:10Z; full interior/finite-source-field controls remain unverified.",
+            "spatial_active_and_local_refinement": {
+              "status": "Scheduled06:10Z health check confirms passive worker and watcher live with matching process identity; active completed successfully. No duplicate chain launched.",
+              "active_report": "dc-imported-star4-spatial03-all-active-v1-20261022.json",
+              "active_sha256": "af31e109826826de9477b1eb73bc3d2f4aeee28743369bb83356923b1090c209",
+              "active_sections": 1004,
+              "active_failures": 0,
+              "active_max_relative_area_error": 0.010790268166415595,
+              "active_max_abs_current_difference_per_loop_a": 0.00104368974574659,
+              "refinement_report": "dc-imported-star4-spatial03-local-current-refinement-v1-20261022.json",
+              "refinement_sha256": "e8c3e2f520f6fa36182560e7d21b70d9788e5c396c27429fc68963552ecdc249",
+              "refinement_status": "passed-local-dc-section-refinement-only",
+              "refinement_sections": 1004,
+              "refinement_failures": 0,
+              "max_abs_current_refinement_difference_per_loop_a": 0.0003785590150798823,
+              "max_fraction_of_two_percent_current_gate": 0.03787050380331687,
+              "max_relative_area_refinement_difference": 8.520961713998076e-13,
+              "scope": "Two completed all-eligible active reports bound to immutable actual sources, matching labels/physical planes/windows/reference signs; isolated mesh axis and fixed curvature checked.2%local-current gate with1e-8A-per-loop floor and2%area-difference gate pass. No full interior/finite-source-field/force acceptance."
+            },
             "window_followup": "At05:55Z launched serial spatial03 all-active1200s,all-passive900s,return180s,H1reference300s and exact affine RT0 export900s stages with18GiB native-memory guard. Each stage must fit before06:53:31Z or remains unlaunched. No long port retry within insufficient remaining window. Source export is preparation only and cannot waive failed/pending local/refinement controls.",
             "watcher": "New spatial-followup-watch checks every30s. Added one-shot OpenChamber session health checks at06:10Z and06:40Z independent of shell watchers, task IDs3de8cf54-3354-49c4-b85a-15898dc8e155 and14e86b30-9741-48b5-9725-2149c094be4b. Scheduled execution still requires OpenChamber available; not a guarantee across app/host shutdown."
           }
@@ -604,7 +622,7 @@
       "dc-imported-star4-exact-copper-v3: completed exact Boolean CAD in89.155s but failed final validation on a string/Path report bug. New v4 uses verified geometry checkpoint only, reruns all bindings/reload checks; v3 stays failed."
     ],
     "test_results": {
-      "python_helpers": "398passed/0skips in29.890s, dc-isolated-refinement-policy-all-helpers-v1-20261021.log. Adds one-axis spatial/drive-length policy controls, unchanged curvature/physical union and rejection of non-refinement; includes native-memory/default runner and existing source controls. Actual isolated refinement numerical runs remain pending. Earlier396/393/392/390/388/387/386test inventories retained.",
+      "python_helpers": "400passed/0skips in30.150s, dc-local-refinement-all-helpers-v1-20261022.log. Adds complete physical-inventory and2%local signed-current/area refinement gates with1e-8near-zero floor, plus existing isolated-input/native-memory/source controls. Actual spatial local-current comparison passes1004sections; port remains interrupted/unverified. Earlier398/396/393/392/390/388/387/386test inventories retained.",
       "rust_simulation": "199unit+7integration passed,2existing ignored; dc-imported-qualification-rust-simulation-v1-20261021.log. Production circular rejection and separate exact-primitive QA snapshot preservation tested.",
       "rust_desktop": "113passed/7ignored in42.08s, dc-imported-qualification-rust-desktop-v1-20261021.log. New external-project export test separately run1passed/0ignored; ignored in ordinary runs because it needs user source/pinned installation. No native-webview qualification.",
       "browser": "36DC/housing/periodic lifecycle regressions pass without skips in34.6s, dc-imported-geometry-browser-regressions-v1-20261021/report.json. UI fixtures only, not imported numerical-source acceptance.",
