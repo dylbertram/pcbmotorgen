@@ -1,7 +1,24 @@
 {
-  "status": "user-approved-five-cache-stage-running-source-controls-verified-force-unqualified",
+  "status": "approved-five-baseline-caches-verified-complete-no-live-compute-force-unqualified",
   "five_cache_stage": {
-    "status": "four-baseline-caches-verified-quadrature-only-still-running",
+    "status": "all-five-approved-baseline-caches-verified-complete-services-unloaded",
+    "final_stage_verification": {
+      "report":"five-caches-approved-v1-final-verification.json",
+      "cleanup_report":"five-caches-approved-v1-cleanup-verification.json",
+      "verified_at_utc":"2026-10-22T23:20:52.231244Z",
+      "campaign_finished_utc":"2026-10-22T23:04:39.491765Z",
+      "outer_whole_job_seconds":14310.091043625027,
+      "total_material_point_count":1138510,
+      "evidence_hash_count":135,
+      "quadrature_archive_sha256":"81a41f52efc8e162fca7069fbe1afd606ed03a1396a9255e99afcfdd6667af5f",
+      "quadrature_maximum_opening_relative_change":0.0021647633335664077,
+      "quadrature_maximum_direct_reference_relative_difference":0.00014598450495885098,
+      "quadrature_native_storage_error":6.123866318181756e-15,
+      "result":"Allfivebaselinecaches independently reconciled against successful whole-job receipts/launchers,exactphysical/source/mesh/preflight/RT0/cache archives,all-point2%opening/5%directreference andnative-storage checks. Eacharchive finite andshapecomplete,ownbaseline0.18693290585146136A normalization verified. 135uniqueevidencehashes unchanged. Fullstage completed in3h58m30s,not theconservative8h40m30sdeclaredbudget.",
+      "cleanup":"Bothownedstage services exit0/notrunning,matchingowner/watch identities absent,thenunloaded at23:21Z. Process-table audit findsno matching numericalworker/runner/watcher. Plists/logs/failures preserved. No newstage launched.",
+      "scheduling":"Periodicstagehealth1420b0c3 disabled afterverifiedcompletion andcleanup toavoidrepeatedidlechecks. Audit05b3e29144/hardstop06task57335093 remainbackstops untilwindowend;old daytime d87a98ed staysdisabled. Furthernumericalstagesrequirefreshreviewedboundedagreement,notinferred fromthiscompletion.",
+      "remaining":"Three source-refinement cache/source-force chains andtheir measuredpreflights/bare/pose references;full37job185state44pairmagneticmatrix;ninedownstreamsourceforcecontrols;separateperbodyrequirements;fullcaseaudit/admission/saved-host acceptance;native/install/license/generalpreparation. Therefore wholecache-plan step remainsunchecked,overnight2/6. No forcequalification/general-support claim.05reserve06hardstopunchanged."
+    },
     "opening_and_coarse_verification": {
       "reports":["five-caches-opening-final-verification.json","five-caches-coarse-final-verification.json"],
       "verified_at_utc":"2026-10-22T22:40:39Z",
