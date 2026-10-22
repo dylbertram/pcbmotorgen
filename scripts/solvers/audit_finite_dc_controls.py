@@ -69,7 +69,7 @@ def load(work,status):
     if receipt.get('status')!='completed' or type(receipt.get('exit_code')) is not int or receipt['exit_code']!=0:
         raise ValueError('Whole DC job did not complete')
     if sha(work/'mesh.vol')!=report['mesh_sha256']:raise ValueError('DC mesh changed')
-    for name,digest in report.get('input_hashes',{}).items():
+    for name,digest in (report.get('input_hashes',{})|report.get('study_bindings',{})).items():
         if sha(Path(name))!=digest:raise ValueError('DC saved physical input changed')
     if not report.get('source_snapshots'):raise ValueError('Missing archived DC implementation')
     for entry in report['source_snapshots'].values():

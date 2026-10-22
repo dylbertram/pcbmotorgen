@@ -259,6 +259,17 @@ paths are exercised separately from UI fixtures. New designs still need the
 offline preparation and complete qualification workflow described above; this
 inspection does not complete the missing in-app preparation lifecycle.
 
+The additional compact generated two-strand Case A is now individually
+registered as `linear-star-compact-two-strand-four-layer-board-v1`. Its full
+37-job/185-state/44-pair magnetic matrix and nine downstream source-force
+comparisons pass, including total and current-induced force gates. The real
+Rust saved-design host also passed fresh calculation, unsupported-edit rejection
+and cancellation/child cleanup using the clean pinned worker. The four-layer
+board routes active copper on layers 0/1 only. Its saved 6 mm pose and sampled
+0, ±0.1, ±0.5 loop A with nominal/±100 µm lateral offsets do not establish
+interpolation, other stack placements or arbitrary-design support. See
+`results/linear-dc-day-2026-10-22.json` for evidence hashes and preserved failures.
+
 Applicability also rejects sufficient geometric proofs of non-star cross-phase
 via-pad contacts. `audit_linear_dc_pad_contacts.py` records a positive-radius
 contact witness inside both saved annular pads and outside every actual bore.
@@ -284,6 +295,34 @@ pads remove the known contact witnesses, but their 0.05 mm gap at 0.40 mm
 centres is not manufacturing acceptance. Saved spacing settings are unchanged.
 Fresh CAD/source/force evidence is required, and no original 0.30 mm-drill
 field or cache is eligible. The original shorted design remains untouched.
+The revised baseline now passes all 504 active, 251 passive and four return
+sections, plus independent H1 agreement within 0.225%. It uses its own 1 V basis
+current of 0.18693290585146136 A. Its source refinements, near-field checks and
+full nonlinear matrix are still required; the revision is not registered.
+
+New declared cases also need downstream **source-refinement force controls**.
+`plan_linear_dc_source_force_campaign.py` runs measured preflights, then fresh
+mesh/drive-length/curvature current caches, bias controls and nonlinear forces
+at all five sampled currents and three poses on the exact fixed magnetic mesh.
+`audit_linear_dc_source_force_controls.py` rechecks the electrical/near-field
+evidence, identical material quadrature, saved solutions and total/incremental
+2% force gates. The case plan must name its passing `source_control_audit` before
+the whole case audit or registry will admit it. This does not qualify separate
+winding/shield body forces or general request preparation.
+
+`audit_dc_case_matrix.py --matrix-component-only --case-plan ...` can inspect a
+completed new 37-job matrix while those source controls run. Its explicit
+component-only status is not accepted by the registry. It is not a shortcut to
+qualification and does not repeat the already accepted recorded-case campaign.
+
+For an ended resource-limited source job, `solve_linear_dc_study.py --mesh-work`
+may reuse a verified mesh checkpoint without remeshing. It requires ended
+worker/supervisor identities, matching physical/study inputs, engine, controls,
+archived physics, BRep/mesh hashes, CAD partition/volume gates and DOF limits.
+Only mesh bytes are copied; no prior `.sol` file is loaded, and the current solve
+starts from zero. The face count uses the native range length rather than a
+multi-million-object Python list. Original failed receipts and fields remain
+unaccepted. Every source reload also rechecks declared study bindings.
 
 The experimental desktop worker is disabled unless its launch environment sets
 all three absolute host paths. This is a local installed-solver integration, not

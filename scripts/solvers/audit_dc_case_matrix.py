@@ -145,7 +145,10 @@ def main():
     parser.add_argument('--archive-root', type=Path, required=True)
     parser.add_argument('--work', type=Path, required=True)
     parser.add_argument('--case-plan', type=Path, help='declared non-recorded case: job works, material/source/section reports')
+    parser.add_argument('--matrix-component-only', action='store_true', help='Inspect a declared magnetic matrix before source-force controls finish; output cannot admit or register a case')
     args = parser.parse_args()
+    if args.matrix_component_only and not args.case_plan:
+        parser.error('Component-only inspection requires a new declared case; do not repeat the accepted recorded matrix')
     root, work = args.archive_root.resolve(), args.work.resolve()
     if work.exists():
         parser.error('Preserve previous case audits')
@@ -181,6 +184,16 @@ def main():
         if (not section['passed'] or not np.isfinite(numbers).all() or not 0 <= numbers[0] <= .02 or
             not 0 <= numbers[1] <= max(1e-8, .05*abs(numbers[2]))):
             raise ValueError('Signed current section fails unchanged source controls')
+    source_control_path=None
+    if case and not args.matrix_component_only:
+        from audit_linear_dc_source_force_controls import verify_source_force_audit
+        if not case.get('source_control_audit'):
+            raise ValueError('New case admission requires its complete source-refinement force audit')
+        source_control_path=(root/case['source_control_audit']).resolve()
+        verify_source_force_audit(evidence,source_control_path,material['model'],evidence.digest(current_work/'summary.json'))
+        implementation=Path(__file__).with_name('audit_linear_dc_source_force_controls.py')
+        implementation_files.append(implementation)
+        implementation_hashes[str(implementation.resolve())]=hashlib.sha256(implementation.read_bytes()).hexdigest()
     jobs, pairs = matrix_plan()
     if case:
         if set(case['jobs']) != set(jobs):
@@ -211,12 +224,15 @@ def main():
     snapshots = capture(work, implementation_files)
     if any(snapshots[path]['sha256'] != digest for path, digest in implementation_hashes.items()):
         raise ValueError('Case-audit implementation changed during verification')
-    result = dict(status='passed-declared-case-actual-geometry-dc-force-matrix-only' if case else 'passed-recorded-actual-geometry-dc-force-matrix-only', scope=__doc__,
+    result = dict(status=('passed-declared-magnetic-matrix-component-not-admission' if args.matrix_component_only else
+                         'passed-declared-case-actual-geometry-dc-force-matrix-only' if case else 'passed-recorded-actual-geometry-dc-force-matrix-only'), scope=__doc__,
                   current_points_a=sorted(float(value) for value in CURRENTS), pose_offsets_x_m=[0., .0001, -.0001],
                   magnetic_jobs=len(jobs), saved_current_states=len(jobs)*len(CURRENTS), control_pairs=len(pairs),
                   actual_model=material['model'], prescribed_source_summary_sha256=source_hash,
                   current_section_eligibility=sections['eligibility'], qualified_eligible_sections=expected_sections,
-                  case_plan=str(args.case_plan.resolve()) if case else None,
+                   case_plan=str(args.case_plan.resolve()) if case else None,
+                   source_refinement_force_audit=str(source_control_path) if source_control_path else None,
+                   component_only=args.matrix_component_only,
                   force_floor_n=1e-8, refinement_gate=.02, formulation_gate=.05,
                   evidence_hashes={str(path): digest for path, digest in evidence.hashes.items()}, controls=controls,
                   source_snapshots=snapshots,

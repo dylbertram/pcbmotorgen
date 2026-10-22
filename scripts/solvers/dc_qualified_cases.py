@@ -62,6 +62,12 @@ def verify_case(root, entry, evidence):
         raise ValueError('Every qualified PM pose needs its audited live inputs')
     source = evidence.report(Path(source_path))
     current = evidence.report(Path(source['source_work'])/'summary.json')
+    if audit['status']=='passed-declared-case-actual-geometry-dc-force-matrix-only':
+        from audit_linear_dc_source_force_controls import verify_source_force_audit
+        control_path=audit.get('source_refinement_force_audit')
+        if not control_path or str(resolve(root,control_path).resolve()) not in bound:
+            raise ValueError('New case lacks audited downstream source-refinement force controls')
+        verify_source_force_audit(evidence,resolve(root,control_path),audit['actual_model'],evidence.digest(Path(source['source_work'])/'summary.json'))
     return dict(case_id=entry['case_id'], label=entry['label'], audit_sha256=entry['audit_sha256'],
                 fixture=json.loads(Path(fixture).read_text()), model=audit['actual_model'], current_geometry=current['geometry'],
                 source_hash=evidence.digest(Path(source_path)), live=live)

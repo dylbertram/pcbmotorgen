@@ -38,6 +38,7 @@ def main():
     parser.add_argument('--work',type=Path,required=True);parser.add_argument('--mesh',type=float,required=True)
     parser.add_argument('--curvature-safety',type=float,required=True);parser.add_argument('--port-fraction',type=float,required=True)
     parser.add_argument('--max-dofs',type=int,required=True);parser.add_argument('--mesh-only',action='store_true')
+    parser.add_argument('--mesh-work',type=Path,help='Reuse only an ended hash-verified mesh checkpoint, never a saved or failed field')
     add_thread_option(parser);args=parser.parse_args();origin=args.geometry_work.resolve();work=args.work.resolve()
     if work.exists():parser.error('Preserve previous source trials')
     physical=json.loads((origin/'summary.json').read_text());returned=json.loads((origin/'return/summary.json').read_text())
@@ -87,14 +88,27 @@ def main():
             drive_volume_m3=float(np.linalg.norm(end-start)*layer['trace_width_m']*layer['thickness_m']))
         if len(whole.solids)!=1:raise ValueError('Closed current CAD is not one connected conductor')
         report.update(geometry=geometry,brep_sha256=sha(work/'closed-copper.brep'));save()
-        mesh=mesh_cad(ng,whole,geometry,args.mesh,args.curvature_safety,checkpoint)
-        solids=list(mesh.ngmesh.GetGeometry().solids);drive=next(solid for solid in solids if solid.name=='drive')
-        errors=[abs(sum(solid.mass for solid in solids)/geometry['volume_m3']-1),abs(drive.mass/geometry['drive_volume_m3']-1)]
-        if not np.isfinite(errors).all() or max(errors)>1e-9:raise ValueError('Drive partition changed physical CAD or declared drive volume')
-        mesh.ngmesh.Save(str(work/'mesh.vol'));mesh=ng.Mesh(str(work/'mesh.vol'))
+        if args.mesh_work:
+            from linear_dc_mesh_checkpoint import load_checkpoint
+            prior,checkpoint_inputs=load_checkpoint(args.mesh_work,report)
+            bindings.update(checkpoint_inputs)
+            shutil.copy2(args.mesh_work/'mesh.vol',work/'mesh.vol')
+            if sha(work/'mesh.vol')!=prior['mesh_sha256']:raise ValueError('Checkpoint mesh changed while copied')
+            errors=[prior['cad_partition_checks'][key] for key in ['physical_union_relative_error','drive_volume_relative_error']]
+            report['mesh_checkpoint_reuse']=dict(origin=str(args.mesh_work.resolve()),mesh_sha256=prior['mesh_sha256'],
+                source_summary_sha256=sha(args.mesh_work/'summary.json'),field_policy='Fresh solve from zero; no prior .sol file is read or copied')
+            report['source_snapshots'].update(capture(work,[Path(__file__).with_name('linear_dc_mesh_checkpoint.py')]))
+            checkpoint('verified-ended-mesh-checkpoint-reused',mesh_sha256=prior['mesh_sha256'])
+        else:
+            mesh=mesh_cad(ng,whole,geometry,args.mesh,args.curvature_safety,checkpoint)
+            solids=list(mesh.ngmesh.GetGeometry().solids);drive=next(solid for solid in solids if solid.name=='drive')
+            errors=[abs(sum(solid.mass for solid in solids)/geometry['volume_m3']-1),abs(drive.mass/geometry['drive_volume_m3']-1)]
+            if not np.isfinite(errors).all() or max(errors)>1e-9:raise ValueError('Drive partition changed physical CAD or declared drive volume')
+            mesh.ngmesh.Save(str(work/'mesh.vol'))
+        mesh=ng.Mesh(str(work/'mesh.vol'))
         volume=float(ng.Integrate(ng.CoefficientFunction(1.),mesh,order=6));error=abs(volume/geometry['volume_m3']-1)
         report.update(mesh_sha256=sha(work/'mesh.vol'),mesh_elements=mesh.ne,mesh_vertices=mesh.nv,materials=list(mesh.GetMaterials()),
-            estimated_dofs=len(list(mesh.faces))+mesh.ne,cad_partition_checks=dict(physical_union_relative_error=errors[0],drive_volume_relative_error=errors[1]),
+            estimated_dofs=len(mesh.faces)+mesh.ne,cad_partition_checks=dict(physical_union_relative_error=errors[0],drive_volume_relative_error=errors[1]),
             geometric_volume_check=dict(mesh_volume_m3=volume,exact_cad_volume_m3=geometry['volume_m3'],relative_difference=error,limit=.02));save()
         if not np.isfinite(error) or error>.02:raise ValueError('Source mesh misses unchanged2%CAD volume gate')
         if report['estimated_dofs']>args.max_dofs:raise ValueError('Source resource cap exceeded before assembly')

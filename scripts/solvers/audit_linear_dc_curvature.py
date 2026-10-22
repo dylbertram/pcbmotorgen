@@ -31,16 +31,24 @@ def isolated_curvature(first,second):
         raise ValueError('Independently finer numerical curvature required')
 
 
+def curvature_pair(first,second):
+    """Coarse/fine indices without changing the predetermined baseline probes."""
+    if first['request']['curvature_safety']<second['request']['curvature_safety']:
+        isolated_curvature(first,second);return 0,1
+    isolated_curvature(second,first);return 1,0
+
+
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
     for key in ['first-work','second-work','first-sections','second-sections','near-field-work','source-export','work']:
         parser.add_argument('--'+key,type=Path,required=True)
     args=parser.parse_args();work=args.work.resolve()
     if work.exists():parser.error('Preserve previous curvature controls')
-    first=load(args.first_work.resolve(),MIXED);second=load(args.second_work.resolve(),MIXED);isolated_curvature(first,second)
+    first=load(args.first_work.resolve(),MIXED);second=load(args.second_work.resolve(),MIXED)
+    coarse,fine=curvature_pair(first,second)
     first_sections,_=load_sections(args.first_sections,args.first_work)
     second_sections,_=load_sections(args.second_sections,args.second_work)
-    sections=compare_sections(first_sections,second_sections)
+    sections=compare_sections([first_sections,second_sections][coarse],[first_sections,second_sections][fine])
     near=json.loads((args.near_field_work/'summary.json').read_text());export=json.loads((args.source_export/'summary.json').read_text())
     for report in [near,export]:completed_receipt(report)
     if near['status']!='passed-sampled-linear-near-field-controls-only' or near['failures'] or export['status']!='passed-affine-rt0-source-export-only':
@@ -57,7 +65,8 @@ def main():
     with np.load(args.source_export/'rt0-source.npz',allow_pickle=False) as saved:
         cells=saved['vertices_m'][saved['cells']];mean=saved['mean_current_a_m2'];slope=saved['radial_slope_a_m3']
     points=np.asarray([probe['point_m'] for probe in near['probes']]);actual=tetrahedron_field(points,cells,mean,radial_slope=slope)/export['effective_loop_current_a']
-    errors=relative(np.asarray(near['analytical_field_t_per_loop_a']),actual);resistance=resistance_check(first,second,.02)
+    baseline=np.asarray(near['analytical_field_t_per_loop_a'])
+    errors=relative([baseline,actual][coarse],[baseline,actual][fine]);resistance=resistance_check([first,second][coarse],[first,second][fine],.02)
     failures=[item['label'] for item in sections if not item['passed']]
     if not resistance['passed']:failures.append('resistance')
     failures.extend('field:'+near['probes'][i]['label'] for i,e in enumerate(errors) if not np.isfinite(e) or e>.02)

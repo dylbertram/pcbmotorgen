@@ -1081,14 +1081,12 @@ mod tests {
         let config: crate::ipc::ProjectConfigStateIpc =
             serde_json::from_value(state["config"].clone()).unwrap();
         let cad = serde_json::from_value(state["cad_geometry"].clone()).unwrap();
-        let original = read_json(
-            &runtime
-                .archive
-                .join("dc-live-request-roundtrip-v1-20261021/request.json"),
-        )
-        .unwrap();
-        // Only explicitly recorded material placement and return are taken from
-        // this regression study. Copper is rebuilt from the original design.
+        let study_path = std::env::var_os("PCB_MOTOR_DC_STUDY_REQUEST_PATH")
+            .map(PathBuf::from)
+            .unwrap_or_else(|| runtime.archive.join("dc-live-request-roundtrip-v1-20261021/request.json"));
+        let original = read_json(&study_path).unwrap();
+        // Only explicit material placement and return come from the selected
+        // study. Copper is rebuilt from its actual saved project, never replayed.
         let winding =
             tauri::async_runtime::block_on(super::super::physics::prepare_dc_winding_geometry(
                 config.to_linear_motor_ipc(),

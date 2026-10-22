@@ -1,10 +1,13 @@
 from copy import deepcopy
 import unittest
 
-from audit_linear_dc_curvature import isolated_curvature
+from audit_linear_dc_curvature import curvature_pair,isolated_curvature
 
 
 class IsolatedCurvatureTest(unittest.TestCase):
+    def test_fixed_probe_baseline_may_be_the_finer_source(self):
+        first,second=self.reports();self.assertEqual(curvature_pair(first,second),(0,1))
+        self.assertEqual(curvature_pair(second,first),(1,0))
     def reports(self):
         first=dict(version='pinned',input_hashes={'physical':'same'},geometry={'return':'actual'},
             request=dict(mesh_m=.0002,curvature_safety=6,port_fraction=.5),mesh_elements=100)
