@@ -121,7 +121,8 @@ def main():
     if bare['source_work'] != str(origin) or bare['source_summary_sha256'] != source['input_hashes'][str(origin/'summary.json')] or bare['source_solution_sha256'] != source['input_hashes'][str(origin/'dc-current-potential.sol')]:
         raise ValueError('Bare PM force belongs to a different physical winding current')
     # Reuse only an exactly matched source/pose, not a similarly named fixture.
-    models = [Path(p) for p in original['input_hashes'] if Path(p).name == 'summary.json' and sha(Path(p)) == bare['model_summary_sha256']]
+    bound = [*original['input_hashes'], *original.get('study_bindings', {})]
+    models = [Path(p) for p in bound if Path(p).name == 'summary.json' and sha(Path(p)) == bare['model_summary_sha256']]
     if len(models) != 1:
         raise ValueError('Missing immutable original PM-pose reference')
     original_model = json.loads(models[0].read_text())['model']

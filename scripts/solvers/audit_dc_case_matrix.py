@@ -86,10 +86,11 @@ def matrix_plan():
     return jobs, pairs
 
 
-def comparison_order(first, second, kind):
-    # Quadrature variants are degree6 versus the baseline degree8. Other
-    # variants are the finer mesh, larger domain, or tighter source opening.
-    return (second, first) if kind == 'refinement' and not first.endswith('/quadrature') else (first, second)
+def comparison_order(first, second, kind, quadrature_finer=False):
+    # Recorded quadrature variants are degree6 versus the baseline degree8. Other
+    # variants, and a declared finer quadrature rule, are the reference.
+    coarser_variant = first.endswith('/quadrature') and not quadrature_finer
+    return (second, first) if kind == 'refinement' and not coarser_variant else (first, second)
 
 
 class Evidence:
@@ -143,6 +144,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--archive-root', type=Path, required=True)
     parser.add_argument('--work', type=Path, required=True)
+    parser.add_argument('--case-plan', type=Path, help='declared non-recorded case: job works, material/source/section reports')
     args = parser.parse_args()
     root, work = args.archive_root.resolve(), args.work.resolve()
     if work.exists():
@@ -152,17 +154,24 @@ def main():
         ['compare_finite_current_controls.py', 'finite_current_coupling.py', 'finite_current_zero_bias.py']]]
     implementation_hashes = {str(path.resolve()): hashlib.sha256(path.read_bytes()).hexdigest() for path in implementation_files}
     evidence = Evidence()
-    material = evidence.report(root/'dc03-approved-35um-clearance-v1-20261021/summary.json')
-    source = evidence.report(root/'dc-source-curvature4-rt0-export-v1-20261021/summary.json')
+    case = json.loads(args.case_plan.read_text()) if args.case_plan else None
+    if case:
+        implementation_files.append(args.case_plan.resolve())
+        implementation_hashes[str(args.case_plan.resolve())] = hashlib.sha256(args.case_plan.read_bytes()).hexdigest()
+    material_path = Path(case['material_work'])/'summary.json' if case else root/'dc03-approved-35um-clearance-v1-20261021/summary.json'
+    source_path = Path(case['source_work'])/'summary.json' if case else root/'dc-source-curvature4-rt0-export-v1-20261021/summary.json'
+    material = evidence.report(material_path)
+    source = evidence.report(source_path)
     if (material['status'] != 'completed-approved-disjoint-material-geometry-only' or material['failures'] or
         source['status'] != 'passed-affine-rt0-source-export-only' or material['current_source_work'] != source['source_work']):
         raise ValueError('Approved actual geometry and accepted finite-current source required')
-    source_summary = root/'dc-source-curvature4-rt0-export-v1-20261021/summary.json'
+    source_summary = source_path
     source_hash = evidence.digest(source_summary)
-    sections = evidence.report(root/'dc-source-curvature4-all-eligible-sections-20261021.json', '--output')
+    sections = evidence.report(Path(case['sections_report']) if case else root/'dc-source-curvature4-all-eligible-sections-20261021.json', '--output')
+    expected_sections = case['expected_sections'] if case else 501
     current_work = Path(source['source_work'])
     if (sections['status'] != 'passed-finite-dc-all-eligible-winding-sections-only' or sections['failures'] or
-        sections['selection'] != 'all eligible' or sections['expected_sections'] != 501 or len(sections['sections']) != 501 or
+        sections['selection'] != 'all eligible' or sections['expected_sections'] != expected_sections or len(sections['sections']) != expected_sections or
         sections['source_work'] != str(current_work) or
         sections['source_summary_sha256'] != evidence.digest(current_work/'summary.json') or
         sections['source_solution_sha256'] != evidence.digest(current_work/'dc-current-potential.sol')):
@@ -173,9 +182,13 @@ def main():
             not 0 <= numbers[1] <= max(1e-8, .05*abs(numbers[2]))):
             raise ValueError('Signed current section fails unchanged source controls')
     jobs, pairs = matrix_plan()
+    if case:
+        if set(case['jobs']) != set(jobs):
+            raise ValueError('Declared case plan must cover exactly the recorded coverage template')
+        jobs = case['jobs']
     reports, controls = {}, {}
     for key, request in jobs.items():
-        path = root/request['work']/'summary.json'
+        path = (Path(request['work']) if Path(request['work']).is_absolute() else root/request['work'])/'summary.json'
         report = evidence.report(path)
         validate_state_report(report, material['model'], request['mode'], request['pose'],
                               request['formulation'], request['order'], request['degree'])
@@ -188,7 +201,7 @@ def main():
                 raise ValueError('Saved magnetic solution changed')
         reports[key] = report
     for first, second, kind in pairs:
-        left, right = comparison_order(first, second, kind)
+        left, right = comparison_order(first, second, kind, bool(case and case.get('quadrature_finer')))
         values = compare(reports[left], reports[right], kind)
         if not all(value['passed'] for value in values.values()):
             raise ValueError('Matrix control fails unchanged gate: '+first+' versus '+second)
@@ -198,11 +211,12 @@ def main():
     snapshots = capture(work, implementation_files)
     if any(snapshots[path]['sha256'] != digest for path, digest in implementation_hashes.items()):
         raise ValueError('Case-audit implementation changed during verification')
-    result = dict(status='passed-recorded-actual-geometry-dc-force-matrix-only', scope=__doc__,
+    result = dict(status='passed-declared-case-actual-geometry-dc-force-matrix-only' if case else 'passed-recorded-actual-geometry-dc-force-matrix-only', scope=__doc__,
                   current_points_a=sorted(float(value) for value in CURRENTS), pose_offsets_x_m=[0., .0001, -.0001],
                   magnetic_jobs=len(jobs), saved_current_states=len(jobs)*len(CURRENTS), control_pairs=len(pairs),
                   actual_model=material['model'], prescribed_source_summary_sha256=source_hash,
-                  current_section_eligibility=sections['eligibility'], qualified_eligible_sections=501,
+                  current_section_eligibility=sections['eligibility'], qualified_eligible_sections=expected_sections,
+                  case_plan=str(args.case_plan.resolve()) if case else None,
                   force_floor_n=1e-8, refinement_gate=.02, formulation_gate=.05,
                   evidence_hashes={str(path): digest for path, digest in evidence.hashes.items()}, controls=controls,
                   source_snapshots=snapshots,

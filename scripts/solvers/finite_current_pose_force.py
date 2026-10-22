@@ -78,7 +78,7 @@ def main():
         if sha(Path(path)) != digest:
             raise ValueError('Immutable physical pose-force input changed')
     original = json.loads((current_work/'summary.json').read_text())
-    model_path = next(Path(p) for p in original['input_hashes'] if Path(p).name == 'summary.json' and sha(Path(p)) == reference['model_summary_sha256'])
+    model_path = next(Path(p) for p in [*original['input_hashes'], *original.get('study_bindings', {})] if Path(p).name == 'summary.json' and sha(Path(p)) == reference['model_summary_sha256'])
     if json.loads(model_path.read_text())['model']['magnets'] != material['model']['magnets']:
         raise ValueError('Original reference uses different PM geometry/nominal pose')
     inputs[str(model_path)] = reference['model_summary_sha256']

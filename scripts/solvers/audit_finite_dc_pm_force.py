@@ -44,6 +44,14 @@ def sources(ng,mesh,current,degree,batch_cells=2048):
     if points:yield np.concatenate(points),np.concatenate(values),np.concatenate(volumes)
 
 
+def model_summary(source,geometry_path):
+    """Exactly one bound summary carrying the magnetic model, from inputs or declared study bindings."""
+    bound=[*source['input_hashes'],*source.get('study_bindings',{})]
+    candidates=[Path(p) for p in bound if p.endswith('/summary.json') and p!=str(geometry_path) and 'model' in json.loads(Path(p).read_text())]
+    if len(candidates)!=1:raise ValueError('Exactly one bound magnetic model summary required')
+    return candidates[0]
+
+
 def main():
     parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('--work',type=Path,required=True)
     parser.add_argument('--output',type=Path,required=True);parser.add_argument('--body-orders',type=int,nargs='+',default=[2,4])
@@ -55,7 +63,7 @@ def main():
     if source['request']['geometry_order']!=1:raise ValueError('Finite-current force requires linear source geometry')
     brep=next(Path(p) for p in source['input_hashes'] if p.endswith('/copper.brep'));geometry_path=brep.with_name('summary.json')
     geometry=json.loads(geometry_path.read_text());rho=geometry['geometry']['copper_resistivity_ohm_m']
-    model_path=next(Path(p) for p in source['input_hashes'] if p.endswith('/summary.json') and p!=str(geometry_path))
+    model_path=model_summary(source,geometry_path)
     model_source=json.loads(model_path.read_text());model=model_source['model'];magnets=model['magnets'];incident=source_field(model)
     import ngsolve as ng
     if ng.__version__!=source['version']:raise ValueError('Finite-current force engine changed')
@@ -94,12 +102,18 @@ def main():
         difference=float(np.linalg.norm(a-b));limit=max(1e-8,.02*float(np.linalg.norm(b)))
         output['quadrature_control']={'absolute_change_n':difference,'limit_n':limit,'passed':difference<=limit}
         if difference>limit:output['failures'].append('finite-current force quadrature refinement')
-        reference=np.asarray(model_source['direct_pm_current_force_n_per_a']);actual=b/source['dc']['effective_loop_current_a']
-        error=float(np.linalg.norm(actual-reference));limit=max(1e-8,.05*float(np.linalg.norm(reference)))
-        output['filament_source_comparison']={'finite_pm_force_n_per_loop_a':actual.tolist(),'line_pm_force_n_per_loop_a':reference.tolist(),
-            'absolute_change_n_per_a':error,'limit_n_per_a':limit,'passed':error<=limit,
-            'scope':'Source-only finite versus filament interaction; does not qualify interior line fields or inductance.'}
-        if error>limit:output['failures'].append('finite/filament bare PM interaction comparison')
+        actual=b/source['dc']['effective_loop_current_a']
+        if 'direct_pm_current_force_n_per_a' in model_source:
+            reference=np.asarray(model_source['direct_pm_current_force_n_per_a'])
+            error=float(np.linalg.norm(actual-reference));limit=max(1e-8,.05*float(np.linalg.norm(reference)))
+            output['filament_source_comparison']={'finite_pm_force_n_per_loop_a':actual.tolist(),'line_pm_force_n_per_loop_a':reference.tolist(),
+                'absolute_change_n_per_a':error,'limit_n_per_a':limit,'passed':error<=limit,
+                'scope':'Source-only finite versus filament interaction; does not qualify interior line fields or inductance.'}
+            if error>limit:output['failures'].append('finite/filament bare PM interaction comparison')
+        else:
+            # Never invent a line reference for a model that did not record one.
+            output['filament_source_comparison']={'available':False,'finite_pm_force_n_per_loop_a':actual.tolist(),
+                'scope':'No recorded filament reference for this model; comparison not performed or claimed.'}
         if sha(work/'summary.json')!=output['source_summary_sha256'] or sha(work/'dc-current-potential.sol')!=source['solution_sha256'] or sha(model_path)!=output['model_summary_sha256']:
             raise ValueError('Finite-current source changed during force audit')
         for name,entry in output['source_snapshots'].items():
