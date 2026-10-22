@@ -1,7 +1,37 @@
 {
-  "status": "reviewed-source-recovery-stage-verified-complete-full-qualification-not-admitted",
+  "status": "user-approved-five-cache-stage-running-source-controls-verified-force-unqualified",
+  "five_cache_stage": {
+    "status": "running-quadrature-opening-refined-domain-coarse-pending",
+    "launched_at_utc": "2026-10-22T19:06:08.628194Z",
+    "launch_record": "five-caches-approved-v1-launch-record.json",
+    "postlaunch_verification": "five-caches-approved-v1-postlaunch-verification.json",
+    "prelaunch": "five-caches-approved-v1-prelaunch.json",
+    "campaign": "five-caches-proposal-v1-campaign.json",
+    "campaign_state": "linear-dc-night-case-b-five-caches-proposal-v1-campaign-state.json",
+    "campaign_sha256": "9a15e1311f155ffe45c5d2fadc10a5cb1170ec0775af0de2442e7348017175b7",
+    "outer_declaration": "five-caches-approved-v1-outer-job.json",
+    "outer_declaration_sha256": "6c5a3179399210c45969dd286ae62f15a34b9a4112a143fa77b7d1ba73ddf9e6",
+    "outer_timeout_seconds": 31800,
+    "whole_stage_budget_seconds": 31230,
+    "owner_label": "com.pcbmotorgen.dc.20261022.night-five-caches-approved-v1",
+    "owner_pid":18799,
+    "owner_start_ticks":1792695968344810,
+    "monitor_label": "com.pcbmotorgen.dc.20261022.night-five-caches-approved-v1-inner-watch",
+    "monitor_directory": "five-caches-direct-inner-watch",
+    "monitor_pid":18804,
+    "monitor_interval_seconds":30,
+    "verified_jobs": {"quadrature":{"pid":18852,"start_ticks":1792695970181919},"opening":{"pid":18850,"start_ticks":1792695970181230},"refined":{"pid":18851,"start_ticks":1792695970181238}},
+    "resource_budget": "Only approved campaign:15GiBcompute,1.5GiBouterguard,.5GiBinner-supervisor/monitor reserve,total17GiBbelow18GiBtarget. Sampled postlaunch3.684GiB. Domain/coarse start only as slots free. Global/disk observations at continuation; reserve16GiBfree with8GiBnewoutput reservation from77.934GiBfree.",
+    "verification": "Successful exact-parser/output/DAG/hash/resource/deadline refresh and8regression tests before launch.588source/implementation/evidence hashes frozen. Three whole-job receipts/launchers live withmatching microsecond startidentities; bothone-shotservices running exactlyonce. Owneridentity verified before starting independentmonitor. KeepAlivefalse,cleanpinnedsourcePython,no developerPYTHONPATH. No numerical/cache acceptance inferred from liveness.",
+    "continuation": "Existing1420b0c3 schedule now20min, preserved rather than overwritten; updatedprompt covers approvedcaches. Independent30smonitor verifiesinnerreceipts. At19:06Z audit05/hardstop06prompts were founddisabled andrestored forapprovedstage, nextRunAt verified. Olddaytime taskremainsdisabled. Host/OpenChamberawake required; no crossshutdowncoverageclaim.",
+    "scope": "Onlyfivebaselinefinite-coppermaterialsourcecaches. Eachrequireswholepassingreport,all-point2%opening/direct5%references,nativestoragechecks,archive/input/mesh hashes and successfulreceipts. Full37job185state44pairmatrix,ninesourceforcecontrols,bare/pose/perbody/caseadmission remainopen. Overnightplan2/6 unchanged;no push/bundles.05reserve06hardstopunchanged."
+  },
   "next_bounded_stage_proposal": {
-    "status": "preflight-passed-awaiting-bounded-stage-agreement-not-launched",
+    "status": "explicitly-user-approved-launched-see-five_cache_stage",
+    "user_approval": "Yes, approve to launch this bounded five-cache stage",
+    "approved_prelaunch": "five-caches-approved-v1-prelaunch.json",
+    "approved_scope": "Five baseline material-source caches only. No coupled force or admission stage. No launch beyond unchanged05:00Z reserve/06:00Zhardstop.",
+    "refreshed_review": "2026-10-22T19:04:58.513473Z actual-parser/DAG/output/hash/resource preflight passed;8focused regressions pass,588input/implementation/evidence hashes frozen,35701.486527s available,77.934GiBfree. No live solver/runner/watcher found before launch.",
     "campaign": "five-caches-proposal-v1-campaign.json",
     "preflight": "five-caches-proposal-v1-prelaunch.json",
     "scope": "Five required baseline finite-copper material-source caches only. Full force qualification still cannot fit and is not promised. No bare/pose/magnetic/source-force/admission gate removed.",
@@ -9,7 +39,7 @@
     "compute_seconds_available_at_review":36131.795083,
     "resource_review": "Atmost3x5GiBjobs=15GiBcompute plus2GiBsupervision reserve=17GiBbelow18GiBglobaltarget. Prior5GiBpreflights reverified, observedpeak2.153-2.189GiB each. Parallelcontention can cause timeout; no completion guaranteed. No overlapping campaign allowed.",
     "schedule": "Startquadrature/opening/refined,then domain/coarse in freedslots. Whole declared budget8h40m30s fits before05:00Z reserve atreview. Must refresh clock/quiescence/hash/output/resource checks and establishone-shot/directmonitor coverage before any agreed launch.",
-    "authorization": "Plan requires agreement on bounded work when fullqualification cannotfit. New stage proposal prepared butnotlaunched; askuser before expanding beyondcompletedsource stage."
+    "authorization": "Explicit user agreement received for the reviewed five-cache stage. Refresh passed, immutable one-shot anddirect30smonitor required; further stages still require separate reviewed bounded agreement."
   },
   "complete_source_step_review": {
     "report": "complete-source-step-verification.json",
