@@ -6,12 +6,22 @@ async function openPanel(page: Page, bridge = true) {
   await page.getByRole("tab", { name: /^Simulate/i }).click();
   if (bridge) await page.evaluate(() => {
     const w = window as any;
-    w.dcMode = "completed"; w.dcCalls = [];
+    w.dcMode = "completed"; w.dcInspectMode = "qualified"; w.dcCalls = [];
     w.__TAURI_INTERNALS__ = { invoke: async (command: string, args: any) => {
       if (command === "dc_coupling_capability") return { available: true, scope: "UI fixture only", qualified_cases: [
         {case_id:"fixture-case",label:"Fixture qualified design",audit_sha256:"fixture-audit",
          declaration:{material_model:{fixture:true},return_geometry:{fixture:true}}}] };
       w.dcCalls.push({command,args});
+      if (command === "inspect_dc_coupling") {
+        const qualified = w.dcInspectMode !== "preparation";
+        const report = {schema:"finite-dc-applicability-v1",request_id:args.study.request_id,request_sha256:"inspection-content-hash",
+          state:qualified ? "qualified" : "preparation-required",source_status:qualified ? "qualified-exact-basis" : "unqualified",
+          force_status:qualified ? "qualified-sampled-states" : "unqualified",
+          reason:qualified ? "The active copper matches this verified case. No force calculated." : "Actual copper requires its own offline preparation and qualification.",
+          qualified_case:qualified ? {case_id:"fixture-case",label:"Fixture qualified design",audit_sha256:"fixture-audit"} : null};
+        if (w.dcInspectMode === "delayed") return new Promise(resolve => {w.resolveDcInspection=()=>resolve(report);});
+        return report;
+      }
       if (command === "start_dc_coupling") {
         if (w.dcMode === "failed") throw new Error("Actual winding differs from qualified geometry");
         w.dcJob = {request_id:args.study.request_id,job_id:`job-${args.study.request_id}`,state:"running",
@@ -121,4 +131,34 @@ test("qualified designs fill only their audited placement and still need acknowl
   const start=await page.evaluate(()=>(window as any).dcCalls.find((c:any)=>c.command==="start_dc_coupling"));
   expect(start.args.study.material_model).toEqual({fixture:true});
   expect(Object.keys(start.args.study)).not.toContain("winding");
+});
+
+test("checking the active design separates qualification from force calculation",async({page})=>{
+  const panel=await openPanel(page);await declare(page);
+  await panel.getByRole("button",{name:"Check this design",exact:true}).click();
+  await expect(panel.getByLabel("Active design DC applicability")).toContainText("Qualified design");
+  await expect(panel.getByLabel("Active design DC applicability")).toContainText("verified for this exact geometry");
+  await expect(panel.locator("dl")).toHaveCount(0);
+  expect(await page.evaluate(()=>(window as any).dcCalls.filter((c:any)=>c.command==="start_dc_coupling").length)).toBe(0);
+});
+
+test("unqualified designs need preparation and cannot calculate a fixture force",async({page})=>{
+  const panel=await openPanel(page);await declare(page);
+  await page.evaluate(()=>{(window as any).dcInspectMode="preparation";});
+  await panel.getByRole("button",{name:"Check this design",exact:true}).click();
+  await expect(panel.getByLabel("Active design DC applicability")).toContainText("Preparation required");
+  await expect(panel.getByLabel("Active design DC applicability")).toContainText("Current source: unqualified");
+  await expect(panel.getByRole("button",{name:"Calculate static DC force",exact:true})).toBeDisabled();
+  await expect(panel.locator("dl")).toHaveCount(0);
+});
+
+test("a late applicability check cannot qualify edited geometry",async({page})=>{
+  const panel=await openPanel(page);await declare(page);
+  await page.evaluate(()=>{(window as any).dcInspectMode="delayed";});
+  await panel.getByRole("button",{name:"Check this design",exact:true}).click();
+  await expect.poll(()=>page.evaluate(()=>typeof (window as any).resolveDcInspection)).toBe("function");
+  await panel.getByRole("combobox",{name:"Loop current (A)"}).selectOption("0.1");
+  await page.evaluate(()=>{(window as any).resolveDcInspection();});
+  await expect(panel.getByLabel("Active design DC applicability")).toHaveCount(0);
+  await expect(panel.locator("dl")).toHaveCount(0);
 });

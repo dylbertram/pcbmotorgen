@@ -2,8 +2,8 @@
   import { onMount, onDestroy, untrack } from "svelte";
   import type { ConfigStore } from "../../stores/config.svelte";
   import type { CadGeometry, LinearMotorConfig, DriveSettings } from "../../types";
-  import type { DcCapability, DcQualifiedCase, DcStudy } from "../../types/dcCoupling";
-  import { dcCouplingCapability, startDcCoupling, dcCouplingStatus, cancelDcCoupling } from "../../ipc/dcJobs";
+  import type { DcApplicability, DcCapability, DcQualifiedCase, DcStudy } from "../../types/dcCoupling";
+  import { dcCouplingCapability, inspectDcCoupling, startDcCoupling, dcCouplingStatus, cancelDcCoupling } from "../../ipc/dcJobs";
   import { DcJobController, type DcViewState } from "../../dcJobController";
 
   let { config, cadGeometry = null, active }: { config: ConfigStore; cadGeometry?: CadGeometry | null; active: boolean } = $props();
@@ -14,6 +14,9 @@
   let offset = $state(0);
   let acknowledged = $state(false);
   let inputError = $state<string | null>(null);
+  let applicability = $state<DcApplicability | null>(null);
+  let inspecting = $state(false);
+  let inspectionEpoch = 0;
   const busy = $derived(["starting", "running", "cancelling"].includes(view.phase));
   const force = $derived(view.phase === "completed" ? view.job?.result?.pm_array_force_n : null);
   let destroyed = false;
@@ -32,7 +35,7 @@
   $effect.pre(() => {
     void JSON.stringify(config.toIpc());void JSON.stringify(config.drive);void JSON.stringify(cadGeometry);
     void declaration;void current;void offset;void acknowledged;void active;
-    untrack(() => { inputError = null;void controller.invalidate(); });
+    untrack(() => { inputError = null;applicability = null;inspectionEpoch++;inspecting = false;void controller.invalidate(); });
   });
   $effect(() => {
     if (!active) return;
@@ -45,7 +48,7 @@
     const timer = setInterval(() => { void controller.poll(); }, 300);
     return () => clearInterval(timer);
   });
-  onDestroy(() => { destroyed = true;void controller.invalidate(); });
+  onDestroy(() => { destroyed = true;inspectionEpoch++;void controller.invalidate(); });
 
   // Fills only the audited explicit placement/return; acknowledgement stays a
   // separate user action and the worker still checks the rebuilt copper.
@@ -54,19 +57,44 @@
     acknowledged = false;
   }
 
+  function readStudy(): DcStudy {
+    const explicit = JSON.parse(declaration);
+    if (!explicit || typeof explicit !== "object" || Array.isArray(explicit)
+      || Object.keys(explicit).sort().join(",") !== "material_model,return_geometry"
+      || !explicit.material_model || typeof explicit.material_model !== "object" || Array.isArray(explicit.material_model)
+      || !explicit.return_geometry || typeof explicit.return_geometry !== "object" || Array.isArray(explicit.return_geometry)) {
+      throw new Error("Provide exactly material_model and return_geometry objects. Do not include archived forces or winding snapshots.");
+    }
+    return { request_id: crypto.randomUUID(), material_model: explicit.material_model,
+      return_geometry: explicit.return_geometry, current_a: current, pm_offset_x_m: offset,
+      placement_acknowledged: acknowledged };
+  }
+
+  async function inspectDesign() {
+    inputError = null;applicability = null;
+    const epoch = ++inspectionEpoch;
+    inspecting = true;
+    try {
+      await controller.invalidate();
+      if (destroyed || epoch !== inspectionEpoch) return;
+      const study = readStudy();
+      const next = await inspectDcCoupling($state.snapshot(config.toIpc()), $state.snapshot(config.drive), $state.snapshot(cadGeometry), study);
+      if (destroyed || epoch !== inspectionEpoch) return;
+      if (next.schema !== "finite-dc-applicability-v1" || next.request_id !== study.request_id) {
+        throw new Error("The applicability response belongs to a different request. Check this design again.");
+      }
+      applicability = next;
+    } catch (error) {
+      if (!destroyed && epoch === inspectionEpoch) inputError = String(error);
+    } finally {
+      if (!destroyed && epoch === inspectionEpoch) inspecting = false;
+    }
+  }
+
   async function calculate() {
     inputError = null;
     try {
-      const explicit = JSON.parse(declaration);
-      if (!explicit || typeof explicit !== "object" || Array.isArray(explicit)
-        || Object.keys(explicit).sort().join(",") !== "material_model,return_geometry"
-        || !explicit.material_model || typeof explicit.material_model !== "object" || Array.isArray(explicit.material_model)
-        || !explicit.return_geometry || typeof explicit.return_geometry !== "object" || Array.isArray(explicit.return_geometry)) {
-        throw new Error("Provide exactly material_model and return_geometry objects. Do not include archived forces or winding snapshots.");
-      }
-      const study: DcStudy = { request_id: crypto.randomUUID(), material_model: explicit.material_model,
-        return_geometry: explicit.return_geometry, current_a: current, pm_offset_x_m: offset,
-        placement_acknowledged: acknowledged };
+      const study = readStudy();
       submitted = { config: $state.snapshot(config.toIpc()), drive: $state.snapshot(config.drive),
         cad: $state.snapshot(cadGeometry), study };
       await controller.start(study.request_id);
@@ -90,7 +118,7 @@
         {#each capability.qualified_cases as entry (entry.case_id)}
           <li class="flex flex-wrap items-center justify-between gap-2 rounded border border-slate-700 px-2 py-1">
             <span class="text-slate-200">{entry.label}</span>
-            <button type="button" onclick={() => useDeclaration(entry)} disabled={busy}
+            <button type="button" onclick={() => useDeclaration(entry)} disabled={busy || inspecting}
               class="rounded border border-slate-600 px-2 py-0.5 hover:bg-slate-800 disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400">Use audited placement</button>
           </li>
         {/each}
@@ -120,7 +148,9 @@
     <span>I acknowledge this explicit physical material placement and finite return. This does not modify the saved design or approve corrections for other designs.</span>
   </label>
   <div class="flex flex-wrap items-center gap-3">
-    <button type="button" disabled={!capability.available || !acknowledged || !declaration.trim() || busy || !active} onclick={calculate}
+    <button type="button" disabled={!capability.available || !acknowledged || !declaration.trim() || busy || inspecting || !active} onclick={inspectDesign}
+      class="rounded border border-slate-600 px-3 py-1.5 hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400">Check this design</button>
+    <button type="button" disabled={!capability.available || !acknowledged || !declaration.trim() || busy || inspecting || !active || (applicability !== null && applicability.state !== "qualified")} onclick={calculate}
       class="rounded border border-emerald-600 px-3 py-1.5 text-emerald-200 hover:bg-emerald-950 disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400">Calculate static DC force</button>
     {#if busy}
       <button type="button" onclick={() => { void controller.cancel(); }} disabled={view.phase === "cancelling"}
@@ -128,6 +158,16 @@
       <p role="status" class="text-slate-400">{view.phase === "cancelling" ? "Waiting for the desktop worker to stop. No force is displayed." : "Calculating fresh fields. Qualified-design solves take about 1–2 minutes; the whole job is capped at 360 s."}</p>
     {/if}
   </div>
+  {#if inspecting}
+    <p role="status" class="text-slate-400">Checking the active copper, return and placement against verified evidence. No force is calculated.</p>
+  {:else if applicability}
+    <div aria-label="Active design DC applicability" class="space-y-1 rounded border border-slate-700 p-2">
+      <p class="text-slate-200">{applicability.state === "qualified" ? "Qualified design" : applicability.state === "preparation-required" ? "Preparation required" : "Unsupported request"}</p>
+      <p class="text-slate-400">{applicability.reason}</p>
+      <p class="text-slate-400">Current source: {applicability.source_status === "qualified-exact-basis" ? "verified for this exact geometry" : "unqualified"}. Force scope: {applicability.force_status === "qualified-sampled-states" ? "sampled current and pose states only" : "unqualified"}.</p>
+      {#if applicability.qualified_case}<p class="text-slate-400">{applicability.qualified_case.label}</p>{/if}
+    </div>
+  {/if}
   {#if inputError || view.error}
     <p role="alert" class="break-words text-amber-200">DC coupling unavailable: {inputError ?? view.error}</p>
   {:else if view.phase === "cancelled"}

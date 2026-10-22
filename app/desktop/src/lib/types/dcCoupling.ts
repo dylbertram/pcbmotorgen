@@ -62,3 +62,15 @@ export interface DcQualifiedCase extends DcQualifiedCaseIdentity {
 }
 
 export interface DcCapability { available: boolean; reason?: string; scope?: string; qualified_cases?: DcQualifiedCase[] }
+
+/** Read-only applicability, never a numerical force or implicit preparation. */
+export interface DcApplicability {
+  schema: "finite-dc-applicability-v1";
+  request_id: string;
+  request_sha256: string;
+  state: "qualified" | "preparation-required" | "unsupported";
+  source_status: "qualified-exact-basis" | "unqualified";
+  force_status: "qualified-sampled-states" | "unqualified";
+  reason: string;
+  qualified_case: DcQualifiedCaseIdentity | null;
+}

@@ -75,6 +75,7 @@ fn main() {
             commands::physics::analyze_housing_motion,
             commands::physics::prepare_dc_winding_geometry,
             commands::dc_jobs::dc_coupling_capability,
+            commands::dc_jobs::inspect_dc_coupling,
             commands::dc_jobs::start_dc_coupling,
             commands::dc_jobs::dc_coupling_status,
             commands::dc_jobs::cancel_dc_coupling,

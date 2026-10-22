@@ -2,7 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { isTauriAvailable } from "./core";
 import { assertCadMapping } from "../cadMapping";
 import type { LinearMotorConfig, DriveSettings, CadGeometry } from "../types";
-import type { DcCapability, DcJobStatus, DcStudy } from "../types/dcCoupling";
+import type { DcApplicability, DcCapability, DcJobStatus, DcStudy } from "../types/dcCoupling";
 
 function requireDesktop() {
   if (!isTauriAvailable()) throw new Error("DC coupling requires the configured experimental desktop worker. Browser previews do not substitute forces.");
@@ -19,6 +19,14 @@ export async function startDcCoupling(
   requireDesktop();
   assertCadMapping(cadGeometry, config);
   return invoke<DcJobStatus>("start_dc_coupling", { config, driveSettings, cadGeometry, study });
+}
+
+export async function inspectDcCoupling(
+  config: LinearMotorConfig, driveSettings: DriveSettings, cadGeometry: CadGeometry | null, study: DcStudy,
+): Promise<DcApplicability> {
+  requireDesktop();
+  assertCadMapping(cadGeometry, config);
+  return invoke<DcApplicability>("inspect_dc_coupling", { config, driveSettings, cadGeometry, study });
 }
 
 export async function dcCouplingStatus(jobId: string): Promise<DcJobStatus> {

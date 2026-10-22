@@ -51,7 +51,7 @@ def main():
     if not found:
         sys.path.insert(0, str(HERE))
         try:
-            import recalculate_dc_request, finite_current_coupling, desktop_dc_job  # noqa: F401
+            import recalculate_dc_request, finite_current_coupling, desktop_dc_job, dc_applicability  # noqa: F401
             import ngsolve
         except Exception as error:
             found.append(f'live worker modules do not import: {error}')

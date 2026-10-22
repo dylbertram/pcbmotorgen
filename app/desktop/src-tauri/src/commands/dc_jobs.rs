@@ -193,6 +193,12 @@ impl Drop for OwnedChild {
 pub struct DcJobs {
     job: Arc<Mutex<Option<Job>>>,
     shutting_down: Arc<AtomicBool>,
+    inspecting: Arc<AtomicBool>,
+}
+
+struct InspectionPermit(Arc<AtomicBool>);
+impl Drop for InspectionPermit {
+    fn drop(&mut self) { self.0.store(false, Ordering::SeqCst); }
 }
 
 fn hash(bytes: &[u8]) -> String {
@@ -298,6 +304,19 @@ fn verify_result(job: &Path, request: &Value, request_sha: &str) -> Result<Value
 }
 
 impl DcJobs {
+    fn begin_inspection(&self) -> Result<InspectionPermit, String> {
+        let slot = self.job.lock().map_err(|_| "DC job state failed; restart the app")?;
+        if self.shutting_down.load(Ordering::SeqCst) {
+            return Err("DC worker is shutting down".into());
+        }
+        if slot.as_ref().is_some_and(|job| job.status.active()) {
+            return Err("Wait for the DC job to finish or cancel before checking another design".into());
+        }
+        self.inspecting.compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+            .map_err(|_| "A DC applicability check is already running")?;
+        Ok(InspectionPermit(self.inspecting.clone()))
+    }
+
     fn launch(
         &self,
         runtime: Runtime,
@@ -314,6 +333,9 @@ impl DcJobs {
             .map_err(|_| "DC job state failed; restart the app")?;
         if self.shutting_down.load(Ordering::SeqCst) {
             return Err("DC worker is shutting down; no new job was launched".into());
+        }
+        if self.inspecting.load(Ordering::SeqCst) {
+            return Err("Wait for the DC applicability check before starting a numerical job".into());
         }
         if let Some(previous) = slot.as_ref() {
             if previous.status.active() {
@@ -543,6 +565,10 @@ impl DcJobs {
                 std::thread::sleep(Duration::from_millis(20));
             }
         }
+        for _ in 0..100 {
+            if !self.inspecting.load(Ordering::SeqCst) { break; }
+            std::thread::sleep(Duration::from_millis(20));
+        }
     }
 }
 
@@ -565,6 +591,91 @@ fn qualified_cases(archive: &Path) -> Result<Vec<Value>, String> {
         .map(|case| json!({"case_id":case["case_id"],"label":case["label"],"audit_sha256":case["audit_sha256"],
             "declaration":case["declaration"]}))
         .collect())
+}
+
+fn verify_applicability(value: Value, request: &Value, request_sha: &str) -> Result<Value, String> {
+    let fields = ["schema", "request_id", "request_sha256", "state", "source_status", "force_status", "reason", "qualified_case"];
+    let object = value.as_object().ok_or("Malformed DC applicability report")?;
+    if object.len() != fields.len() || object.keys().any(|key| !fields.contains(&key.as_str()))
+        || value["schema"] != "finite-dc-applicability-v1"
+        || value["request_id"] != request["request_id"] || value["request_sha256"] != request_sha
+        || !value["reason"].is_string()
+    {
+        return Err("Unverified or stale DC applicability report".into());
+    }
+    if value["state"] == "qualified" {
+        if value["source_status"] != "qualified-exact-basis" || value["force_status"] != "qualified-sampled-states"
+            || !value["qualified_case"]["case_id"].is_string() || !value["qualified_case"]["audit_sha256"].is_string()
+        {
+            return Err("Missing exact-case qualification in applicability report".into());
+        }
+    } else if !["preparation-required", "unsupported"].iter().any(|state| value["state"] == *state)
+        || value["source_status"] != "unqualified" || value["force_status"] != "unqualified" || !value["qualified_case"].is_null()
+    {
+        return Err("Invalid unqualified applicability state".into());
+    }
+    Ok(value)
+}
+
+fn inspect_actual_request(runtime: Runtime, request: Value, shutting_down: Arc<AtomicBool>) -> Result<Value, String> {
+    if shutting_down.load(Ordering::SeqCst) { return Err("DC worker is shutting down; no inspection launched".into()); }
+    let script = runtime.script.with_file_name("dc_applicability.py");
+    if !script.is_file() { return Err("DC applicability checker is missing from the installed worker".into()); }
+    let bytes = serde_json::to_vec_pretty(&request).map_err(|error| error.to_string())?;
+    if bytes.len() > 8_000_000 { return Err("DC request exceeds the 8 MB input cap".into()); }
+    let root = runtime.archive.join("dc-desktop-inspections");
+    fs::create_dir_all(&root).map_err(|error| error.to_string())?;
+    let directory = tempfile::Builder::new().prefix("inspect-").tempdir_in(root).map_err(|error| error.to_string())?.keep();
+    let request_path = directory.join("request.json");
+    fs::write(&request_path, &bytes).map_err(|error| error.to_string())?;
+    let output = File::create(directory.join("applicability.json")).map_err(|error| error.to_string())?;
+    let errors = File::create(directory.join("inspection.log")).map_err(|error| error.to_string())?;
+    let mut command = Command::new(&runtime.python);
+    command.arg(script).arg("--request").arg(&request_path).arg("--archive-root").arg(&runtime.archive)
+        .env("OPENBLAS_NUM_THREADS", "1").env("OMP_NUM_THREADS", "1").env("VECLIB_MAXIMUM_THREADS", "1")
+        .stdin(Stdio::null()).stdout(output).stderr(errors);
+    #[cfg(unix)]
+    { use std::os::unix::process::CommandExt; command.process_group(0); }
+    let mut child = OwnedChild { process: command.spawn().map_err(|error| error.to_string())?, reaped: false };
+    let start = Instant::now();
+    loop {
+        if shutting_down.load(Ordering::SeqCst) {
+            child.stop(); return Err("DC applicability check stopped during app shutdown".into());
+        }
+        if start.elapsed() >= Duration::from_secs(30) {
+            child.stop(); return Err("DC applicability check exceeded its 30 s budget; no force was calculated".into());
+        }
+        match child.try_wait().map_err(|error| error.to_string())? {
+            Some(exit) if exit.success() => break,
+            Some(_) => return Err(format!("DC applicability check failed; no force was calculated. See {}", directory.join("inspection.log").display())),
+            None => std::thread::sleep(Duration::from_millis(25)),
+        }
+    }
+    let digest = hash(&bytes);
+    if hash(&fs::read(&request_path).map_err(|error| error.to_string())?) != digest {
+        return Err("DC inspection input changed; stale applicability suppressed".into());
+    }
+    verify_applicability(read_json(&directory.join("applicability.json"))?, &request, &digest)
+}
+
+#[tauri::command]
+pub async fn inspect_dc_coupling(
+    jobs: tauri::State<'_, DcJobs>,
+    config: crate::ipc::LinearMotorConfigIpc,
+    drive_settings: pcbmotorgen_simulation::drive::DriveSettings,
+    cad_geometry: Option<pcbmotorgen_export::cad_dxf::CadGeometry>,
+    study: DcStudy,
+) -> Result<Value, String> {
+    study.validate()?;
+    let permit = jobs.begin_inspection()?;
+    let shutting_down = jobs.shutting_down.clone();
+    let runtime = Runtime::from_env()?;
+    let winding = super::physics::prepare_dc_winding_geometry(config, drive_settings, cad_geometry).await?;
+    tauri::async_runtime::spawn_blocking(move || {
+        let _permit = permit;
+        inspect_actual_request(runtime, study.request(winding), shutting_down)
+    })
+        .await.map_err(|error| error.to_string())?
 }
 
 #[tauri::command]
@@ -816,6 +927,67 @@ mod tests {
     }
 
     #[test]
+    fn applicability_verifier_rejects_stale_or_force_bearing_reports() {
+        let request = json!({"request_id":"inspect"});
+        let valid = json!({"schema":"finite-dc-applicability-v1","request_id":"inspect","request_sha256":"sha",
+            "state":"preparation-required","source_status":"unqualified","force_status":"unqualified",
+            "reason":"Offline qualification required","qualified_case":null});
+        assert!(verify_applicability(valid.clone(), &request, "sha").is_ok());
+        for (key, value) in [("request_sha256", json!("old")), ("request_id", json!("other")),
+            ("state", json!("qualified")), ("source_status", json!("qualified-exact-basis")), ("pm_array_force_n", json!([1.,2.,3.]))] {
+            let mut changed = valid.clone(); changed[key] = value;
+            assert!(verify_applicability(changed, &request, "sha").is_err());
+        }
+    }
+
+    #[test]
+    fn inspection_and_numerical_job_share_one_owned_worker_policy() {
+        let jobs = DcJobs::default();
+        let dir = tempfile::tempdir().unwrap();
+        let permit = jobs.begin_inspection().unwrap();
+        assert!(jobs.begin_inspection().is_err());
+        assert!(jobs.launch(runtime(dir.path(), "pass"), json!({"request_id":"blocked"}), Duration::from_secs(3))
+            .unwrap_err().contains("applicability check"));
+        assert!(!dir.path().join("dc-desktop-jobs").exists());
+        drop(permit);
+        let running = jobs.launch(runtime(dir.path(), "import time;time.sleep(60)"), json!({"request_id":"active"}), Duration::from_secs(3)).unwrap();
+        assert!(jobs.begin_inspection().is_err());
+        jobs.cancel(&running.job_id).unwrap();
+        wait(&jobs, &running.job_id);
+        let permit = jobs.begin_inspection().unwrap();
+        drop(permit);
+        jobs.shutdown();
+        assert!(jobs.begin_inspection().is_err());
+    }
+
+    #[test]
+    fn shutdown_stops_owned_inspection_and_its_child() {
+        let dir = tempfile::tempdir().unwrap();
+        let rt = runtime(dir.path(), "pass");
+        fs::write(dir.path().join("dc_applicability.py"), "import subprocess,sys,time\nfrom pathlib import Path\np=subprocess.Popen([sys.executable,'-c','import time;time.sleep(60)'])\nPath(sys.argv[2]).with_name('nested.pid').write_text(str(p.pid))\ntime.sleep(60)\n").unwrap();
+        let jobs = DcJobs::default(); jobs.inspecting.store(true, Ordering::SeqCst);
+        let stopped = jobs.shutting_down.clone(); let flag = jobs.inspecting.clone();
+        let thread = std::thread::spawn(move || {
+            let _permit = InspectionPermit(flag);
+            inspect_actual_request(rt, json!({"request_id":"inspect"}), stopped)
+        });
+        let start = Instant::now();
+        let pid_path = loop {
+            let path = fs::read_dir(dir.path().join("dc-desktop-inspections")).ok()
+                .and_then(|mut paths| paths.next()).and_then(|path| path.ok()).map(|entry| entry.path().join("nested.pid"));
+            if let Some(path) = path { if path.exists() { break path; } }
+            assert!(start.elapsed() < Duration::from_secs(3));
+            std::thread::sleep(Duration::from_millis(10));
+        };
+        jobs.shutdown(); assert!(thread.join().unwrap().unwrap_err().contains("shutdown"));
+        let pid = fs::read_to_string(pid_path).unwrap();
+        let output = Command::new("ps").args(["-o","stat=","-p",pid.trim()]).output().unwrap();
+        let state = String::from_utf8_lossy(&output.stdout);
+        assert!(state.trim().is_empty() || state.trim().starts_with('Z'));
+        assert!(inspect_actual_request(runtime(dir.path(), "pass"), json!({"request_id":"late"}), jobs.shutting_down.clone()).unwrap_err().contains("shutting down"));
+    }
+
+    #[test]
     fn normal_shutdown_stops_active_job() {
         let dir = tempfile::tempdir().unwrap();
         let jobs = DcJobs::default();
@@ -867,6 +1039,34 @@ mod tests {
         println!("{}",serde_json::to_string(&json!({"source_project":project_path,"source_sha256":hash(&original),
             "version_index":index,"imported":!saved["cad_geometry"].is_null(),"qualification_only":qualification_only,
             "snapshot":output,"snapshot_sha256":hash(&bytes)})).unwrap());
+    }
+
+    #[test]
+    #[ignore = "Explicit actual saved-design applicability check; requires configured worker, project and declared study request"]
+    fn real_saved_design_applicability_rebuilds_copper_without_a_force() {
+        let runtime = Runtime::from_env().unwrap();
+        let path = PathBuf::from(std::env::var_os("PCB_MOTOR_PROJECT_PATH").unwrap());
+        let original = fs::read(&path).unwrap();
+        let project: Value = serde_json::from_slice(&original).unwrap();
+        let state = &project["versions"][1]["state"];
+        let config: crate::ipc::ProjectConfigStateIpc = serde_json::from_value(state["config"].clone()).unwrap();
+        let cad = serde_json::from_value(state["cad_geometry"].clone()).unwrap();
+        let declared = read_json(&PathBuf::from(std::env::var_os("PCB_MOTOR_DC_STUDY_REQUEST_PATH").unwrap())).unwrap();
+        let winding = tauri::async_runtime::block_on(super::super::physics::prepare_dc_winding_geometry(
+            config.to_linear_motor_ipc(), config.drive, cad)).unwrap();
+        assert_eq!(winding["routing"], declared["winding"]["routing"]);
+        assert_eq!(winding["networks"], declared["winding"]["networks"]);
+        let study = DcStudy { request_id:format!("inspect-real-{}",std::process::id()),
+            material_model:declared["material_model"].clone(),return_geometry:declared["return_geometry"].clone(),
+            current_a:0.1,pm_offset_x_m:0.,placement_acknowledged:true };
+        study.validate().unwrap();
+        let request = study.request(winding);
+        let result = inspect_actual_request(runtime, request, Arc::new(AtomicBool::new(false))).unwrap();
+        let expected = std::env::var("PCB_MOTOR_DC_EXPECT_APPLICABILITY_STATE").unwrap();
+        assert_eq!(result["state"], expected);
+        assert!(result.get("pm_array_force_n").is_none());
+        assert_eq!(fs::read(path).unwrap(), original);
+        println!("Actual saved-design applicability: {}", serde_json::to_string(&result).unwrap());
     }
 
     #[test]

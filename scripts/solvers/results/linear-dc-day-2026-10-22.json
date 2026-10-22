@@ -19,16 +19,17 @@
   "plan_progress": {
     "step_1": "complete;new12h cutoff approved,765recorded evidence hashes verified,actual two new saved host designs exported,production descriptors and closed return graphs checked;nominal app-defined models and explicit returns prepared;vertical finite-extent separation proved before CAD;per-case source/force/control matrix and candidate/admission envelope recorded. No source/force qualification from preparation.",
     "steps_2_through_6": "not complete",
-    "step_2": "source controls: imported port drive-length passed globally+locally; case-A source chain passed. Remaining: near-source field integration extension.",
-    "step_4": "in progress: per-design registry admission implemented and exercised with recorded case; new cases register only after their audit passes."
+    "step_2": "source controls: imported port drive-length passes global/local/passive/return/H1 controls;case-A21near/app-region field probes and mesh/port field stability pass. Supplemental accepted-curvature6->8control passes79local sections,resistance and21fixed fields. New-case-Bsource controls remain pending;step not checked complete.",
+    "step_4": "in progress: exact per-design registry admission and active-design applicability inspection implemented. Real host rebuilds tested for recorded/A/B designs,with A/B correctly preparation-required. New cases register only after full audit;in-app preparation/qualification workflow and native interaction remain incomplete."
   },
   "source_gap": {
-    "work": "dc-imported-star4-curvature4-port-control-v2-day-20261022",
+    "work": "dc-imported-star4-curvature4-port-control-v3-detached-day-20261022",
+    "preserved_interrupted_v2_work": "dc-imported-star4-curvature4-port-control-v2-day-20261022",
     "purpose": "Generic electrical drive-length control only,not imported magnetic coupling or app admission",
-    "status": "passed-global-and-local-drive-length-control",
+    "status": "passed-global-local-passive-return-and-independent-current-drive-length-controls",
     "observed_at_utc": "2026-10-22T09:33:11Z",
     "interrupted_seconds": 618.7470707920147,
-    "liveness": "Receipt supervisor33397 and watcher33815 absent; no matching solver or watcher processes. Numerical running summary is stale. Cause unknown. No duplicate launched from stale state.",
+    "preserved_v2_interruption_liveness": "Receipt supervisor33397 and watcher33815 absent; no matching solver or watcher processes. Numerical running summary is stale. Cause unknown. No duplicate launched from stale state.",
     "source_work": "dc-imported-star4-curvature4-dc-v1-20261021",
     "port_fraction": 0.4,
     "curvature_safety": 4,
@@ -55,7 +56,15 @@
       "local_refinement": "dc-imported-star4-port-v3-local-current-refinement-v1-20261022.json",
       "local_refinement_sha256": "72bc3abeb4019abb22063b15a382804d00f57b766c865dfdbe20c636a6005670",
       "local_failures": 0,
-      "services": "port-v3/port-v3-watch exited0 runs1, unloaded after nonrunning status; plists/logs kept. Watcher observed chains-finished."
+      "services": "port-v3/port-v3-watch exited0 runs1, unloaded after nonrunning status; plists/logs kept. Watcher observed chains-finished.",
+      "followup": {
+        "campaign": "linear-dc-day-port-v3-followup-v1",
+        "status": "all3jobs completed;outer receipt exit0 and launcher success;owned worker/watcher labels unloaded after final nonrunning service/watcher checks",
+        "passive": "linear-dc-day-port-v3-passive-v1-20261022.json:507sections,0failures,1126.36s",
+        "return": "linear-dc-day-port-v3-return-v1-20261022.json:4sections,0failures,100.17s",
+        "primal": "linear-dc-day-port-v3-primal-v1-20261022:completed176.04s;H1R14.984939925182541ohm;original-matrix algebraic corrections reached unchanged power/current gates on pass2of3",
+        "agreement": "linear-dc-day-port-v3-primal-agreement-v1-20261022.json passed;relative0.004034534530620304 below5%gate. No imported magnetic geometry or app-force admission."
+      }
     },
     "scope": "Generic imported electrical drive-length control only; no imported magnetic geometry, near-field or app admission."
   },
@@ -106,7 +115,23 @@
       "guard": "New preparer rejects empty/nonfinite/disconnected winding union before return construction. Fresh-source entry point independently rejects empty bare CAD. No Boolean healing,material moves,geometry corrections or automatic retries performed.",
       "next_gate": "Investigate exact saved-primitive Boolean construction without physical changes. Case B cannot advance to source/force qualification until actual winding CAD is recovered and independently checked."
     },
-    "fresh_source_entry": "scripts/solvers/solve_linear_dc_study.py explicitly supports declared curvature4/6,mesh and port controls,exact closed CAD provenance,2%volume gate,24Mpreassembly DOF cap and fresh1V mixed solve. Helper tests passed;no new-case source solve launched while live v3 occupies serial large-job slot. Passive no-stub audit and source/local/field/force gates remain incomplete."
+    "case_b_exact_cad_v4": {
+      "archive": "linear-dc-day-case-b-copper-v4-20261022",
+      "status": "completed-finite-copper-geometry-only-unqualified",
+      "receipt_exit_code": 0,
+      "launcher_status": "completed-command-not-numerical-qualification",
+      "whole_command_seconds": 498.6546465830179,
+      "bare_brep_sha256": "45e12614ffc40bc588b64576a699ca8bac38a188e31017018b2a399e375dbcc9",
+      "bare_volume_m3": 2.1396137874462557e-8,
+      "closed_volume_m3": 2.144447491735545e-8,
+      "solid_components": 1,
+      "analytic_union_relative_difference": 1.1685115320458905e-5,
+      "nonterminal_return_contact_volume_m3": 0.0,
+      "minimum_closed_copper_ferrite_distance_m": 0.001165,
+      "all_partition_overlap_volumes_m3": 0.0,
+      "verification": "Study/fixture/implementation/archive hashes and both BRep hashes checked. Same545traces/384vias and original dimensions;only Boolean grouping/order changed. No tolerance/healing/material correction. Own completed worker/watcher labels unloaded,logs/plists retained. Historicalv1/v2/v3 failures remain preserved."
+    },
+    "fresh_source_entry": "scripts/solvers/solve_linear_dc_study.py supports explicit declared mesh/curvature/port controls,exact closed CAD provenance,2%volume gate,24Mpreassembly DOF cap and fresh1V mixed solve. Case-Acurvature6 source/local/field and6->8controls passed. Case-Bfirstcurvature6basis completedglobal gates from verifiedv4CAD;local/source controls running,no case-Bsource/force acceptance yet."
   },
   "memory_verification": {
     "tool": "opencode-mem memory MCP",
@@ -194,9 +219,9 @@
     ]
   },
   "case_b_union_diagnosis": {
-    "status": "blocked-exact-cad-construction",
+    "status": "exact-cad-v4-and-first-source-global-gates-passed-local-source-controls-running-no-force-admission",
     "analytic_union_m3": 2.1395887861045515e-08,
-    "finding": "Pairwise OCC fuse loses volume silently: two faithful level-8 subtrees(1.538e-8,4.13e-9m3) fuse to9.30e-9m3 vs analytic1.92e-8 at level9, then empty at level10. Order swap,UnifySameDomain and Fuse([..]) also empty; Glue is a partition, not accepted. Exact case-B source remains blocked; no healing/substitution.",
+    "finding": "Historicalv1finding:pairwise OCC fuse loses volume silently:two faithful level-8 subtrees(1.538e-8,4.13e-9m3) fuse to9.30e-9m3 vs analytic1.92e-8 at level9,then empty at level10. Order swap,UnifySameDomain and Fuse([..]) also empty;Glue is a partition,not accepted. Later v4single-drill Boolean ordering passed final CAD without healing/substitution;source/force qualification remains separate.",
     "reports": [
       "linear-dc-day-case-b-union-diagnostic-v1-20261022.json",
       "linear-dc-day-case-b-union-diagnostic-v2-20261022.json",
@@ -211,11 +236,11 @@
       "important_distinction": "The undrilled per-kind fuse matched the undrilled analytic union. That is NOT a successful final drilled winding and must not be called case-B recovery. Per-kind grouped builder remains experimental;guards reject failed final topology/volume.",
       "case_a_crosscheck": "linear-dc-day-case-a-copper-perkind-v1-20261022 completed16.56s/exit0;volume3.5011945365730746e-9m3 versus canonical3.5011945325895833e-9. No independent current/force evidence and no replacement of canonical case-A source.",
       "active_diagnostic": "linear-dc-day-case-b-single-drill-v1-20261022 completed exit0 with final launcher success. One drilled solid,volume2.1396137874462557e-8m3,relative analytic-union difference1.1685115320458905e-5. Single cut completed at476.65s. Diagnostic only,no downstream CAD. Earlier conversation-shell drill-v2 diagnostic was interrupted and produced no report or surviving worker.",
-      "production_v4": "linear-dc-day-case-b-copper-v4-20261022 launched with explicit per-kind-single-drill strategy,1800s/4GiB budget and own independent one-shot watcher. Same declared primitives/bores,only Boolean ordering changes. Must pass exact union,connectivity,return and partition gates before any source launch;not yet admitted.",
+      "production_v4": "linear-dc-day-case-b-copper-v4-20261022 completed498.65s/exit0 and passed exact union,connectivity,return and partition gates;see case_preparation.case_b_exact_cad_v4. Force/app admission still absent.",
       "historical_strategy_job": "case-b-fuse-strategy-v1 timed out under its3600s budget;its partial report is diagnostic-only,never source CAD. Final receipts/launcher must be checked before service cleanup."
     }
   },
-  "tests_latest": "434 helpers passed,0 skips,32.323s (PCB_MOTOR_HOUSING_BINARY supplied) linear-dc-day-single-drill-near-field-all-helpers-v1-20261022.log",
+  "tests_latest": "440 helpers passed, zero skips, 35.441 s in linear-dc-day-applicability-curvature-all-helpers-v2-20261022.log. Desktop 117 passed, 8 ignored, 41.66 s; frontend 471 passed, 1 existing skip; full browser 346 passed, zero skips/flakes, 322.920 s.",
   "app_integration": {
     "status": "implemented-per-design-registry-admission-recorded-case-registered-case-a-pending-audit",
     "request": "finite-dc-live-request-v2 from host; no host-pinned basis. Worker re-verifies every registered audit/evidence, requires exactly one exact match, else Qualification required with per-case reason before any solve.",
@@ -255,9 +280,84 @@
       "helpers": "427 passed,0 skips"
     }
   },
+  "case_b_source": {
+    "status": "completed-first-fresh-basis-global-gates-local-source-controls-running-no-force-admission",
+    "work": "linear-dc-day-case-b-source-m200-c6-p50-v1-20261022",
+    "worker_label": "com.pcbmotorgen.dc.20261022.case-b-source-c6-v1",
+    "watcher_label": "com.pcbmotorgen.dc.20261022.case-b-source-c6-v1-watch",
+    "declaration": "linear-dc-day-detached-supervision-v1-20261022/case-b-source-c6-v1-job.json",
+    "controls": {"mesh_m":0.0002,"curvature_safety":6.0,"port_fraction":0.5,"drive_emf_v":1.0,"max_dofs":24000000},
+    "timeout_s": 5400,
+    "native_footprint_limit_gib": 8,
+    "launch_basis": "Verified completedv4CAD and all hashes;measured existing numerical footprint9.33GiB plus8GiB job guard below18GiB shared target at launch. Whole budget fits before18:29:49Z.",
+    "completed_basis": {
+      "whole_command_seconds": 1602.512011499959,
+      "peak_native_footprint_gib": 5.510931104421616,
+      "mesh_elements": 1645935,
+      "dofs": 5492216,
+      "effective_loop_current_a": 8.845151318251187,
+      "resistance_ohm": 0.11305629084452049,
+      "relative_equation_residual": 6.163933842272339e-14,
+      "relative_power_balance": 1.1721734693992403e-12,
+      "mesh_volume_relative_difference": 0.0007841117299333122,
+      "solution_sha256": "6d84c70a71eb3270b8a671952779e5286f8841e9153f1f4bb080fcd3d3b65fcc",
+      "verification": "Receipt completedexit0,launcher completed,physical/study/archive/mesh/solution hashes checked. Finalworker/watcher servicesnonrunning and safely unloaded;plists/logskept. Actual1Vbasis,not1A."
+    },
+    "control_campaign": {
+      "declaration": "linear-dc-day-detached-supervision-v1-20261022/case-b-source-controls-v1-campaign.json",
+      "name": "linear-dc-day-case-b-source-controls-v1",
+      "jobs": 24,
+      "status": "running;completedbasis adopted,active inventory running at11:59Z. Source solves depend on completedcase-A10GiBscalar retry to avoid heavyoverlap.",
+      "scope": "Allactive/passive/return/H1agreement/exactRT0/material/21predeterminednear-app-region probes;freshcurvature4,mesh150um,port40controls with applicable local/resistance/field comparisons. No fabricatedstubcoverage. Curvature4failure,ifany,remainsfailed,notreferenceacceptance.",
+      "whole_wrapper_timeout_s": 19800,
+      "sum_nonprior_job_timeout_s": 17280,
+      "source_guards_gib": 8,
+      "followup_guards_gib": 6,
+      "cutoff": "2026-10-22T18:29:49.742086Z",
+      "forecast": "Firstbasis26.7min;threefreshsourcecontrols plus local/integration checks remain before CaseBmagnetic matrix. Fullforcequalification before acceptance reserve is unproven and may notfit. No droppingCaseB/gates or extendingcutoff."
+    }
+  },
+  "applicability_integration": {
+    "status": "implemented-and-tested-read-only-no-force-or-implicit-preparation",
+    "path": "inspect_dc_coupling rebuilds active copper through production host path;dc_applicability.py re-verifies registry evidence and returns qualified/preparation-required/unsupported with separate source/force status.30s owned inspection cap,shutdown cleanup,one-worker interlock betweeninspection/force,request hash/identity and stale-response checks. No magnetic job is launched.",
+    "ui": "Check this design displays exact active-design qualification independently of host case list. Unqualified inspected designs cannot calculate a fixture force;physical edits/tab departure discard late applicability. Source preparation remains separate offline work,not an implicit UI operation.",
+    "actual_requests": "linear-dc-day-applicability-real-requests-v1-20261022: recorded qualified, A/B preparation-required; no force returned. Final actual Rust saved-project rebuilds and clean-installed-worker inspections passed for all three in linear-dc-day-applicability-real-host-{recorded,case-a,case-b}-v2-20261022.log, taking 1.93/1.16/1.32 s. PYTHONPATH unset.",
+    "tests": {
+      "dc_rust": "Full desktop117passed,8ignored,41.66s in linear-dc-day-applicability-desktop-rust-v2-20261022.log. All3actual-design inspections passed separately with--ignored. Addedinspection/force mutualexclusion and nested-childshutdown tests.",
+      "vitest": "471passed,1existing skip,1.38s;linear-dc-day-applicability-vitest-v1-20261022.log",
+      "browser": "20DC-specific passed0skips;full346passed0skips0flaky322.920s in linear-dc-day-applicability-full-browser-v1-20261022/report.json",
+      "build": "Vite build passed4.69s;linear-dc-day-applicability-build-v1-20261022.log;chunk-size warning only",
+      "typecheck": "npxsvelte-check still reports the same34errors in3untouched files (DocumentEditor.svelte,DriverSuitability.svelte,cadMapping.test.ts);none in changed files. Initial pnpm-exec attempt failed because svelte-check is not installed locally;both logs retained.",
+      "helpers": "440passed0skips35.441s;linear-dc-day-applicability-curvature-all-helpers-v2-20261022.log;freshcleanworker checkpassed withPYTHONPATHunset and applicabilityimport included."
+    },
+    "limits": "This is applicability inspection,not completion of the missing in-app source-preparation/full-qualification lifecycle,not native WKWebView acceptance,and not new design admission. Only recorded case is registered until full force matrices pass."
+  },
+  "case_a_resource_retries": {
+    "preserved_failures": ["linear-vector-refined-v2","linear-scalar-coarse-v2","linear-scalar-refined-v2","linear-scalar-domain-v2"],
+    "failure_kind": "Higher-order linear controls exceeded3GiB native guard at3.01-3.24GiB;failed partial fields remain unaccepted and are not imported.",
+    "new_campaign": "linear-dc-day-case-a-linear-memory-v3 serial4job rerun,max6GiB per job/1800s,8400s bounded outer wrapper. Existing measured numerical footprint2.23GiB at declaration. Same orders,physical inputs,state matrix and2%/5%gates;fresh fields only.",
+    "audit_plan": "linear-dc-day-detached-supervision-v1-20261022/case-a-magnetic-audit-plan-v3.json preserves failed work mapping and substitutes only these4new work paths within unchanged37job/44pair coverage. No acceptance until every needed rerun passes.",
+    "observed_1143": "Originalcampaign59completed4failed1live8pending;serialretry linear-vector-refined-v3 completed243.51s,peak3.439GiB,next scalar-coarse running. Other failures remain pending rerun,not waived.",
+    "completed_v3_retry": "3of4completed;scalar-refined-v3 exceeded6GiBguard at6794450704bytes. Failure preserved,notwaived. Outer failedexit1 and ownwatcherattention-required;bothfinishedlabels safelyunloaded,plists/logskept.",
+    "v4_scalar_retry": "case-a-linear-scalar-memory-v4 launchedfresh in linear-dc-day-case-a-linear-scalar-refined-v4-20261022 with1800s/10GiB guard after measuredotherusage0.254GiB. At11:59Z live,3of5states saved,notqualifiedyet. Nochangedorders/geometry/gates. Finalaudit usescase-a-magnetic-audit-plan-v4.json mapping onlythisworkpath;v2/v3failuresremainpreserved.",
+    "watching": "Old inner-v2/v4watcherscorrectlyexitedattention-required and onlytheircompletedownedlabels unloaded. Newcase-ab-inner-v5-watch directlyobserves originalcaseAand24jobcaseBcampaign receipts,excludingrecordedfailures. Scalar-v4 has ownwatcher. Top-levellivecampaignwatchersunchanged."
+  },
+  "case_a_curvature_extension": {
+    "status": "passed-supplemental-source-control-no-force-admission",
+    "declaration": "scripts/solvers/cases/linear-dc-day-curvature8-control-20261022.json",
+    "reason": "Originalcurvature4source failed16barrel area gates,so cannot be accepted as a coarse reference. Require passing6and8source/all-active sections and compare identical fixed near/app-region fields,local signed currents/areas and resistance under unchanged2%gates.",
+    "campaign": "linear-dc-day-case-a-curvature8-v1:all4jobs completedexit0 in162.27s,source126.53s,sections15.20s,export5.26s,audit6.82s. Inputsandarchivedimplementations reverified;completedownedworker/watchlabels safelyunloaded,plists/logskept. Original4/6matrix andphysicalmodelunchanged.",
+    "report": "linear-dc-day-case-a-curvature6-8-v1-20261022/summary.json",
+    "resistance_relative_difference": 0.00026124496778812123,
+    "all_local_sections_passed": 79,
+    "fixed_field_probes": 21,
+    "max_field_relative_difference": 0.00027770702255397163,
+    "gate": 0.02,
+    "limits": "Noevery-pointfield,interpolationorforceacceptance. Source-refinementdownstreamcoupled-forcecontrols remainapartfromthissource-onlycomparison."
+  },
   "installed_worker": {
     "status": "passed-clean-macos-arm64-pinned-install",
-    "requirements": "scripts/solvers/requirements-dc-worker.txt (20 pinned dists, CPython3.12)",
+    "requirements": "scripts/solvers/requirements-dc-worker.txt (18 pinned distributions plus2comment lines, CPython3.12)",
     "installer": "scripts/solvers/install_dc_worker_macos.sh",
     "clean_venv": "dc-worker-clean-install-v1-20261022",
     "install_seconds": 22.71,

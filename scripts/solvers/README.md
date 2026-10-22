@@ -244,6 +244,21 @@ Results are separate from the existing force sweep, housing screening and driver
 calculations. Changes, tab departure and unmount immediately hide old forces and
 request cancellation, including a start response that arrives after invalidation.
 
+**Check this design** is a separate, read-only applicability inspection. The host
+rebuilds the active design's actual copper and `dc_applicability.py` re-verifies
+the registered evidence. It reports **Qualified design**, **Preparation
+required**, or **Unsupported request**, with current-source and force scope
+listed separately. It never calculates or returns a force or starts implicit
+preparation. Edits and tab departure discard late inspection responses. Each
+inspection has a 30 s budget, owns its child process group, and stops on normal
+app shutdown. Inspection and numerical jobs share the one-owned-worker policy;
+neither may start while the other is active.
+
+The recorded case's fresh-worker path and all three real saved-design inspection
+paths are exercised separately from UI fixtures. New designs still need the
+offline preparation and complete qualification workflow described above; this
+inspection does not complete the missing in-app preparation lifecycle.
+
 The experimental desktop worker is disabled unless its launch environment sets
 all three absolute host paths. This is a local installed-solver integration, not
 a redistributed or packaged solver. Install the pinned worker into a new

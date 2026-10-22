@@ -12,6 +12,7 @@
 //! | `dc_coupling_status`          | REAL (sync)  | Request-bound supervised status, verified fresh result only. |
 //! | `cancel_dc_coupling`          | REAL (sync)  | Cancels the owned numerical process group; no cancelled force. |
 //! | `dc_coupling_capability`      | REAL (sync)  | Host installation availability, not general geometry qualification. |
+//! | `inspect_dc_coupling`         | REAL (async) | Rebuild copper and inspect exact qualified-case applicability; no magnetic job or force. |
 //! | `generate_coils`              | REAL          | Resolves the selected routing pattern and returns geometry plus dimensions. |
 //! | `evaluate_force_sweep`        | REAL          | Uses core `ForceEvaluator` (Lorentz).    |
 //! | `compute_friction`            | REAL          | Uses core `FrictionEstimator`.           |
