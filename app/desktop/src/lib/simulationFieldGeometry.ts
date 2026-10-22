@@ -112,6 +112,7 @@ export function fieldLineGeometry(field: FieldPreview, scene: SceneTransform, zS
       grid.bounds[2][0] + (iz + .5) / 6 * (grid.bounds[2][1] - grid.bounds[2][0])];
     for (const sign of [-1, 1]) {
       let p = seed;
+      const visited = new Map<string, number>();
       for (let i = 0; i < 240; i++) {
         const first = direction(p, sign);
         if (!first) break;
@@ -130,6 +131,13 @@ export function fieldLineGeometry(field: FieldPreview, scene: SceneTransform, zS
           }
         }
         p = next;
+        // Trilinear display interpolation need not be divergence-free. Stop
+        // revisited trajectories instead of drawing repeated artificial spirals
+        // around a coarse-grid null or overpainting the same closed path.
+        const key = p.map(v => Math.round(v / step)).join(":");
+        const previous = visited.get(key);
+        if (previous !== undefined && i - previous > 8) break;
+        if (previous === undefined) visited.set(key, i);
         if (i > 12 && Math.hypot(...p.map((v, axis) => v - seed[axis])) < step) break;
       }
     }

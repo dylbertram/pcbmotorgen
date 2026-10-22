@@ -24,6 +24,26 @@ function setup() {
 }
 
 describe("managed DC request lifecycle",()=>{
+  it("keeps verified finite-copper winding samples separate from forces and clears them on edits", async () => {
+    const {controller,transport,last}=setup();
+    const samples=[];
+    for(let z=0;z<2;z++)for(let y=0;y<2;y++)for(let x=0;x<2;x++)samples.push({position_m:[x,y,z] as [number,number,number],b_t:[0,0,.001] as [number,number,number],magnitude_t:.001});
+    const value:DcJobStatus={...running(),operation:"winding-field",state:"completed",winding_field:{
+      status:"sampled-qualified-finite-copper-winding-field-only",request_id:"one",input_request_sha256:"content-hash",qualified_case:{...CASE,audit_sha256:"a".repeat(64)},
+      sampling:{bounds_m:[[0,1],[0,1],[0,1]],counts:[2,2,2]},loop_current_a:.1,phase_currents_a:{A:.1,C:-.1},source_basis_sha256:"b".repeat(64),
+      source_translation_m:[0,0,0],source_elements:1,evidence_hashes:{fixture:"c".repeat(64)},field:{method:"qualified-finite-copper-winding-xyz",scope:"Unit-test data only",magnets:[],samples}}};
+    transport.start.mockResolvedValue(value);await controller.start("one");expect(last().phase).toBe("completed");expect(last().job?.result).toBeNull();expect(last().job?.winding_field?.field.samples).toHaveLength(8);
+    await controller.invalidate();expect(last().job).toBeNull();
+    for(const change of ["force","sha","pm","point","partial"]) {
+      const changed=structuredClone(value);
+      if(change==="force")changed.result=complete().result;
+      if(change==="sha")changed.winding_field!.input_request_sha256="stale";
+      if(change==="pm")changed.winding_field!.field.method="analytical-pm-only-xyz";
+      if(change==="point")changed.winding_field!.field.samples[0].position_m[0]=.5;
+      if(change==="partial")changed.winding_field!.field.samples.pop();
+      transport.start.mockResolvedValue(changed);await controller.start("one");expect(last().phase).toBe("failed");
+    }
+  });
   it("keeps prepared sources unqualified and never renders them as force results",async()=>{
     const {controller,transport,last}=setup();transport.start.mockResolvedValue({...running(),operation:"preparation"});
     transport.poll.mockResolvedValue(prepared());await controller.start("one");await controller.poll();

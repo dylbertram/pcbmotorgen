@@ -40,7 +40,8 @@ export interface DcJobStatus {
   request_id: string;
   job_id: string;
   state: "running" | "cancelling" | "completed" | "prepared" | "cancelled" | "timed_out" | "failed";
-  operation?: "force" | "preparation";
+  operation?: "force" | "preparation" | "winding-field";
+  winding_field?: DcWindingFieldResult | null;
   preparation?: DcPreparedSource | null;
   preparation_progress?: { stage: "geometry" | "source" | "active" | "passive" | "return" | "independent" | "rt0"; stage_timeout_s: number } | null;
   elapsed_seconds: number;
@@ -58,6 +59,22 @@ export interface DcJobStatus {
 }
 
 export interface DcQualifiedCaseIdentity { case_id: string; label: string; audit_sha256: string }
+
+export interface WindingFieldSampling { bounds_m: [[number, number], [number, number], [number, number]]; counts: [number, number, number] }
+export interface DcWindingFieldResult {
+  status: "sampled-qualified-finite-copper-winding-field-only";
+  request_id: string;
+  input_request_sha256: string;
+  qualified_case: DcQualifiedCaseIdentity;
+  sampling: WindingFieldSampling;
+  loop_current_a: number;
+  phase_currents_a: Record<string, number>;
+  source_basis_sha256: string;
+  source_translation_m: [number, number, number];
+  source_elements: number;
+  field: import("./simulationVisualization").FieldPreview;
+  evidence_hashes: Record<string, string>;
+}
 
 /** Audited explicit placement/return for one registered case. Listing it is not admission. */
 export interface DcQualifiedCase extends DcQualifiedCaseIdentity {
@@ -78,6 +95,7 @@ export interface DcPreparedSource {
 export interface DcCapability {
   available: boolean; reason?: string; scope?: string; qualified_cases?: DcQualifiedCase[];
   preparation_available?: boolean; preparation_reason?: string; preparation_timeout_s?: number;
+  winding_field_available?: boolean;
 }
 
 /** Read-only applicability, never a numerical force or implicit preparation. */

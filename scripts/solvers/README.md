@@ -409,7 +409,40 @@ unproven without an observed session. No new delivery bundle is produced.
 
 In **Simulate**, choose **3D fields & heat** to use the existing orbitable
 viewer. Its overlay selector offers Off, Magnetic fields, Copper heat/loss,
-and both. The default field view is **Lines + slice**. Field lines follow the
+and both. The primary field source is now **Coil currents, qualified DC**, not
+the permanent magnets. Choose an exact audited source, inspect and acknowledge
+its explicit placement/finite return, choose a sampled signed DC loop current,
+then select **Sample coil B-field**. Unmatched designs remain unavailable. No PM
+field, wire model or new preparation campaign substitutes for a missing source.
+The source controls fold after completion so they do not cover the field.
+
+`start_dc_winding_field` rebuilds the actual saved/generated/imported copper
+through the same exact-case request boundary used by DC applicability. The
+worker re-verifies the case audit and every input hash, then directly integrates
+the actual affine-RT0 finite copper cells at 96 new exterior XYZ observations.
+The basis is normalized by its own effective loop current, preserving current
+sign, actual cross-sections, layer depths, finite vias and declared return.
+Observation coordinates are mapped to the source frame using its audited
+translation, then returned in the original routing frame. There is no source
+solve, mesh/cache campaign, filament substitution, PM field or nonlinear
+material response in this display. The admitted DC drive loop is not arbitrary
+AC phase excitation. Named driven-phase currents are shown when present in the
+audited physical declaration. The new raster is a display sample of a qualified
+source, not blanket near-field/refinement or coupled-FEM qualification.
+
+Direct integration refuses inside/on-copper or unresolved observations rather
+than moving, softening or replacing them. A field request shares the existing
+one-owned-DC-worker policy, with explicit cancellation on edits/source changes,
+tab departure/unmount and shutdown. Limits are 180 s whole job, 170 s child
+supervision, a sampled 4 GiB native-memory guard and the existing input/result
+caps. A completed source report is verified separately from force/preparation;
+it cannot populate a force result. Hash-bound physical declarations are not
+mistaken for numerical reports requiring solver receipts.
+
+**Permanent magnets only** remains an explicitly selected comparison source,
+with 240/700/2016 samples. There is no automatic PM fallback for coils.
+
+The default field view is **Lines + slice**. Field lines follow the
 native XYZ vector grid, with magnitude colors and direction cues; a filled XZ
 slice shows the norm of the interpolated vector. **XZ field section** turns the
 camera square to that plane. The Y-slice control moves the slice and seed plane
@@ -428,12 +461,13 @@ native magnetic adapter, not the older centre-line X-Z grid. The interactive
 field mode is explicitly **analytical permanent magnets only**, with image
 magnets disabled. It excludes winding reaction and nonlinear material response.
 It is not a coupled FEM field or a new force qualification. UI resolutions are
-240, 700 or2016 points, with a2048-point native cap and finite bounded coordinates.
+240, 700 or2016 PM points, with a2048-point native cap and finite bounded coordinates.
 The observation volume includes the actual mover and return-flux space around
 the winding rather than only its copper bounding box. Streamlines use bounded
 bidirectional midpoint integration of trilinearly interpolated native samples.
 They stop at the sampled boundary, magnet surfaces, field nulls, closed loops
-or the fixed step cap. They never extrapolate or generate a browser magnetic
+or the fixed step cap. Revisited trajectories stop rather than repeatedly
+overpainting interpolation-induced spirals. They never extrapolate or generate a browser magnetic
 model. Lines and filled slices are display approximations, not additional
 physical resolution or a qualified near-field calculation. Seed density is
 not a quantitative flux-density encoding. Magnet interiors are unpainted.
@@ -467,6 +501,8 @@ No predicted temperature, transient thermal response, AC/PWM/core loss or
 housing/backplane heating is implied. A degrees-C value in the expanded legend
 is the saved temperature used for copper resistance, not a computed result.
 Housing motion heating keeps its separate existing model and region outputs.
+The DC coil-field loop and cycle-average heat overlay use separate explicitly
+labeled excitation models; choosing a DC loop does not silently change heat.
 
 Every response binds its request, full physical inputs and selected native
 implementation/lockfile digest. The controller debounces edits, serializes

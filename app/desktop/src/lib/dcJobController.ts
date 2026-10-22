@@ -136,7 +136,29 @@ export class DcJobController {
         throw new Error("Unverified or improperly qualified DC preparation response");
       }
     } else if (job.preparation != null) throw new Error("Non-prepared DC job returned source artifacts");
-    if (job.state === "completed") {
+    if (job.state === "completed" && job.operation === "winding-field") {
+      const value = job.winding_field;
+      if (job.result !== null || !value || value.status !== "sampled-qualified-finite-copper-winding-field-only"
+        || value.request_id !== job.request_id || value.input_request_sha256 !== job.request_sha256
+        || !/^[a-f0-9]{64}$/.test(value.source_basis_sha256) || !/^[a-f0-9]{64}$/.test(value.qualified_case?.audit_sha256)
+        || !value.qualified_case.case_id || ![0, .1, -.1, .5, -.5].includes(value.loop_current_a)
+        || value.field.method !== "qualified-finite-copper-winding-xyz" || value.field.magnets.length !== 0
+        || !value.evidence_hashes || !Object.keys(value.evidence_hashes).length
+        || "pm_array_force_n" in value || "force_n" in value
+        || value.field.samples.length > 96 || value.field.samples.length !== value.sampling.counts.reduce((a,b) => a*b,1)
+        || value.field.samples.some(s => !Number.isFinite(s.magnitude_t) || Math.abs(Math.hypot(...s.b_t) - s.magnitude_t) > Math.max(1e-12, s.magnitude_t * 1e-10))) {
+        throw new Error("Unverified qualified finite-copper winding field");
+      }
+      const { counts, bounds_m: bounds } = value.sampling;
+      if (counts.length !== 3 || counts.some(n => !Number.isInteger(n) || n < 2 || n > 16)
+        || bounds.length !== 3 || bounds.some(v => v.length !== 2 || !v.every(Number.isFinite) || v[0] >= v[1])
+        || value.field.samples.some((s,i) => {
+          const indices = [i % counts[0], Math.floor(i / counts[0]) % counts[1], Math.floor(i / (counts[0] * counts[1]))];
+          return s.b_t.length !== 3 || !s.b_t.every(Number.isFinite) || s.position_m.length !== 3
+            || s.position_m.some((p,axis) => !Number.isFinite(p) || Math.abs(p - (bounds[axis][0] + indices[axis] * (bounds[axis][1] - bounds[axis][0]) / (counts[axis] - 1))) > 1e-12);
+        })) throw new Error("Winding-field coordinates do not match the bound observation grid");
+    } else if (job.winding_field != null) throw new Error("A non-field DC operation returned winding samples");
+    if (job.state === "completed" && job.operation !== "winding-field") {
       const result = job.result;
       if (job.operation === "preparation" || !result || result.status !== "passed-fresh-qualified-geometry-dc-request-only"
         || result.input_request_sha256 !== job.request_sha256

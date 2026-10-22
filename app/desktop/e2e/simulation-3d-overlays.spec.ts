@@ -17,6 +17,7 @@ async function nativeFixture(page: Page) {
       if (command === "travel_envelope") return mocks.mockTravelEnvelope(args.config);
       if (command === "analyze_drive") return mocks.mockDriveAnalysis(args.config, args.drive, null);
       if (command === "sample_b_field") return mocks.mockBFieldGrid(args.config, args.nX, args.nZ, args.xExtentM, args.zExtentM);
+      if (command === "dc_coupling_capability") return { available: false, reason: "No qualified coil source in this UI fixture." };
       if (command !== "sample_simulation_visualization") throw new Error(`UI fixture has no${command}`);
       w.vizCalls.push(args); const r = args.request, config = args.config;
       const samples = [];
@@ -47,10 +48,86 @@ async function nativeFixture(page: Page) {
   });
 }
 
-async function show3D(page: Page) {
+async function show3D(page: Page, pm = true) {
   await page.getByRole("tab", { name: /^Simulate/i }).click();
   await page.getByRole("button", { name: "Show 3D fields and heat", exact: true }).click();
-  return page.getByTestId("coil-iso");
+  const viewer = page.getByTestId("coil-iso");
+  await expect(viewer.getByRole("group", { name: "3D simulation overlays", exact: true })).toBeVisible();
+  if (pm) {
+    const compact = viewer.getByRole("button", { name: "Field and loss settings", exact: true });
+    const narrow = await compact.isVisible();
+    if (narrow) await compact.click();
+    await viewer.getByRole("combobox", { name: "Magnetic field source", exact: true }).selectOption("pm");
+    if (narrow) await compact.click();
+  }
+  return viewer;
+}
+
+test("coil-generated B is primary and never substitutes a PM field for an unqualified design", async ({ page }) => {
+  await gotoDesignApp(page); await nativeFixture(page); const viewer = await show3D(page, false);
+  await expect(viewer).toHaveAttribute("data-field-source", "coils");
+  await expect(viewer).toHaveAttribute("data-field-samples", "0");
+  await expect(viewer).toContainText("No magnet field or wire substitute is shown");
+  expect(await page.evaluate(() => (window as any).vizCalls.length)).toBe(0);
+});
+
+test("qualified coil controls bind the DC loop, render winding-only data and clear it on current edits", async ({ page }) => {
+  await gotoDesignApp(page); await nativeFixture(page);
+  await page.evaluate(() => {
+    const w=window as any, original=w.__TAURI_INTERNALS__.invoke;
+    w.coilStarts=[];
+    w.__TAURI_INTERNALS__.invoke=async (command:string,args:any) => {
+      if(command==="dc_coupling_capability")return {available:true,winding_field_available:true,qualified_cases:[{case_id:"ui-only",label:"UI-only coil source, not numerical evidence",audit_sha256:"a".repeat(64),declaration:{material_model:{fixture:true},return_geometry:{fixture:true}}}]};
+      if(command!=="start_dc_winding_field")return original(command,args);
+      w.coilStarts.push(args);
+      const s=args.sampling, samples=[];
+      for(let z=0;z<s.counts[2];z++)for(let y=0;y<s.counts[1];y++)for(let x=0;x<s.counts[0];x++) {
+        const p=[x,y,z].map((v,axis)=>s.bounds_m[axis][0]+v*(s.bounds_m[axis][1]-s.bounds_m[axis][0])/(s.counts[axis]-1));
+        const b=[0,0,args.study.current_a*.001];samples.push({position_m:p,b_t:b,magnitude_t:Math.hypot(...b)});
+      }
+      const field={status:"sampled-qualified-finite-copper-winding-field-only",request_id:args.study.request_id,input_request_sha256:"c".repeat(64),qualified_case:{case_id:"ui-only",label:"UI-only coil source, not numerical evidence",audit_sha256:"a".repeat(64)},sampling:s,loop_current_a:args.study.current_a,
+        source_basis_sha256:"b".repeat(64),source_translation_m:[0,0,0],source_elements:1,phase_currents_a:{A:args.study.current_a,C:-args.study.current_a},evidence_hashes:{"ui-fixture-only":"d".repeat(64)},field:{method:"qualified-finite-copper-winding-xyz",scope:"Nonphysical UI fixture only",magnets:[],samples}};
+      return {request_id:args.study.request_id,job_id:"ui-coil-job",state:"completed",operation:"winding-field",request_sha256:"c".repeat(64),elapsed_seconds:0,evidence_directory:"ui-only",result:null,error:null,winding_field:field};
+    };
+  });
+  const viewer=await show3D(page,false);
+  await viewer.getByRole("combobox",{name:"Audited coil source",exact:true}).selectOption("ui-only");
+  await expect(viewer.getByRole("button",{name:"Sample coil B-field",exact:true})).toBeDisabled();
+  await viewer.getByRole("checkbox",{name:/I acknowledge this audited placement/}).check();
+  await viewer.getByRole("button",{name:"Sample coil B-field",exact:true}).click();
+  await expect(viewer).toHaveAttribute("data-field-samples","96");
+  await expect(viewer.getByLabel("Magnetic field legend")).toContainText("A: 0.1 A");
+  await expect(viewer.getByLabel("Magnetic field legend")).toContainText("C: -0.1 A");
+  expect(await page.evaluate(()=>(window as any).vizCalls.length)).toBe(0);
+  await viewer.getByText("Qualified coil source and DC drive",{exact:true}).click();
+  await viewer.getByRole("combobox",{name:"Coil DC loop current",exact:true}).selectOption("-0.1");
+  await expect(viewer).toHaveAttribute("data-field-samples","0");
+  expect(await page.evaluate(()=>(window as any).coilStarts.length)).toBe(1);
+});
+
+if(process.env.PCB_MOTOR_NATIVE_WINDING_FIELD_REPORT && process.env.PCB_MOTOR_NATIVE_VISUALIZATION_REPORT) {
+  test("actual saved-design finite-copper winding field renders without magnet contributions",async ({page},info)=>{
+    const winding=JSON.parse(readFileSync(process.env.PCB_MOTOR_NATIVE_WINDING_FIELD_REPORT!,"utf8"));
+    const snapshot=JSON.parse(readFileSync(process.env.PCB_MOTOR_NATIVE_VISUALIZATION_REPORT!,"utf8"));
+    await gotoDesignApp(page);
+    const checked=await page.evaluate(async ({snapshot,winding})=>{
+      const {sampledFieldGrid,fieldLineGeometry,fieldSliceGeometry}=await import(/* @vite-ignore */ "/src/lib/simulationFieldGeometry.ts");
+      const {generatedTerminalGeometry}=await import(/* @vite-ignore */ "/src/lib/generatedTerminalGeometry.ts");
+      const {buildCoilScene}=await import(/* @vite-ignore */ "/src/lib/coilScene.ts");
+      const c=snapshot.config,g=snapshot.cad_geometry??generatedTerminalGeometry(snapshot.coils,c.num_layers,c.pcb_thickness_m*1000,c.trace_width_m*1000),scene=buildCoilScene(g);
+      sampledFieldGrid(winding.field);
+      const lines=fieldLineGeometry(winding.field,scene,1,.5),slice=fieldSliceGeometry(winding.field,scene,1,.5);
+      const stats={lineVertices:lines.getAttribute("position").count,sliceVertices:slice.getAttribute("position").count,magnetCount:winding.field.magnets.length,maxB:Math.max(...winding.field.samples.map((s:any)=>s.magnitude_t)),phases:winding.phase_currents_a};
+      lines.dispose();slice.dispose();
+      const {renderFrozenNativeWindingReport}=await import(/* @vite-ignore */ "/e2e/fixtures/nativeVisualizationHarness.ts");
+      (window as any).closeWinding=renderFrozenNativeWindingReport(snapshot,winding);return stats;
+    },{snapshot,winding});
+    expect(checked.lineVertices).toBeGreaterThan(0);expect(checked.sliceVertices).toBeGreaterThan(0);expect(checked.magnetCount).toBe(0);expect(checked.maxB).toBeGreaterThan(0);
+    await expect(page.getByTestId("frozen-native-visualization").locator("canvas")).toBeVisible();
+    await page.screenshot({path:info.outputPath("actual-case-a-finite-copper-coil-b-field.png")});
+    await info.attach("actual-finite-copper-coil-field-rendering",{body:JSON.stringify(checked,null,2),contentType:"application/json"});
+    await page.evaluate(async()=>{await (window as any).closeWinding();});
+  });
 }
 
 test("3D simulation overlays never fabricate browser fields or heat", async ({ page }) => {

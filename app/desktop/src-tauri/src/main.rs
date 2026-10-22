@@ -79,6 +79,7 @@ fn main() {
             commands::dc_jobs::inspect_dc_coupling,
             commands::dc_jobs::start_dc_coupling,
             commands::dc_jobs::start_dc_preparation,
+            commands::dc_jobs::start_dc_winding_field,
             commands::dc_jobs::dc_coupling_status,
             commands::dc_jobs::cancel_dc_coupling,
             commands::kicad::connect_kicad,

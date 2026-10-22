@@ -150,6 +150,8 @@ pub struct DcJobStatus {
     pub preparation: Option<Value>,
     #[serde(default)]
     pub preparation_progress: Option<Value>,
+    #[serde(default)]
+    pub winding_field: Option<Value>,
 }
 
 fn force_operation() -> String { "force".into() }
@@ -238,6 +240,69 @@ fn preparation_runtime(mut runtime: Runtime) -> Result<Runtime, String> {
     runtime.script = runtime.script.with_file_name("desktop_dc_preparation.py");
     if !runtime.script.is_file() { return Err("Installed source-preparation worker is missing".into()); }
     Ok(runtime)
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct WindingFieldSampling {
+    bounds_m: [[f64; 2]; 3],
+    counts: [usize; 3],
+}
+impl WindingFieldSampling {
+    fn validate(&self) -> Result<(), String> {
+        if self.counts.iter().any(|n| !(2..=16).contains(n)) || self.counts.iter().product::<usize>() > 96
+            || self.bounds_m.iter().any(|v| !v[0].is_finite() || !v[1].is_finite() || v[0]>=v[1] || v.iter().any(|x|x.abs()>1.)) {
+            return Err("Finite-copper winding field requires ordered SI bounds and at most 96 XYZ points".into());
+        }
+        Ok(())
+    }
+}
+
+fn verify_winding_field(job: &Path, request: &Value, request_sha: &str) -> Result<Value,String> {
+    if file_hash(&job.join("request.json"))? != request_sha { return Err("Winding-field request changed".into()); }
+    let receipt=read_json(&job.join("desktop-worker.log.command.json"))?;
+    let report=read_json(&job.join("result/summary.json"))?;
+    if receipt["status"]!="completed" || receipt["exit_code"].as_i64()!=Some(0)
+        || report["status"]!="sampled-qualified-finite-copper-winding-field-only"
+        || report["request_id"]!=request["request_id"] || report["input_request_sha256"]!=request_sha
+        || report["sampling"]!=request["sampling"] || report["loop_current_a"]!=request["dc_request"]["current_a"]
+        || report["field"]["method"]!="qualified-finite-copper-winding-xyz" || report["field"]["magnets"]!=json!([])
+        || !report["qualified_case"]["case_id"].is_string()
+        || ["pm_array_force_n","force_n","fresh_solution"].iter().any(|k|report.get(k).is_some()) {
+        return Err("Unverified finite-copper winding field; no force or substituted magnetic field accepted".into());
+    }
+    let sampling:WindingFieldSampling=serde_json::from_value(request["sampling"].clone()).map_err(|e|e.to_string())?;
+    sampling.validate()?;
+    let samples=report["field"]["samples"].as_array().ok_or("Missing winding XYZ samples")?;
+    if samples.len()!=sampling.counts.iter().product::<usize>() { return Err("Incomplete winding field grid".into()); }
+    for (i,sample) in samples.iter().enumerate() {
+        let indices=[i%sampling.counts[0],(i/sampling.counts[0])%sampling.counts[1],i/(sampling.counts[0]*sampling.counts[1])];
+        let vector=|name:&str|->Result<Vec<f64>,String> {
+            let a=sample[name].as_array().ok_or("Malformed winding vector")?;
+            if a.len()!=3 { return Err("Three physical vector components required".into()); }
+            a.iter().map(|x|x.as_f64().filter(|v|v.is_finite()).ok_or("Nonfinite winding vector".into())).collect()
+        };
+        let p=vector("position_m")?;let b=vector("b_t")?;
+        let norm=b.iter().map(|v|v*v).sum::<f64>().sqrt();
+        if sample["magnitude_t"].as_f64().map_or(true,|v|!v.is_finite() || (norm-v).abs()>1e-12_f64.max(norm*1e-10))
+            || (0..3).any(|axis|(p[axis]-(sampling.bounds_m[axis][0]+indices[axis] as f64*(sampling.bounds_m[axis][1]-sampling.bounds_m[axis][0])/(sampling.counts[axis]-1) as f64)).abs()>1e-12) {
+            return Err("Winding field coordinates or magnitudes differ from request".into());
+        }
+    }
+    let hashes=report["evidence_hashes"].as_object().ok_or("Missing winding-source evidence")?;
+    if hashes.is_empty() || !hashes.values().any(|h|h==&report["source_basis_sha256"])
+        || !hashes.values().any(|h|h==&report["qualified_case"]["audit_sha256"]) {
+        return Err("No bound qualified winding-source/audit hashes".into());
+    }
+    for (name,digest) in hashes {
+        if file_hash(Path::new(name))? != digest.as_str().ok_or("Malformed winding-source hash")? { return Err("Winding-source evidence changed".into()); }
+    }
+    let snapshots=report["source_snapshots"].as_object().ok_or("Missing winding sampler implementation")?;
+    if snapshots.is_empty() { return Err("Winding sampler implementation is not bound".into()); }
+    for (name,entry) in snapshots {
+        if file_hash(Path::new(name))? != entry["sha256"].as_str().ok_or("Malformed sampler hash")? { return Err("Winding sampler implementation changed".into()); }
+    }
+    Ok(report)
 }
 
 fn verify_preparation(job: &Path, request: &Value, request_sha: &str) -> Result<Value, String> {
@@ -413,7 +478,7 @@ impl DcJobs {
     }
 
     fn launch_operation(&self, runtime: Runtime, request: Value, timeout: Duration, operation: &'static str) -> Result<DcJobStatus, String> {
-        if !["force", "preparation"].contains(&operation) { return Err("Unknown DC operation".into()); }
+        if !["force", "preparation", "winding-field"].contains(&operation) { return Err("Unknown DC operation".into()); }
         let bytes = serde_json::to_vec_pretty(&request).map_err(|error| error.to_string())?;
         if bytes.len() > 8_000_000 {
             return Err("DC request exceeds the declared 8 MB input cap".into());
@@ -467,9 +532,10 @@ impl DcJobs {
             operation: operation.into(),
             preparation: None,
             preparation_progress: None,
+            winding_field: None,
         };
         let mut command = runtime.command(&request_path, &job);
-        if operation == "preparation" { command.env_remove("PYTHONPATH"); }
+        if operation != "force" { command.env_remove("PYTHONPATH"); }
         let log = File::options()
             .write(true)
             .create_new(true)
@@ -515,7 +581,8 @@ impl DcJobs {
                         else { (state,error,result) };
                     final_status.state = state.into();
                     final_status.error = error;
-                    if operation == "preparation" { final_status.preparation = result;final_status.result = None; }
+                    if operation == "winding-field" { final_status.winding_field = result;final_status.result = None;final_status.preparation = None; }
+                    else if operation == "preparation" { final_status.preparation = result;final_status.result = None; }
                     else { final_status.result = result;final_status.preparation = None; }
                     final_status.preparation_progress = None;
                     final_status.elapsed_seconds = start.elapsed().as_secs_f64();
@@ -528,7 +595,8 @@ impl DcJobs {
                             // accepted while verification ran must suppress its force.
                             if cancel_thread.load(Ordering::SeqCst) {
                                 final_status.state = "cancelled".into();
-                                final_status.result = None;
+                                 final_status.result = None;
+                                 final_status.winding_field = None;
                                 final_status.error =
                                     Some("DC job cancelled; no force returned".into());
                             }
@@ -569,7 +637,8 @@ impl DcJobs {
                                     None,
                                 );
                             } else if exit.success() {
-                                let verified = if operation == "preparation" { verify_preparation(&job, &request, &request_sha) }
+                                 let verified = if operation == "preparation" { verify_preparation(&job, &request, &request_sha) }
+                                     else if operation == "winding-field" { verify_winding_field(&job, &request, &request_sha) }
                                     else { verify_result(&job, &request, &request_sha) };
                                 match verified {
                                     Ok(result) => finish(if operation == "preparation" { "prepared" } else { "completed" }, None, Some(result)),
@@ -804,7 +873,8 @@ pub fn dc_coupling_capability() -> Value {
                 "preparation_available":preparation_available,"preparation_reason":preparation_reason,"preparation_timeout_s":PREPARATION_TIMEOUT.as_secs()})
         }
         Ok(cases) => {
-            json!({"available":true,"qualified_cases":cases,
+            let winding_field_available=Runtime::from_env().map(|r|r.script.with_file_name("desktop_dc_winding_field.py").is_file()).unwrap_or(false);
+            json!({"available":true,"qualified_cases":cases,"winding_field_available":winding_field_available,
                 "preparation_available":preparation_available,"preparation_reason":preparation_reason,"preparation_timeout_s":PREPARATION_TIMEOUT.as_secs(),
                 "scope":"Registered individually qualified linear designs and their sampled current/pose states only; provisional reversible material law; no interpolation or hardware qualification"})
         }
@@ -842,6 +912,21 @@ pub async fn start_dc_coupling(
     let winding =
         super::physics::prepare_dc_winding_geometry(config, drive_settings, cad_geometry).await?;
     jobs.launch(runtime, study.request(winding), TIMEOUT)
+}
+
+#[tauri::command]
+pub async fn start_dc_winding_field(
+    jobs: tauri::State<'_, DcJobs>, config: crate::ipc::LinearMotorConfigIpc,
+    drive_settings: pcbmotorgen_simulation::drive::DriveSettings,
+    cad_geometry: Option<pcbmotorgen_export::cad_dxf::CadGeometry>, study: DcStudy, sampling: WindingFieldSampling,
+) -> Result<DcJobStatus,String> {
+    study.validate()?;sampling.validate()?;
+    let mut runtime=Runtime::from_env()?;
+    runtime.script=runtime.script.with_file_name("desktop_dc_winding_field.py");
+    if !runtime.script.is_file() { return Err("Qualified winding-field sampler is not installed".into()); }
+    let winding=super::physics::prepare_dc_winding_geometry(config,drive_settings,cad_geometry).await?;
+    jobs.launch_operation(runtime,json!({"schema":"qualified-dc-winding-field-request-v1","request_id":study.request_id,
+        "dc_request":study.request(winding),"sampling":sampling}),Duration::from_secs(180),"winding-field")
 }
 
 #[tauri::command]
@@ -1280,6 +1365,71 @@ mod tests {
         println!("{}",serde_json::to_string(&json!({"source_project":project_path,"source_sha256":hash(&original),
             "version_index":index,"imported":!saved["cad_geometry"].is_null(),"qualification_only":qualification_only,
             "snapshot":output,"snapshot_sha256":hash(&bytes)})).unwrap());
+    }
+
+    #[test]
+    fn winding_sampling_refuses_unbounded_or_nonfinite_grids() {
+        let mut s=WindingFieldSampling{bounds_m:[[0.,0.01];3],counts:[8,3,4]};
+        assert!(s.validate().is_ok());s.counts=[20,5,7];assert!(s.validate().is_err());
+        s.counts=[8,3,4];s.bounds_m[0][0]=f64::NAN;assert!(s.validate().is_err());
+    }
+
+    #[test]
+    #[ignore = "Explicit bounded actual saved-design finite-copper B sampling only; requires clean worker/project/study env, no source or force solve"]
+    fn real_saved_design_samples_qualified_winding_field_without_magnets() {
+        let mut runtime=Runtime::from_env().unwrap();runtime.script=runtime.script.with_file_name("desktop_dc_winding_field.py");
+        let project:Value=serde_json::from_slice(&fs::read(std::env::var_os("PCB_MOTOR_PROJECT_PATH").unwrap()).unwrap()).unwrap();
+        let state=&project["versions"][1]["state"];
+        let config:crate::ipc::ProjectConfigStateIpc=serde_json::from_value(state["config"].clone()).unwrap();
+        let ipc=config.to_linear_motor_ipc();let sim=ipc.to_core().to_simulation();
+        let cad=serde_json::from_value(state["cad_geometry"].clone()).unwrap();
+        let explicit=read_json(Path::new(&std::env::var("PCB_MOTOR_DC_STUDY_REQUEST_PATH").unwrap())).unwrap();
+        let winding=tauri::async_runtime::block_on(super::super::physics::prepare_dc_winding_geometry(ipc,config.drive,cad)).unwrap();
+        assert_eq!(winding["routing"],explicit["winding"]["routing"]);
+        let study=DcStudy{request_id:format!("winding-real-{}",std::process::id()),material_model:explicit["material_model"].clone(),
+            return_geometry:explicit["return_geometry"].clone(),current_a:0.1,pm_offset_x_m:0.,placement_acknowledged:true};
+        let sampling=WindingFieldSampling{bounds_m:[[0.,sim.active_area_length_m],[0.,sim.board_width_m],[-sim.pcb_thickness_m-0.003,0.003]],counts:[8,3,4]};
+        let request=json!({"schema":"qualified-dc-winding-field-request-v1","request_id":study.request_id,"dc_request":study.request(winding),"sampling":sampling});
+        let jobs=DcJobs::default();let initial=jobs.launch_operation(runtime.clone(),request.clone(),Duration::from_secs(180),"winding-field").unwrap();
+        println!("Real winding-field evidence: {}",initial.evidence_directory);
+        let start=Instant::now();
+        loop {
+            let result=jobs.status(&initial.job_id).unwrap();
+            if !result.active() {
+                assert_eq!(result.state,"completed","{:?}",result.error);assert!(result.result.is_none());
+                let field=result.winding_field.unwrap();assert_eq!(field["field"]["samples"].as_array().unwrap().len(),96);
+                assert_eq!(field["field"]["magnets"],json!([]));assert_eq!(field["phase_currents_a"]["A"],0.1);assert_eq!(field["phase_currents_a"]["C"],-0.1);
+                println!("Real winding-field report: {}/result/summary.json",initial.evidence_directory);break;
+            }
+            assert!(start.elapsed()<Duration::from_secs(190));std::thread::sleep(Duration::from_millis(100));
+        }
+        let mut changed=request.clone();changed["request_id"]=json!(format!("winding-reject-{}",std::process::id()));
+        changed["dc_request"]["request_id"]=changed["request_id"].clone();
+        changed["dc_request"]["return_geometry"]["return_width_m"]=json!(0.009);
+        let rejected=jobs.launch_operation(runtime.clone(),changed,Duration::from_secs(180),"winding-field").unwrap();
+        let rejected=wait(&jobs,&rejected.job_id);assert_eq!(rejected.state,"failed");assert!(rejected.winding_field.is_none());
+        println!("Real unsupported winding source rejected: {}",rejected.evidence_directory);
+        let mut cancelled=request;cancelled["request_id"]=json!(format!("winding-cancel-{}",std::process::id()));
+        cancelled["dc_request"]["request_id"]=cancelled["request_id"].clone();
+        let running=jobs.launch_operation(runtime,cancelled,Duration::from_secs(180),"winding-field").unwrap();
+        let evidence=PathBuf::from(&running.evidence_directory);let start=Instant::now();
+        loop {
+            if read_json(&evidence.join("desktop-worker.log.command.json")).ok().is_some_and(|v|v["pid"].as_u64().is_some()) {break;}
+            assert!(start.elapsed()<Duration::from_secs(10));std::thread::sleep(Duration::from_millis(20));
+        }
+        jobs.cancel(&running.job_id).unwrap();let ended=wait(&jobs,&running.job_id);
+        assert_eq!(ended.state,"cancelled");assert!(ended.winding_field.is_none());assert!(ended.result.is_none());
+        let pid=read_json(&evidence.join("desktop-launch.json")).unwrap()["pid"].as_u64().unwrap();
+        let start=Instant::now();
+        loop {
+            let output=Command::new("/bin/ps").args(["-axo","pgid=,stat="]).output().unwrap();
+            let live=String::from_utf8(output.stdout).unwrap().lines().any(|line| {
+                let f:Vec<_>=line.split_whitespace().collect();f.len()==2&&f[0].parse::<u64>().ok()==Some(pid)&&!f[1].starts_with('Z')
+            });
+            if !live {break;}assert!(start.elapsed()<Duration::from_secs(3));std::thread::sleep(Duration::from_millis(20));
+        }
+        println!("Real winding-field group cancellation verified: {}",running.evidence_directory);
+        jobs.shutdown();
     }
 
     #[test]

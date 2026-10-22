@@ -17,7 +17,7 @@ export interface VisualizationRequest {
   heat: boolean;
 }
 export interface FieldPreview {
-  method: "analytical-pm-only-xyz";
+  method: "analytical-pm-only-xyz" | "qualified-finite-copper-winding-xyz";
   scope: string;
   samples: { position_m: [number, number, number]; b_t: [number, number, number]; magnitude_t: number }[];
   magnets: { center_m: [number, number, number]; size_m: [number, number, number]; positive_z: boolean }[];

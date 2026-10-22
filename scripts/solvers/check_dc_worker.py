@@ -73,6 +73,7 @@ def main():
         sys.path.insert(0, str(HERE))
         try:
             import recalculate_dc_request, finite_current_coupling, desktop_dc_job, dc_applicability  # noqa: F401
+            import sample_dc_winding_field, desktop_dc_winding_field  # noqa: F401
             import ngsolve
             if args.preparation:
                 import solve_linear_dc_study, prepare_linear_dc_copper  # noqa: F401
