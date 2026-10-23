@@ -1,5 +1,18 @@
 {
   "status": "approved-five-baseline-caches-verified-complete-no-live-compute-force-unqualified",
+  "audit_reserve_2026_10_23": {
+    "status": "audit-reserve-entered-no-live-owned-compute-evidence-unchanged",
+    "observed_at_utc": "2026-10-23T05:00:57.041886Z",
+    "report": "audit-reserve-20261023T0500Z.json",
+    "unique_stage_evidence_hashes_rechecked": 267,
+    "evidence_changes": [],
+    "result": "Source recovery, complete source/local/field review and all five baseline caches retain their verified report, receipt, launcher and archive hashes. Both campaigns remain finished-all-completed; their outer receipts and launchers passed. No matching owned numerical process identity or solver/runner/watcher was found. All four overnight source/cache service labels remain unloaded. No signal, restart or numerical launch was needed.",
+    "historical_services": "18 older loaded labels were observed with no running PID. They are outside this window's two completed stage owners and were left untouched. All original failures, partial evidence, plists and logs remain preserved.",
+    "free_disk_gib": 68.34390258789062,
+    "schedules": "Recurring stage-health task1420b0c3 and old daytime taskd87a98ed remain disabled. The05:00Z one-shot was sent and is disabled. The06:00Z hard-stop task57335093 remains enabled with nextRunAt1792735200000. Final window task shutdown remains due at06:00Z; unrelated tasks unchanged.",
+    "acceptance": "No new compute after05:00Z. Original2% refinement,5% reference,1e-8N force floor,37job185state44pair matrix,nine downstreamsourceforcecontrols and separate per-body requirements remain unchanged. Case B force/general admission is not qualified. Overnight plan stays2/6; end-of-window audit step is not claimed complete before06:00Z.",
+    "supervision": "This is a current-state observation, not evidence of supervision during host or OpenChamber shutdown. Hard stop06:00Z is unchanged."
+  },
   "five_cache_stage": {
     "status": "all-five-approved-baseline-caches-verified-complete-services-unloaded",
     "final_stage_verification": {
