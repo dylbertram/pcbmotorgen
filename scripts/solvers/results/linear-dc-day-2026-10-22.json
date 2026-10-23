@@ -4,6 +4,7 @@
   "issue": "pcbmotorgen#ytgr",
   "branch": "simulation/add-femm-and-improve",
   "overnight_continuation_manifest": "scripts/solvers/results/linear-dc-night-2026-10-22.json",
+  "overnight_window_final_status": "Closed at the unchanged2026-10-23T06:00Z hard stop. Source/local/fixed-field controls andfivebaselinecaches verified; no owned compute orwindowtasks remainactive. Overnightaudit/cleanupcomplete,3/6steps;parentacceptance1/6 anddaytime2/5 unchanged. Source-refinementcache/forcechains,magneticmatrix,per-body/admission/saved-host/native/install/license/general gates remainopen. See linkedovernightmanifest hard_stop_2026_10_23. No blanketcompletion orCaseBforcequalification.",
   "magnet_visibility_and_contribution": {
     "status": "implemented-and-verified-independent-display-and-free-space-contribution-controls",
     "user_request": "Show/hide magnets in the 3D viewer independently of adding/removing their contribution to the field calculation.",

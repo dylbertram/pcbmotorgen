@@ -1,5 +1,19 @@
 {
-  "status": "approved-five-baseline-caches-verified-complete-no-live-compute-force-unqualified",
+  "status": "overnight-window-closed-hard-stop-verified-case-b-force-unqualified",
+  "hard_stop_2026_10_23": {
+    "status": "closed-no-extension-no-live-owned-compute",
+    "observed_at_utc": "2026-10-23T06:01:07.412072Z",
+    "report": "hard-stop-20261023T0600Z.json",
+    "evidence_hashes_rechecked": 267,
+    "evidence_changes": [],
+    "result": "Successful source/local/field and five-cache evidence remains unchanged. Both campaign declarations match their final states; both outer declarations match successful launcher hashes. All declared fresh inner and outer receipts/launchers remain successful. PID/start/boot checks and process-table inspection found no matching owned compute to stop. All four overnight service labels remain unloaded. No new numerical work, signal, restart or service mutation was needed.",
+    "task_shutdown": "schedule.list confirms all window tasks disabled: start2b8157f3, periodic1420b0c3, auditb3e29144 and hardstop57335093. The hard-stop one-shot was sent and automatically disabled. Old daytime d87a98ed remains disabled. No unrelated task was changed; no enabled or running scheduled tasks were reported.",
+    "preservation": "Failed/partial outputs remain unaccepted and preserved with logs/plists. Five original untracked root designs remain present; no design, Mutagen or housing UI edits. No push or bundles.",
+    "completed": "Reviewed preflight; missing Case B source/local/fixed-field controls; five approved baseline material-source caches; end-of-window audit and owned-job/task cleanup.",
+    "remaining": "Three source-refinement cache/force chains with measured preflights and bare/pose references; full37-job185-state44-pair magnetic matrix; nine downstream source-force controls; separate winding/shield-body gates; full case audit/admission and saved-host fresh/reject/cancel acceptance; general preparation/native/isolated-installation/license gates. Original2%/5%/1e-8N requirements retained. No Case B force/general-support qualification.",
+    "plan_status": "Overnight cleanup/audit step completed independently of the unresolved numerical gates:3/6. Parent acceptance plan remains1/6 and daytime2/5; their unchecked requirements are not waived. Parent acceptance record updated through the linked daytime/overnight manifests.",
+    "supervision": "Current-state hard-stop audit only. There is no proof or claim of uninterrupted supervision across host or OpenChamber unavailability. Audit05:00Z and hard stop06:00Z were not extended. Any further numerical work needs new explicit authorization and reviewed bounded declarations."
+  },
   "audit_reserve_2026_10_23": {
     "status": "audit-reserve-entered-no-live-owned-compute-evidence-unchanged",
     "observed_at_utc": "2026-10-23T05:00:57.041886Z",
