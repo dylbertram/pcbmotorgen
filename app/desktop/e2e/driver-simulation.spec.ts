@@ -95,6 +95,52 @@ test("voltage updates driver results even when the force sweep fails", async ({ 
   await expect(results).toContainText("10.20 V usable");
 });
 
+test("driver results clear while pending, show errors without stale sections, and recover", async ({ page }) => {
+  const pageErrors: string[] = [];
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+  await page.route(/\/src\/lib\/ipc\/physics\.ts(?:\?t=\d+)?$/, (route) => route.fulfill({
+    contentType: "application/javascript",
+    body: `import * as original from '/src/lib/ipc/physics.ts?original';
+      export * from '/src/lib/ipc/physics.ts?original';
+      let failed = false;
+      const pending = [];
+      globalThis.__failPendingDriver = () => {
+        failed = true;
+        for (const reject of pending.splice(0)) reject(new Error('Test driver failure'));
+      };
+      export async function analyzeDrive(config, ...args) {
+        if (config.supply_voltage_v !== 12) return original.analyzeDrive(config, ...args);
+        if (failed) throw new Error('Test driver failure');
+        return new Promise((resolve, reject) => { pending.push(reject); });
+      }`,
+  }));
+  await gotoDesignApp(page);
+  await simulation(page, "driver", "drive");
+  const results = page.locator('section[aria-labelledby="driver-suitability-heading"]');
+  const voltageSection = results.getByRole("region", { name: "Voltage and speed", exact: true });
+  await expect(results).toContainText("at 5.0 V");
+  await expect(voltageSection).toBeVisible();
+
+  const voltage = page.getByRole("spinbutton", { name: "Bus voltage (V)", exact: true });
+  await voltage.fill("12");
+  await voltage.press("Enter");
+  await expect(results).toContainText("Measuring the routed copper");
+  await expect(results).not.toContainText("at 5.0 V");
+  await expect(voltageSection).toHaveCount(0);
+  await page.evaluate(() => (window as unknown as { __failPendingDriver: () => void }).__failPendingDriver());
+  await expect(results.getByRole("alert")).toContainText("Test driver failure");
+  await expect(results).not.toContainText("Measuring the routed copper");
+  await expect(voltageSection).toHaveCount(0);
+  await expect(results.getByRole("region", { name: "Operating limits", exact: true })).toHaveCount(0);
+
+  await voltage.fill("24");
+  await voltage.press("Enter");
+  await expect(results).toContainText("at 24.0 V");
+  await expect(results.getByRole("alert")).toHaveCount(0);
+  await expect(voltageSection).toBeVisible();
+  expect(pageErrors).toEqual([]);
+});
+
 test("a rejected new model clears the previous sweep and driver Kf", async ({ page }) => {
   await page.route(/\/src\/lib\/ipc\/physics\.ts(?:\?t=\d+)?$/, (route) => route.fulfill({
     contentType: "application/javascript",
