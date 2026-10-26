@@ -433,6 +433,12 @@ be combined with `--mesh-only` or `--mesh-work`. It does not prove CAD topology,
 current convergence, refinement, field/force admission or general preparation
 completion. The original failed reports remain preserved rather than repaired.
 
+Validation-only coverage does not exercise the post-mesh/post-solve publication
+path. That path has a separate mocked-production regression and rechecks the
+validator's frozen input hashes before completing a report. A mesh or solution
+left by a failed final verification remains unaccepted; do not repair its status
+or import it as a successful source.
+
 The explicit real-FEM Rust integration test is ignored in ordinary unit runs
 because it requires the pinned external installation and original project. Run
 it separately with `--ignored`; do not count the ordinary ignored inventory as

@@ -154,7 +154,7 @@ def main():
             solution,dc=solve(ng,mesh,electric,physical['geometry']['copper_resistivity_ohm_m'],True,work/'linear-progress.json','amg')
             solution.Save(str(work/'dc-current-potential.sol'));report.update(solution_sha256=sha(work/'dc-current-potential.sol'),
                 dc=dict(dc,drive_emf_v=1.,effective_loop_current_a=dc['source_power_w'],effective_loop_resistance_ohm=1/dc['source_power_w']))
-        for name,digest in (inputs|bindings|physical['input_hashes']|study['input_hashes']).items():
+        for name,digest in (inputs|bindings|validated_hashes).items():
             if sha(Path(name))!=digest:raise ValueError('Source physical input or declaration changed')
         for name,entry in report['source_snapshots'].items():
             if sha(Path(name))!=entry['sha256']:raise ValueError('Source implementation changed')

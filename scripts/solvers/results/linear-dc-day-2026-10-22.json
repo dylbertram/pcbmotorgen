@@ -3,6 +3,10 @@
   "plan_id": "ab7e988f-ed3c-4e40-a43b-d7c7f84cbe89",
   "issue": "pcbmotorgen#ytgr",
   "branch": "simulation/add-femm-and-improve",
+  "eleven_hour_preparation_2026_10_26": {
+    "report": "scripts/solvers/results/managed-preparation-night-2026-10-26.json",
+    "state": "New11hwindow approved20:10:32ZOct26 through07:10:32ZOct27, reserve05:40:32Z. Single source-only attempt progressed through CAD/mesh/current solve but failed final verification due agent-introduced undefined study reference. Owned workers ended and failure preserved. Regression reproduced/fixed with mocked production-path coverage;485scopedhelpertests pass. No failed-solution adoption or automatic second attempt; further full retry awaits explicit permission. Full source/general/native/isolation/license gates remain open; CaseBforce excluded."
+  },
   "two_hour_hardening_2026_10_26": {
     "report": "scripts/solvers/results/preparation-hardening-2026-10-26.json",
     "result": "Bounded source-input preflight and cancellation-publication hardening verified. Production-shared validation-only path accepts actual corrected CaseA input metadata without meshing/solving, explicitly rejects old corrupted reports, and independently checks conflicting report hashes. Final cancellation now clears prepared-source and progress payloads as well as force/field.484scopedhelpers,124desktop with12explicitignored,44affectedChromium and native no-bundle build pass. Full numerical/general/native/isolation/license gates unchanged; no source retry or CaseBforce work."

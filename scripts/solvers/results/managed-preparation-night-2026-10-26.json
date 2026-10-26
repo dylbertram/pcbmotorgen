@@ -1,0 +1,45 @@
+{
+  "status": "single-attempt-failed-regression-fixed-awaiting-additional-attempt-approval",
+  "plan_id": "029f25f8-c2b8-476a-93a8-e5827b5a7792",
+  "authorization": "User requested planning and implementation during an eleven-hour uninterrupted window.",
+  "start_utc": "2026-10-26T20:10:32Z",
+  "numerical_cutoff_audit_reserve_utc": "2026-10-27T05:40:32Z",
+  "hard_stop_utc": "2026-10-27T07:10:32Z",
+  "base_commit": "b68cfca",
+  "scope": "Exactly one complete source-only preparation attempt using actual unchanged saved generated Case A through the production-shared managed host. No automatic second full attempt. Bounded verification/fixes and useful dependency evidence afterward.",
+  "evidence_directory": "/Users/dylanbertram/.local/opt/solver-prototypes-macos/managed-preparation-night-20261026-v1",
+  "tasks": {
+    "health": "3469a4aa-b130-43d8-923f-3e74687a9bb1",
+    "audit": "253c2b59-4590-4152-8918-432ce56d830e",
+    "hard_stop": "f15690a6-82c3-4bf2-a25f-343e94dbb295"
+  },
+  "initial_evidence": "Tracked checkout clean at b68cfca with five preserved untracked root designs. No candidate numerical workers or20261026owned services;81.19GiB disk free,46percent system memory free. Clean pinned preparation-worker/AMG check passes. Current focused managed-host tests14pass1explicitexportignored.",
+  "live_attempt": {
+    "launched_utc": "2026-10-26T20:12:56.437199Z",
+    "job_directory": "/Users/dylanbertram/.local/opt/solver-prototypes-macos/dc-desktop-jobs/dc-CiVQft",
+    "worker_pid": 20591,
+    "worker_label": "com.pcbmotorgen.dc.20261026.managed-night-once-v1",
+    "watch_label": "com.pcbmotorgen.dc.20261026.managed-night-once-v1-watch",
+    "launch_record": "managed-preparation-night-20261026-v1/launch-record.json",
+    "declaration_sha256": "c93077d26fd324cc9e1705af7656018d673d9d92ded7891e7b0421af75f184ff",
+    "first_live_observation_utc": "2026-10-26T20:13:16.341658Z",
+    "verified": "Host/child receipts live with matching start/boot identities; both one-shot services and independent watcher running, no alerts.378code/input/binaryhashes unchanged. CAD completed7.456s and source stage running;0.435GiB aggregate observed owned host+worker memory;80.65GiB disk free.",
+    "current_state": "Running is not numerical acceptance. Do not duplicate, retry, build tests or edit hash-bound code/inputs while live. Consult actual current receipts/status before acting."
+  },
+  "attempt_outcome": {
+    "result": "Failed55.04s after meshing and source solve, during final input verification. No successful whole source receipt or prepared source published; computed fields remain failed/unaccepted and must not be reused.",
+    "error": "NameError: study is not defined. b68cfca extracted study loading into validate_source_inputs but left final production verification referencing the removed local variable. This is an agent-introduced regression.",
+    "cleanup": "20:16:28Z actual host/child/stage PID-start identities all absent,378frozenhashes unchanged. Only ended owned once/watch labels unloaded, logs/plists retained. failure-and-cleanup.json preserves evidence hashes.",
+    "fix": "Use the validator's complete validated_hashes at final production verification. Added a mocked production mesh-only path test that first reproduced the exact NameError beyond validation-only mode. No actual meshing/solve in this regression test.",
+    "retry": "No automatic second full attempt or failed-field adoption. Continue bounded backend verification only. Full numerical completion remains open."
+  },
+  "bounded_fix_verification": {
+    "helpers": "485scopedhelpers pass0skip; unchanged memory-heavy four-test test_ngsolve_eddy_av excluded explicitly. Not a full-suite pass.",
+    "red_green": "Mocked production mesh-only path first reproduced the exact undefined-study NameError at final verification, then passed after replacing that stale reference with the validator's frozen validated_hashes. Initial incomplete mock fixture error retained separately.",
+    "real_probe": "Corrected actual saved CaseA input validation-only still passes; no new real mesh/current/field/force solve or artifact adoption.",
+    "evidence": "managed-preparation-night-20261026-v1/fix-verification.json",
+    "remaining": "Successful whole managed preparation and downstream section/H1/export acceptance remain unverified. Any additional full attempt requires explicit permission under the saved plan's one-attempt limit."
+  },
+  "resources": "14400s host/child cap;14100s total stage caps.13GiB preparation+1GiB host+2GiB headroom=16GiB below18GiB target.8GiB evidence cap;24GiB admission free-disk requirement. One heavy job; no concurrent tests/builds.",
+  "constraints": "No CaseBforce/pilot/refinement-cache/reference chain/matrix/per-body/admission work, no heavy AC/gauge rerun, no physical/return/resistivity/geometry repairs, no housingUI/Mutagen edits, no push/installers/ZIP/bundles. Strict2%/5%/1e-8N gates and all failures preserved. Source-only completion cannot qualify fields/forces or general/native/isolation/license acceptance."
+}
