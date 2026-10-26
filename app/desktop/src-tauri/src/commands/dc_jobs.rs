@@ -891,6 +891,19 @@ pub async fn start_dc_preparation(
     study: DcStudy,
     confirmed_timeout_s: u64,
 ) -> Result<DcJobStatus, String> {
+    start_dc_preparation_on_host(&jobs, config, drive_settings, cad_geometry, study, confirmed_timeout_s).await
+}
+
+// Shared with the opt-in real saved-project acceptance test. The test must use
+// exactly the command's validation, geometry rebuild and owned-job launch path.
+async fn start_dc_preparation_on_host(
+    jobs: &DcJobs,
+    config: crate::ipc::LinearMotorConfigIpc,
+    drive_settings: pcbmotorgen_simulation::drive::DriveSettings,
+    cad_geometry: Option<pcbmotorgen_export::cad_dxf::CadGeometry>,
+    study: DcStudy,
+    confirmed_timeout_s: u64,
+) -> Result<DcJobStatus, String> {
     if confirmed_timeout_s != PREPARATION_TIMEOUT.as_secs() { return Err("Explicitly confirm the separate 14400 s preparation budget before launching".into()); }
     study.validate()?;
     if cad_geometry.is_some() { return Err("In-app preparation currently accepts actual generated linear copper only; imported preparation remains separate".into()); }
@@ -948,6 +961,57 @@ pub fn cancel_dc_coupling(
 #[cfg(all(test, unix))]
 mod tests {
     use super::*;
+
+    #[test]
+    #[ignore = "Explicit four-hour actual saved-design source-only preparation; requires approved window, clean worker/project/study and exclusive status path"]
+    fn real_saved_design_preparation_completes_without_force_qualification() {
+        assert_eq!(std::env::var("PCB_MOTOR_CONFIRM_REAL_PREPARATION_SECONDS").unwrap(), "14400",
+            "This opt-in test can launch four hours of numerical work");
+        let output=PathBuf::from(std::env::var("PCB_MOTOR_PREPARATION_ACCEPTANCE_STATUS").unwrap());
+        assert!(output.is_absolute() && !output.exists(), "Fresh absolute acceptance-status path required");
+        let project_path=PathBuf::from(std::env::var("PCB_MOTOR_PROJECT_PATH").unwrap());
+        let study_path=PathBuf::from(std::env::var("PCB_MOTOR_DC_STUDY_REQUEST_PATH").unwrap());
+        let project_sha=file_hash(&project_path).unwrap();let study_sha=file_hash(&study_path).unwrap();
+        let project=read_json(&project_path).unwrap();let state=&project["versions"][1]["state"];
+        let config:crate::ipc::ProjectConfigStateIpc=serde_json::from_value(state["config"].clone()).unwrap();
+        let cad=serde_json::from_value(state["cad_geometry"].clone()).unwrap();
+        let explicit=read_json(&study_path).unwrap();
+        let study=DcStudy{request_id:format!("preparation-complete-{}",std::process::id()),
+            material_model:explicit["material_model"].clone(),return_geometry:explicit["return_geometry"].clone(),
+            current_a:explicit["current_a"].as_f64().unwrap(),pm_offset_x_m:explicit["pm_offset_x_m"].as_f64().unwrap(),
+            placement_acknowledged:explicit["placement_acknowledged"].as_bool().unwrap()};
+        let jobs=DcJobs::default();
+        struct ShutdownOnExit(DcJobs);
+        impl Drop for ShutdownOnExit {
+            fn drop(&mut self) { self.0.shutdown(); }
+        }
+        let _shutdown=ShutdownOnExit(jobs.clone());
+        let initial=tauri::async_runtime::block_on(start_dc_preparation_on_host(&jobs,
+            config.to_linear_motor_ipc(),config.drive,cad,study,14_400)).unwrap();
+        let evidence=PathBuf::from(&initial.evidence_directory);
+        println!("Real source-only preparation evidence: {}",evidence.display());
+        let started=Instant::now();
+        let ended=loop {
+            let status=jobs.status(&initial.job_id).unwrap();
+            fs::write(&output,serde_json::to_vec_pretty(&json!({"status":status,
+                "project_path":project_path,"project_sha256":project_sha,
+                "study_path":study_path,"study_sha256":study_sha,
+                "scope":"Actual production host source preparation only; no force or field admission"})).unwrap()).unwrap();
+            if !status.active() {break status;}
+            assert!(started.elapsed()<PREPARATION_TIMEOUT+Duration::from_secs(15),"Host preparation exceeded its bound");
+            std::thread::sleep(Duration::from_millis(250));
+        };
+        assert_eq!(file_hash(&project_path).unwrap(),project_sha,"Saved project changed");
+        assert_eq!(file_hash(&study_path).unwrap(),study_sha,"Declared study changed");
+        assert_eq!(ended.operation,"preparation");assert_eq!(ended.state,"prepared","{:?}",ended.error);
+        assert!(ended.result.is_none());assert!(ended.winding_field.is_none());
+        let request=read_json(&evidence.join("request.json")).unwrap();
+        let verified=verify_preparation(&evidence,&request,&ended.request_sha256).unwrap();
+        assert_eq!(ended.preparation.as_ref(),Some(&verified));
+        assert_eq!(verified["force_status"],"unqualified");
+        assert_eq!(verified["source_status"],"prepared-baseline-needs-refinement");
+        jobs.shutdown();
+    }
 
     #[test]
     fn preparation_shares_owned_job_shutdown_and_never_returns_a_force() {

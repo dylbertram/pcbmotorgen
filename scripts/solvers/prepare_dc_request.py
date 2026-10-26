@@ -52,8 +52,8 @@ def geometry(request_path,work):
     unchanged_request_bytes(request_path,digest)
     for name,digest in bound.items():
         if sha(Path(name))!=digest:raise ValueError('Prepared actual geometry inputs changed')
-    for name,value in provenance.items():
-        if sha(Path(name))!=value['sha256']:raise ValueError('Actual CAD preparation implementation changed during construction')
+    for name,source in provenance.items():
+        if sha(Path(name))!=source['sha256']:raise ValueError('Actual CAD preparation implementation changed during construction')
     for path,value in [(work/'summary.json',report),(returned/'summary.json',value)]:path.write_text(json.dumps(value,indent=2,allow_nan=False)+'\n')
 
 
@@ -79,7 +79,11 @@ def main():
         if remaining<STAGES[name]+10:raise ValueError('Entire '+name+' budget no longer fits; no late stage launched')
         unchanged_request_bytes(request_path,digest);report['stages'][name]=dict(state='running',hard_timeout_s=STAGES[name]);save()
         os.environ['PCB_MOTOR_SOLVER_TIMEOUT']=str(STAGES[name])
-        seconds=run([sys.executable,str(HERE/script),*map(str,args)],work,name+'.log',new_process_group=False)
+        stage_started=time.monotonic()
+        try:
+            seconds=run([sys.executable,str(HERE/script),*map(str,args)],work,name+'.log',new_process_group=False)
+        except BaseException as error:
+            report['stages'][name].update(state='failed',error=str(error),seconds=time.monotonic()-stage_started);save();raise
         report['stages'][name].update(state='completed',seconds=seconds);unchanged_request_bytes(request_path,digest);save()
     try:
         cad=work/'geometry';source=work/'source';matrix=work/'matrix.json'
@@ -105,7 +109,7 @@ def main():
             evidence_hashes={str(p):h for p,h in evidence.hashes.items()},independent_current_agreement=agreement,seconds=time.monotonic()-started)
         validate_prepared_summary(report,digest);unchanged_request_bytes(request_path,digest);save()
     except BaseException as error:
-        report.update(status='failed-request-bound-current-preparation',error=str(error),seconds=time.monotonic()-started);save();raise
+        report.update(status='failed-request-bound-current-preparation',source_status='failed',error=str(error),seconds=time.monotonic()-started);save();raise
 
 
 if __name__=='__main__':main()

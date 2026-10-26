@@ -3,6 +3,11 @@
   "plan_id": "ab7e988f-ed3c-4e40-a43b-d7c7f84cbe89",
   "issue": "pcbmotorgen#ytgr",
   "branch": "simulation/add-femm-and-improve",
+  "source_preparation_followup_2026_10_26": {
+    "report": "scripts/solvers/results/source-preparation-window-2026-10-26.json",
+    "result": "Approved five-hour window ended early after its single managed-host source-preparation attempt failed before mesh/solve. Actual CAD completed; return-report variable shadowing fixed with red/green regression and bounded unchanged-geometry handoff verification. Failure progress reporting fixed. Native loaded-image/license inventories added, not clearance. No second source attempt; full managed preparation/general/native/isolation/license gates remain open. All owned work ended and window tasks disabled; failures/logs/plists retained.",
+    "verification": "123desktop passes12explicitignored;480scopedhelpers0skips excluding unchanged4-test AC/gauge module after preserved4/8GiB resource stops;44affectedbrowserpasses; native no-bundle build passes. Unchanged b224259 frontend evidence reused by hashes. Not a full helper-suite or numerical acceptance pass."
+  },
   "daytime_followup_2026_10_24": {
     "report": "scripts/solvers/results/daytime-app-typecheck-2026-10-24.json",
     "result": "Bounded daytime frontend cleanup verified: local pinned pnpm check now0errors0warnings;503unitpass1existing skip;372currentbrowserpass0skip/unexpected/flaky;productionbuildpassed. Former34-error reports below are historical and preserved. No new numericalcampaign ornight scheduling. Exclude this completed cleanup from tonight's unfinished-work budget; rerun only affected checks after subsequent changes.",

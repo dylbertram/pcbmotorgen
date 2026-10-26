@@ -341,8 +341,10 @@ export PCB_MOTOR_DC_ARCHIVE_ROOT="$HOME/.local/opt/solver-prototypes-macos"
 versioned package, another Python series or another platform before any job
 evidence is written. Do not set `PYTHONPATH`. The archive root is required
 evidence, not an optional cache. Other platforms remain unqualified.
-NGSolve/Netgen are LGPL-2.1 and OCCT LGPL-2.1 with exception; this local
-installation redistributes nothing.
+The pinned NGSolve/Netgen mesher metadata declares LGPL-2.1-only. The installed
+OCCT distribution has an LGPLv2+ classifier and an LGPL-2.1 license file; an
+exception or complete redistribution obligations must not be inferred from
+that metadata alone. This local integration is not redistribution clearance.
 
 The default installer covers the admitted fresh magnetic worker. The optional
 source-preparation environment also pins PyAMG 5.3.0, without a developer
@@ -363,6 +365,31 @@ still separate acceptance requirements. The installed magnetic worker's
 `linear-dc-day-worker-license-metadata-v1-20261022.json` under the evidence root.
 That inventory does not settle transitive native-library or redistribution
 requirements and is not approval to distribute a bundle.
+
+For read-only loaded-native-image and license-file evidence, run the pinned
+worker's interpreter without a developer `PYTHONPATH`:
+
+```sh
+env -u PYTHONPATH "$PCB_MOTOR_DC_PREPARATION_PYTHON" scripts/solvers/audit_dc_worker_native.py --preparation --output ./preparation-native-inventory.json
+```
+
+The audit refuses an existing output file. It explicitly imports NGSolve and
+Netgen OCC, records loaded images and Mach-O linkage, binds imported module
+paths, and hashes installed license/notice files. The preparation mode also
+runs the existing small AMG installation smoke test. It does not mesh copper,
+solve a source/field/force, create an isolated environment or grant distribution
+clearance. Relocatable dependencies, optional runtime paths, Homebrew/interpreter
+components and applicable source/relinking/notice obligations remain separate
+review items. Use the magnetic worker interpreter without `--preparation` to
+inventory that environment instead.
+
+The bounded 2026-10-26 managed-host completion attempt reached actual saved
+Case A CAD but failed before meshing because the return report was overwritten
+by implementation-hash metadata. A regression reproduces the defect, and the
+corrected handoff passes geometry-only verification without changing physical
+geometry or returns. Failed stages now persist `failed`, not stale `running`
+progress. Full source completion was not retried or established. See
+`results/source-preparation-window-2026-10-26.json` for receipts and limitations.
 
 `DcJobs` admits one numerical job at a time, preserves a unique evidence directory
 under `dc-desktop-jobs`, and owns the worker's POSIX process group. The whole-job
