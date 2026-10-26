@@ -1,5 +1,5 @@
 {
-  "status": "single-attempt-failed-regression-fixed-awaiting-additional-attempt-approval",
+  "status": "explicit-user-approved-fresh-retry-live",
   "plan_id": "029f25f8-c2b8-476a-93a8-e5827b5a7792",
   "authorization": "User requested planning and implementation during an eleven-hour uninterrupted window.",
   "start_utc": "2026-10-26T20:10:32Z",
@@ -39,6 +39,19 @@
     "real_probe": "Corrected actual saved CaseA input validation-only still passes; no new real mesh/current/field/force solve or artifact adoption.",
     "evidence": "managed-preparation-night-20261026-v1/fix-verification.json",
     "remaining": "Successful whole managed preparation and downstream section/H1/export acceptance remain unverified. Any additional full attempt requires explicit permission under the saved plan's one-attempt limit."
+  },
+  "retry_authorization": "User explicitly selected Run one fresh retry (Recommended) after disclosure of the agent-introduced regression and fixed/tested4f6867f. Authorizes exactly one additional fresh source-only attempt with unchanged physical inputs,14400s cap,no failed-solution reuse,same05:40:32ZOct27cutoff and07:10:32Zhardstop. No further automatic attempt or CaseBforce work.",
+  "latest_attempt": {
+    "launched_utc": "2026-10-26T21:32:38.312592Z",
+    "evidence_directory": "/Users/dylanbertram/.local/opt/solver-prototypes-macos/managed-preparation-night-20261026-v1/retry-approved-v2",
+    "job_directory": "/Users/dylanbertram/.local/opt/solver-prototypes-macos/dc-desktop-jobs/dc-Eh4OnC",
+    "launch_record": "retry-approved-v2/launch-record.json",
+    "worker_pid": 50096,
+    "worker_label": "com.pcbmotorgen.dc.20261026.managed-night-approved-retry-v2",
+    "watch_label": "com.pcbmotorgen.dc.20261026.managed-night-approved-retry-v2-watch",
+    "declaration_sha256": "bfac9f7e418cb812d8a272b8043010f6939a69ed574c5910b9b327c1cd70d5af",
+    "frozen_inputs": "378hashes recomputed; only two expected fixed Python files differ from initial attempt. Saved geometry/request/registry/binary and other code remain identical. Fresh job, no prior mesh or solution used.",
+    "restrictions": "No further automatic attempt. Do not edit frozen files or run builds/tests while this retry is live. Original window cutoff/hardstop unchanged."
   },
   "resources": "14400s host/child cap;14100s total stage caps.13GiB preparation+1GiB host+2GiB headroom=16GiB below18GiB target.8GiB evidence cap;24GiB admission free-disk requirement. One heavy job; no concurrent tests/builds.",
   "constraints": "No CaseBforce/pilot/refinement-cache/reference chain/matrix/per-body/admission work, no heavy AC/gauge rerun, no physical/return/resistivity/geometry repairs, no housingUI/Mutagen edits, no push/installers/ZIP/bundles. Strict2%/5%/1e-8N gates and all failures preserved. Source-only completion cannot qualify fields/forces or general/native/isolation/license acceptance."
