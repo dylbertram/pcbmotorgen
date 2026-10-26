@@ -11,6 +11,37 @@ import prepare_dc_request as preparation
 
 
 class GeometryHandoffTest(unittest.TestCase):
+    def test_mocked_whole_pipeline_preserves_request_digest_through_publication(self):
+        # All CAD/current/audit/export operations are mocked. This covers final
+        # orchestration, not numerical acceptance or reuse of failed artifacts.
+        with TemporaryDirectory() as folder:
+            root=Path(folder).resolve();request=root/'request.json';request.write_text('{"request_id":"whole-contract"}')
+            bound=root/'study-binding.json';bound.write_text('a different digest')
+            work=root/'result';hashes={}
+            class Evidence:
+                def __init__(self):self.hashes=hashes
+                def digest(self,path):
+                    value=preparation.sha(Path(path));self.hashes[str(path)]=value;return value
+                def report(self,path,flag):self.digest(path)
+                def unchanged(self):pass
+            def run(command,where,log,**kwargs):
+                for name in ['geometry/summary.json','source/summary.json','active.json','passive.json','return.json',
+                             'independent/summary.json','rt0/summary.json','source/dc-current-potential.sol','independent/potential.sol','rt0/rt0-source.npz']:
+                    path=work/name;path.parent.mkdir(parents=True,exist_ok=True)
+                    path.write_text(json.dumps(dict(geometry=dict(copper_resistivity_ohm_m=1.7e-8))))
+                return .01
+            def load(*args):return dict(study_bindings={str(bound):preparation.sha(bound)})
+            with patch('sys.argv',['prepare_dc_request.py','--request',str(request),'--work',str(work)]), \
+                 patch.object(preparation,'problems',return_value=[]),patch.object(preparation,'actual_inputs',return_value={}), \
+                 patch.object(preparation,'run',side_effect=run),patch.object(preparation,'load',side_effect=load), \
+                 patch.object(preparation,'Evidence',Evidence),patch.object(preparation,'resistance_check',return_value=dict(passed=True)):
+                preparation.main()
+            report=json.loads((work/'summary.json').read_text())
+            self.assertEqual(report['input_request_sha256'],preparation.sha(request))
+            self.assertEqual(report['status'],'prepared-request-bound-current-source-not-qualified')
+            self.assertEqual(report['force_status'],'unqualified')
+            self.assertTrue(all(s['state']=='completed' for s in report['stages'].values()))
+
     def test_failed_stage_cannot_leave_running_progress_in_final_report(self):
         with TemporaryDirectory() as folder:
             root=Path(folder);request=root/'request.json';request.write_text('{"request_id":"failed-stage"}\n')

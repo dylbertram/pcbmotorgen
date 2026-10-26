@@ -1,5 +1,5 @@
 {
-  "status": "explicit-user-approved-fresh-retry-live",
+  "status": "approved-retry-failed-final-request-digest-check-fix-verification",
   "plan_id": "029f25f8-c2b8-476a-93a8-e5827b5a7792",
   "authorization": "User requested planning and implementation during an eleven-hour uninterrupted window.",
   "start_utc": "2026-10-26T20:10:32Z",
@@ -52,6 +52,13 @@
     "declaration_sha256": "bfac9f7e418cb812d8a272b8043010f6939a69ed574c5910b9b327c1cd70d5af",
     "frozen_inputs": "378hashes recomputed; only two expected fixed Python files differ from initial attempt. Saved geometry/request/registry/binary and other code remain identical. Fresh job, no prior mesh or solution used.",
     "restrictions": "No further automatic attempt. Do not edit frozen files or run builds/tests while this retry is live. Original window cutoff/hardstop unchanged."
+  },
+  "retry_v2_outcome": {
+    "state": "Failed68.625s at final preparation-summary validation; geometry/source/active/passive/return/independent/RT0 stages all recorded completed. Whole operation and all computed artifacts remain failed/unaccepted; no field or mesh reuse.",
+    "cause": "prepare_dc_request.main reused digest for study-binding hash iteration, overwriting the original request digest before validate_prepared_summary. Wrong final expected digest rejected an otherwise populated report.",
+    "cleanup": "21:36:25Z exact host/child/stage identities absent,378frozenhashes unchanged, only ended own retry worker/watch labels unloaded; evidence in retry-approved-v2/failure-and-cleanup.json. Logs/plists/solutions retained unaccepted.",
+    "fix": "Rename study-binding loop value to expected. New fully mocked whole-orchestration regression reproduced final-summary rejection before fix; no numerical job is run by this test.",
+    "further_attempts": "None authorized yet; fresh permission required. Existing window deadlines and all numerical gates unchanged."
   },
   "resources": "14400s host/child cap;14100s total stage caps.13GiB preparation+1GiB host+2GiB headroom=16GiB below18GiB target.8GiB evidence cap;24GiB admission free-disk requirement. One heavy job; no concurrent tests/builds.",
   "constraints": "No CaseBforce/pilot/refinement-cache/reference chain/matrix/per-body/admission work, no heavy AC/gauge rerun, no physical/return/resistivity/geometry repairs, no housingUI/Mutagen edits, no push/installers/ZIP/bundles. Strict2%/5%/1e-8N gates and all failures preserved. Source-only completion cannot qualify fields/forces or general/native/isolation/license acceptance."

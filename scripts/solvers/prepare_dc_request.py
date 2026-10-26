@@ -102,8 +102,8 @@ def main():
         evidence=Evidence();artifacts={name:str(work/path) for name,path in [('source','source/summary.json'),('active','active.json'),('passive','passive.json'),
             ('return','return.json'),('independent','independent/summary.json'),('rt0','rt0/summary.json')]}
         for name,path in artifacts.items():evidence.report(Path(path),'--output' if name in ['active','passive','return'] else '--work')
-        for path,digest in current['study_bindings'].items():
-            if evidence.digest(path)!=digest:raise ValueError('Request-bound source study changed')
+        for path,expected in current['study_bindings'].items():
+            if evidence.digest(path)!=expected:raise ValueError('Request-bound source study changed')
         evidence.digest(source/'dc-current-potential.sol');evidence.digest(work/'independent/potential.sol');evidence.digest(work/'rt0/rt0-source.npz');evidence.unchanged()
         report.update(status='prepared-request-bound-current-source-not-qualified',source_status='prepared-baseline-needs-refinement',artifacts=artifacts,
             evidence_hashes={str(p):h for p,h in evidence.hashes.items()},independent_current_agreement=agreement,seconds=time.monotonic()-started)
