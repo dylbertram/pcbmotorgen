@@ -60,13 +60,13 @@
   {#if !capability.available || capability.winding_field_available === false}
     <p role="status">Coil field unavailable: {capability.reason ?? "Install the qualified winding-field worker on this host."} No magnet field or wire substitute is shown.</p>
   {:else}
-    <label class="flex flex-wrap items-center gap-2">Audited coil source
+    <label class="source-row"><span>Audited source</span>
       <select aria-label="Audited coil source" bind:value={selected} disabled={busy} class="min-w-0 max-w-full rounded border border-slate-600 bg-slate-800 p-1">
         <option value="">Choose an exact qualified source</option>
         {#each capability.qualified_cases ?? [] as value (value.case_id)}<option value={value.case_id}>{value.label}</option>{/each}
       </select>
     </label>
-    <label class="flex items-center gap-2">DC loop current (A)
+    <label class="source-row"><span>DC loop (A)</span>
       <select aria-label="Coil DC loop current" bind:value={current} class="rounded border border-slate-600 bg-slate-800 p-1">
         {#each [-.5, -.1, 0, .1, .5] as value (value)}<option {value}>{value}</option>{/each}
       </select>
@@ -75,7 +75,7 @@
       <details><summary>Audited placement and finite return</summary><pre class="max-h-32 overflow-auto whitespace-pre-wrap break-all">{JSON.stringify(entry.declaration, null, 2)}</pre></details>
       <label class="flex items-start gap-2"><input type="checkbox" bind:checked={acknowledged} /><span>I acknowledge this audited placement and finite return for this exact design. No geometry is moved or repaired.</span></label>
     {/if}
-    <p>Audited DC drive-loop configuration only, not independent AC phase excitation. 96 exterior observations, direct finite-cell integration, 180 s whole-job and 4 GiB memory limits. New display points are not newly qualified field-refinement results.</p>
+    <details><summary class="cursor-pointer">Sampling limits</summary><p>Audited DC drive-loop configuration only, not independent AC phase excitation. 96 exterior observations, direct finite-cell integration, 180 s whole-job and 4 GiB memory limits. New display points are not newly qualified field-refinement results.</p></details>
     <button type="button" disabled={!entry || !acknowledged || busy || !active} onclick={sample} class="rounded border border-emerald-600 px-2 py-1 disabled:opacity-40">Sample coil B-field</button>
     {#if busy}<button type="button" onclick={() => { void controller.cancel(); }} class="rounded border border-slate-600 px-2 py-1">Cancel coil field</button><p role="status">Sampling the finite-copper current source. Previous coil field cleared.</p>{/if}
   {/if}
@@ -83,3 +83,11 @@
   {#if view.phase === "cancelled"}<p role="status">Coil field cancelled. No old winding field is displayed.</p>{/if}
   {#if view.phase === "completed" && view.job?.winding_field}<p>{view.job.winding_field.qualified_case.label} · {view.job.winding_field.loop_current_a} A DC loop. {Object.entries(view.job.winding_field.phase_currents_a).map(([net, amps]) => `${net}: ${amps} A`).join(", ")}</p>{/if}
 </div>
+
+<style>
+  .source-row { display: grid; grid-template-columns: 5.75rem minmax(0, 1fr); align-items: center; gap: 0.5rem; }
+  .source-row select { min-width: 0; width: 100%; min-height: 2rem; }
+  @container (max-width: 520px) {
+    .source-row { grid-template-columns: 4.75rem minmax(0, 1fr); }
+  }
+</style>

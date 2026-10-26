@@ -8,7 +8,7 @@
 
   let { field, scene, zScale, opacity, style, sliceFraction }: { field: FieldPreview; scene: CoilScene; zScale: number; opacity: number; style: FieldStyle; sliceFraction: number } = $props();
   const { invalidate } = useThrelte();
-  const geometry = $derived(style === "slice" ? null : style === "arrows" ? fieldGlyphGeometry(field, scene, zScale) : fieldLineGeometry(field, scene, zScale, sliceFraction));
+  const geometry = $derived(style === "slice" ? null : style === "arrows" ? fieldGlyphGeometry(field, scene, zScale) : fieldLineGeometry(field, scene, zScale, sliceFraction, style === "lines-3d" ? "3d" : "slice"));
   const slice = $derived(style === "slice" || style === "lines-slice" ? fieldSliceGeometry(field, scene, zScale, sliceFraction) : null);
   $effect(() => { const current = geometry, currentSlice = slice; invalidate(); return () => { current?.dispose(); currentSlice?.dispose(); }; });
 </script>

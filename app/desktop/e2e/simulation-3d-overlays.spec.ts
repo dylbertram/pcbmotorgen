@@ -55,7 +55,7 @@ async function show3D(page: Page, pm = true) {
   await expect(viewer.getByRole("group", { name: "3D simulation overlays", exact: true })).toBeVisible();
   if (pm) {
     const compact = viewer.getByRole("button", { name: "Field and loss settings", exact: true });
-    const narrow = await compact.isVisible();
+    const narrow = await compact.getAttribute("aria-expanded") === "false";
     if (narrow) await compact.click();
     await viewer.getByRole("combobox", { name: "Magnetic field source", exact: true }).selectOption("pm");
     if (narrow) await compact.click();
@@ -96,6 +96,11 @@ test("qualified coil controls bind the DC loop, render winding-only data and cle
   await viewer.getByRole("checkbox",{name:/I acknowledge this audited placement/}).check();
   await viewer.getByRole("button",{name:"Sample coil B-field",exact:true}).click();
   await expect(viewer).toHaveAttribute("data-field-samples","96");
+  const settings = viewer.getByRole("button", { name: "Field and loss settings", exact: true });
+  await settings.click(); await expect(settings).toHaveAttribute("aria-expanded", "false");
+  await expect(viewer).toHaveAttribute("data-field-samples", "96");
+  await settings.click(); await expect(settings).toHaveAttribute("aria-expanded", "true");
+  expect(await page.evaluate(() => (window as any).coilStarts.length)).toBe(1);
   await expect(viewer.getByLabel("Magnetic field legend")).toContainText("A: 0.1 A");
   await expect(viewer.getByLabel("Magnetic field legend")).toContainText("C: -0.1 A");
   expect(await page.evaluate(()=>(window as any).vizCalls.length)).toBe(0);
@@ -334,6 +339,12 @@ test("field style, Y slice and opacity redraw native samples without requesting 
   await expect(viewer).toHaveAttribute("data-field-slice", "0.25");
   await viewer.getByRole("combobox", { name: "Field rendering style", exact: true }).selectOption("lines");
   await expect(viewer).toHaveAttribute("data-field-style", "lines");
+  await expect(viewer.getByLabel("Magnetic field legend")).toContainText("XZ-projected Bx/Bz");
+  await expect(viewer.getByRole("status").filter({ hasText: "3D rendering is unavailable" })).toHaveCount(0);
+  await viewer.getByRole("combobox", { name: "Field rendering style", exact: true }).selectOption("lines-3d");
+  await expect(viewer).toHaveAttribute("data-field-style", "lines-3d");
+  await expect(viewer.getByLabel("Magnetic field legend")).toContainText("3D trajectories");
+  await expect(viewer.getByText("Seed plane Y", { exact: true })).toBeVisible();
   await viewer.getByRole("combobox", { name: "Field rendering style", exact: true }).selectOption("arrows");
   await expect(viewer).toHaveAttribute("data-field-style", "arrows");
   await expect(viewer.getByRole("slider", { name: "Field slice position", exact: true })).toHaveCount(0);
@@ -343,6 +354,91 @@ test("field style, Y slice and opacity redraw native samples without requesting 
   await expect(viewer.getByRole("button", { name: "XZ field section", exact: true })).toHaveAttribute("aria-pressed", "true");
   expect(await page.evaluate(() => (window as any).vizCalls.length)).toBe(calls);
   await page.screenshot({ path: info.outputPath("ui-fixture-field-lines-and-slice.png") });
+});
+
+test("slice lines and direction cues stay coplanar at every slider position without changing native samples", async ({ page }, info) => {
+  await gotoDesignApp(page); await nativeFixture(page); const viewer = await show3D(page);
+  await expect(viewer).toHaveAttribute("data-field-samples", "240");
+  const calls = await page.evaluate(() => (window as any).vizCalls.length);
+  for (const fraction of [0, .25, .75, 1]) {
+    await viewer.getByRole("slider", { name: "Field slice position", exact: true }).fill(String(fraction));
+    const checked = await page.evaluate(async fraction => {
+      const { fieldLineGeometry, fieldSliceGeometry } = await import(/* @vite-ignore */ "/src/lib/simulationFieldGeometry.ts");
+      const field = (window as any).vizLastReport.field, before = JSON.stringify(field);
+      const scene = { centerMm: [0, 0, 0], scale: .001 };
+      const lines = fieldLineGeometry(field, scene, 1, fraction), slice = fieldSliceGeometry(field, scene, 1, fraction);
+      const positions = lines.getAttribute("position"), plane = slice.getAttribute("position").getZ(0);
+      let maxDistance = 0;
+      for (let i = 0; i < positions.count; i++) maxDistance = Math.max(maxDistance, Math.abs(positions.getZ(i) - plane));
+      const ys = field.samples.map((s: any) => s.position_m[1]), y = Math.min(...ys) + fraction * (Math.max(...ys) - Math.min(...ys));
+      const result = { vertices: positions.count, maxDistance, unchanged: before === JSON.stringify(field), yMm: y * 1000 };
+      lines.dispose(); slice.dispose(); return result;
+    }, fraction);
+    expect(checked.vertices).toBeGreaterThan(0); expect(checked.maxDistance).toBeLessThan(1e-7); expect(checked.unchanged).toBe(true);
+    await expect(viewer.getByLabel("Field slice readout", { exact: true })).toHaveText(`${checked.yMm.toFixed(2)} mm`);
+  }
+  const toggle = viewer.getByRole("button", { name: "Field and loss settings", exact: true });
+  await toggle.click(); await expect(toggle).toHaveAttribute("aria-expanded", "false");
+  await toggle.click(); await expect(toggle).toHaveAttribute("aria-expanded", "true");
+  await expect(viewer).toHaveAttribute("data-field-slice", "1");
+  expect(await page.evaluate(() => (window as any).vizCalls.length)).toBe(calls);
+  await page.screenshot({ path: info.outputPath("projected-field-inspector.png") });
+});
+
+test("field inspector aligns inputs and stays clear of the camera and Z rail", async ({ page }, info) => {
+  await gotoDesignApp(page); await nativeFixture(page); const viewer = await show3D(page);
+  await expect(viewer).toHaveAttribute("data-field-samples", "240");
+  const panel = viewer.getByRole("group", { name: "3D simulation overlays", exact: true });
+  const bounds = (await viewer.boundingBox())!, box = (await panel.boundingBox())!;
+  const camera = (await viewer.getByRole("group", { name: "3D camera controls", exact: true }).boundingBox())!;
+  const zRail = (await viewer.getByRole("group", { name: "Z height", exact: true }).boundingBox())!;
+  expect(box.x).toBeGreaterThanOrEqual(bounds.x); expect(box.x + box.width).toBeLessThanOrEqual(bounds.x + bounds.width);
+  expect(box.x).toBeGreaterThan(camera.x + camera.width); expect(box.x).toBeGreaterThan(zRail.x + zRail.width);
+  const selects = await panel.getByRole("combobox").all();
+  const boxes = await Promise.all(selects.map(select => select.boundingBox()));
+  for (const other of boxes.slice(1)) { expect(other!.x).toBeCloseTo(boxes[0]!.x, 0); expect(other!.width).toBeCloseTo(boxes[0]!.width, 0); }
+  for (const theme of ["light", "dark"] as const) {
+    await page.emulateMedia({ colorScheme: theme });
+    await page.screenshot({ path: info.outputPath(`field-inspector-${theme}.png`) });
+    await viewer.screenshot({ path: info.outputPath(`field-viewer-${theme}.png`) });
+  }
+});
+
+test("XZ section changes the actual camera view, not just the selected button", async ({ page }, info) => {
+  await gotoDesignApp(page); await nativeFixture(page); const viewer = await show3D(page);
+  await expect(viewer).toHaveAttribute("data-field-samples", "240");
+  // Isolate the flat PCB so a section camera must make the copper almost
+  // horizontal. A changed bitmap alone also passes for a stale isometric fit.
+  await viewer.getByRole("checkbox", { name: "Include magnets in B-field", exact: true }).uncheck();
+  await viewer.getByRole("checkbox", { name: "Show magnets in 3D", exact: true }).uncheck();
+  await expect(viewer).toHaveAttribute("data-field-samples", "0");
+  const canvas = viewer.locator("canvas");
+  // An element screenshot includes HTML controls layered over the canvas.
+  // Mask those so slider accents cannot masquerade as copper geometry.
+  const masks = [viewer.getByRole("group", { name: "3D camera controls", exact: true }),
+    viewer.getByRole("group", { name: "3D simulation overlays", exact: true }),
+    viewer.getByRole("group", { name: "Z height", exact: true }), viewer.getByLabel("Simulation overlay legend")];
+  const bitmap = () => canvas.screenshot({ mask: masks, maskColor: "#ffffff" });
+  // Settle initial Bounds/camera work before comparing canvas pixels only.
+  await page.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
+  const isometric = await bitmap();
+  await viewer.getByRole("button", { name: "XZ field section", exact: true }).click();
+  await expect(viewer.getByRole("button", { name: "XZ field section", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await expect.poll(async () => (await bitmap()).equals(isometric)).toBe(false);
+  await expect.poll(async () => page.evaluate(async image => {
+    const img = new Image(); img.src = `data:image/png;base64,${image}`; await img.decode();
+    const flat = document.createElement("canvas"); flat.width = img.width; flat.height = img.height;
+    const context = flat.getContext("2d")!; context.drawImage(img, 0, 0);
+    const { data } = context.getImageData(0, 0, flat.width, flat.height);
+    let minX = flat.width, maxX = -1, minY = flat.height, maxY = -1;
+    for (let y = 0; y < flat.height; y++) for (let x = 0; x < flat.width; x++) {
+      const i = (y * flat.width + x) * 4, rgb = [data[i], data[i + 1], data[i + 2]];
+      if (Math.max(...rgb) - Math.min(...rgb) < 35) continue;
+      minX = Math.min(minX, x); maxX = Math.max(maxX, x); minY = Math.min(minY, y); maxY = Math.max(maxY, y);
+    }
+    return maxX > minX ? (maxY - minY) / (maxX - minX) : Infinity;
+  }, (await bitmap()).toString("base64"))).toBeLessThan(.08);
+  await viewer.screenshot({ path: info.outputPath("projected-xz-section.png") });
 });
 
 test("phase visibility filters the heat overlay without recalculating the physical loss", async ({ page }) => {

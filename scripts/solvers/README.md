@@ -508,24 +508,29 @@ field-line/slice rendering follow the calculation, not solid visibility, so
 hiding a solid cannot change the calculated samples. The visible magnet solids
 use the active configuration and mover position independently of sample results.
 
-The default field view is **Lines + slice**. Field lines follow the
-native XYZ vector grid, with magnitude colors and direction cues; a filled XZ
-slice shows the norm of the interpolated vector. **XZ field section** turns the
-camera square to that plane. The Y-slice control moves the slice and seed plane
-through the sampled volume. Lines may leave that plane as they follow the full
-3D vector. Field lines, magnitude slice and original sample arrows can also be
-selected separately. Layer/phase visibility, true-scale copper, camera reset and
+The default field view is **Projected lines + slice**. Lines integrate the
+in-plane Bx/Bz components of the native vector grid on the selected XZ plane.
+Trajectories and direction cues stay on that plane. Colors and the filled slice
+still show full |B|, including By; a purely normal field has magnitude but no
+projected line. This is not a flattened 3D trajectory or a new field solve.
+**3D field lines** explicitly follows the full XYZ vector from the selected
+seed plane. Projected lines, magnitude slice and 3D sample arrows can also be
+selected separately. **XZ field section** fits the actual camera square to the
+plane with one orbit controller, without a second fitter restoring old angles.
+The Y control moves through the sampled volume and shows its physical position
+in millimetres when samples are available. Layer/phase visibility, true-scale copper, camera reset and
 the display-only Z multiplier remain available. Changing Z, opacity, field
 style, section camera or Y slice does not resample physical data. Legends state
-the units and model limits. On narrow screens, settings and detailed legends
+the units and model limits. Source and display controls use aligned rows in a
+collapsible inspector, with full-width slice and opacity sliders. On narrow screens, settings and detailed legends
 collapse independently to leave the copper visible. PM-only scope and loss
 units remain visible, and loading/failure messages do not require expanding a
 legend.
 
 `sample_simulation_visualization` samples actual XYZ positions through the
-native magnetic adapter, not the older centre-line X-Z grid. The interactive
-field mode is explicitly **analytical permanent magnets only**, with image
-magnets disabled. It excludes winding reaction and nonlinear material response.
+native magnetic adapter, not the older centre-line X-Z grid. This optional
+PM-only sampling path is explicitly **analytical permanent magnets only**, with
+image magnets disabled. It excludes winding reaction and nonlinear material response.
 It is not a coupled FEM field or a new force qualification. UI resolutions are
 240, 700 or2016 PM points, with a2048-point native cap and finite bounded coordinates.
 The observation volume includes the actual mover and return-flux space around

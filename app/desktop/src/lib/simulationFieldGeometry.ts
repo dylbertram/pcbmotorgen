@@ -3,7 +3,7 @@ import type { CoilScene } from "./coilScene";
 import type { FieldPreview } from "./types/simulationVisualization";
 import { FIELD_PALETTE, physicalToScene } from "./visualizationGeometry";
 
-export type FieldStyle = "lines-slice" | "lines" | "slice" | "arrows";
+export type FieldStyle = "lines-slice" | "lines" | "lines-3d" | "slice" | "arrows";
 type Point = [number, number, number];
 type SceneTransform = Pick<CoilScene, "centerMm" | "scale">;
 
@@ -87,10 +87,11 @@ export function fieldSliceGeometry(field: FieldPreview, scene: SceneTransform, z
   return geometry(positions, colors);
 }
 
-/** Bidirectional midpoint integration through the full interpolated XYZ vector.
- * Seeds lie on the selected Y slice, but trajectories are not projected onto
- * it. Stop at magnets, domain exits, nulls, loops or the fixed step/length cap. */
-export function fieldLineGeometry(field: FieldPreview, scene: SceneTransform, zScale: number, sliceFraction: number): BufferGeometry {
+/** Integrate Bx/Bz on the selected physical XZ plane by default, not a flattened
+ * 3D trajectory. Color still shows full |B| at that observation. Explicit 3D
+ * mode follows XYZ from the same seed plane. Both stop at magnets, domain
+ * exits, projected nulls, loops or the fixed step/length cap. */
+export function fieldLineGeometry(field: FieldPreview, scene: SceneTransform, zScale: number, sliceFraction: number, space: "slice" | "3d" = "slice"): BufferGeometry {
   const grid = sampledFieldGrid(field), positions: number[] = [], colors: number[] = [];
   const maximum = Math.max(0, ...field.samples.map(s => s.magnitude_t));
   const step = Math.min(...grid.spacing) / 6;
@@ -104,8 +105,9 @@ export function fieldLineGeometry(field: FieldPreview, scene: SceneTransform, zS
   const direction = (p: Point, sign: number): Point | null => {
     const b = grid.sample(p);
     if (!b || grid.insideMagnet(p)) return null;
-    const norm = Math.hypot(...b);
-    return norm > Math.max(1e-14, maximum * 1e-8) ? b.map(v => sign * v / norm) as Point : null;
+    const projected: Point = space === "slice" ? [b[0], 0, b[2]] : b;
+    const norm = Math.hypot(...projected);
+    return norm > Math.max(1e-14, maximum * 1e-8) ? projected.map(v => sign * v / norm) as Point : null;
   };
   for (let iz = 0; iz < 6; iz++) for (let ix = 0; ix < 24; ix++) {
     const seed: Point = [grid.bounds[0][0] + (ix + .5) / 24 * (grid.bounds[0][1] - grid.bounds[0][0]), y,

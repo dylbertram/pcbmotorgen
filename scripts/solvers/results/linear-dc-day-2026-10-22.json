@@ -3,6 +3,10 @@
   "plan_id": "ab7e988f-ed3c-4e40-a43b-d7c7f84cbe89",
   "issue": "pcbmotorgen#ytgr",
   "branch": "simulation/add-femm-and-improve",
+  "field_slice_ui_review_2026_10_26": {
+    "report": "scripts/solvers/results/field-slice-ui-review-2026-10-26.json",
+    "state": "User requested another field-line/control review after source-window closure. Default lines now integrate Bx/Bz on the selected XZ slice, with full |B| colors and an explicit 3D alternative. Aligned collapsible source/display inspector, full-width sliders, physical Y readout and actual orthogonal camera fit verified. Final510unit passes1existing skip,0typecheckerrors/warnings,54affected and384fullChromium passes0skip/unexpected/flaky, native no-bundle build passes. Frozen native CaseA data rendered only; no new numerical solve/admission/native observation or license claim. Original designs and prior preparation evidence unchanged; old schedules remain disabled."
+  },
   "eleven_hour_preparation_2026_10_26": {
     "report": "scripts/solvers/results/managed-preparation-night-2026-10-26.json",
     "state": "Fresh dc-UuzZ9B successfully completed production-shared actual saved CaseA managed source preparation in70.264s after approved software fixes/retries. All7stages,41evidence/378frozenhashes,79active/42passive/4return sections and independent current agreement verified. Source-only prepared baseline needs refinement; no new field/force or general geometry admission. Earlier dc-CiVQft/dc-Eh4OnC failures preserved/unaccepted, never reused. Final486scopedhelpers pass0skip excluding unchanged4-test AC/gauge module;124desktop pass12explicitignored. Unchanged app/browser/native-build evidence retained by revision. General/native/isolation/license gates open; CaseBforce excluded. See linked manifest for closure evidence."

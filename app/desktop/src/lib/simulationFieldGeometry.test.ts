@@ -36,6 +36,39 @@ describe("native sampled-field interpolation and bounded rendering", () => {
     }
     expect(f).toEqual(before); lines.dispose();
   });
+  it("keeps every line and arrowhead on the selected XZ plane, even with a large normal field", () => {
+    const f = field(() => [1, 100, 1]), before = structuredClone(f);
+    for (const fraction of [0, .25, .75, 1]) {
+      const lines = fieldLineGeometry(f, scene, 1, fraction), slice = fieldSliceGeometry(f, scene, 1, fraction);
+      const points = lines.getAttribute("position"), plane = slice.getAttribute("position").getZ(0);
+      expect(points.count).toBeGreaterThan(0);
+      for (let i = 0; i < points.count; i++) expect(points.getZ(i)).toBeCloseTo(plane, 6);
+      lines.dispose(); slice.dispose();
+    }
+    expect(f).toEqual(before);
+  });
+  it("integrates the in-plane vector, rather than flattening a 3D trajectory afterward", () => {
+    // The normal component cannot change the in-plane trajectory or its reach.
+    const a = fieldLineGeometry(field(() => [1, 0, 1]), scene, 1, .25);
+    const b = fieldLineGeometry(field(() => [1, 100, 1]), scene, 1, .25);
+    expect(Array.from(a.getAttribute("position").array)).toEqual(Array.from(b.getAttribute("position").array));
+    a.dispose(); b.dispose();
+  });
+  it("draws no projected direction for a purely normal field, without losing slice magnitude", () => {
+    const f = field(() => [0, 5, 0]), before = structuredClone(f);
+    const lines = fieldLineGeometry(f, scene, 1, .5), slice = fieldSliceGeometry(f, scene, 1, .5);
+    expect(lines.getAttribute("position").count).toBe(0);
+    expect(slice.getAttribute("position").count).toBeGreaterThan(0);
+    expect(f).toEqual(before);
+    lines.dispose(); slice.dispose();
+  });
+  it("only follows the normal component in explicitly requested 3D mode", () => {
+    const lines = fieldLineGeometry(field(() => [0, 5, 0]), scene, 1, .5, "3d");
+    const points = lines.getAttribute("position");
+    expect(points.count).toBeGreaterThan(0);
+    expect(new Set(Array.from({ length: points.count }, (_, i) => points.getZ(i))).size).toBeGreaterThan(1);
+    lines.dispose();
+  });
   it("draws no lines through a null field and does not invent magnitude", () => {
     const f = field(() => [0, 0, 0]);
     const lines = fieldLineGeometry(f, scene, 1, .5), slice = fieldSliceGeometry(f, scene, 1, .5);

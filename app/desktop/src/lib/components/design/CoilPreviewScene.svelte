@@ -1,8 +1,10 @@
 <script lang="ts">
   import { T, useThrelte } from "@threlte/core";
-  import { Bounds, OrbitControls } from "@threlte/extras";
+  import { OrbitControls } from "@threlte/extras";
   import { untrack, tick } from "svelte";
-  import type { OrthographicCamera } from "three";
+  import { Box3, Vector3, type Group, type OrthographicCamera } from "three";
+  import type { OrbitControls as OrbitController } from "three/examples/jsm/controls/OrbitControls.js";
+  import { fitCoilCamera } from "../../fitCoilCamera";
   import type { CoilScene, CopperPath } from "../../coilScene";
   import { PHASE_COLORS } from "./coilPreviewCanvas";
   import CoilCopperBatch from "./CoilCopperBatch.svelte";
@@ -39,12 +41,27 @@
   const viaBatches = $derived(heat ? [...HEAT_PALETTE, "#64748b"].map(color => ({ color,
     paths: vias.filter(p => (heat.has(p.key) ? heatColor(heat.get(p.key)!, maximumLoss) : "#64748b") === color) }))
     : [{ color: "#fbbf24", paths: vias }]);
-  let bounds = $state<Bounds>();
-  // Fit new field extents and display-only Z exaggeration after geometry mounts.
+  let content = $state.raw<Group>();
+  let controls = $state.raw<OrbitController>();
+  let fittedView = "";
+  // One controller owns the camera. A separate Bounds controller retains old
+  // angles and can silently restore isometric view after selecting XZ.
   $effect(() => {
-    void scene; void zScale; void reset; void field; void sectionView;
+    void scene; void zScale; void field;
+    const viewKey = `${reset}:${sectionView}`, width = $size.width, height = $size.height;
+    if (!camera || !controls || !content) return;
     let cancelled = false;
-    void tick().then(() => { if (!cancelled) bounds?.fit(); });
+    void tick().then(() => {
+      if (cancelled || !camera || !controls || !content) return;
+      // Flush residual orbit damping before a programmatic view change.
+      const damping = controls.enableDamping;
+      controls.enableDamping = false; controls.update(); controls.enableDamping = damping;
+      const direction = fittedView === viewKey ? camera.position.clone().sub(controls.target)
+        : sectionView ? new Vector3(0, 0, 1) : new Vector3(12, 10, 14);
+      content.updateWorldMatrix(true, true);
+      const center = fitCoilCamera(camera, new Box3().setFromObject(content, true), width, height, direction);
+      if (center) { controls.target.copy(center); controls.update(); fittedView = viewKey; invalidate(); }
+    });
     return () => { cancelled = true; };
   });
 
@@ -61,16 +78,14 @@
   });
 </script>
 
-{#key `${reset}:${sectionView}`}
-  <T.OrthographicCamera bind:ref={camera} makeDefault position={sectionView ? [0, 0, 14] : [12, 10, 14]} {zoom} near={0.01} far={1000}>
-    <OrbitControls enableDamping minZoom={zoom / 20} maxZoom={zoom * 50} />
+  <T.OrthographicCamera bind:ref={camera} makeDefault position={[12, 10, 14]} {zoom} near={0.01} far={1000}>
+    <OrbitControls bind:ref={controls} enableDamping minZoom={zoom / 20} maxZoom={zoom * 50} />
   </T.OrthographicCamera>
-{/key}
 <T.AmbientLight intensity={1.5} />
 <T.DirectionalLight position={[5, 10, 8]} intensity={2} />
 
 {#key scene}
-<Bounds bind:this={bounds} animate={false} margin={1.25}>
+<T.Group bind:ref={content}>
 {#each batches as batch (batch.net)}
   <CoilCopperBatch paths={batch.paths} width={scene.width} color={batch.color} {zScale} centerlines={traceMode === "centerlines"} />
 {/each}
@@ -85,5 +100,5 @@
     <T.MeshBasicMaterial color="#34d399" />
   </T.Mesh>
 {/each}
-</Bounds>
+</T.Group>
 {/key}

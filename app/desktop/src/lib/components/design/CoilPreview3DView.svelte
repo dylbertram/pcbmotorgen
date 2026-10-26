@@ -37,7 +37,9 @@
   let fieldStyle = $state<FieldStyle>("lines-slice");
   let sliceFraction = $state(.5);
   let sectionView = $state(false);
-  let settingsOpen = $state(false);
+  let settingsOpen = $state<boolean | null>(null);
+  let viewerWidth = $state(0);
+  const settingsExpanded = $derived(settingsOpen ?? viewerWidth > 760);
   let legendsOpen = $state(false);
   let fieldSource = $state("coils");
   let coilField = $state<DcWindingFieldResult | null>(null);
@@ -68,6 +70,15 @@
     catch (error) { return { values: null, power: null, error: String(error) }; }
   });
   const maximumField = $derived(field ? Math.max(0, ...field.samples.map(p => p.magnitude_t)) : 0);
+  const sliceYmm = $derived.by(() => {
+    if (!field) return null;
+    const ys = field.samples.map(p => p.position_m[1]), low = Math.min(...ys), high = Math.max(...ys);
+    return (low + sliceFraction * (high - low)) * 1000;
+  });
+  const fieldDescription = $derived(fieldStyle === "arrows" ? "Native XYZ sample arrows"
+    : fieldStyle === "lines-3d" ? "3D trajectories through interpolated XYZ samples"
+    : fieldStyle === "slice" ? "XZ slice colored by full |B|"
+    : "XZ-projected Bx/Bz lines; color shows full |B|");
   const maximumHeat = $derived(heatMapping.values ? Math.max(0, ...heatMapping.values.values()) : 0);
   const visibleHeat = $derived(heatMapping.power ? [...paths, ...vias].reduce((sum, p) => sum + (heatMapping.power?.get(p.key) ?? 0), 0) : 0);
 
@@ -112,10 +123,10 @@
   onDestroy(() => { controller.invalidate(); magnetController.invalidate(); });
 </script>
 
-<div class="coil-3d relative h-full w-full bg-slate-950" role="img" aria-label="Coil preview — isometric"
+<div class="coil-3d relative h-full w-full bg-slate-950" bind:clientWidth={viewerWidth} role="img" aria-label="Coil preview — isometric"
   data-testid="coil-iso" data-layers={geometry?.layer_z_mm.filter((_, i) => view.isLayerVisible(i)).length ?? 0}
   data-segments={paths.length} data-vias={vias.length} data-terminals={terminals.length} data-trace-mode={view.traceMode} data-z-scale={view.zScale}
-  data-field-samples={field?.samples.length ?? 0} data-visible-magnets={visibleMagnets.length} data-include-magnets={includeMagnets} data-field-source={fieldSource} data-field-style={fieldStyle} data-field-slice={sliceFraction} data-heat-unit="W/m" data-settings-open={settingsOpen} data-legends-open={legendsOpen} data-heat-paths={heatMapping.values?.size ?? 0} data-visualization-state={visualization.phase}>
+  data-field-samples={field?.samples.length ?? 0} data-visible-magnets={visibleMagnets.length} data-include-magnets={includeMagnets} data-field-source={fieldSource} data-field-style={fieldStyle} data-field-slice={sliceFraction} data-heat-unit="W/m" data-settings-open={settingsExpanded} data-legends-open={legendsOpen} data-heat-paths={heatMapping.values?.size ?? 0} data-visualization-state={visualization.phase}>
   {#if scene}
     <svelte:boundary>
       <Canvas renderMode="on-demand">
@@ -134,23 +145,34 @@
       <button class="text-slate-300 hover:bg-slate-800 hover:text-emerald-300" type="button" onclick={() => reset++}>Reset 3D view</button>
     </div>
     {#if simulation}
-      <div class="simulation-controls absolute left-16 right-3 top-12 z-20 rounded border border-slate-700 bg-slate-900/95 p-2 text-xs text-slate-300" role="group" aria-label="3D simulation overlays">
-        <button type="button" class="compact-overlay-toggle" aria-expanded={settingsOpen} onclick={() => settingsOpen = !settingsOpen}>Field and loss settings</button>
-        <div class="overlay-control-fields flex flex-wrap items-center gap-2">
-        <label class="flex items-center gap-1">Show
+      <div class="simulation-controls absolute right-2 top-2 z-20 rounded border border-slate-700 bg-slate-900/95 text-xs text-slate-300" role="group" aria-label="3D simulation overlays">
+        <button type="button" class="inspector-toggle" aria-expanded={settingsExpanded} onclick={() => settingsOpen = !settingsExpanded}>
+          <span>Field and loss settings</span><span aria-hidden="true">{settingsExpanded ? "−" : "+"}</span>
+        </button>
+        <div class="overlay-control-fields" hidden={!settingsExpanded}>
+        <label class="control-row"><span>Overlay</span>
           <select aria-label="3D simulation overlay" bind:value={mode} class="rounded border border-slate-600 bg-slate-800 px-1 py-1 text-slate-100">
             <option value="off">Off</option><option value="fields">Magnetic fields</option><option value="heat">Copper heat / loss</option><option value="both">Fields and heat</option>
           </select>
         </label>
-        <label class="flex items-center gap-1"><input type="checkbox" aria-label="Show magnets in 3D" bind:checked={showMagnets} /> Show magnets in 3D</label>
+        <label class="check-row"><input type="checkbox" aria-label="Show magnets in 3D" bind:checked={showMagnets} /> <span>Show magnets in 3D</span></label>
         {#if mode === "fields" || mode === "both"}
-          <label class="flex items-center gap-1">Field source <select aria-label="Magnetic field source" bind:value={fieldSource} onchange={event => { if (event.currentTarget.value === "pm") includeMagnets = true; }} class="rounded border border-slate-600 bg-slate-800 p-1"><option value="coils">Coil currents, qualified DC</option><option value="pm">Permanent magnets only</option></select></label>
-          <label class="flex items-center gap-1"><input type="checkbox" aria-label="Include magnets in B-field" bind:checked={includeMagnets} /> Include magnets in B-field</label>
-          <label class="flex items-center gap-1">Field view <select aria-label="Field rendering style" bind:value={fieldStyle} class="rounded border border-slate-600 bg-slate-800 p-1"><option value="lines-slice">Lines + slice</option><option value="lines">Field lines</option><option value="slice">Magnitude slice</option><option value="arrows">Sample arrows</option></select></label>
-          <button class="rounded border border-slate-600 text-slate-300 hover:bg-slate-800 hover:text-emerald-300" type="button" aria-pressed={sectionView} onclick={() => sectionView = !sectionView}>XZ field section</button>
-          {#if fieldSource === "pm"}<label class="flex items-center gap-1">Samples <select aria-label="Field sample density" bind:value={density} class="rounded border border-slate-600 bg-slate-800 p-1"><option value="sparse">240</option><option value="dense">700</option><option value="fine">2016</option></select></label>{/if}
-          <label class="flex items-center gap-1">Opacity <input aria-label="Field overlay opacity" type="range" min="0.15" max="1" step="0.05" bind:value={opacity} class="w-16 accent-emerald-400" /></label>
-          {#if fieldStyle !== "arrows"}<label class="flex items-center gap-1">Y slice <input aria-label="Field slice position" type="range" min="0" max="1" step="0.05" bind:value={sliceFraction} class="w-16 accent-emerald-400" /><output>{Math.round(sliceFraction * 100)}%</output></label>{/if}
+          <fieldset class="control-section"><legend>Source</legend>
+            <label class="control-row"><span>Calculate B</span><select aria-label="Magnetic field source" bind:value={fieldSource} onchange={event => { if (event.currentTarget.value === "pm") includeMagnets = true; }} class="rounded border border-slate-600 bg-slate-800 p-1"><option value="coils">Coil currents, qualified DC</option><option value="pm">Permanent magnets only</option></select></label>
+            <label class="check-row"><input type="checkbox" aria-label="Include magnets in B-field" bind:checked={includeMagnets} /> <span>Include magnets in B-field</span></label>
+            {#if fieldSource === "pm"}<label class="control-row"><span>Native samples</span><select aria-label="Field sample density" bind:value={density} class="rounded border border-slate-600 bg-slate-800 p-1"><option value="sparse">240</option><option value="dense">700</option><option value="fine">2016</option></select></label>{/if}
+          </fieldset>
+          <fieldset class="control-section"><legend>Display</legend>
+            <label class="control-row"><span>Rendering</span><select aria-label="Field rendering style" bind:value={fieldStyle} class="rounded border border-slate-600 bg-slate-800 p-1"><option value="lines-slice">Projected lines + slice</option><option value="lines">Projected lines</option><option value="slice">Magnitude slice</option><option value="lines-3d">3D field lines</option><option value="arrows">3D sample arrows</option></select></label>
+            <p class="control-hint">{fieldDescription}. Display interpolation only.</p>
+            {#if fieldStyle !== "arrows"}
+              <label class="range-control"><span>{fieldStyle === "lines-3d" ? "Seed plane Y" : "Slice Y"}</span><output aria-label="Field slice readout">{sliceYmm === null ? `${Math.round(sliceFraction * 100)}%` : `${sliceYmm.toFixed(2)} mm`}</output>
+                <input aria-label="Field slice position" aria-valuetext={sliceYmm === null ? `${Math.round(sliceFraction * 100)}%` : `${sliceYmm.toFixed(2)} millimeters, ${Math.round(sliceFraction * 100)}%`} type="range" min="0" max="1" step="0.01" bind:value={sliceFraction} class="accent-emerald-400" />
+              </label>
+            {/if}
+            <label class="range-control"><span>Opacity</span><output>{Math.round(opacity * 100)}%</output><input aria-label="Field overlay opacity" type="range" min="0.15" max="1" step="0.05" bind:value={opacity} class="accent-emerald-400" /></label>
+            <button class="section-button rounded border border-slate-600 text-slate-300 hover:bg-slate-800 hover:text-emerald-300" type="button" aria-pressed={sectionView} onclick={() => sectionView = !sectionView}>XZ field section</button>
+          </fieldset>
           {#if fieldSource === "coils" && geometry}
             <details open={!coilField} class="basis-full"><summary class="cursor-pointer">Qualified coil source and DC drive</summary>
               <QualifiedCoilFieldControls input={simulation} {geometry} active={true} onResult={value => { coilField = value; }} />
@@ -179,13 +201,13 @@
             <div class="max-w-64 space-y-1 rounded border border-slate-700 bg-slate-900/95 p-2 text-slate-300" aria-label="Magnetic field legend">
               <p>{fieldSource === "coils" ? includeMagnets ? "Coils + magnets, free-space sum" : "Coil-current" : "PM"} field magnitude |B| · T</p><div class="h-1.5 rounded" style:background={`linear-gradient(to right, ${FIELD_PALETTE.join(",")})`}></div>
               <p class="flex justify-between font-mono"><span>0 T</span><span>{maximumField.toPrecision(3)} T</span></p>
-              <p>{fieldStyle === "arrows" ? "Native XYZ sample arrows" : "Interpolated XYZ field lines / XZ slice"}</p>
+              <p>{fieldDescription}</p>
               {#if fieldSource === "coils"}
                 {#if includeMagnets}<p>Vector superposition of native coil and PM samples at identical XYZ points. No magnetic-material reaction or coupled FEM solution.</p>{/if}
                 <p>{coilField?.loop_current_a} A audited DC loop, including declared finite return. {Object.entries(coilField?.phase_currents_a ?? {}).map(([net, amps]) => `${net}: ${amps} A`).join(", ")}</p>
-                <details><summary class="cursor-pointer">Finite-copper coil-field limits</summary><p>Direct exterior integration of the exact audited finite-copper current basis. {includeMagnets ? "Analytical PM field added in free space." : "No magnet contribution."} No material reaction, independent AC phase drive, wire substitute or newly qualified field-refinement claim. Lines and slice interpolate the new native samples. Seed density is not flux density. Heat uses a separate cycle-average phase-current model. Magnet visibility does not change calculated values.</p></details>
+                <details><summary class="cursor-pointer">Finite-copper coil-field limits</summary><p>Direct exterior integration of the exact audited finite-copper current basis. {includeMagnets ? "Analytical PM field added in free space." : "No magnet contribution."} No material reaction, independent AC phase drive, wire substitute or newly qualified field-refinement claim. Projected lines follow Bx/Bz on the selected XZ plane; a purely normal field has no in-plane line. Colors use full |B|. Explicit 3D lines follow XYZ. Seed density is not flux density. Heat uses a separate cycle-average phase-current model. Magnet visibility does not change calculated values.</p></details>
               {:else}
-                <details><summary class="cursor-pointer">PM-only model limits</summary><p>Analytical permanent magnets only. No winding or nonlinear material response. Lines follow the interpolated native vector grid and stop at magnets or the sampled boundary. Seed density is not flux density. Interpolation is a display approximation, not added physical resolution.</p></details>
+                <details><summary class="cursor-pointer">PM-only model limits</summary><p>Analytical permanent magnets only. No winding or nonlinear material response. Projected lines follow Bx/Bz on the selected XZ plane; a purely normal field has no in-plane line. Colors use full |B|. Explicit 3D lines follow XYZ. Lines stop at magnets or the sampled boundary. Seed density is not flux density. Interpolation is a display approximation, not added physical resolution.</p></details>
               {/if}
             </div>
           {/if}
@@ -210,7 +232,7 @@
     <div class="pointer-events-none absolute bottom-2 left-16 right-12 text-[10px] text-slate-400">
       Drag to orbit · Right-drag to pan · Scroll or pinch to zoom · Z × {view.zScale}
     </div>
-    <div class="layer-depths pointer-events-none absolute right-12 top-2 text-right font-mono text-[10px] text-slate-400">
+    <div class="layer-depths pointer-events-none absolute right-12 top-2 text-right font-mono text-[10px] text-slate-400" class:simulation-depths={simulation !== null}>
       {#each geometry?.layer_z_mm ?? [] as z, idx (idx)}
         {#if view.isLayerVisible(idx)}<div>L{idx + 1} · {z.toFixed(2)} mm</div>{/if}
       {/each}
@@ -222,16 +244,37 @@
 
 <style>
   .coil-3d { container-type: size; }
-  .overlay-legends { max-height: 40cqh; }
-  .simulation-controls { max-height: 60cqh; overflow-y: auto; }
+  .overlay-legends { max-height: 40cqh; right: auto; max-width: min(26rem, calc(100% - 4.75rem)); }
+  .simulation-controls { width: 22rem; max-width: calc(100% - 4.5rem); }
+  .inspector-toggle { display: flex; justify-content: space-between; align-items: center; width: 100%; min-height: 2rem; text-align: left; padding: 0.5rem 0.75rem; }
+  .inspector-toggle:hover { background: rgb(var(--slate-800)); }
+  .overlay-control-fields { display: grid; gap: 0.625rem; padding: 0.625rem; max-height: calc(100cqh - 5rem); overflow-y: auto; border-top: 1px solid rgb(var(--slate-700)); }
+  .overlay-control-fields[hidden] { display: none; }
+  .control-row { display: grid; grid-template-columns: 5.75rem minmax(0, 1fr); align-items: center; gap: 0.5rem; }
+  .control-row select { width: 100%; min-width: 0; min-height: 2rem; }
+  .check-row { display: flex; align-items: start; gap: 0.5rem; line-height: 1.4; }
+  .check-row input { margin-top: 0.125rem; accent-color: #10b981; }
+  .control-section { display: grid; min-width: 0; gap: 0.5rem; border-top: 1px solid rgb(var(--slate-700)); }
+  .control-section legend { padding-right: 0.5rem; margin-bottom: 0.5rem; font-weight: 600; color: rgb(var(--slate-200)); }
+  .control-hint { color: rgb(var(--slate-400)); font-size: 0.6875rem; line-height: 1.5; }
+  .range-control { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 0.25rem 0.5rem; }
+  .range-control input { grid-column: 1 / -1; width: 100%; min-width: 0; height: 1.25rem; }
+  .range-control output { font-variant-numeric: tabular-nums; color: rgb(var(--slate-200)); }
+  .section-button { min-height: 2rem; }
+  .section-button[aria-pressed="true"] { border-color: #10b981; color: #10b981; }
+  .simulation-depths { display: none; }
   .compact-overlay-toggle { display: none; }
+  @container (max-width: 760px) {
+    .simulation-controls { top: 3rem; }
+    .overlay-control-fields { max-height: calc(65cqh - 4rem); }
+  }
   @container (max-width: 520px) {
     .compact-overlay-toggle { display: block; }
-    .overlay-control-fields, .overlay-legends-body { display: none; }
-    .coil-3d[data-settings-open="true"] .overlay-control-fields { display: flex; max-height: 50cqh; overflow-y: auto; padding-top: 0.5rem; }
+    .overlay-legends-body { display: none; }
     .coil-3d[data-legends-open="true"] .overlay-legends-body { display: flex; }
     .layer-depths { display: none; }
-    .simulation-controls { padding: 0.25rem; }
+    .overlay-control-fields { padding: 0.5rem; }
+    .control-row { grid-template-columns: 4.75rem minmax(0, 1fr); }
   }
   @container (max-height: 180px) {
     .z-height { top: 2.75rem; bottom: 0.25rem; padding: 0.25rem; gap: 0.25rem; }
