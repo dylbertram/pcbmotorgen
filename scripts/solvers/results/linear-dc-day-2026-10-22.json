@@ -3,6 +3,10 @@
   "plan_id": "ab7e988f-ed3c-4e40-a43b-d7c7f84cbe89",
   "issue": "pcbmotorgen#ytgr",
   "branch": "simulation/add-femm-and-improve",
+  "two_hour_hardening_2026_10_26": {
+    "report": "scripts/solvers/results/preparation-hardening-2026-10-26.json",
+    "result": "Bounded source-input preflight and cancellation-publication hardening verified. Production-shared validation-only path accepts actual corrected CaseA input metadata without meshing/solving, explicitly rejects old corrupted reports, and independently checks conflicting report hashes. Final cancellation now clears prepared-source and progress payloads as well as force/field.484scopedhelpers,124desktop with12explicitignored,44affectedChromium and native no-bundle build pass. Full numerical/general/native/isolation/license gates unchanged; no source retry or CaseBforce work."
+  },
   "source_preparation_followup_2026_10_26": {
     "report": "scripts/solvers/results/source-preparation-window-2026-10-26.json",
     "result": "Approved five-hour window ended early after its single managed-host source-preparation attempt failed before mesh/solve. Actual CAD completed; return-report variable shadowing fixed with red/green regression and bounded unchanged-geometry handoff verification. Failure progress reporting fixed. Native loaded-image/license inventories added, not clearance. No second source attempt; full managed preparation/general/native/isolation/license gates remain open. All owned work ended and window tasks disabled; failures/logs/plists retained.",

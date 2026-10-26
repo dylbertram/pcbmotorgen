@@ -421,6 +421,18 @@ ambiguous return endpoints, changed copper cross-section, unsupported shapes
 and failed numerical gates are rejected without geometry repair. The ordinary
 magnetic installation does not silently enable this longer operation.
 
+Before allocating source compute, `solve_linear_dc_study.py --validate-only`
+can run the same input/receipt/provenance checks used by the production source
+path. Supply its ordinary geometry/matrix/control arguments and a fresh `--work`
+directory. This mode rejects malformed return reports, unsuccessful or missing
+receipts, changed physical inputs/CAD, invalid return/drive dimensions and
+undeclared controls. Its report is explicitly
+`validated-linear-source-inputs-only-no-mesh-or-solve`, with source and force
+status still unqualified. It never calls meshing or current solving and cannot
+be combined with `--mesh-only` or `--mesh-work`. It does not prove CAD topology,
+current convergence, refinement, field/force admission or general preparation
+completion. The original failed reports remain preserved rather than repaired.
+
 The explicit real-FEM Rust integration test is ignored in ordinary unit runs
 because it requires the pinned external installation and original project. Run
 it separately with `--ignored`; do not count the ordinary ignored inventory as

@@ -1,0 +1,36 @@
+{
+  "status": "bounded-hardening-verified-closed-no-source-solve",
+  "plan_id": "11fba0e0-3e3e-4d6c-8ab0-216091bc6e85",
+  "authorization": "User requested planning and implementation of another two hours together.",
+  "start_utc": "2026-10-26T17:10:52Z",
+  "audit_reserve_utc": "2026-10-26T18:50:52Z",
+  "hard_stop_utc": "2026-10-26T19:10:52Z",
+  "hard_stop_task": "acb433cd-720a-4b18-a64e-a59b3ed21557",
+  "base_commit": "3bd9766",
+  "scope": "Fail-fast production-shared source input validation and validation-only evidence; cancellation/publication safety. No source mesh/current/field/force solve or full preparation attempt.",
+  "initial_audit": "Tracked checkout clean except five existing untracked root designs; no candidate numerical worker or owned20261026launchd label. Disk82.14GiB free.",
+  "evidence_directory": "/Users/dylanbertram/.local/opt/solver-prototypes-macos/preparation-hardening-20261026-v1",
+  "changes": {
+    "source_preflight": "Extracted one shared production source-input validator and added --validate-only with an explicitly unqualified no-mesh/no-solve report. Requires explicit successful copper/return receipts, valid declared controls, finite positive physical data, unchanged request/study/CAD and matching return provenance before expensive work. Existing numerical gates and solve path remain intact.",
+    "binding_conflict_fix": "A new regression reproduced stale copper binding being hidden by a correct study binding at the same key in a dict union. Each report is now checked independently; no overwrite can hide a stale hash.",
+    "publication_fix": "A deterministic red-before-green regression reproduced cancelled preparation payload surviving final publication. The last cancellation check remains inside the existing publication lock and now clears force, field, preparation and progress together.",
+    "documentation": "Explains validation-only scope and exclusions; no preparation/qualification/geometry-topology claim."
+  },
+  "verification": {
+    "report": "preparation-hardening-20261026-v1/verification.json",
+    "sha256": "49fc90a73eaccbf49c60cef3f20edcf0104e3b9edb1f81357682aea0ccfcc793",
+    "helpers": "484passed0skips, explicitly excluding unchanged four-test test_ngsolve_eddy_av module. Not a full-suite pass; no heavy AC/gauge rerun.",
+    "desktop": "124passed12explicitignored; focused host14passed1existing export ignored. No real full source test invoked.",
+    "browser": "44affectedChromium tests passed,0skips/flakes/unexpected,49.013s. Not WKWebView evidence.",
+    "native_build": "Debug --no-bundle --ci passed under240s/6GiB guard. No delivery bundle.",
+    "actual_request": "Production-shared validation-only CLI accepted the already-generated corrected CaseA handoff and rejected preserved original corrupted metadata with explicit ValueError before output creation. Nine input hashes rechecked; no mesh/solution produced. No CAD regeneration or numerical solve.",
+    "diagnostics": "Red publication and conflicting-hash regressions retained. Initial test-fixture /var versus/private canonical-path mismatch corrected in fixtures, not relaxed in production. Earlier helper run overlapped later test additions; final-v2 with frozen code/test hashes is authoritative."
+  },
+  "closure": {
+    "state": "All owned validation/test/build processes ended by actual identity checks; listener1542absent. New hard-stop backstop disabled after verification; old window tasks remain disabled.",
+    "preservation": "Original five root hashes, qualified registry and all88morning closure-evidence hashes verified unchanged. No Mutagen/housingUI or physical-input changes.",
+    "remaining": "Full source completion/general admission/native observation/isolated installation/transitive license clearance remain open. Morning failed attempt is not rerun or relabeled successful. CaseBforce remains unapproved.",
+    "checkpoint": "Verified changes and this report are checkpointed locally; exact commit recorded in external checkpoint receipt and project knowledge. No push."
+  },
+  "constraints": "Case B forces, heavy AC/gauge reruns, physical changes, pushes/installers/ZIPs/bundles, housing UI and Mutagen changes excluded. Strict gates and old failures retained."
+}

@@ -160,6 +160,19 @@ impl DcJobStatus {
     fn active(&self) -> bool {
         matches!(self.state.as_str(), "running" | "cancelling")
     }
+
+    // Called while holding the publication lock, after verification. A cancel
+    // may have arrived since the earlier atomic check in the monitor closure.
+    fn finalize_publication(&mut self, cancelled: bool) {
+        if cancelled {
+            self.state = "cancelled".into();
+            self.result = None;
+            self.winding_field = None;
+            self.preparation = None;
+            self.preparation_progress = None;
+            self.error = Some("DC job cancelled; no force returned".into());
+        }
+    }
 }
 
 struct Job {
@@ -592,14 +605,8 @@ impl DcJobs {
                             .is_some_and(|entry| entry.status.job_id == job_id)
                         {
                             // Serialize cancellation with result publication. A cancel
-                            // accepted while verification ran must suppress its force.
-                            if cancel_thread.load(Ordering::SeqCst) {
-                                final_status.state = "cancelled".into();
-                                 final_status.result = None;
-                                 final_status.winding_field = None;
-                                final_status.error =
-                                    Some("DC job cancelled; no force returned".into());
-                            }
+                            // accepted while verification ran must suppress all results.
+                            final_status.finalize_publication(cancel_thread.load(Ordering::SeqCst));
                             let _ = fs::write(
                                 job.join("desktop-status.json"),
                                 serde_json::to_vec_pretty(&final_status).unwrap(),
@@ -961,6 +968,25 @@ pub fn cancel_dc_coupling(
 #[cfg(all(test, unix))]
 mod tests {
     use super::*;
+
+    #[test]
+    fn cancellation_at_publication_clears_every_payload_kind() {
+        // Deterministic publication-boundary contract, not a real late-stage
+        // numerical cancellation claim. Verification already produced a value.
+        for operation in ["force", "preparation", "winding-field"] {
+            let status:DcJobStatus=serde_json::from_value(json!({"request_id":"race","job_id":"job",
+                "state":"prepared","elapsed_seconds":1.,"evidence_directory":"test-only",
+                "request_sha256":"hash","error":null,"operation":operation,
+                "result":{"test":true},"preparation":{"test":true},"winding_field":{"test":true},
+                "preparation_progress":{"stage":"rt0"}})).unwrap();
+            let mut uncancelled=status.clone();uncancelled.finalize_publication(false);
+            assert!(uncancelled.preparation.is_some());assert_eq!(uncancelled.state,"prepared");
+            let mut cancelled=status;cancelled.finalize_publication(true);
+            assert_eq!(cancelled.state,"cancelled");assert!(cancelled.result.is_none());
+            assert!(cancelled.winding_field.is_none());assert!(cancelled.preparation.is_none());
+            assert!(cancelled.preparation_progress.is_none());
+        }
+    }
 
     #[test]
     #[ignore = "Explicit four-hour actual saved-design source-only preparation; requires approved window, clean worker/project/study and exclusive status path"]

@@ -32,29 +32,66 @@ def validate_controls(matrix,study,mesh,curvature,port,max_dofs):
     if study['status']!='prepared-actual-linear-study-no-source-or-force-acceptance':raise ValueError('Actual prepared study required')
 
 
+def validate_source_inputs(origin,matrix_path,mesh,curvature,port,max_dofs):
+    """Shared production handoff check. Never meshes, solves or modifies inputs."""
+    origin=Path(origin).resolve();matrix_path=Path(matrix_path).resolve()
+    try:
+        physical=json.loads((origin/'summary.json').read_text());returned=json.loads((origin/'return/summary.json').read_text())
+        for label,report in [('copper',physical),('return',returned)]:
+            if not isinstance(report,dict) or not report.get('command_receipt'):
+                raise ValueError('Completed '+label+' report with explicit successful receipt required')
+            completed_receipt(report)
+        if physical.get('status')!='completed-finite-copper-geometry-only-unqualified' or returned.get('status')!='prepared-physical-dc-return-geometry-only' or physical.get('failures')!=[] or returned.get('failures')!=[]:
+            raise ValueError('Completed exact copper and explicit return required')
+        study_path=Path(physical['actual_study_work'])/'summary.json';study=json.loads(study_path.read_text())
+        matrix=json.loads(matrix_path.read_text());validate_controls(matrix,study,mesh,curvature,port,max_dofs)
+        declaration=(Path(__file__).resolve().parents[2]/matrix['study_inputs']).resolve()
+        if study['input_hashes'].get(str(declaration))!=sha(declaration):raise ValueError('Matrix and prepared study have different declared physical inputs')
+        if physical['translation_m']!=returned['translation_m'] or physical['input_hashes']!=returned['input_hashes']:
+            raise ValueError('Copper and return physical provenance differs')
+        points=np.asarray(returned['closure']['return_path_m'],dtype=float)
+        translation=np.asarray(physical['translation_m'],dtype=float)
+        layer=physical['geometry']['layers'][0]
+        positive=[layer['trace_width_m'],layer['thickness_m'],physical['geometry']['copper_resistivity_ohm_m'],physical['closed_partition_volume_m3']]
+        if points.shape!=(4,3) or translation.shape!=(3,) or not np.isfinite(points).all() or not np.isfinite(translation).all() or not all(not isinstance(v,bool) and isinstance(v,(int,float)) and np.isfinite(v) and v>0 for v in positive):
+            raise ValueError('Finite explicit return, translation and positive physical copper dimensions required')
+        drive_segment(points,layer['trace_width_m'],port)
+        hashes={str(p):sha(p) for p in [origin/'summary.json',origin/'return/summary.json',study_path,matrix_path,Path(physical['command_receipt']),Path(returned['command_receipt'])]}
+        # Check each report independently. A dict union would silently hide a
+        # stale copper binding when the study names the same path correctly.
+        for bound in [physical['input_hashes'],study['input_hashes']]:
+            for name,digest in bound.items():
+                if sha(Path(name))!=digest:raise ValueError('Actual source physical input changed')
+                hashes[name]=digest
+        for name,key in [('copper.brep','brep_sha256'),('closed-copper-for-partition-audit.brep','closed_partition_brep_sha256')]:
+            if sha(origin/name)!=physical[key]:raise ValueError('Exact physical CAD changed')
+            hashes[str(origin/name)]=physical[key]
+        return physical,returned,study_path,hashes
+    except (KeyError,TypeError,IndexError,AttributeError,OSError) as error:
+        raise ValueError('Malformed or missing source-preparation handoff: '+str(error)) from error
+
+
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--geometry-work',type=Path,required=True);parser.add_argument('--matrix',type=Path,required=True)
     parser.add_argument('--work',type=Path,required=True);parser.add_argument('--mesh',type=float,required=True)
     parser.add_argument('--curvature-safety',type=float,required=True);parser.add_argument('--port-fraction',type=float,required=True)
     parser.add_argument('--max-dofs',type=int,required=True);parser.add_argument('--mesh-only',action='store_true')
+    parser.add_argument('--validate-only',action='store_true',help='Validate the production handoff only; never mesh or solve')
     parser.add_argument('--mesh-work',type=Path,help='Reuse only an ended hash-verified mesh checkpoint, never a saved or failed field')
     add_thread_option(parser);args=parser.parse_args();origin=args.geometry_work.resolve();work=args.work.resolve()
     if work.exists():parser.error('Preserve previous source trials')
-    physical=json.loads((origin/'summary.json').read_text());returned=json.loads((origin/'return/summary.json').read_text())
-    completed_receipt(physical);completed_receipt(returned)
-    if physical['status']!='completed-finite-copper-geometry-only-unqualified' or returned['status']!='prepared-physical-dc-return-geometry-only' or returned['failures']:
-        raise ValueError('Completed exact copper and explicit return required')
-    study_path=Path(physical['actual_study_work'])/'summary.json';study=json.loads(study_path.read_text())
-    matrix=json.loads(args.matrix.read_text());validate_controls(matrix,study,args.mesh,args.curvature_safety,args.port_fraction,args.max_dofs)
-    declaration=(Path(__file__).resolve().parents[2]/matrix['study_inputs']).resolve()
-    if study['input_hashes'].get(str(declaration))!=sha(declaration):raise ValueError('Matrix and prepared study have different declared physical inputs')
-    if physical['translation_m']!=returned['translation_m'] or physical['input_hashes']!=returned['input_hashes']:
-        raise ValueError('Copper and return physical provenance differs')
-    for name,digest in (physical['input_hashes']|study['input_hashes']).items():
-        if sha(Path(name))!=digest:raise ValueError('Actual source physical input changed')
-    for name,key in [('copper.brep','brep_sha256'),('closed-copper-for-partition-audit.brep','closed_partition_brep_sha256')]:
-        if sha(origin/name)!=physical[key]:raise ValueError('Exact physical CAD changed')
+    if args.validate_only and (args.mesh_only or args.mesh_work):parser.error('Validation-only cannot request meshing or a mesh checkpoint')
+    physical,returned,study_path,validated_hashes=validate_source_inputs(origin,args.matrix,args.mesh,args.curvature_safety,args.port_fraction,args.max_dofs)
+    if args.validate_only:
+        work.mkdir(parents=True)
+        report=dict(status='validated-linear-source-inputs-only-no-mesh-or-solve',input_hashes=validated_hashes,
+            source_status='unqualified',force_status='unqualified',mesh_or_solve_performed=False,
+            source_snapshots=capture(work,[Path(__file__)]))
+        if any(sha(Path(p))!=h for p,h in validated_hashes.items()):raise ValueError('Source input changed during validation')
+        # Never overwrite prior validation evidence or call the solver below.
+        with (work/'summary.json').open('x') as stream:stream.write(json.dumps(report,indent=2,allow_nan=False)+'\n')
+        return
     import ngsolve as ng
     from netgen.occ import OCCGeometry
     work.mkdir(parents=True);started=time.monotonic()
