@@ -1,0 +1,16 @@
+{
+  "status": "failed-stricter-separate-body-force-controls",
+  "scope": "Completed single-PM/5mm-flex fine-mesh Elmer and GetDP finite-plate fields. The stored nonlinear equations and fields pass their earlier gates, but exact separate-body stress controls below do not. No operating motor or finite-current-return qualification.",
+  "getdp_exact_audit_sha256": "aaefe10dd51aa2d85370826f11ac99c0e688bca69163d1a03f27f615ff81c4a3",
+  "elmer_exact_audit_sha256": "98c7b76fcd1f6ead34b5d4c736ecc4421614b2a0a62fe32aebced97ac51efdab",
+  "clearances_m": [0.0004, 0.0006, 0.0008],
+  "stator_z_force_cross_backend_relative_errors": [0.001663964456441125, 0.0016874483289137654, 0.007182138864107124],
+  "getdp_action_reaction_errors_n": [0.03520451668194963, 0.022044204171205044, 0.019519674332201538],
+  "getdp_action_reaction_limits_n": [0.029804881989915974, 0.029710099495036918, 0.030071363599478353],
+  "getdp_failed_controls": ["mover force path", "0.4mm action/reaction"],
+  "elmer_action_reaction_errors_n": [0.051305397100705585, 0.22604363477038034, 0.0528359957803239],
+  "elmer_action_reaction_limits_n": [0.030859406283879415, 0.03421436263448997, 0.03092124743118163],
+  "elmer_failed_controls": ["bare mover self-force floor", "mover force path", "all three action/reaction paths"],
+  "maximum_exact_face_area_relative_errors": {"getdp": 6.661338147750939e-15, "elmer": 4.884981308350689e-15},
+  "conclusion": "Cross-backend stator agreement does not qualify mover force. Exact integration does not remove the raw FEM field error. Refine the fields with unchanged force floors and 2% path/balance gates."
+}

@@ -348,11 +348,11 @@
       if (!isCurrentSimulation(generation)) return;
 
       const [s, f, h] = results;
-      // Apply each successful result independently. A failed calculation does
-      // not erase the last good value from the other simulation panels.
-      if (s.status === "fulfilled") sweep = s.value;
-      if (f.status === "fulfilled") friction = f.value;
-      if (h.status === "fulfilled") height = h.value;
+      // Failed panels must not show values from another input/model or feed
+      // an old Kf to driver analysis. Independent successful panels remain.
+      sweep = s.status === "fulfilled" ? s.value : null;
+      friction = f.status === "fulfilled" ? f.value : null;
+      height = h.status === "fulfilled" ? h.value : null;
 
       const reasons = results
         .filter(
@@ -367,6 +367,7 @@
       error = reasons.length ? reasons.join("  ·  ") : null;
     } catch (e) {
       if (!isCurrentSimulation(generation)) return;
+      clearSimulationResults();
       error = e instanceof Error ? e.message : String(e);
     } finally {
       if (isCurrentSimulation(generation)) loading = false;
@@ -420,10 +421,16 @@
       config.drive.winding_temp_c,
       config.drive.via_plating_m,
     ];
+    void JSON.stringify(config.backplane);
     void valid;
     void geometryKey(projects.cadGeometry);
 
     const generation = ++simulationGeneration;
+    // Driver-only work is debounced for 120ms, before the 150ms replacement
+    // sweep starts. Invalidate its Kf now, not only when that sweep settles.
+    // Otherwise an old sweep can be paired with the newly edited IPC inputs.
+    sweep = null;
+    drive = null;
     if (!active || activeTab !== "simulate") {
       scheduleSimulation.cancel();
       loading = false;
@@ -439,8 +446,11 @@
   // and again when only the driver settings change, without re-running the
   // sweep. The expanded preview also needs live electrical results.
   let driveGeneration = 0;
+  const driveRequested = $derived(active && (
+    activeTab === "simulate" || coilPreviewExpanded || previewPanel === "driver"
+  ));
   const scheduleDrive = debounce((generation: number) => {
-    if (generation !== driveGeneration || !active || (activeTab !== "simulate" && !coilPreviewExpanded && previewPanel !== "driver")) return;
+    if (generation !== driveGeneration || !driveRequested) return;
     void runDrive(generation);
   }, 120);
 
@@ -480,7 +490,7 @@
     void geometryKey(projects.cadGeometry);
     void valid;
     const generation = ++driveGeneration;
-    if (!active || (activeTab !== "simulate" && !coilPreviewExpanded && previewPanel !== "driver")) {
+    if (!driveRequested) {
       scheduleDrive.cancel();
       drivePending = false;
       return;
@@ -678,6 +688,7 @@
           >
             <div class="min-h-0 flex-1">
               <CoilPreview bind:this={coilPreview} workspace {config} coils={activeCoils} {motion}
+                simulationActive={active && activeTab === "simulate"}
                 active={active && !externalDialogOpen} designSettings={motorSettings}
                 bind:sidePanel={previewPanel} bind:expanded={coilPreviewExpanded} {drive} {driveError} {drivePending}
                 camera={session.camera} view={session.previewView} importedGeometry={projects.cadGeometry}
@@ -687,6 +698,7 @@
                 open={activeTab === "simulate"}
                 availableHeight={Math.max(0, motorWorkspaceHeight - motorStatusHeight)}
                 onConfigureWinding={() => coilPreview?.showDesignSettings("routing")}
+                onShow3D={() => { session.previewView.viewMode = "iso"; previewPanel = null; }}
                 {config}
                 active={active && activeTab === "simulate"}
                 {sweep}

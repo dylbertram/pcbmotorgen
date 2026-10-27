@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { selectDesignPanel } from "./helpers";
 
 // Only the disk/dialog transport is replaced. Stores, tabs and revision UI are
 // production code; Rust tests cover the actual files.
@@ -56,6 +57,7 @@ async function create(page: Page, kind: "motor" | "sensor") {
   const dialog = page.getByRole("dialog", { name: "New coil file", exact: true });
   await dialog.getByRole("button", { name: kind === "motor" ? /^Motor coil/ : /^Sensor coil/ }).click();
   await expect(dialog).toBeHidden();
+  if (kind === "motor") await selectDesignPanel(page, "Magnets");
 }
 
 async function fileAction(page: Page, name: string) {
@@ -77,8 +79,10 @@ test("multiple motor and sensor tabs keep separate drafts and dirty markers", as
   await page.locator("#sensor-wavelength").press("Enter");
   const tabs = page.getByRole("navigation", { name: "Open files" });
   await tabs.getByRole("tab", { name: /^M Untitled motor 1/ }).click();
+  await selectDesignPanel(page, "Magnets");
   await expect(page.locator("#magnet-count")).toHaveValue("6");
   await tabs.getByRole("tab", { name: /^M Untitled motor 2/ }).click();
+  await selectDesignPanel(page, "Magnets");
   await expect(page.locator("#magnet-count")).toHaveValue("8");
   await tabs.getByRole("tab", { name: /^S Untitled sensor 3/ }).click();
   await expect(page.locator("#sensor-wavelength")).toHaveValue("240");
@@ -115,6 +119,7 @@ test("Save All, workspace reopen, and + dialog listing other files in folder and
   await expect(folderList.getByRole("button", { name: /coil-2\.pmsensor/ })).toHaveCount(0);
   await folderList.getByRole("button", { name: /coil-1\.pmmotor/ }).click();
   await expect(dialog).toBeHidden();
+  await selectDesignPanel(page, "Magnets");
   await expect(page.locator("#magnet-count")).toHaveValue("6");
 });
 

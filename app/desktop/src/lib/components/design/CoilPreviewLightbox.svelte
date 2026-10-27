@@ -41,11 +41,13 @@
   import HoldingForceChart from "./HoldingForceChart.svelte";
   import PreviewStatus from "./PreviewStatus.svelte";
   import type { DriveAnalysis } from "../../types";
+  import type { VisualizationInput } from "../../types/simulationVisualization";
 
   let {
     expanded = $bindable(false),
     embedded = false,
     active = true,
+    simulation = null,
     designSettings,
     sidePanel = $bindable<PreviewPanelId | null>(null),
     height = PREVIEW_H,
@@ -82,6 +84,7 @@
     expanded?: boolean;
     embedded?: boolean;
     active?: boolean;
+    simulation?: VisualizationInput | null;
     designSettings?: Snippet<[DesignPanelId]>;
     sidePanel?: PreviewPanelId | null;
     height?: number;
@@ -221,7 +224,7 @@
             label={embedded ? "Coil preview" : "Coil preview — expanded"}>
             {#if view.viewMode === "iso"}
               <div class="absolute inset-y-0" style:left={`${leftDockWidth}px`} style:right={`${dockWidth + 44}px`}>
-                <CoilPreviewIsoView geometry={terminalGeometry ?? importedGeometry} {view} isVisible={isTerminalVisible} />
+                <CoilPreviewIsoView geometry={terminalGeometry ?? importedGeometry} {view} isVisible={isTerminalVisible} {simulation} />
               </div>
             {:else}
             <canvas bind:this={modalCanvasRef} class="block h-full w-full"
@@ -290,7 +293,7 @@
              moves inside the lightbox. The phase-waveform popover is anchored
              directly above this box at the same width, so it cannot be moved. -->
         {#if view.viewMode === "top"}
-        <div class="absolute bottom-3 z-20 flex w-[min(420px,calc(100%-4rem))] flex-col gap-2 {sidePanel ? 'max-sm:hidden' : ''}" style:left={`${leftDockWidth + 8}px`} style:max-width={`calc(100% - ${leftDockWidth + dockWidth + 60}px)`}>
+        <div class="absolute bottom-3 z-20 flex w-[min(420px,calc(100%-4rem))] flex-col gap-2 {sidePanel ? 'max-lg:hidden' : ''}" style:left={`${leftDockWidth + 8}px`} style:max-width={`calc(100% - ${leftDockWidth + dockWidth + 60}px)`}>
           {#if terminalPanelOpen}
             <div class="rounded-md border border-slate-700 bg-slate-900/95 p-3">
               <PreviewLayerSlider {view} layers={importedGeometry ? importedGeometry.layer_z_mm.map((_, idx) => ({ idx })) : uniqueLayers} onSelect={(layer) => { if (layer !== null && terminalTool?.active) terminalTool.chooseLayer(layer); view.phaseVisibility = []; }} />

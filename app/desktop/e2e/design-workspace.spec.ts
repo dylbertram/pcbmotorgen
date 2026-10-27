@@ -135,7 +135,7 @@ test("edits survive panel changes and workflow changes", async ({ page }) => {
   await travel.press("Enter");
   await left.getByRole("button", { name: "Magnets", exact: true }).click();
   const count = page.getByRole("spinbutton", { name: "Magnet count", exact: true });
-  await count.fill("14");
+  await count.fill("10");
   await count.press("Enter");
   await left.getByRole("button", { name: "Routing", exact: true }).click();
   await page.getByRole("combobox", { name: "Winding connection", exact: true }).selectOption("2");
@@ -147,10 +147,10 @@ test("edits survive panel changes and workflow changes", async ({ page }) => {
   await page.getByRole("tab", { name: /^Simulate/i }).click();
   await expect(page.getByRole("dialog", { name: "Constraints", exact: true })).toBeVisible();
   await left.getByRole("button", { name: "Magnets", exact: true }).click();
-  await expect(count).toHaveValue("14");
+  await expect(count).toHaveValue("10");
   await page.getByRole("tab", { name: /^Design/i }).click();
   await expect(page.getByRole("dialog", { name: "Magnets", exact: true })).toBeVisible();
-  await expect(count).toHaveValue("14");
+  await expect(count).toHaveValue("10");
 });
 
 test("Escape closes only the selected panel and returns focus to its button", async ({ page }) => {

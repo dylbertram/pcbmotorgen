@@ -1,0 +1,81 @@
+{
+  "status": "closed-early-after-failed-single-attempt-and-verified-fallback-numerical-completion-open",
+  "authorization": "User: begin execution, for the saved five-hour draft plan 473e0db8-15c7-4f2b-9cbf-da6e232cecda.",
+  "start_utc": "2026-10-26T11:00:17Z",
+  "latest_launch_utc": "2026-10-26T11:30:17Z",
+  "numerical_cutoff_and_audit_reserve_utc": "2026-10-26T15:30:17Z",
+  "hard_stop_utc": "2026-10-26T16:00:17Z",
+  "branch": "simulation/add-femm-and-improve",
+  "base_commit": "b224259",
+  "single_attempt": {
+    "launched_utc": "2026-10-26T11:06:18.954407Z",
+    "job_directory": "/Users/dylanbertram/.local/opt/solver-prototypes-macos/dc-desktop-jobs/dc-rEXXvO",
+    "request_sha256": "04c045ef3cdf60dadef87966d057301932da6f9f664699fb9493a58922edec08",
+    "result": "Failed in9.33s before meshing/solving. CAD completed7.536s; source parser imported, then KeyError status while reading return metadata.",
+    "cause": "prepare_dc_request.geometry overwrites the return report variable value in the source-snapshot hash loop, then serializes source metadata to return/summary.json.",
+    "containment": "No force/prepared result published. Supervisor/host/stage receipts failed, monitor raised attention-required. All exact process identities/group members absent; only the two ended owned launchd labels unloaded, logs/plists retained.375frozeninputhashes unchanged before fixes.",
+    "evidence": "source-preparation-window-20261026-v1/failure-and-cleanup.json",
+    "retry": "No second source attempt authorized or launched. Continue approved backend/dependency fallback; full numerical completion remains open."
+  },
+  "fallback_outcome": {
+    "handoff_fix": "Regression first reproduced KeyError status. Renamed provenance-loop value so the original return report is serialized intact; no geometry/physics change.",
+    "failure_reporting": "Separate mocked-stage regression first reproduced stale preparing/running state after failure. Failed stages now persist failed/error/elapsed fields and source_status failed.",
+    "actual_geometry_only": "Final bounded120s/4GiB native CAD-only verification passed8.074s. All original physical geometry/volume/union/contact/partition audits and exact declared return closure preserved. No source mesh or current solve launched.",
+    "native_inventory": "Added tested read-only audit_dc_worker_native.py. Final preparation/magnetic inventories bind19/18 pinned packages,663/651 loaded images,147/135 inspected non-system images, imported module paths and license-file hashes. Actual NGSolve/Netgen OCC extensions explicitly loaded without mesh/solve. All package license files and module hashes rechecked.",
+    "license_limitations": "Source/relinking/notice obligations, OCCT metadata/exception interpretation, relocatable/optional/transitive components and unowned Homebrew/interpreter dependencies remain open. Inventory is not clearance.",
+    "environment_gates": "No approved isolated macOS ARM environment supplied; no user/VM/system installer created. No observed WKWebView interaction. Both gates remain open.",
+    "documentation": "Documented audit command and actual failure/fix limits; removed unverified blanket OCCT-exception claim."
+  },
+  "verification": {
+    "desktop": "123passed12explicitignored; new opt-in four-hour completion test is ignored in default runs and was run separately as the failed attempt above.",
+    "focused_host": "13passed1existing explicit export ignored; actual saved-project native export then run explicitly and passed, equals declared winding exactly.",
+    "scoped_helpers": "480passed0skips0failures in11.169s, excluding unchanged four-test test_ngsolve_eddy_av module. Explicit included/excluded module list preserved. Not a full-suite pass.",
+    "helper_resource_failures": "Full discovery was stopped at4GiB and8GiB guards, observed5.20GB/9.17GB physical footprint in unchanged AC/gauge region. Owned PIDs absent before scoped rerun. Both failed attempts retained; no further budget increase or changed assertions/skips. Earlier unguarded482-test run had4housing-entrypoint skips and predates final two tests; it is not final evidence.",
+    "affected_browser": "44passed0skipped/unexpected/flaky,47.2s; DC lifecycle/preparation and3D source/loss overlays atbothviewports. Chromium, not WKWebView.",
+    "native_build": "Tauri debug --no-bundle --ci passed18.385s under240s/6GiB guard. No app/ZIP/installer delivery bundle created.",
+    "frontend_reuse": "All six relevant b224259 frontend implementation hashes remain unchanged. Prior0typecheckerrors/warnings,503unitpasses1existing skip and full372browser evidence reused only at those unchanged inputs; affected44browser tests reran now.",
+    "preserved_diagnostics": "Initial helper invocation used a nonexistent test module name and failed import; correct20-test command passed. Red-before-green metadata/failure-state regressions and unsuccessful first live-observation assertion preserved as diagnostics, not acceptance. Native inventories v1/v2 retained with limitations; finalv3 is authoritative.",
+    "evidence": "source-preparation-window-20261026-v1/final-code-verification.json"
+  },
+  "closure": {
+    "verified_quiescence_and_early_closure_utc": "2026-10-26T11:26:17.490464Z",
+    "evidence_report": "source-preparation-window-20261026-v1/closure-evidence.json",
+    "evidence_sha256": "6eb4adaf868e61307af2c5741759ae8b87d55d6371dedcede7d1274760dd1af0",
+    "reason": "The one admitted attempt failed; approved bounded fallback is verified. No second full attempt or unrelated work is authorized merely to fill remaining hours.",
+    "owned_work": "Actual failed/successful receipts and PID identities rechecked; no owned workers remain. Only ended own once/watch launchd labels unloaded; plists/logs/failures retained. Browser1541listener absent.",
+    "tasks": "All three new window tasks disabled after quiescence verification; old schedules remain disabled.",
+    "physical_inputs": "Original saved project/study and qualified registry remain hash-identical. Five original root designs untouched; housing UI and Mutagen unchanged.",
+    "plan": "Preflight/harness completed; dependency evidence and cleanup verified. Keep primary full numerical preparation requirement and parent acceptance open.",
+    "checkpoint": "Verified local milestone includes this report. Resolve exact commit with git log -- scripts/solvers/results/source-preparation-window-2026-10-26.json; also recorded in Kata/Project knowledge and external checkpoint receipt. No push."
+  },
+  "window_tasks": {
+    "health": "19c65b7a-2e2f-48e2-b055-9d458c91105b",
+    "audit": "a1ed3415-9179-4c54-97b5-cb6358e6d593",
+    "hard_stop": "4b6d4cad-9e0e-4446-b509-d249a9429cb5",
+    "note": "Created only for this approved window; old tasks remain disabled. Host and OpenChamber must stay awake."
+  },
+  "scope": "At most one actual saved Case A generated-linear source-preparation completion attempt through the managed host, conditional on complete bounded preflight. Otherwise backend acceptance/dependency evidence fallback. No Case B force work or automatic expensive retry.",
+  "evidence_directory": "/Users/dylanbertram/.local/opt/solver-prototypes-macos/source-preparation-window-20261026-v1",
+  "preflight_observations": {
+    "tracked_changes_at_start": false,
+    "original_untracked_designs": "Five root designs retained untouched.",
+    "candidate_numerical_processes": "None in initial process-table scan; full receipt identity audit pending.",
+    "old_launchd_labels": "Several ended historical labels remain loaded with no PID. Do not remove unrelated historical labels during this window.",
+    "old_schedules": "All disabled; none reactivated.",
+    "initial_free_disk_gib": 84.32,
+    "initial_memory_pressure_free_percent": 42,
+    "workers": "Both pinned clean worker Python invocation paths exist; dependency/provenance checks pending.",
+    "kata": "Initial MCP discovery failed with expired session HTTP404; retry only after catalog recovery. No new issue created."
+  },
+  "limits": {
+    "whole_preparation_seconds": 14400,
+    "preparation_memory_gib": 13,
+    "supervision_headroom_gib": 3,
+    "aggregate_native_target_gib": 18,
+    "evidence_cap_gib": 8,
+    "admission_free_disk_reserve_plus_output_gib": 24,
+    "concurrency": "One heavy job; no overlapping builds/tests."
+  },
+  "remaining_gates": "Full managed preparation, general geometry qualification, observed WKWebView, isolated macOS ARM installation and native/transitive license acceptance remain unproven.",
+  "constraints": "Preserve actual physical inputs/returns/resistivity, strict2%/5%/1e-8N gates, roots, failures, housing UI and Mutagen. No push/installers/ZIP/delivery bundles."
+}

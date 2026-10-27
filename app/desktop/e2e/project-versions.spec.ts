@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { gotoDesignApp } from "./helpers";
+import { gotoDesignApp, selectDesignPanel } from "./helpers";
 
 test.beforeEach(async ({ page }) => {
   // Replace only disk/menu transport. Rust tests exercise the real archive and files.
@@ -70,6 +70,7 @@ async function versionsDialog(page: Page) {
 
 test("title bar versions, File save-new-version, and latest-edited reopening", async ({ page }) => {
   await gotoDesignApp(page);
+  await selectDesignPanel(page, "Magnets");
   let dialog = await versionsDialog(page);
   await expect(dialog.getByText(/No saved versions yet/)).toBeVisible();
   await dialog.getByRole("button", { name: "Close", exact: true }).click();
@@ -91,6 +92,7 @@ test("title bar versions, File save-new-version, and latest-edited reopening", a
   await expect(page.getByLabel("Unsaved changes", { exact: true })).toHaveCount(0);
   await fileAction(page, "closeFile");
   await fileAction(page, "open");
+  await selectDesignPanel(page, "Magnets");
   await expect(page.getByRole("button", { name: "Project versions", exact: true })).toHaveText("Version 1");
   await expect(page.locator("#magnet-count")).toHaveValue("8");
   const archive = await page.evaluate(() => (window as any).__versions);
@@ -102,6 +104,7 @@ test("title bar versions, File save-new-version, and latest-edited reopening", a
 
 test("description edits and selective deletion preserve unsaved work", async ({ page }) => {
   await gotoDesignApp(page);
+  await selectDesignPanel(page, "Magnets");
   await newVersion(page, "Original");
   await newVersion(page, "Alternative");
   await page.locator("#magnet-count").fill("8");
@@ -126,6 +129,7 @@ test("description edits and selective deletion preserve unsaved work", async ({ 
 
 test("deleting the active version opens the remaining design", async ({ page }) => {
   await gotoDesignApp(page);
+  await selectDesignPanel(page, "Magnets");
   await newVersion(page, "Original");
   await page.locator("#magnet-count").fill("6");
   await page.locator("#magnet-count").press("Enter");

@@ -1,0 +1,788 @@
+{
+  "status": "implementation-in-progress-not-qualified",
+  "plan_id": "ab7e988f-ed3c-4e40-a43b-d7c7f84cbe89",
+  "issue": "pcbmotorgen#ytgr",
+  "branch": "simulation/add-femm-and-improve",
+  "field_slice_ui_review_2026_10_26": {
+    "report": "scripts/solvers/results/field-slice-ui-review-2026-10-26.json",
+    "state": "User requested another field-line/control review after source-window closure. Default lines now integrate Bx/Bz on the selected XZ slice, with full |B| colors and an explicit 3D alternative. Aligned collapsible source/display inspector, full-width sliders, physical Y readout and actual orthogonal camera fit verified. Final510unit passes1existing skip,0typecheckerrors/warnings,54affected and384fullChromium passes0skip/unexpected/flaky, native no-bundle build passes. Frozen native CaseA data rendered only; no new numerical solve/admission/native observation or license claim. Original designs and prior preparation evidence unchanged; old schedules remain disabled."
+  },
+  "eleven_hour_preparation_2026_10_26": {
+    "report": "scripts/solvers/results/managed-preparation-night-2026-10-26.json",
+    "state": "Fresh dc-UuzZ9B successfully completed production-shared actual saved CaseA managed source preparation in70.264s after approved software fixes/retries. All7stages,41evidence/378frozenhashes,79active/42passive/4return sections and independent current agreement verified. Source-only prepared baseline needs refinement; no new field/force or general geometry admission. Earlier dc-CiVQft/dc-Eh4OnC failures preserved/unaccepted, never reused. Final486scopedhelpers pass0skip excluding unchanged4-test AC/gauge module;124desktop pass12explicitignored. Unchanged app/browser/native-build evidence retained by revision. General/native/isolation/license gates open; CaseBforce excluded. See linked manifest for closure evidence."
+  },
+  "two_hour_hardening_2026_10_26": {
+    "report": "scripts/solvers/results/preparation-hardening-2026-10-26.json",
+    "result": "Bounded source-input preflight and cancellation-publication hardening verified. Production-shared validation-only path accepts actual corrected CaseA input metadata without meshing/solving, explicitly rejects old corrupted reports, and independently checks conflicting report hashes. Final cancellation now clears prepared-source and progress payloads as well as force/field.484scopedhelpers,124desktop with12explicitignored,44affectedChromium and native no-bundle build pass. Full numerical/general/native/isolation/license gates unchanged; no source retry or CaseBforce work."
+  },
+  "source_preparation_followup_2026_10_26": {
+    "report": "scripts/solvers/results/source-preparation-window-2026-10-26.json",
+    "result": "Approved five-hour window ended early after its single managed-host source-preparation attempt failed before mesh/solve. Actual CAD completed; return-report variable shadowing fixed with red/green regression and bounded unchanged-geometry handoff verification. Failure progress reporting fixed. Native loaded-image/license inventories added, not clearance. No second source attempt; full managed preparation/general/native/isolation/license gates remain open. All owned work ended and window tasks disabled; failures/logs/plists retained.",
+    "verification": "123desktop passes12explicitignored;480scopedhelpers0skips excluding unchanged4-test AC/gauge module after preserved4/8GiB resource stops;44affectedbrowserpasses; native no-bundle build passes. Unchanged b224259 frontend evidence reused by hashes. Not a full helper-suite or numerical acceptance pass."
+  },
+  "daytime_followup_2026_10_24": {
+    "report": "scripts/solvers/results/daytime-app-typecheck-2026-10-24.json",
+    "result": "Bounded daytime frontend cleanup verified: local pinned pnpm check now0errors0warnings;503unitpass1existing skip;372currentbrowserpass0skip/unexpected/flaky;productionbuildpassed. Former34-error reports below are historical and preserved. No new numericalcampaign ornight scheduling. Exclude this completed cleanup from tonight's unfinished-work budget; rerun only affected checks after subsequent changes.",
+    "scope": "Frontend/dev-tooling cleanup only. Parent/daytime checks and general/native/isolated-install/license/force gates remain open."
+  },
+  "overnight_continuation_manifest": "scripts/solvers/results/linear-dc-night-2026-10-22.json",
+  "overnight_window_final_status": "Closed at the unchanged2026-10-23T06:00Z hard stop. Source/local/fixed-field controls andfivebaselinecaches verified; no owned compute orwindowtasks remainactive. Overnightaudit/cleanupcomplete,3/6steps;parentacceptance1/6 anddaytime2/5 unchanged. Source-refinementcache/forcechains,magneticmatrix,per-body/admission/saved-host/native/install/license/general gates remainopen. See linkedovernightmanifest hard_stop_2026_10_23. No blanketcompletion orCaseBforcequalification.",
+  "magnet_visibility_and_contribution": {
+    "status": "implemented-and-verified-independent-display-and-free-space-contribution-controls",
+    "user_request": "Show/hide magnets in the 3D viewer independently of adding/removing their contribution to the field calculation.",
+    "controls": "Show magnets in 3D changes only solid visibility and never samples or changes B. Solids come from active config/mover pose even without field results or with overlays Off. Include magnets in B-field defaults off for coil mode. When enabled, analytical PMs are sampled natively at exactly the existing coil XYZ grid, then vectors are added componentwise and magnitudes recomputed. Removing PMs restores the existing coil-only result without rerunning the finite-copper source. Selecting PM-only explicitly enables PM contribution; disabling it there leaves no active field source. No saved design is edited.",
+    "scope": "Coils plus magnets is explicitly free-space linear superposition of a prescribed audited finite-copper DC current source and analytical permanent magnets. No nonlinear material reaction, coupled-FEM qualification, arbitrary-design coil fallback or new source/cache/force campaign. Qualified-source restrictions remain. No addition of magnitudes or interpolation between different grids. Hidden magnet solids do not change numerical samples or the field-rendering masks.",
+    "lifecycle": "Separate latest-only native PM controller for the coil grid, immediate combined-display clearing while loading/on failure, invalidation on include/source/physical/tab changes, no old combined result publication. Showing/hiding solids does not touch either sampler. Coil sampling is not repeated for visibility or contribution changes.",
+    "verification": {
+      "frontend": "498 passed, 1 existing skipped, 56 files in linear-dc-magnet-controls-frontend-v2.log. Initial added unit test used strict equality between hypot and sqrt and failed by one floating-point ULP; corrected numeric assertion to 14 decimal digits. Vector addition/cancellation, input preservation and mismatched-grid refusal verified.",
+      "targeted_browser": "26 passed, zero skips/unexpected/flaky, 38.737s in linear-dc-magnet-controls-browser-v2/report.json. Independent visibility/contribution combinations, no source resampling, restoration of coil-only samples, PM-only exclusion and existing lifecycle/mobile tests pass.",
+      "full_browser": "376 passed, zero skips/unexpected/flaky, 354.140s in linear-dc-magnet-controls-full-browser-v1/report.json. SHA256 1114362b15fd535ba785b3cdb59bf09ae7a9c04188ff04f34aff5cb4bf0a06d8.",
+      "native_data": "Fresh bounded native PM export at the actual saved Case A coil grid: linear-dc-magnet-controls-paired-native-v1.json, produced by explicitly executed saved-design Rust export test, linear-dc-magnet-controls-native-export-v1.log. Actual PM samples and prior verified finite-copper coil samples have matching 96 XYZ observations; browser test verifies componentwise superposition residual below 1e-14 T and changed combined magnitude. No finite-current/force/source campaign rerun.",
+      "native_build": "pnpm exec tauri build --debug --no-bundle --ci passed, linear-dc-magnet-controls-native-build-v1.log. No push or installer/delivery bundle.",
+      "typecheck": "34 existing errors in the same 3 baseline files, linear-dc-magnet-controls-typecheck-final-v2.log; none in new magnet controls, vector combination or rendering components.",
+      "gates": "Original native WKWebView, arbitrary-design/current-source, AC phase, material-response, Case B and installation/license gates remain open. Parent/daytime checks unchanged."
+    }
+  },
+  "daytime_app_visualization": {
+    "status": "3d-field-and-loss-features-implemented-bounded-integration-verified-native-and-general-preparation-gates-open",
+    "day_plan": "15235a51-0ca4-4ba6-90ee-3c3bd4faa529",
+    "day_plan_checks": "Field and heat/loss visualization steps checked. General preparation completion, complete acceptance and final handoff still unchecked. Parent acceptance remains1/6; no overnight gate is waived.",
+    "entry": "In Simulate select 3D fields & heat. Field source now defaults to Coil currents, qualified DC. Choose an exact audited source, acknowledge its physical placement/finite return and explicitly sample its signed DC loop. PM-only sampling remains an optional comparison, never a fallback. Fields use lines plus an XZ magnitude slice, section camera and Y-slice control. Heat W/m and camera/layer/net/Z-scale behavior retained.",
+    "field_scope": "Coil mode directly integrates an exact registered affine-RT0 finite-copper DC basis at 96 new exterior XYZ observations, including declared finite return, no magnets or material reaction. No arbitrary AC phase excitation or new blanket spatial/refinement qualification. Unmatched designs unavailable without substitution. Optional PM-only mode retains native analytical 240/700/2016 XYZ samples and 2048 cap. Both show actual physical coordinates in Tesla, no browser-physics fallback.",
+    "heat_scope": "Native resistor-network branch I-squared-R, cycle-average at explicit winding-phase peak current divided bysqrt2 forRMS. Real trace/via coordinates, layer depths, copper weights/plating and saved winding-temperature resistivity. Native arc chord rule disclosed. Colors now use W/m of actual native conductor length, with total/visible W separately; no continuous thermal hotspots, temperature prediction, bend current crowding, AC/PWM/core or housing heating. This graph preview does not waive finite-volume/contact qualification or original B shorts.",
+    "mapping": "Shape/layer/net mapping from actual branch losses to original geometry;mappedtotalconservation checked. Generatedviewer layerorder corrected to matchnativehost layer0topZ0 andlaternegative depths;importeddepthsand saveddesignsunchanged. Display-onlyZexaggeration andopacity do notresamplephysics orchangevalues.",
+    "lifecycle": "Immutable requestID/inputSHA/nativeimplementation-lockfileSHA/appversion. Debounced, serialized native sampling withlatest-onlyqueuedrequest, immediateold-data clearing onphysical/current/pose/mode edits andtabdeparture/unmount. Failed/stale samplescannotshowoldcolors. On-demandrendering withGPUgeometry disposal. No archivedforce replay.",
+    "actual_saved_design_native_check": {
+      "input": "linear-dc-day-generated-designs-v2-20261022/linear-star-compact-two-strand-four-layer-board.pmmotor",
+      "report": "linear-dc-day-case-a-native-visualization-v2-20261022.json",
+      "log": "linear-dc-day-native-viewer-export-v2-20261022.log",
+      "field_samples": 240,
+      "native_branch_edges": 131,
+      "total_cycle_average_copper_loss_w": 0.5719979869125956,
+      "native_network_power_balance_relative_error": 2.350497927585931e-13,
+      "implementation_sha256": "e8edd99f13d557827a8b62284193b2fa282d04edfc7f8714daecc78d0551dbe8",
+      "meaning": "Actual savedproject rebuilt by Rust, native field and networklosssampling andRust-to-TSgeometry/lossmapping checked. This interactive-previewtest isnot a newFEMcampaign or nativeWKWebViewE2E. BrowserUI fixturesremainlabelednon-numericalevidence."
+    },
+    "bend_and_field_line_followup": {
+      "status": "verified-native-data-and-browser-rendering-preview-not-new-physical-qualification",
+      "user_request": "Correct misleading heat contrast at bends and make the field visualization resemble a continuous field-line / filled-field reference rather than detached arrows.",
+      "loss_correction": "Previous color encoded total watts per primitive, making a short bend look cold solely because it was shorter. Color now uses branch watts divided by the identical native graph length, including arc chords. Via watts and lengths accumulate across actual intervals. Separate watt totals remain conservative. Equal-current equal-cross-section copper keeps its W/m regardless of splitting; no current crowding or thermal field is invented.",
+      "field_rendering": "Default magnitude-colored 3D streamlines plus filled XZ magnitude slice, separate lines/slice/arrows options, Y seed/slice position and XZ section camera. Native observation bounds include actual mover and return-flux space. 240/700/2016 samples, native cap unchanged at 2048. Interpolation and integration operate only on native XYZ vectors in physical SI, never a browser magnetic substitute. Trilinear vectors and their norms, bounded bidirectional midpoint integration, fixed seeds/step cap, magnet/domain/null/loop stops, no extrapolation or magnet-interior paint. Seed density is not flux density and added triangles/segments are not added physical resolution. PM-only and interpolation limits remain visible.",
+      "lifecycle": "Style, Y slice, opacity, section camera and Z scale only redraw the same native samples. Old-data invalidation and latest-only native queue retained. GPU geometries disposed on replacement/unmount. Normal Z scaling cannot change physical trajectories, field colors, loss W/m or total watts. Narrow screens collapse settings and detailed legends independently, retaining scope/units and visible errors without covering the coil.",
+      "actual_saved_case_a": {
+        "report": "linear-dc-day-case-a-native-field-lines-v1-20261022.json",
+        "sha256": "33682af3b7d79fbb89cfb641ededb21954c626e5870c077e36426c0af3574ba5",
+        "log": "linear-dc-day-native-field-lines-export-v1-20261022.log",
+        "samples": 2016,
+        "counts": [28, 4, 18],
+        "native_edges": 131,
+        "total_loss_w": 0.5719979869125956,
+        "scope": "Fresh bounded interactive PM sampling and native graph loss from the actual saved Case A, not an offline source/cache/force campaign. Frozen native report validated and rendered using the production Threlte scene in an explicit test-only browser harness; no archived force replay, synthetic field, re-identified IPC response or observed native WKWebView claim."
+      },
+      "verification": {
+        "frontend": "496 passed, 1 existing skipped, 55 files in linear-dc-day-bend-and-streamlines-frontend-final-v4-20261022.log. Tests cover bend/straight and split invariance, via interval length, conserved watts, affine native-vector interpolation, no extrapolation, null field, bounded lines, magnet masking/thin-magnet crossing and Z-invariant physical paths/colors.",
+        "desktop": "122 passed, 10 explicit ignored external-environment tests, 39.63s in linear-dc-day-bend-and-streamlines-desktop-v1-20261022.log; expanded saved-design native export separately run and passed.",
+        "targeted_browser": "18 passed, no skips/flakes, 26.9s in linear-dc-day-bend-and-streamlines-browser-v2-20261022. Includes actual native field and loss mapping/rendering, style/Y/opacity/camera changes without resampling, mobile and WebGL fallback. Full v3 had 365 passed and one pre-existing top-down tab/scroll test failure, preserved in linear-dc-day-bend-and-streamlines-full-browser-v3-20261022. Its cause is unconfirmed; 16 exact targeted repetitions across both viewports passed without weakening the assertion or changing scroll code, in linear-dc-day-bend-and-streamlines-scroll-repeat-v1-20261022. Mobile screenshot review then found controls/legends covering the coil and led to compact narrow-screen controls; isolated mobile v5 passes both themes. Full v4 then passed 366, but code/test edits overlapped that run, so the final frozen-state v5 was required and passed separately.",
+        "full_browser": "Final frozen-state v5: 366 passed, 0 skipped/unexpected/flaky, 346.613s in linear-dc-day-bend-and-streamlines-full-browser-final-v5-20261022/report.json. SHA256 3ba591df1ca97c9eff30b4d1cb52eb506526eb40050319c5e97ea4fe16c52db8. Includes actual native report finite line/slice geometry, per-layer native resistance/length consistency across straights/bends, conserved total watts, new controls without resampling, compact mobile light/dark captures and errors visible without expanding legends. Previous scroll failure remains preserved, not erased by retries or a weakened test.",
+        "typecheck": "34 existing errors in the same 3 baseline files; no new visualization/type errors in linear-dc-day-bend-and-streamlines-typecheck-final-v4-20261022.log.",
+        "native_build": "pnpm exec tauri build --debug --no-bundle --ci passed in linear-dc-day-bend-and-streamlines-native-build-final-v2-20261022.log. No installer/ZIP/delivery bundle or push.",
+        "remaining": "Original source/general qualification, Case B, observed WKWebView and isolated installation/license gates unchanged. Daytime checks stay 2/5, parent 1/6."
+      }
+    },
+    "qualified_coil_field_followup": {
+      "status": "qualified-source-first-coil-generated-B-implemented-and-verified",
+      "user_direction": "User clarified primary interest is coils own B-fields rather than magnets, then explicitly selected Qualified sources first. No authorization for arbitrary-design approximation or a new offline source/force campaign.",
+      "entry": "Coil currents, qualified DC is the default source. Select an exact audited case, inspect/acknowledge its explicit placement and finite return, select sampled signed DC loop current, then Sample coil B-field. Source controls fold after completion. Unsupported or unmatched geometry displays no PM/wire substitute. Optional Permanent magnets only is explicitly selectable.",
+      "physical_model": "Actual host-rebuilt copper matched through existing exact-case registry admission, audit and all evidence re-verified. Existing affine-RT0 finite tetrahedral source directly integrated at 96 newly declared exterior XYZ points, scaled by its own effective loop current. Audited translation maps routing observations into the original finite-source frame without physical relocation. Signed driven-phase currents shown where bound declaration provides them. No filament, source radius, softening, fitted correction, inside-copper extrapolation, PM contribution, nonlinear material reaction or arbitrary independent AC phase current. Heat remains separately labeled cycle-average I2R; DC coil loop does not silently change its excitation.",
+      "operation": "start_dc_winding_field shares the one-owned-DC-worker policy with force/preparation/inspection. 180s host whole-job cap, 170s child cap, sampled 4GiB native guard, 96-point cap, original input/result limits. Edits/source selection/tab departure/unmount/shutdown invalidate results and cancel owned group. Winding reports are a separate optional status field, never accepted as force or preparation. Source/audit/implementation hashes and exact XYZ grid/magnitudes rechecked before publication.",
+      "display_limits": "Native direct samples are finite-copper winding-source B, not a newly qualified coupled FEM grid. Lines/slice still interpolate samples and need not preserve divergence-free topology. Revisited trajectories stop instead of repeatedly overpainting coarse-grid spirals. No blanket near-copper accuracy, thermal or general new-design qualification claimed.",
+      "real_saved_host": {
+        "log": "linear-dc-day-coil-field-real-saved-host-v4-20261022.log",
+        "test_seconds": 43.71,
+        "completed_job": "dc-desktop-jobs/dc-ThJaQr",
+        "report": "dc-desktop-jobs/dc-ThJaQr/result/summary.json",
+        "report_sha256": "3dabc50ada671116fc824c2f060e571639fcc914f0e0c767e24d347223f57a88",
+        "source_cells": 276596,
+        "observations": 96,
+        "phase_currents_a": {"A": 0.1, "C": -0.1},
+        "maximum_sample_magnitude_t": 0.00009797886070152577,
+        "peak_physical_footprint_bytes": 246203544,
+        "unsupported_return_rejected": "dc-desktop-jobs/dc-t4nNff failed before field publication",
+        "cancelled_job": "dc-desktop-jobs/dc-Jatxrb final host status cancelled, field/force null and owned group absent/defunct verified. Raw Python receipt remains running/stale because whole-group kill stopped final write; preserved, never called completed.",
+        "preserved_failures": "dc-Szb8RC failed on Path-vs-string evidence key lookup; dc-V5JCAW failed by treating a hash-bound physical declaration as a numerical report needing command_receipt. Both ended before retry, preserved. Bound-declaration regression covers the corrected distinction; no admission/numerical gate relaxed."
+      },
+      "verification": {
+        "helpers": "478 passed, zero skips, 31.813s in linear-dc-day-coil-field-helpers-final-v2-20261022.log, clean source-worker environment without PYTHONPATH.",
+        "frontend": "497 passed, 1 existing skip, 55 files, 1.36s in linear-dc-day-coil-field-frontend-final-v2-20261022.log.",
+        "desktop": "123 passed, 11 explicit ignored external-environment tests, 40.26s in linear-dc-day-coil-field-desktop-final-v1-20261022.log. Real saved-host winding pass/reject/cancel test separately executed successfully.",
+        "browser": "Final frozen-state full suite: 372 passed, zero skipped/unexpected/flaky, 350.372s in linear-dc-day-coil-field-full-browser-final-v3-20261022/report.json. SHA256 3fbc2b0f0e021041e49b1673e956916b3d1ac04785d3f67c31bd6f72de8dd398. Includes actual finite-copper report rendering with no magnets, source-primary/no-fallback UI, explicit acknowledgement, phase/current binding and clearing, plus existing PM/loss/mobile/driver/housing/import suites.",
+        "preserved_browser_failures": "Initial targeted mobile helper inspected compact-toggle visibility before lazy viewer loaded; fixed explicit readiness wait. Full v1 and v2 each371pass/1failure found actual shorter-viewport source-required legend covering Sample button; fixed settings z-order and bounded scrolling. Six exact control repeats passed, then final full frozen v3 all372 passed. No forced clicks, skipped assertions or hidden failures.",
+        "native_build": "pnpm exec tauri build --debug --no-bundle --ci passed in linear-dc-day-coil-field-native-build-final-v3-20261022.log. No installer/ZIP/delivery bundle/push.",
+        "typecheck": "Same 34 existing errors in 3 baseline files; no new field/controller/component errors in linear-dc-day-coil-field-typecheck-final-v3-20261022.log.",
+        "worker": "Clean pinned magnetic worker checker imports new source sampler and supervisor without PYTHONPATH, passed linear-dc-day-coil-field-clean-worker-check-v1-20261022.json. No new dependency or installation/license acceptance claim.",
+        "remaining": "Arbitrary-design coil sources/general preparation/qualification, independent AC phase excitation, coupled field/material response, Case B, observed native WKWebView and isolated installation/license gates remain open. Parent/daytime checks unchanged. No offline source/cache/force campaign launched."
+      }
+    },
+    "preparation_integration": {
+      "state": "bounded-explicit-source-only-stage-implemented-not-general-qualification",
+      "entry": "Prepare current source requires actual-design applicability, placement/return acknowledgement and separate14400s confirmation. Currentstageandhardlimits exposed. Fullbaseline completion remainsunverified; no longsourcecampaign launchedtoday.",
+      "guards": "Separate pinned preparationPython withPyAMG5.3.0, no developerPYTHONPATH. OneownedPOSIXgroup,14400swholebudget,13GiBsamplednativeguard,8GiBevidencecap/8GiBfree-diskreserve. Serialstagesmustfitwholebudget; edits/tabdeparture/shutdowncancelandhideartifacts. Host verifiesrequest/artifacthashes/statuses/stagesandneveracceptsforcefrompreparation.",
+      "real_cancellation": "linear-dc-day-preparation-real-saved-host-cancel-final-v3-20261022.log passed1explicitrealtest0.97s, evidence dc-desktop-jobs/dc-Y97R7I. CancelledduringCAD beforecurrentlaunch; ownedgroupchildrenabsent andnoforce/sourcepublished.",
+      "current_saved_host_applicability": "linear-dc-day-case-a-current-app-applicability-v3-20261022.log passed1explicitrealtest2.04s withcleanworker andactualsavedCaseAcopper, correctlyqualified. No magneticfieldsolve orarchivedforce returned.",
+      "installer": "Fresh source-preparationvenv dc-source-worker-clean-install-v1-20261022 installedpinnedworker+PyAMGwithoutPYTHONPATH. FinalcheckerimportsprepentrypointsandcompiledAMGsmokepasses. Same-machinevenvisnotisolatedmacOSreproduction ortransitivenative/licenseclearance."
+    },
+    "overnight_preflight": {
+      "script": "scripts/solvers/preflight_linear_dc_campaign.py",
+      "method": "Actualscriptparse_args interceptioninchildPython,threadwrapperstoppedbeforeNGSolveTaskManager. CLIrequiredflags/types,DAG,output/logcollisions,priorreceipts,missingproducerdependenciesandfulltimeout/launchmargin/RAMscheduleinspectedwithoutsolverexecution.",
+      "draft": "linear-dc-day-detached-supervision-v1-20261022/night-case-b-source-recovery-v1-campaign.json",
+      "audit": "linear-dc-day-detached-supervision-v1-20261022/night-case-b-source-recovery-v1-prelaunch-v2.json",
+      "audit_status": "passed-nonnumerical-prelaunch-audit-only",
+      "declared_order_full_budget_seconds": 8370,
+      "checkpoint": "Port0.4endedmesh98bec7166e4cf2be5a2a0b03135089a3284a56af5d79953c124590586cc510b1 reverifiedwithfinalmemory-limitreceipt/absentidentities/physical-CAD-implementationhashes;onlyeligiblemesh,notafield.",
+      "prevention": "Correctfirst-report/second-reportflagsvalidatedagainstrealparser;meshcurrentnotrerunforCLI-onlyfailure. Fresh13GiBportzero-solve,active/passive/return/H1agreementandlocalchecksbeforeRT0/fixedfields. Initialnonnumericalauditmisclassifiedauditorinputworkasoutput;preservedfailedreport,correctedrulewithregressiontest,newv2auditpasses. Nocampaignhasbeenlaunchedtoday.",
+      "limit": "This8370srecovery-stagebudgetisnotafullCaseBovernightfit. Mandatorycacheforecastsstill18.34serialhoursbeforeforcecontrols;globalresource/criticalpathfitandallforcecoverage remainrequiredbeforelaunchingfullcampaign."
+    },
+    "verification": {
+      "helpers": "475passed,zeroskips,38.105s in linear-dc-day-visualization-preflight-helpers-v4-20261022.log;cleaninstalledsourceenvironment,noPYTHONPATH.",
+      "simulation": "201unit+7integrationpassed,2ignored,16.70s+0.07s in linear-dc-day-3d-visualization-simulation-v2-20261022.log.",
+      "frontend": "486passed,1existingskip in linear-dc-day-visualization-frontend-final-v3-20261022.log.",
+      "desktop": "122passed,10explicitlyignored external-environmenttests,37.11s in linear-dc-day-app-and-viewer-desktop-final-v5-20261022.log. The actualsavedhost cancellation andnativeviewerexport tests were runseparately, notinferredfromignoredcounts.",
+      "browser": "Finalfullv3passed364,zeroskips/flakes338.061s in linear-dc-day-3d-app-full-browser-v3-20261022/report.json;reportSHAc34b3c16336b62fdc44d09898ab0591ad5b7f8313bea7f1644bf667cb311b1f1. Includesactualnative-provenanceexportv2mapping,WebGLoverlayrendering,mobile/phasehiding/Z/stale/error/cancelchecks andexistinghousing/dock/importregressions. Fullv2also364passed345.779s. Earlierfullv1ended363passed1failed because nativeexportv1lackedtheaddedimplementationdigest;preservednotcountedasallpass.",
+      "native_build": "pnpm exec tauri build --debug --no-bundle --ci passed in linear-dc-day-3d-app-native-build-final-v4-20261022.log. NoZIP/appbundle/installercreated orobservedWKWebViewinteractionclaimed.",
+      "typecheck": "34errorsin3previouslyfailingfilesDocumentEditor.svelte,DriverSuitability.svelte,cadMapping.test.ts;noneonnewvisualizationlines ornewmodules. Samebaselinecountin linear-dc-day-visualization-svelte-check-final-v3-20261022.log,notatypecheckpass.",
+      "svelte_mcp": "Officialdocsconsulted;changedcomponentsautofixerreportsnoissues. Suggestionsreviewed:effectsownexternalIPC/cancellation,ThreeGPUcleanup,camerafitandrenderinvalidation,notderivednumericstate.",
+      "remaining": "Successfulfullnewrequestpreparation/generalqualification,observednativeWKWebViewinteraction,isolatedmacOSuser/machineandtransitivenative/licenseacceptanceunproven. OvernightCaseBsource/field/forceworkremainseparateandunqualified."
+    }
+  },
+  "user_directed_split_2026_10_22": {
+    "observed_at_utc": "2026-10-22T15:12:00Z",
+    "instruction": "No more offline simulation campaigns for the rest of today. Focus on integrating existing verified work into the app, verification, and heat/loss plus magnetic-field visualization in the existing 3D viewer when Simulate is selected. Defer long remaining source/field/Case B qualification work to a separately planned 12-hour overnight window.",
+    "parent_plan": "ab7e988f-ed3c-4e40-a43b-d7c7f84cbe89",
+    "daytime_plan": "15235a51-0ca4-4ba6-90ee-3c3bd4faa529",
+    "overnight_plan": "06b8f23f-1ae6-4dae-a5f0-13ed7eb22f42",
+    "overnight_duration_hours": 12,
+    "overnight_start_utc": "2026-10-22T18:00:00Z",
+    "overnight_end_utc": "2026-10-23T06:00:00Z",
+    "overnight_timezone": "Europe/Stockholm",
+    "overnight_start_task": "2b8157f3-c681-4b01-a897-1b205922f85c",
+    "launch_permission": "User confirmed both plans and supplied roughly8:00PM tonight. Stated assumption uses this Mac's Europe/Stockholm zone:20:00CEST through08:00CEST nextday. One start prompt scheduled into this session; it requires OpenChamber/host awake, preflight approval and job-budget fit. No numerical work launched early and old recurring task staysdisabled.",
+    "quiescence": "Scanned all detached job declarations and running receipts with live-worker identities; no live numerical worker. launchctl list showed no running owned com.pcbmotorgen.dc.20261022 services. Campaigns had already ended, so no worker needed cancellation.",
+    "case_b_source_controls_final": "16 completed, two failed, five blocked. Mesh150um active and fixed-field checks pass, but its local comparison used wrong flags. Port0.4 source hit its11GiB guard after saving an eligible candidate mesh; no accepted current solution. Preserve failures and verify checkpoint before any fresh zero solve tonight.",
+    "case_b_port_checkpoint": {
+      "work": "linear-dc-day-case-b-drill150um-controls-source-m200-c6-p40-v1-20261022",
+      "failure": "memory-limit at997.597777s;12,040,825,200bytes above11GiB guard",
+      "mesh_sha256": "98bec7166e4cf2be5a2a0b03135089a3284a56af5d79953c124590586cc510b1",
+      "elements": 3791787,
+      "estimated_dofs": 12366888,
+      "mesh_cad_relative_difference": 0.0008323106968071148,
+      "current_solution": "none; summary running state is stale and cannot qualify a field"
+    },
+    "case_b_magnetic_preflights_final": "Nine completed, bare-force900s timeout preserved, pose preflight blocked. All five fresh5GiB cache preflights pass; earlier2GiB failures remain failed.",
+    "cache_forecasts_seconds": {
+      "coarse": 5386.755492421083,
+      "domain": 5836.74256237445,
+      "refined": 10016.024636973549,
+      "opening": 20083.334017280104,
+      "quadrature": 24687.09236200058
+    },
+    "schedule_policy": "Five caches total18.34serial hours before source-refinement caches, bare/pose references and coupled solves. Overnight plan requires global RAM reservations and a full budgeted critical-path fit, not a serial12h promise or division by parallel count. Validate all actual argv/parser contracts and outputs before launch; local audit needs --first-report/--second-report.",
+    "visualization_policy": "Default heat means actual calculated loss, not temperature. Show model/units/provenance and distinguish PM-only analytical fields from solved coupled fields. Existing Y-averaged2D grid must not be extruded and presented as a solved3D field. No fabricated hot spots or unqualified CaseB forces.",
+    "progress_policy": "User confirmed both plans. Implement daytime app/3D visualization work now without offline campaigns; overnight tasks remain open until complete evidence. Parent physical/model/numerical/native/installation requirements remain in force."
+  },
+  "approval": {
+    "user_request": "Implement the Complete the remaining linear static-DC app work today plan, updating checks as work finishes.",
+    "compute_window_choice": "12 hours (Recommended), explicitly selected by user",
+    "approved_at_utc": "2026-10-22T07:59:49.742086Z",
+    "compute_end_utc": "2026-10-22T19:59:49.742086Z",
+    "acceptance_reserve_starts_utc": "2026-10-22T18:29:49.742086Z",
+    "policy": "Each numerical job budget must fit before acceptance reserve, unless itself an acceptance job. No automatic extension. No push or bundles.",
+    "case_b_drill_revision": "User explicitly approved retaining the five-strand simulation design with 0.15 mm drill and 0.10 mm annular ring, noting four strands would be more reasonable for manufacturing. Separate saved revision only. No other physical change, prior-field reuse or numerical gate relaxation. 0.35 mm pads leave 0.05 mm at the identified 0.40 mm centres; no manufacturing/DRC suitability claim."
+  },
+  "scope": {
+    "linear": "Actual supported generated straight-trace finite copper with explicit layers,vias,connectivity,resistivity,returns and app-defined PM/planar magnetic materials. Exact admission envelope and two additional saved linear cases are being audited before qualification.",
+    "deferred": "Imported PM/ferrite/housing geometry;rotary torque/angular/commutation;inductance,true reversal,temperature,hardware,AC/PWM. Existing generated-case approval never transfers silently.",
+    "preservation": "Existing housing screening,merged UI,original root designs,historical failures and Mutagen."
+  },
+  "plan_progress": {
+    "step_1": "complete;new12h cutoff approved,765recorded evidence hashes verified,actual two new saved host designs exported,production descriptors and closed return graphs checked;nominal app-defined models and explicit returns prepared;vertical finite-extent separation proved before CAD;per-case source/force/control matrix and candidate/admission envelope recorded. No source/force qualification from preparation.",
+    "steps_2_through_6": "not complete",
+    "step_2": "Imported drive-length and CaseA source/field controls pass. Revised B baseline active/passive/return/H1/RT0 and27fixed near-field probes pass, curvature4 and mesh150um source/field controls pass. Remaining port drive-length and mesh-local audit deferred to tonight; original shorted B remains unsupported. No gate waived or step checked complete.",
+    "step_4": "Recorded and CaseA exact sampled cases are registered with actual saved-host fresh calculation evidence. Revised B is unqualified; original shorted B unsupported. Explicit bounded source-only app preparation has actual-request CAD and current-host cancellation/contract evidence, but full general qualification/completed newsource remain unverified. Daytime3D nativePMfield andnetworkJouleloss overlays areimplemented, withtwo daytimecheckscompleted; remaininggeneral/native/installationacceptance staysopen."
+  },
+  "source_gap": {
+    "work": "dc-imported-star4-curvature4-port-control-v3-detached-day-20261022",
+    "preserved_interrupted_v2_work": "dc-imported-star4-curvature4-port-control-v2-day-20261022",
+    "purpose": "Generic electrical drive-length control only,not imported magnetic coupling or app admission",
+    "status": "passed-global-local-passive-return-and-independent-current-drive-length-controls",
+    "observed_at_utc": "2026-10-22T09:33:11Z",
+    "interrupted_seconds": 618.7470707920147,
+    "preserved_v2_interruption_liveness": "Receipt supervisor33397 and watcher33815 absent; no matching solver or watcher processes. Numerical running summary is stale. Cause unknown. No duplicate launched from stale state.",
+    "source_work": "dc-imported-star4-curvature4-dc-v1-20261021",
+    "port_fraction": 0.4,
+    "curvature_safety": 4,
+    "timeout_s": 10800,
+    "max_dofs": 24000000,
+    "native_footprint_limit_bytes": 19327352832,
+    "threads": 2,
+    "v3": {
+      "work": "dc-imported-star4-curvature4-port-control-v3-detached-day-20261022",
+      "seconds": 3896.85,
+      "peak_physical_footprint_bytes": 15206396408,
+      "mesh_elements": 5433456,
+      "dofs": 18182860,
+      "resistance_ohm": 15.045397182749962,
+      "reference_resistance_ohm": 15.045399018902202,
+      "relative_difference": 1.220407954694025e-07,
+      "relative_power_balance": 7.038813976123492e-14,
+      "effective_loop_current_a": 0.0664655102057746,
+      "active_report": "dc-imported-star4-port-v3-all-active-v1-20261022.json",
+      "active_sha256": "9635bbb43fc88e5124a6723d799db7d3eda7535ace5f8767a24f677184b2e58f",
+      "active_sections": 1004,
+      "active_failures": 0,
+      "active_seconds": 903.67,
+      "local_refinement": "dc-imported-star4-port-v3-local-current-refinement-v1-20261022.json",
+      "local_refinement_sha256": "72bc3abeb4019abb22063b15a382804d00f57b766c865dfdbe20c636a6005670",
+      "local_failures": 0,
+      "services": "port-v3/port-v3-watch exited0 runs1, unloaded after nonrunning status; plists/logs kept. Watcher observed chains-finished.",
+      "followup": {
+        "campaign": "linear-dc-day-port-v3-followup-v1",
+        "status": "all3jobs completed;outer receipt exit0 and launcher success;owned worker/watcher labels unloaded after final nonrunning service/watcher checks",
+        "passive": "linear-dc-day-port-v3-passive-v1-20261022.json:507sections,0failures,1126.36s",
+        "return": "linear-dc-day-port-v3-return-v1-20261022.json:4sections,0failures,100.17s",
+        "primal": "linear-dc-day-port-v3-primal-v1-20261022:completed176.04s;H1R14.984939925182541ohm;original-matrix algebraic corrections reached unchanged power/current gates on pass2of3",
+        "agreement": "linear-dc-day-port-v3-primal-agreement-v1-20261022.json passed;relative0.004034534530620304 below5%gate. No imported magnetic geometry or app-force admission."
+      }
+    },
+    "scope": "Generic imported electrical drive-length control only; no imported magnetic geometry, near-field or app admission."
+  },
+  "reused_evidence_audit": {
+    "recorded_matrix_sha256": "6cfab100944bc80d3312da9bd6b3f5e66b2afa3c623f56e8d643b214a1dedb9f",
+    "evidence_hashes_verified": 765,
+    "magnetic_jobs": 37,
+    "saved_states": 185,
+    "control_pairs": 44
+  },
+  "case_preparation": {
+    "declaration": "scripts/solvers/cases/linear-dc-day-generated-cases-20261022-v2.json",
+    "saved_design_archive": "linear-dc-day-generated-designs-v2-20261022",
+    "host_exports": "Both actual saved designs exported through production prepare_dc_winding_geometry via the explicit Rust host export test,one passed/zero ignored per invocation. No fixture copper substitution.",
+    "case_a": "Compact two-strand four-layer board:77segments/54vias,active0/1,blind0-to-1,0.4mm depth,new declared saved pose6mm.",
+    "case_b": "Five-strand six-layer board:545segments/384vias,active0/1,blind0-to-1,0.3mm depth,70um inner copper,new declared saved pose12mm.",
+    "preserved_v1": "Inherited41.4mm mover position fell outside new travel in both v1 derived designs. Original/v1 files untouched;v2 explicitly declares valid new design poses with no automatic clamp. Unused declared layers are not called active coverage.",
+    "study_declaration": "scripts/solvers/cases/linear-dc-day-study-inputs-20261022.json",
+    "acceptance_matrix": "scripts/solvers/cases/linear-dc-day-acceptance-matrix-20261022.json",
+    "prepared_model_return_archive": "linear-dc-day-actual-study-inputs-v2-20261022",
+    "source_coordinate_mapping": "Rigid PCB-centering transform only,magnet centre derived from each actual saved first-magnet pose;nominal PCB-bottom stack unchanged. All source fixture bytes remain actual production host output.",
+    "case_a_vertical_copper_stack_separation_m": 0.0007825,
+    "case_b_vertical_copper_stack_separation_m": 0.001165,
+    "separation_scope": "Conservative exact finite trace/via Z intervals establish disjoint vertical extents. Actual CAD union/overlap/distance/tagging checks still required before coupling;no inherited35um clearance or geometry correction.",
+    "metadata_failure_preserved": "Study-input v1 rejected host log because Rust test prints metadata after a known test prefix;no geometry generated. Parser now accepts only standaloneJSON or exact known export-test prefix and checks path/version/hash provenance. v2 completed with all immutable input hashes verified.",
+    "tests": "412helpers passed,0skips,30.136s in linear-dc-day-study-source-all-helpers-v2-20261022.log,including declared curvature4/6 source controls and rejection of empty/disconnected winding CAD before return construction.",
+    "case_a_exact_cad": {
+      "canonical_archive": "linear-dc-day-case-a-copper-v1-20261022",
+      "status": "completed-finite-copper-geometry-only-unqualified",
+      "seconds": 8.192176749929786,
+      "bare_brep_sha256": "83fe58fa59c1cf9a04b7a477a40b03eaa930bd5da84b5fce3ecd940a96576b3f",
+      "bare_volume_m3": 3.5011945325895833e-09,
+      "nonterminal_return_contact_volume_m3": 0.0,
+      "closed_copper_ferrite_distance_m": 0.0007824999999999999,
+      "all_partition_overlap_volumes_m3": 0.0,
+      "preserved_repeat": "linear-dc-case-a-copper-v1-20261022 has identical bare BRep bytes;not independent physics evidence. Both receipts and launcher reports completed exit0. Completed owned worker/watcher labels unloaded;plists/logs retained."
+    },
+    "case_b_exact_cad": {
+      "archive": "linear-dc-day-case-b-copper-v1-20261022",
+      "status": "failed-no-geometry-or-source-acceptance",
+      "seconds": 70.57676345808432,
+      "receipt_exit_code": 1,
+      "launcher_status": "failed-or-interrupted",
+      "watcher_status": "attention-required",
+      "service_cleanup": "Worker final service exit1,watcher final service exit2 with attention-required report;both nonrunning,owned labels unloaded. All plist/log/receipt/diagnostic evidence preserved.",
+      "error": "StdFail_NotDone in copper/material BRep distance. Saved geometry reports zero winding solids and zero volume;188byte bare BRep cannot reload:Bnd_Box is void. Closed shape contains only return,not winding.",
+      "diagnostics": "linear-dc-day-case-b-partition-diagnostic-v1-20261022.log preserves reload failure;v2 diagnostic reports exact saved bare reload failure and return-only14face closed shape. Read-only diagnostics do not admit any geometry.",
+      "guard": "New preparer rejects empty/nonfinite/disconnected winding union before return construction. Fresh-source entry point independently rejects empty bare CAD. No Boolean healing,material moves,geometry corrections or automatic retries performed.",
+      "next_gate": "Investigate exact saved-primitive Boolean construction without physical changes. Case B cannot advance to source/force qualification until actual winding CAD is recovered and independently checked."
+    },
+    "case_b_exact_cad_v4": {
+      "archive": "linear-dc-day-case-b-copper-v4-20261022",
+      "status": "completed-finite-copper-geometry-only-unqualified",
+      "receipt_exit_code": 0,
+      "launcher_status": "completed-command-not-numerical-qualification",
+      "whole_command_seconds": 498.6546465830179,
+      "bare_brep_sha256": "45e12614ffc40bc588b64576a699ca8bac38a188e31017018b2a399e375dbcc9",
+      "bare_volume_m3": 2.1396137874462557e-8,
+      "closed_volume_m3": 2.144447491735545e-8,
+      "solid_components": 1,
+      "analytic_union_relative_difference": 1.1685115320458905e-5,
+      "nonterminal_return_contact_volume_m3": 0.0,
+      "minimum_closed_copper_ferrite_distance_m": 0.001165,
+      "all_partition_overlap_volumes_m3": 0.0,
+      "verification": "Study/fixture/implementation/archive hashes and both BRep hashes checked. Same545traces/384vias and original dimensions;only Boolean grouping/order changed. No tolerance/healing/material correction. Own completed worker/watcher labels unloaded,logs/plists retained. Historicalv1/v2/v3 failures remain preserved."
+    },
+    "fresh_source_entry": "solve_linear_dc_study.py retains declared controls, exact CAD provenance, 2% volume gate and 24M preassembly cap. Original B global basis passed but failed local gates. Approved drill150um B hit an 8 GiB guard after saving a verified 12.37M-DOF mesh; v2 reuses only that ended hash-checked mesh and solves from zero under 13 GiB. No failed field imported or source/force acceptance claimed."
+  },
+  "memory_verification": {
+    "tool": "opencode-mem memory MCP",
+    "canonical_project": "/Users/dylanbertram/Dev/projects_embedded/pcbmotorgen",
+    "scope_hash": "c50ca0bbde64bb9c",
+    "status": "Initially no project memories. State,evidence,interruption and recovery memories now explicitly stored and retrieved. list-shards verified the first3memories/3vectors in current canonical project shard;fourth recovery memory separately search-verified. Not an orphaned worktree. Explicit persistence/retrieval is proven,not automatic capture of every turn.",
+    "cad_source_milestone_memory": "mem_1792659860038_uimo5in1x stored and search-retrieved using linear-dc case-b188byte empty winding;412helper tests,case-A CAD,case-B failure,live-v3 identities and unchanged cutoff recorded."
+  },
+  "supervision_recovery": {
+    "probe_v1": "launchctl submit restarted the completed probe. Exclusive report reservation prevented duplicate execution; repeated starts failed. Label removed,all evidence preserved. Do not use submit for one-shot solver ownership.",
+    "probe_v2": "Explicit plist KeepAlive=false/RunAtLoad=true,bootstrapped from evidence directory,not a login/startup location. Probe completed exit0,launchctl print shows runs=1,last exit0,no stderr and no active instance. This tests ownership/runner,not numerical physics.",
+    "worker_label": "com.pcbmotorgen.dc.20261022.port-v3",
+    "watcher_label": "com.pcbmotorgen.dc.20261022.port-v3-watch",
+    "domain": "gui/501",
+    "service_evidence": "linear-dc-day-detached-supervision-v1-20261022",
+    "source_work": "dc-imported-star4-curvature4-port-control-v3-detached-day-20261022",
+    "current_status": "Fresh v3 submitted with same physical source,portfraction0.4,curvature4,10800s cap,24MDOF preassembly cap,18GiB native guard. Original v1/v2 fields not imported. Actual worker identity verified;supervisor parent is launchd PID1,not conversation shell. Independent one-shot watcher bootstrapped separately.",
+    "health_task": "d87a98ed-ebb4-4779-b16d-e23d91b24c82 was originally configured every five minutes. At 12:40Z its current state was disabled, confirmed by schedule.list; it was left disabled rather than overriding an unexplained setting. Prompt updated for the approved drill revision. Local bounded launchd supervisors/watchers remain active, but periodic agent continuation is not claimed.",
+    "tests": "406helpers passed,0skips,28.708s in linear-dc-day-one-shot-supervision-all-helpers-v2-20261022.log,including input/deadline/native memory/one-shot ownership policies. No application/native E2E qualification from supervision probe."
+  },
+  "case_a_source": {
+    "status": "passed-source-controls-curvature6-basis-no-magnetic-or-force-acceptance",
+    "copper": "linear-dc-day-case-a-copper-v1-20261022",
+    "union_audit": {
+      "report": "linear-dc-day-case-a-union-volume-v1-20261022.json",
+      "sha256": "39b94280f2cf3b4bb701189ba0d07a118d61bb7ecd3133576d0ce67d6b9932ce",
+      "primitives": 393,
+      "relative_difference": 0.00025686020057058556,
+      "gate": 0.005,
+      "mesh_coverage_min": 1.0,
+      "note": "New independent analytic declared-primitive union audit; recorded star2 copper also passes(5.02e-5,linear-dc-day-recorded-star2-union-volume-v1-20261022.json)."
+    },
+    "curvature4": {
+      "work": "linear-dc-day-case-a-source-m200-c4-p50-v1-20261022",
+      "resistance_ohm": 0.7789033277775826,
+      "active_status": "failed",
+      "active_failures": 16,
+      "cause": "via barrel section area2.2-3.0%>2% at curvature4; currents within1.4% of gate. Preserved, not waived."
+    },
+    "basis": {
+      "work": "linear-dc-day-case-a-source-m200-c6-p50-v1-20261022",
+      "mesh_m": 0.0002,
+      "curvature_safety": 6.0,
+      "port_fraction": 0.5,
+      "mesh_elements": 276596,
+      "resistance_ohm": 0.7782721787803403,
+      "effective_loop_current_a": 1.2848975297654064,
+      "summary_sha256": "f5100e499359421c1510bba2fd5aca3ec790f1daed4e6fb5247586ce9fb6716e",
+      "solution_sha256": "065c57ec66e1920beea9c3240fd084ca47c099811da221eab091b7e01ec2a90d",
+      "seconds": 63.3,
+      "volume_relative_difference": 0.0012625281542238964
+    },
+    "controls": {
+      "mesh_m150": 4.126491016887002e-06,
+      "port_p40": 9.607587192039801e-06,
+      "h1_agreement": 0.0035098009806531216,
+      "curvature_c4_c6_resistance": 0.0008109617874705322,
+      "curvature_c4_c6_max_current_gate_fraction": 0.02893465989334477,
+      "active_sections": 79,
+      "active_failures_c6": 0,
+      "local_mesh": "passed",
+      "local_port": "passed",
+      "passive_sections": 42,
+      "passive_failures": 0,
+      "stub_controls": "none: saved geometry records zero physical stubs (explicit --declared-no-stubs)",
+      "return_sections": 4,
+      "return_failures": 0,
+      "rt0": "passed-affine-rt0-source-export-only",
+      "rt0_work": "linear-dc-day-case-a-rt0-m200-c6-p50-v1-20261022"
+    },
+    "reports": [
+      "linear-dc-day-case-a-active-m150-c6-p50-v1-20261022.json",
+      "linear-dc-day-case-a-active-m200-c4-p50-v1-20261022.json",
+      "linear-dc-day-case-a-active-m200-c6-p40-v1-20261022.json",
+      "linear-dc-day-case-a-active-m200-c6-p50-v1-20261022.json",
+      "linear-dc-day-case-a-curvature-c4-c6-supplementary-v1-20261022.json",
+      "linear-dc-day-case-a-local-mesh-refinement-c6-v1-20261022.json",
+      "linear-dc-day-case-a-local-port-refinement-c6-v1-20261022.json",
+      "linear-dc-day-case-a-mesh-resistance-c6-v1-20261022.json",
+      "linear-dc-day-case-a-passive-m200-c6-p50-v1-20261022.json",
+      "linear-dc-day-case-a-port-resistance-c6-v1-20261022.json",
+      "linear-dc-day-case-a-primal-agreement-c6-v1-20261022.json",
+      "linear-dc-day-case-a-return-m200-c6-p50-v1-20261022.json",
+      "linear-dc-day-case-a-union-volume-v1-20261022.json"
+    ]
+  },
+  "case_b_union_diagnosis": {
+    "status": "faithful-cad-v4-preserves-physical-cross-phase-pad-shorts-source-locals-failed-no-force-admission",
+    "analytic_union_m3": 2.1395887861045515e-08,
+    "finding": "Historicalv1finding:pairwise OCC fuse loses volume silently:two faithful level-8 subtrees(1.538e-8,4.13e-9m3) fuse to9.30e-9m3 vs analytic1.92e-8 at level9,then empty at level10. Order swap,UnifySameDomain and Fuse([..]) also empty;Glue is a partition,not accepted. Later v4single-drill Boolean ordering passed final CAD without healing/substitution;source/force qualification remains separate.",
+    "reports": [
+      "linear-dc-day-case-b-union-diagnostic-v1-20261022.json",
+      "linear-dc-day-case-b-union-diagnostic-v2-20261022.json",
+      "linear-dc-day-case-b-union-experiment-v1-20261022.json",
+      "linear-dc-day-case-b-union-volume-v1-20261022.json",
+      "linear-dc-day-case-b-fuse-loss-v1-20261022.json",
+      "linear-dc-day-case-b-fuse-loss-v2-20261022.json (empty: serialization failure, preserved)"
+    ],
+    "drilling_followup": {
+      "case_b_copper_v2": "linear-dc-day-case-b-copper-v2-20261022: bounded1800s timeout,final launcher failed-or-interrupted;geometry summary remains running and is not success. Completed own labels unloaded;all evidence preserved.",
+      "case_b_copper_v3": "linear-dc-day-case-b-copper-v3-20261022: failed268.70s/exit1;drill-each-kind-then-fuse yields4solids and volume2.1096512919552742e-8m3 versus analytic drilled union2.1395887861045515e-8m3. Nonempty-single-solid guard rejected it;no winding/source admission.",
+      "important_distinction": "The undrilled per-kind fuse matched the undrilled analytic union. That is NOT a successful final drilled winding and must not be called case-B recovery. Per-kind grouped builder remains experimental;guards reject failed final topology/volume.",
+      "case_a_crosscheck": "linear-dc-day-case-a-copper-perkind-v1-20261022 completed16.56s/exit0;volume3.5011945365730746e-9m3 versus canonical3.5011945325895833e-9. No independent current/force evidence and no replacement of canonical case-A source.",
+      "active_diagnostic": "linear-dc-day-case-b-single-drill-v1-20261022 completed exit0 with final launcher success. One drilled solid,volume2.1396137874462557e-8m3,relative analytic-union difference1.1685115320458905e-5. Single cut completed at476.65s. Diagnostic only,no downstream CAD. Earlier conversation-shell drill-v2 diagnostic was interrupted and produced no report or surviving worker.",
+      "production_v4": "linear-dc-day-case-b-copper-v4-20261022 completed498.65s/exit0 and passed exact union,connectivity,return and partition gates;see case_preparation.case_b_exact_cad_v4. Force/app admission still absent.",
+      "historical_strategy_job": "case-b-fuse-strategy-v1 timed out under its3600s budget;its partial report is diagnostic-only,never source CAD. Final receipts/launcher must be checked before service cleanup."
+    }
+  },
+  "tests_latest": "Qualified-source-first coil B follow-up:478helpers0skips31.813s;frontend497pass1existing skip;desktop123pass11explicit ignored40.26s;final fullbrowser372pass0skip/unexpected/flaky350.372s reportSHA3fbc2b0f0e021041e49b1673e956916b3d1ac04785d3f67c31bd6f72de8dd398. Native no-bundlebuild and clean worker imports pass. Actual savedCaseA direct finite-copper96XYZ sampling atA+.1/C-.1A plus unsupported-return reject/owned-group cancellation passed43.71s. No PM substitution or offline source/cache/force campaign. Historical integration/browser failures preserved with fixes documented. Same34baseline type errors; original arbitrary-source/general,CaseB,nativeWKWebView,isolatedinstall/license gates remain open.",
+  "app_integration": {
+    "status": "implemented-per-design-registry-admission-recorded-case-registered-case-a-pending-audit",
+    "request": "finite-dc-live-request-v2 from host; no host-pinned basis. Worker re-verifies every registered audit/evidence, requires exactly one exact match, else Qualification required with per-case reason before any solve.",
+    "registry": {
+      "path": "/Users/dylanbertram/.local/opt/solver-prototypes-macos/dc-qualified-linear-cases-v1.json",
+      "sha256": "4a6adbe880bc2bc59d8e8c78b417ac98840d06bfc99b399150c93724c34136f5",
+      "cases": [
+        "recorded-star2-two-layer-v1"
+      ],
+      "preserved_trial": "linear-dc-day-registry-trial-without-declaration-v1-20261022.json (first trial entry lacked UI declaration; set aside, not deleted)"
+    },
+    "real_host_jobs": {
+      "dev_venv": {
+        "evidence": "dc-desktop-jobs/dc-l50RuJ",
+        "seconds": 94.79,
+        "unsupported": "dc-desktop-jobs/dc-ttN11B",
+        "cancelled": "dc-desktop-jobs/dc-pluWWI"
+      },
+      "clean_install": {
+        "evidence": "dc-desktop-jobs/dc-6DtCX1",
+        "seconds": 95.34,
+        "unsupported": "dc-desktop-jobs/dc-ttzrqh",
+        "cancelled": "dc-desktop-jobs/dc-3lKBpD",
+        "force_n": [
+          -0.007311654370788881,
+          0.0007639403644975085,
+          -1.1333007823988988
+        ],
+        "note": "Bit-identical fresh force from dev and clean venv; recorded design rebuilt from star_2-layer.pmmotor sha 0ed215f6..."
+      }
+    },
+    "tests": {
+      "rust_dc_jobs": "6 passed,2 explicit ignored; ignored real-geometry test then run explicitly twice and passed (117-118 s)",
+      "vitest": "470 passed,1 skipped (pre-existing)",
+      "browser": "e2e/dc-coupling.spec.ts 14 passed (desktop-tauri+desktop-wide)",
+      "svelte_check": "34 pre-existing errors in DocumentEditor.svelte, cadMapping.test.ts, DriverSuitability.svelte; none in changed files",
+      "helpers": "427 passed,0 skips"
+    }
+  },
+  "case_b_source": {
+    "status": "global-gates-pass-but-active-passive-current-controls-fail-proved-physical-pad-shorts-not-qualified",
+    "work": "linear-dc-day-case-b-source-m200-c6-p50-v1-20261022",
+    "worker_label": "com.pcbmotorgen.dc.20261022.case-b-source-c6-v1",
+    "watcher_label": "com.pcbmotorgen.dc.20261022.case-b-source-c6-v1-watch",
+    "declaration": "linear-dc-day-detached-supervision-v1-20261022/case-b-source-c6-v1-job.json",
+    "controls": {"mesh_m":0.0002,"curvature_safety":6.0,"port_fraction":0.5,"drive_emf_v":1.0,"max_dofs":24000000},
+    "timeout_s": 5400,
+    "native_footprint_limit_gib": 8,
+    "launch_basis": "Verified completedv4CAD and all hashes;measured existing numerical footprint9.33GiB plus8GiB job guard below18GiB shared target at launch. Whole budget fits before18:29:49Z.",
+    "completed_basis": {
+      "whole_command_seconds": 1602.512011499959,
+      "peak_native_footprint_gib": 5.510931104421616,
+      "mesh_elements": 1645935,
+      "dofs": 5492216,
+      "effective_loop_current_a": 8.845151318251187,
+      "resistance_ohm": 0.11305629084452049,
+      "relative_equation_residual": 6.163933842272339e-14,
+      "relative_power_balance": 1.1721734693992403e-12,
+      "mesh_volume_relative_difference": 0.0007841117299333122,
+      "solution_sha256": "6d84c70a71eb3270b8a671952779e5286f8841e9153f1f4bb080fcd3d3b65fcc",
+      "verification": "Receipt completedexit0,launcher completed,physical/study/archive/mesh/solution hashes checked. Finalworker/watcher servicesnonrunning and safely unloaded;plists/logskept. Actual1Vbasis,not1A."
+    },
+    "control_campaign": {
+      "declaration": "linear-dc-day-detached-supervision-v1-20261022/case-b-source-controls-v1-campaign.json",
+      "name": "linear-dc-day-case-b-source-controls-v1",
+      "jobs": 24,
+      "status": "Stopped future scheduling at 12:06:46Z after local failures. Outer exit -15, launcher failed. The one running curvature-4 solve was cancelled by its verified owned process group. Its receipt is stale running, worker and supervisor absent, launcher failed with EPERM; preserve as unusable interrupted evidence. Never restart these refinements without resolving the physical decision.",
+      "scope": "All active/passive/return/H1/RT0/material and geometry-derived near-field probes, plus isolated source controls. Five magnets and two stack bodies yield 27 predetermined probes, not Case A's 21. No fabricated stub coverage or admission of failed curvature sections.",
+      "whole_wrapper_timeout_s": 19800,
+      "sum_nonprior_job_timeout_s": 17280,
+      "source_guards_gib": 8,
+      "followup_guards_gib": 6,
+      "cutoff": "2026-10-22T18:29:49.742086Z",
+      "forecast": "Original design cannot pass the required local current gates unchanged. No magnetic campaign is eligible. Do not silently repair or replace Case B or extend the cutoff.",
+      "active_sections": 504,
+      "active_failures": 500,
+      "passive_sections": 251,
+      "passive_failures": 249,
+      "return_sections": 4,
+      "return_failures": 0,
+      "h1_agreement_relative_difference": 0.005249191278774656,
+      "remaining_outputs": "H1, RT0 export and material geometry completed before scheduling stopped; their success does not qualify the failed actual winding. Near-field and local/field source comparisons blocked. All outputs remain preserved."
+    }
+  },
+  "case_b_physical_contact_failure": {
+    "report": "linear-dc-day-case-b-pad-contacts-v1-20261022.json",
+    "status": "proved-undeclared-cross-phase-pad-contacts",
+    "diagnostic_receipt": "completed exit 0; launcher completed; watcher chains-finished; inputs and snapshots reverified",
+    "distinct_nonstar_cross_phase_via_pairs": 41,
+    "layer_contact_witnesses": 82,
+    "all_witnesses_inside_actual_copper_mesh": true,
+    "pad_diameter_m": 0.0005,
+    "centre_spacing_m": 0.0004,
+    "example": "A via edge 186 and B via edge 181, layer 0, point [-0.0247,0,0.0015] m. An 8.75 um radius ball is inside both non-star pads and outside every declared drill bore. Same overlap also exists on layer 1.",
+    "interpretation": "The faithful exact union is connected but its contacts differ from the exported phase graphs. Union-volume, global residual, H1 resistance and return checks cannot establish correct circuit connectivity. Active and passive local gates correctly rejected it.",
+    "app": "Applicability now rejects proved non-star cross-phase pad contacts as unsupported, with an actual geometry review reason. It does not offer refinement as a cure for physical overlap.",
+    "required_user_decision": "Historical decision gate: original Case B remains preserved and unqualified. The user subsequently approved only a separately saved drill150um revision with unchanged 0.10 mm ring and five strands. See case_b_drill150um_revision; do not rerun or overwrite the original shorted design.",
+    "stop_evidence": "linear-dc-day-detached-supervision-v1-20261022/case-b-source-controls-v1-local-failure-stop.json",
+    "planner_fix": "Future generated source campaigns emit the selected basis first, default to serial execution and gate RT0/control source solves on completed all-active, all-passive, return and H1 agreement checks. Bound declarations of old campaigns are unchanged."
+  },
+  "case_b_drill150um_revision": {
+    "status": "host-and-cad-verified-first-source-memory-limited-fresh-zero-solve-on-verified-mesh-running",
+    "physical_authorization": "scripts/solvers/cases/linear-dc-day-case-b-drill150um-20261022.json",
+    "study_declaration": "scripts/solvers/cases/linear-dc-day-case-b-drill150um-study-20261022.json",
+    "acceptance_matrix": "scripts/solvers/cases/linear-dc-day-case-b-drill150um-matrix-20261022.json",
+    "saved_project": "linear-dc-day-case-b-drill150um-design-v1-20261022/linear-star-five-strand-six-layer-board-inner-two-ounce-drill150um.pmmotor",
+    "source_project_sha256": "f0d51f023931a4445203be1deaa6abdf0e78c3915cd72e304a0b12cfba93b29d",
+    "host_snapshot_sha256": "8c0b29d79754a48635eda5ed9e73658450a1dcba5b91ec52316c90400eb4b366",
+    "approved_change_audit": "linear-dc-day-case-b-drill150um-design-v1-20261022/approved-drill-change-audit.json",
+    "unchanged": "All saved project values except selected-version min_via_drill_mm. Actual host trace/via positions, routing, graph nodes/edges/terminals, copper widths/depths/stack/plating/temperature, magnet/material placement and explicit return path are unchanged. Native graph current shares and equivalent/via resistances are recomputed, not forced equal.",
+    "new_drill_mm": 0.15,
+    "unchanged_annular_ring_mm": 0.1,
+    "new_pad_diameter_mm": 0.35,
+    "retained_routing_strands": 5,
+    "manufacturing": "Simulation-only approval. 0.05 mm gap at the identified 0.40 mm via spacing is below the saved 0.127 mm spacing setting; that setting is not silently changed and no DRC/manufacturing acceptance is claimed.",
+    "contact_check": "No midpoint witnesses with the new drill/pad dimensions; this removes the known 41 pad-contact witnesses but is not a full clearance or source pass.",
+    "host_export": "Fresh actual Rust host export succeeded with one passed test and no ignored tests in linear-star-five-strand-six-layer-board-inner-two-ounce-drill150um-host-export-v3-20261022.log. Initial v2 invocation failed before export because PCB_MOTOR_VERSION_INDEX was missing; failed log/receipt preserved. A subsequent shell comparison initially overconstrained recomputed graph electrical values; inspected differences and verified only approved physical descriptors changed.",
+    "prepared_study": "linear-dc-day-case-b-drill150um-study-v1-20261022/linear-star-five-strand-six-layer-board-inner-two-ounce-drill150um",
+    "copper_stack_vertical_separation_m": 0.001165,
+    "cad_job": {
+      "label": "com.pcbmotorgen.dc.20261022.case-b-drill150-copper-v1",
+      "work": "linear-dc-day-case-b-drill150um-copper-v1-20261022",
+      "timeout_s": 1800,
+      "native_guard_gib": 4,
+      "strategy": "per-kind-single-drill; same audited primitive construction, with only the explicitly approved drill/pad dimension change",
+      "launch_headroom": "Other numerical usage measured 0.701 GiB before CAD launch; independent own one-shot watcher attached.",
+      "completed_seconds": 131.3243130829651,
+      "volume_m3": 1.9857626415308534e-8,
+      "brep_sha256": "0cc6272a13fe807eb278064f8b4a3f2b637668939b5f3e501cb71b271cfe866d",
+      "analytic_union_relative_difference": 9.320375557120286e-5,
+      "verification": "One solid, unchanged explicit return with zero unintended contact, disjoint material/PM regions and all input/archive/BRep hashes verified. Final receipt exit0, launcher success and watcher chains-finished agreed with nonrunning services. Only these completed owned CAD labels unloaded; plists/logs preserved. CAD is not source/force acceptance."
+    },
+    "source_campaign": {
+      "declaration": "linear-dc-day-detached-supervision-v1-20261022/case-b-drill150-first-source-v1-campaign.json",
+      "label": "com.pcbmotorgen.dc.20261022.case-b-drill150-first-source-v1",
+      "jobs": 11,
+      "timeout_s": 16800,
+      "sum_nonprior_timeout_s": 10920,
+      "resource_order": "First fresh curvature6 source waits for successful revised CAD and completed Case A 10 GiB scalar-quadrature retry. Serial 8 GiB source, then all active/passive/return/H1 checks; RT0/material/near-field only after all baseline gates pass. Failed dependencies block, not bypass.",
+      "next_gates": "Fresh measured source/local qualification, independent mesh/port/curvature controls, full magnetic matrix and source-refinement forces. No original 300 um source/force cache is eligible. All explicit budgets fit before the unchanged acceptance reserve at launch.",
+      "observed_1243": "CAD and Case A large-job dependencies completed; fresh source-m200-c6-p50 launched. No numerical source or force qualification inferred from launch.",
+      "direct_watcher": "Historical v1 watcher recorded the real memory failure. Current case-ab-current-inner-v2-watch directly observes revised source v2 and downstream Case A source-force jobs.",
+      "preserved_v1_failure": "Source memory-limit at 1788.26 s, observed 9,108,037,696 bytes above the declared 8 GiB. Mesh and CAD partition/volume metadata were saved, but no accepted current solution. All eight downstream checks blocked; outer/watch services ended and were safely unloaded with logs/plists retained.",
+      "mesh_checkpoint": {
+        "work": "linear-dc-day-case-b-drill150um-source-m200-c6-p50-v1-20261022",
+        "mesh_sha256": "13de173f00401bfa47de0034faf1354e32e7912cab359fdb423dd306db0f9fdc",
+        "elements": 3792906,
+        "estimated_dofs": 12370248,
+        "mesh_cad_relative_difference": 0.0008323106968340932,
+        "eligibility": "Final resource-limit receipt, absent matching worker/supervisor identities, exact inputs/engine/controls/archived physics/BRep/mesh hashes and passed CAD/partition gates checked. Only mesh bytes copied; no .sol or failed current metadata reused."
+      },
+      "current_v2": {
+        "declaration": "linear-dc-day-detached-supervision-v1-20261022/case-b-drill150-first-source-v2-campaign.json",
+        "label": "com.pcbmotorgen.dc.20261022.case-b-drill150-first-source-v2",
+        "source_work": "linear-dc-day-case-b-drill150um-source-m200-c6-p50-v2-20261022",
+        "source_native_guard_gib": 13,
+        "whole_wrapper_timeout_s": 16800,
+        "sum_nonprior_timeout_s": 16320,
+        "source_timeout_s": 5400,
+        "near_field_timeout_s": 7200,
+        "resource_change": "Fresh solve from zero on exact saved mesh. Face count now uses len(mesh.faces), avoiding a multi-million-object Python list without changing the count or FE unknowns. Source/physics controls and tolerances unchanged. Measured other numerical footprint 0.627 GiB before reserving 13 GiB; concurrent source-force campaign guards total 3.9 GiB.",
+        "forecast": "The smaller holes increased baseline size from 5.49M to 12.37M DOFs. Near-field forecast scales from Case A's 276,596 cells/21 probes to 3,792,906 cells/27 probes, roughly 5,000 s; 7,200 s is explicit. Fresh controls and full Case B force matrix still remain. Completion before reserve is unproven and may not fit; no coverage is dropped or cutoff extended."
+      }
+    },
+    "actual_host_inspection": "linear-dc-day-case-b-drill150um-real-host-inspection-v1-20261022.log: one passed, zero ignored, 1.62s, actual revised saved-project geometry through Rust and clean-installed Python with PYTHONPATH unset. Correct state is preparation-required, no force returned or original qualified source substituted.",
+    "helpers": "448 passed, zero skips, 33.042s in linear-dc-day-drill150um-all-helpers-v1-20261022.log. New tests preserve selected-version-only drill approval and unchanged ring/five strands; known pad witness disappears without claiming full clearance."
+  },
+  "applicability_integration": {
+    "status": "implemented-and-tested-read-only-no-force-or-implicit-preparation",
+    "path": "inspect_dc_coupling rebuilds active copper through production host path;dc_applicability.py re-verifies registry evidence and returns qualified/preparation-required/unsupported with separate source/force status.30s owned inspection cap,shutdown cleanup,one-worker interlock betweeninspection/force,request hash/identity and stale-response checks. No magnetic job is launched.",
+    "ui": "Check this design displays exact active-design qualification independently of host case list. Unqualified inspected designs cannot calculate a fixture force;physical edits/tab departure discard late applicability. Source preparation remains separate offline work,not an implicit UI operation.",
+    "actual_requests": "Historical v1/v2 inspections classified A/B preparation-required before the physical-contact diagnostic. After the contact guard, actual saved-project rebuilds and clean-installed-worker inspections pass with recorded qualified, A preparation-required, B unsupported. Logs linear-dc-day-pad-contact-real-host-{recorded,case-a,case-b}-v1-20261022.log, 1.70/1.37/1.08 s, PYTHONPATH unset; no force returned.",
+    "tests": {
+      "dc_rust": "Full desktop117passed,8ignored,41.66s in linear-dc-day-applicability-desktop-rust-v2-20261022.log. All3actual-design inspections passed separately with--ignored. Addedinspection/force mutualexclusion and nested-childshutdown tests.",
+      "vitest": "471passed,1existing skip,1.38s;linear-dc-day-applicability-vitest-v1-20261022.log",
+      "browser": "20DC-specific passed0skips;full346passed0skips0flaky322.920s in linear-dc-day-applicability-full-browser-v1-20261022/report.json",
+      "build": "Vite build passed4.69s;linear-dc-day-applicability-build-v1-20261022.log;chunk-size warning only",
+      "typecheck": "npxsvelte-check still reports the same34errors in3untouched files (DocumentEditor.svelte,DriverSuitability.svelte,cadMapping.test.ts);none in changed files. Initial pnpm-exec attempt failed because svelte-check is not installed locally;both logs retained.",
+      "helpers": "446 passed, zero skips, 38.349 s in linear-dc-day-pad-contact-gates-all-helpers-v1-20261022.log, including contact witnesses, actual-geometry rejection and source-DAG gate tests."
+    },
+    "limits": "This is applicability inspection,not completion of the missing in-app source-preparation/full-qualification lifecycle,not native WKWebView acceptance,and not new design admission. Only recorded case is registered until full force matrices pass."
+  },
+  "case_a_resource_retries": {
+    "preserved_failures": ["linear-vector-refined-v2","linear-scalar-coarse-v2","linear-scalar-refined-v2","linear-scalar-domain-v2"],
+    "failure_kind": "Higher-order linear controls exceeded3GiB native guard at3.01-3.24GiB;failed partial fields remain unaccepted and are not imported.",
+    "new_campaign": "linear-dc-day-case-a-linear-memory-v3 serial4job rerun,max6GiB per job/1800s,8400s bounded outer wrapper. Existing measured numerical footprint2.23GiB at declaration. Same orders,physical inputs,state matrix and2%/5%gates;fresh fields only.",
+    "audit_plan": "linear-dc-day-detached-supervision-v1-20261022/case-a-magnetic-audit-plan-v3.json preserves failed work mapping and substitutes only these4new work paths within unchanged37job/44pair coverage. No acceptance until every needed rerun passes.",
+    "observed_1143": "Originalcampaign59completed4failed1live8pending;serialretry linear-vector-refined-v3 completed243.51s,peak3.439GiB,next scalar-coarse running. Other failures remain pending rerun,not waived.",
+    "completed_v3_retry": "3of4completed;scalar-refined-v3 exceeded6GiBguard at6794450704bytes. Failure preserved,notwaived. Outer failedexit1 and ownwatcherattention-required;bothfinishedlabels safelyunloaded,plists/logskept.",
+    "v4_scalar_retry": "linear-dc-day-case-a-linear-scalar-refined-v4-20261022 passed all five states, no failures, in 427.5586 s with 8.42785 GiB measured peak under its 10 GiB guard. No changed orders, geometry or gates. Final audit uses case-a-magnetic-audit-plan-v4.json; v2/v3 failures remain preserved.",
+    "watching": "Original campaign ended with 65 completed jobs and seven preserved resource failures. All replacement jobs completed separately. Original worker, completed retry services and finished v7/v1 direct watchers were unloaded after receipt/launcher/watcher/identity/service checks. Current direct coverage is case-ab-current-inner-v2-watch over the remaining source-force and revised B source jobs. Logs/plists retained.",
+    "quadrature_retries_v3": {
+      "declaration": "linear-dc-day-detached-supervision-v1-20261022/case-a-quadrature-retries-v3-campaign.json",
+      "label": "com.pcbmotorgen.dc.20261022.case-a-quadrature-retries-v3",
+      "audit_plan": "Historical v5 mapped resource retries. Current final case plan is case-a-magnetic-audit-plan-v6.json, also requiring the downstream source-force supplement.",
+      "preserved_failures": "Original degree10 nonlinear scalar nominal/+100um jobs timed out at 1800 s with 3/4 partial states. Original linear scalar degree10 job exceeded 3 GiB. No partial fields are imported.",
+      "fresh_jobs": "All three completed: linear scalar degree10 339.14s at4.63366GiB peak; fresh nonlinear scalar nominal1799.66s and+100um1453.83s, each five accepted states. Bounds were5400s and unchanged discretization/gates; failures preserved, no partial fields imported.",
+      "live_minus100um": "Original nonlinear scalar degree10 minus100um completed1743.19s within its original1800s limit, five accepted states. It was never duplicated or extended."
+    }
+  },
+  "case_a_curvature_extension": {
+    "status": "passed-supplemental-source-control-no-force-admission",
+    "declaration": "scripts/solvers/cases/linear-dc-day-curvature8-control-20261022.json",
+    "reason": "Originalcurvature4source failed16barrel area gates,so cannot be accepted as a coarse reference. Require passing6and8source/all-active sections and compare identical fixed near/app-region fields,local signed currents/areas and resistance under unchanged2%gates.",
+    "campaign": "linear-dc-day-case-a-curvature8-v1:all4jobs completedexit0 in162.27s,source126.53s,sections15.20s,export5.26s,audit6.82s. Inputsandarchivedimplementations reverified;completedownedworker/watchlabels safelyunloaded,plists/logskept. Original4/6matrix andphysicalmodelunchanged.",
+    "report": "linear-dc-day-case-a-curvature6-8-v1-20261022/summary.json",
+    "resistance_relative_difference": 0.00026124496778812123,
+    "all_local_sections_passed": 79,
+    "fixed_field_probes": 21,
+    "max_field_relative_difference": 0.00027770702255397163,
+    "gate": 0.02,
+    "limits": "Noevery-pointfield,interpolationorforceacceptance. Source-refinementdownstreamcoupled-forcecontrols remainapartfromthissource-onlycomparison."
+  },
+  "installed_worker": {
+    "license_inventory": "linear-dc-day-worker-license-metadata-v1-20261022.json records installed metadata and license-file hashes for all 18 pinned packages in the clean venv. NGSolve/Netgen metadata reports LGPL-2.1-only. This is not a full transitive native component/linkage/source/distribution audit or redistribution clearance; no bundle built.",
+    "source_preparation_dependency_gap": "The installed worker reproduces admitted fresh magnetic calculations and applicability checks. Offline new-source preparation additionally uses pinned PyAMG 5.3.0 from a separate developer path. A complete installed in-app preparation environment remains unqualified; do not infer it from the magnetic worker installation.",
+    "status": "passed-clean-macos-arm64-pinned-install",
+    "requirements": "scripts/solvers/requirements-dc-worker.txt (18 pinned distributions plus2comment lines, CPython3.12)",
+    "installer": "scripts/solvers/install_dc_worker_macos.sh",
+    "clean_venv": "dc-worker-clean-install-v1-20261022",
+    "install_seconds": 22.71,
+    "rejections": {
+      "missing": "dc-worker-reject-missing-v1-20261022.json: 18 missing dists",
+      "incompatible": "dc-worker-reject-incompatible-v1-20261022.json: numpy 2.4.5 differs from pinned 2.4.6",
+      "host": "desktop_dc_job.py refuses incompatible env before receipt/solve (only request.json in job dir)"
+    },
+    "scope": "Same machine, fresh venv, PYTHONPATH unset. Not a separate machine/user account; wheels may come from local pip cache. Other platforms unqualified."
+  },
+  "case_a_matrix_component": {
+    "work": "linear-dc-day-case-a-matrix-component-v1-20261022",
+    "status": "passed-declared-magnetic-matrix-component-not-admission",
+    "magnetic_jobs": 37,
+    "saved_current_states": 185,
+    "control_pairs": 44,
+    "maximum_pair_relative_difference": 0.012733013229009904,
+    "seconds": 1.4096170410048217,
+    "case_plan": "linear-dc-day-detached-supervision-v1-20261022/case-a-magnetic-audit-plan-v6.json",
+    "meaning": "All complete magnetic magnitude/polarity/pose/mesh/domain/quadrature/opening/independent-formulation limits pass. Known resource failures are preserved; only separately completed fresh reruns enter the component audit. Component status is deliberately rejected by the registry. Full admission also needs downstream source-refinement force audit, then real saved-design fresh-force acceptance."
+  },
+  "case_a_source_force_controls": {
+    "status": "passed-and-bound-into-case-a-admission",
+    "declaration": "scripts/solvers/cases/linear-dc-day-case-a-source-force-controls-20261022.json",
+    "source_evidence": "scripts/solvers/cases/linear-dc-day-case-a-source-evidence-20261022.json",
+    "purpose": "Close the missing source mesh/drive-length/curvature stability through fresh nonlinear forces at all five currents and three poses, not just resistance and 21 field probes. Fixed original coarse magnetic mesh imported through existing checked path; no prior coupled unknowns or forces reused.",
+    "source_axes": ["mesh150um vs200um", "port0.4 vs0.5", "curvature8 vs accepted6"],
+    "stage1": "All 15 material/bare-force/checked-mesh/cache-preflight/pose-preflight jobs completed successfully. Three all-eligible local inventories of 79 sections and isolated numerical axes verified before launch. Finished own service/watch labels unloaded after final evidence; logs/plists kept.",
+    "cache_forecasts_s": {"mesh":2553.150323056151,"port":2381.1366823781946,"curvature":2366.5357622253114},
+    "pose_forecasts_s": {"mesh":83.05907992911102,"port":83.44704210567875,"curvature":133.53426099166632},
+    "stage2": {
+      "declaration": "linear-dc-day-detached-supervision-v1-20261022/case-a-source-force-stage2-v1-campaign.json",
+      "label": "com.pcbmotorgen.dc.20261022.case-a-source-force-stage2-v1",
+      "jobs": 40,
+      "prior_completed_jobs": 15,
+      "fresh_coupled_jobs": 9,
+      "fresh_current_states": 45,
+      "comparison_pairs": 9,
+      "whole_wrapper_timeout_s": 12600,
+      "max_parallel": 3,
+      "per_job_native_guard_gib": 1.3,
+      "campaign_native_guard_gib": 4,
+      "cache_budget_s": 5400,
+      "status": "All 40 jobs completed, including 15 checked priors and 25 fresh jobs. Nine fresh nonlinear five-state solves and the final source-force audit passed. Owned finished services/watchers unloaded after evidence checks."
+    },
+    "aggregate_work": "linear-dc-day-case-a-source-force-audit-v1-20261022",
+    "aggregate_sha256": "8e8f3688bb3c2a32fd99f5442109364a5f8f351fa90461879d05fbb79dc400b8",
+    "evidence_hashes": 483,
+    "maximum_force_pair_relative_difference": 0.000001135270915018773,
+    "audit_policy": "Reverify electrical/local/passive/return/independent-H1 and predetermined near-region fields, exact fixed magnetic mesh import and pointwise quadrature layout, source-specific current normalization, saved coupled solutions, all total and current-induced force pairs under 2%/1e-8 N. New declared-case audit/registry refuse admission without this complete hash-bound supplement. Recorded historical case remains verified under its original scope.",
+    "scope_limit": "Combined stationary winding+shield force only. Separate winding/shield body forces, interpolation, generic in-app preparation and overall plan completion are not established by these controls."
+  },
+  "latest_verification": {
+    "helpers": "464 passed, zero skips, 30.674s in linear-dc-day-qualified-a-b-controls-all-helpers-v1-20261022.log. Includes complete source-force admission gates, ended mesh checkpoint, fixed-probe curvature direction, real host selected-case result binding and executable symlink handling.",
+    "desktop": "117 passed, 8 explicitly ignored real-environment tests, 41.59s in linear-dc-day-source-force-desktop-rust-v1-20261022.log. Actual Case A saved-host test subsequently run explicitly with clean worker and passed, no native UI claim.",
+    "actual_recorded_host": "After admission changes, actual saved-project and clean-installed-worker inspection still qualifies the recorded case: one passed, zero ignored, 1.75s in linear-dc-day-source-force-gated-recorded-host-v1-20261022.log. No force replay or unnecessary repeat of its accepted numerical campaign.",
+    "plan": "Still1/6. CaseA now registered with completed source-force and actual saved-host acceptance. Second case, general in-app preparation/native/isolated installation acceptance remain. Periodic agent continuation task remains disabled; bounded launchd and direct case-b-current-inner-v3-watch provide local numerical supervision only."
+  },
+  "case_a_qualified_milestone": {
+    "status": "qualified-exact-generated-case-and-actual-saved-host-acceptance-passed",
+    "case_id": "linear-star-compact-two-strand-four-layer-board-v1",
+    "actual_design": "linear-dc-day-generated-designs-v2-20261022/linear-star-compact-two-strand-four-layer-board.pmmotor",
+    "case_audit": "linear-dc-day-case-a-qualification-audit-v1-20261022/summary.json",
+    "case_audit_sha256": "3e0b4ac9aead39eaf69b7687ffa2c8bd1f9e0e653494f9183290853a7b7ff724",
+    "case_audit_evidence_hashes": 1193,
+    "registry": "dc-qualified-linear-cases-v1.json now contains recorded case plus Case A. Both entries and 1977 combined evidence hashes reverified at13:47Z.",
+    "currents_loop_a": [0,0.1,-0.1,0.5,-0.5],
+    "linear_offsets_x_m": [0,0.0001,-0.0001],
+    "host_acceptance": {
+      "work": "linear-dc-day-case-a-actual-host-acceptance-v3-20261022",
+      "sha256": "65887562340ba995a864fbb1fb68deee8f90d6c6f8109aeb3a72e7eba0901736",
+      "seconds": 128.51833862497006,
+      "completed_job": "dc-desktop-jobs/dc-9NEiQR",
+      "unsupported_job": "dc-desktop-jobs/dc-eVxBWj",
+      "cancelled_job": "dc-desktop-jobs/dc-dPwuMo",
+      "fresh_pm_array_force_n": [0.003022741274191451,-0.00046618211451404087,-0.5095069285414461],
+      "scope": "Real Rust host rebuilds this saved design's copper, with explicit study placement/return only. Clean pinned worker, developer PYTHONPATH removed. Fresh solved unknown/force, unsupported edit rejection and live nested-child cancellation/cleanup pass. No archived force replay or alternate source basis.",
+      "preserved_wrapper_failures": "v1 invoked resolved cargo symlink as rustup; v2 resolved virtualenv python to system interpreter and correctly failed missing magpylib. No numerical job accepted from either. v3 preserves both executable invocation paths; regression tests cover both symlinks."
+    },
+    "limitations": "Exact sampled-case support, not generic actual-request preparation/qualification, interpolation, separate winding/shield-body forces, native WKWebView acceptance, or independent-machine installation. Four-layer board has active copper on0/1 only. Second selected geometry remains unqualified; plan stays1/6."
+  },
+  "case_b_drill150_source_milestone": {
+    "status": "baseline-electrical-local-and-independent-controls-passed-refinements-and-fields-running",
+    "source_work": "linear-dc-day-case-b-drill150um-source-m200-c6-p50-v2-20261022",
+    "source_sha256": "62c5fcea86f8fc3e3263918d5019fe4ac038104d42b35f7feaa2fa44edd649a8",
+    "source_seconds": 845.2981339170365,
+    "source_peak_native_gib": 7.951575331389904,
+    "loop_current_a_per_1v_basis": 0.18693290585146136,
+    "loop_resistance_ohm": 5.349512946610959,
+    "mixed_equation_relative_residual": 1.0054496989389117e-13,
+    "active_sections": 504,
+    "passive_sections": 251,
+    "return_sections": 4,
+    "local_failures": 0,
+    "independent_h1_resistance_relative_difference": 0.002245393750309743,
+    "exact_rt0": "linear-dc-day-case-b-drill150um-rt0-m200-c6-p50-v3-20261022",
+    "exact_rt0_sha256": "0fd84d27a9fc6bc87652ae1fcd845e5544e39802fdff4dadb3c1ad16efd682cc",
+    "rt0_resource_retry": "Original4GiB export guard failed at30.60s; preserved. Fresh7GiB export completed29.68s, no failed cache imported.",
+    "active_fields": "case-b-drill150-fields-v3, one bounded7200s near-field job over27predetermined probes and unchanged degree10/12/gates. No source refinement or force acceptance inferred from baseline gates.",
+    "active_source_controls": "case-b-drill150-source-controls-v1, serial curvature4/mesh150um/port40 independent sources, active sections, RT0 and fixed-probe controls; max11GiB and3600s fresh source bounds. Curvature4 completed its source and local checks; mesh150um was live at14:22Z. No inputs of live jobs edited.",
+    "magnetic_preflights": "case-b-drill150-mag-stage1-v1, 11 measurement-only material/mesh/bare-force/cache/pose preflight jobs, serial2GiB/2700s outer cap. Full magnetic campaign is not launched; measured forecasts and required source/field gates must fit before18:29:49Z reserve.",
+    "supervision": "Direct case-b-current-inner-v3-watch observes inner numerical receipts until reserve. Source-control outer watcher ended on quiet-scheduler alert; do not confuse it with a stalled live inner source. Historical services unloaded only after receipt/identity/service checks; plists/logs preserved.",
+    "remaining": "Finish source mesh/port/curvature and fixed-field controls, downstream source-refinement forces, full37job magnetic matrix and actual saved-host fresh-force acceptance. Never use original shorted300um CaseB current8.845A for the revision. Full remaining workload may exceed today; do not shorten coverage or extend cutoff."
+  },
+  "native_build_milestone": {
+    "command": "pnpm exec tauri build --debug --no-bundle --ci",
+    "log": "linear-dc-day-native-no-bundle-v2-20261022.log",
+    "status": "built-debug-native-executable-without-bundle",
+    "seconds": 37.20,
+    "initial_failure": "launchdPATH lacked node;v1 failed immediately with env:node:No such file. v2 explicitly names installednode directory inPATH. Failure/log/plist preserved.",
+    "native_e2e": "Not performed. Computer-use tool discovery returned no available tools. Building an executable or observing a process is not WKWebView interaction. Observed manual acceptance remains required."
+  },
+  "campaign_incident": {
+    "at_utc": "2026-10-22T10:13Z",
+    "what": "Outer campaign runner memory guard raised EPERM reading an unreaped zombie child, killed its group including inner supervisors; 5 cache solvers orphaned. Receipts left running (unusable).",
+    "action": "Stopped only the orphaned case-A cache groups; fixed solver_memory_budget.exited (zombie/vanished only) and per-job sessions in runner; relaunched stage2 as v2 names. v1 evidence preserved."
+  },
+  "continuation_2026_10_22_1109": {
+    "case_a_campaign": "com.pcbmotorgen.dc.20261022.case-a-mag-stage2-v2 actual worker23838,runner23840,supervisor23820 and watcher23824 live with matching identities,one launch. State at11:05:15Z:43completed,6launched,23pending. No full force-matrix acceptance or registration yet.",
+    "campaign_inner_watch": "Additional independent case-a-mag-inner-v2-watch checks every inner v2 job receipt directly,not just top-level runner. Launchd KeepAlive=false/RunAtLoad=true,30s observations,ends at acceptance reserve. Top-level watch remains separate.",
+    "case_a_partial_review": "At11:14:32Z campaign45completed/6launched/21pending. Read-only inspection of12completed coupling jobs and11available control pairs found no failed gates;maximum available refinement relative difference0.00467012 and independent-formulation0.0127330. Partial inspection is not37-job/44-pair acceptance.",
+    "near_field": {
+      "declaration": "scripts/solvers/audit_linear_dc_near_field.py:21fixed points,including6probes25/100um below first/middle/last lowest-layer trace surfaces and15interior probes in actual stack/magnet bodies. Same physical points and unchanged2%refinement/5%reference/1e-12T-per-loop-A floor. All affine RT0 terms retained.",
+      "v1": "linear-dc-day-case-a-near-field-v1-20261022 failed91.91s. Degrees6->10volume refinement maximum0.0697780614 exceeds2%;analytical/degree10maximum0.00791435 passes5%,tree-opening maximum6.60e-6 passes2%,tight-tree/analytical maximum3.24e-7 passes5%. Historical failure preserved;not all-near-field admission.",
+      "v2": "linear-dc-day-case-a-near-field-v2-20261022 passed285.54s,receipt completed exit0 and launcher success. Same21points,degrees10/12:maximum volume refinement0.0126163313,analytical/volume0.00469217172,opening6.5973e-6,tree/analytical3.23355e-7. No probe relocation,softening or relaxed gate. Sampled controls only,not every-point field qualification.",
+      "source_refinement": "case-a-near-refinement-v1 completed all4jobs by11:16:22Z. At identical accepted21probes,exact affine source-mesh comparison maximum0.000300286184 and source-port comparison0.00000303135902 both pass unchanged2%gate. Export6.16s/7.32s,comparison6.61s/6.44s. Shared physical input hashes and isolated numerical axis verified;each basis uses its own actual1V loop current."
+    },
+    "port_v3_remaining_checks": "linear-dc-day-port-v3-followup-v1 campaign launched after measured case-A active groups3.56GiB and native free54%. Serial passive1200s,return300s,H1reference600s,8GiB per job,2400s outer budget. New changed-mesh checks,not repetition of unchanged source evidence. No full source-step completion yet.",
+    "regressions": {
+      "helpers": "434passed,0skips,32.323s in linear-dc-day-single-drill-near-field-all-helpers-v1-20261022.log,including quadrature-order policy and exact single-drill geometry regression. Earlier432/32.665s run preserved.",
+      "simulation_rust": "199unit+7integration passed,2ignored,18.42s+0.08s;linear-dc-day-simulation-rust-v1-20261022.log",
+      "desktop_rust": "114passed,7ignored,46.12s;linear-dc-day-desktop-rust-v1-20261022.log. Explicit real-FEM runs are separately recorded under app_integration.",
+      "full_browser": "340passed,0skips,0unexpected,0flaky,319.759s;isolated port1453,artifacts linear-dc-day-full-browser-v1-20261022/report.json. Browser fixtures do not establish native WKWebView interaction."
+    },
+    "unmet_app_requirements": "Registry admission is still exact-case admission,not completion of actual per-request preparation/qualification in the app. Only recorded design registered;case A/B pending. New-design preparing/qualification lifecycle and actual native WKWebView interaction remain unproven. Desktop computer-use tools are unavailable here;manual observed native acceptance remains required.",
+    "schedule": "At12:40Z task d87a98ed-ebb4-4779-b16d-e23d91b24c82 was disabled; left disabled and prompt refreshed. Local launchd watchers do not imply periodic agent continuation. Schedule tools require canonical directory /Users/dylanbertram/Dev/projects_embedded/pcbmotorgen. Acceptance18:29:49.742086Z and compute19:59:49.742086Z unchanged; no re-enable or automatic extension.",
+    "memory_and_issue": "Near-field/single-drill/regression milestone mem_1792667945776_t7vz82flh stored and search-retrieved;correction mem_1792667534863_8tqc7b7ou also stored/retrieved. Kata#ytgr updated at11:19Z;issue stays open. No plan checkbox changed.",
+    "service_cleanup_evidence": "linear-dc-day-completed-service-cleanup-v2-20261022.json preserves final receipt/launcher/watcher and launchctl status before unloading8own completed near-field/diagnostic labels. All logs/plists retained. Active numerical groups left unchanged."
+  }
+}

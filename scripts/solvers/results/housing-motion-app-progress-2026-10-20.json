@@ -1,0 +1,50 @@
+{
+  "status":"verified-experimental-coreless-app-packaged",
+  "tickets":["pcbmotorgen#d458","pcbmotorgen#bs7k"],
+  "scope":"General supported coreless PCB-motor geometry inputs, not one fixture. User rejects a separate branded low-fidelity tier. Experimental method limits remain explicit.",
+  "implementation":{
+    "core":"crates/pcbmotorgen-simulation/src/backplane/housing_motion.rs",
+    "settings":"DriveSettings.housing_motion optional duration_s; target_speed_m_s supplies steady speed",
+    "result":"Independent analyze_housing_motion command returns tagged experimental/unavailable; DriveBackplane diagnostic retained for consistency checks",
+    "ui":"HousingMotionPanel.svelte, enabled from Stackup, independent of electrical-driver compatibility; cancellable request lifecycle clears stale results",
+    "outputs":["housing power-equivalent opposing drag N","housing Joule power W","steady-exposure energy J","separate layer and whole-stack loss W"],
+    "failure_checks":["supported input envelope","finite profile/geometry","converged effective DC saturation state","nonnegative region loss","5% numerical spectral refinement","1e-8 independent steady energy balance","bounded spectral workload","finite output"],
+    "limitations":["planar travelling fundamental with cross-travel spectrum and magnetic feedback","established steady field; not starts/stops/entry-exit/acceleration","finite housing ends/slots/return boundaries unresolved","effective DC magnetic shielding state, not full moving nonlinear material dynamics","winding-current reaction and induced PCB-copper shielding omitted","fixed room-temperature housing conductivity","no temperature or hardware rating"]
+  },
+  "independent_reference":{
+    "work":"housing-motion-independent-planar-v4-20261020",
+    "summary_sha256":"5426acf3ee0ef840b306c36ba8a5b866aa401cc1269d07bf3adc943ac2dd0c9a",
+    "status":"passed-independent-planar-housing-motion-only",
+    "whole_receipt":"completed-exit0",
+    "method":"Independent complex P1 diffusion FEM with interface flux continuity and Robin air boundaries; does not reuse Rust reflection/amplitude recursion",
+    "cases":12,"maximum_region_relative_difference":0.0012192742208609487,
+    "mesh_gate":0.02,"agreement_gate":0.05,
+    "coverage":["all4 supported Al/nonmagnetic-stainless housing materials","0.001/20m/s cases","different magnet dimensions/counts and PCB layer counts","12 magnets/16 PCB layers/5mm wall/10mm gap input case","reverse direction","conducting backplane and housing loss partition","3backplane layers each2mm in weak magnetic bias"],
+    "scope_limit":"Independent numerical verification of the declared planar model, not finite3D housing, moving nonlinear shielding, thermal or hardware accuracy",
+    "preserved_first_failure":"First attempt completed all12 cases but failed its final source-hash check because a string was passed to the Path-only sha helper. That whole attempt remains failed; corrected v2 rerun is separate."
+  },
+  "integration_checks":{
+    "core_model_tests":5,
+    "actual_driver_geometry_test":"Pass: generated braid and imported-style2/4/16-layer serpentine routes with nonuniform physical depths; opt-in does not change phase resistance",
+    "browser_tests":76,
+    "browser_scope":"Two desktop sizes, no skips/retries. Current workspace/dock/driver/reference/bounds and housing UI checks including late response, browser no-substitute, no shielding, delta-independent request path. Housing transport fixtures are not physics validation or native WKWebView end-to-end tests.",
+    "browser_setup":"External mjs configuration importing the TS config stalled before listing tests; preserved as failed setup. Standalone cjs config under Node24.18.0 lists and passes all3 tests on isolated localhost1451; unrelated existing Vite server untouched.",
+    "svelte_component_check":"Renamed HousingMotionPanel autofixer reports no issues or suggestions",
+    "round_trip_test":"Passed legacy-default/opt-in settings serialization and exact floating-point conductor-depth JSON roundtrip",
+    "final_batch":"coreless-post-feature-checks-v3-20261020: simulation191 passed/2 ignored; desktop106 passed/5 ignored; helpers295 passed; frontend457 passed/1 skipped; native unsigned Apple Silicon app bundle built",
+    "actual_projects":"project-housing-{star2-generated,star4-imported,star4-imported-stainless12}-v3-20261020: whole exit0. Real533/1055 segment copper,393/789 vias; resistance unchanged; fixed-phase force agrees with archived independently audited export. Four-layer original overlapping stack rejected; positive scenario explicitly derives PCB thickness0.8mm to4.8mm, retains copper depths and never rewrites root project. Stainless scenario uses12 magnets. Additional generated/imported-style2/4/16-layer tests remain separate."
+  },
+  "delivery":{
+    "directory":"coreless-experimental-delivery-20261020",
+    "audit":"verification.json; verified-experimental-coreless-app-delivery-scope-only",
+    "audit_sha256":"3dcbce2fb3f5e1616bb2189c709151cf2698249bf620cbc5b2dc0dc711ec3258",
+    "archive":"pcbmotorgen-experimental-macos-arm64-20261020.zip",
+    "archive_sha256":"03d3d67822a5c1966b408921f152908f8a30512f504a93a94f79682e43542f1d",
+    "app":"pcbmotorgen-experimental.app",
+    "signing":"Local unsigned debug build, not notarized or cross-platform release",
+    "preservation":"Audit verifies original root PMMOTOR/DXF hashes against pre-rebase manifest. Working source/diff archived, no commit/push."
+  },
+  "remaining":["Legacy expanded-modal browser tests target removed main UI controls; failed attempts preserved, migration tracked under pcbmotorgen#0z3q, not claimed passed","Optional lumped thermal estimate not implemented; no thermal assumptions fabricated","Full finite3D/nonlinear/entry-exit/inductance/hardware qualification remains separate reference backlog","No automated native WKWebView end-to-end run"],
+  "raw_archives":"$HOME/.local/opt/solver-prototypes-macos",
+  "working_tree":"Uncommitted/unpushed on rebased simulation/add-femm-and-improve; root examples and Mutagen untouched"
+}

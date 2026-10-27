@@ -28,6 +28,32 @@ pub struct CadBoard {
 mod tests {
     use super::*;
 
+    fn assert_current_and_power_balance(board: &CadBoard, cad: &CadGeometry) {
+        use pcbmotorgen_simulation::drive::{extract_phase_networks_with_terminals, solve_network};
+        for net in extract_phase_networks_with_terminals(&board.routing, &CadBoard::drive_hints(cad).terminals) {
+            // Unequal values exercise signed branching, not only a symmetric path.
+            let resistance: Vec<_> = (0..net.edges.len()).map(|i| 0.5 + 0.1 * (i % 7) as f64).collect();
+            let solved = solve_network(&net, &resistance);
+            assert!(solved.connected, "{}", net.net);
+            let mut balance = vec![0.0; net.node_count];
+            for (edge, current) in net.edges.iter().zip(&solved.current_share) {
+                balance[edge.a] += current;
+                balance[edge.b] -= current;
+            }
+            for node in 0..net.node_count {
+                if !net.terminal.contains(&node) && !net.star.contains(&node) {
+                    assert!(balance[node].abs() < 1e-8, "{} KCL at {node}: {}", net.net, balance[node]);
+                }
+            }
+            let injected: f64 = net.terminal.iter().map(|&node| balance[node]).sum();
+            let returned: f64 = net.star.iter().map(|&node| -balance[node]).sum();
+            assert!((injected - 1.0).abs() < 1e-8);
+            assert!((returned - injected).abs() < 1e-8);
+            let power: f64 = solved.current_share.iter().zip(resistance).map(|(i,r)| i*i*r).sum();
+            assert!((power - solved.resistance_ohm).abs() < 1e-8 * power.max(1.0), "{} power mismatch", net.net);
+        }
+    }
+
     fn mapped() -> CadGeometry {
         serde_json::from_value(serde_json::json!({
             "trace_width_mm":0.2, "layer_z_mm":[-1.6,0.0],
@@ -48,6 +74,7 @@ mod tests {
         let core = LinearMotorConfig { phases:1, routing_pattern:"missing-plugin".into(), ..Default::default() };
         let cad = mapped();
         let board = CadBoard::new(&cad, &core).unwrap();
+        assert_current_and_power_balance(&board, &cad);
         assert_eq!(board.routing.segments.len(), 2);
         assert_eq!(board.routing.segments[0].net, "A");
         assert!(!board.routing.segments[1].is_active);
@@ -74,6 +101,7 @@ mod tests {
         terminals.input.layer = 1;
         terminals.output.layer = 2;
         let board = CadBoard::new(&cad, &core).unwrap();
+        assert_current_and_power_balance(&board, &cad);
         let sim = board.simulation_input(&cad, &core);
         let analysis = pcbmotorgen_simulation::drive::analyze_drive_with(
             &sim, &board.routing, &Default::default(), None, &CadBoard::drive_hints(&cad));
@@ -98,6 +126,7 @@ mod tests {
             let cad: CadGeometry = serde_json::from_value(state["cad_geometry"].clone()).unwrap();
             let core = config.to_linear_motor_ipc().to_core();
             let board = CadBoard::new(&cad, &core).unwrap();
+            assert_current_and_power_balance(&board, &cad);
             let sim = board.simulation_input(&cad, &core);
             let analysis = pcbmotorgen_simulation::drive::analyze_drive_with(
                 &sim, &board.routing, &config.drive, None, &CadBoard::drive_hints(&cad));

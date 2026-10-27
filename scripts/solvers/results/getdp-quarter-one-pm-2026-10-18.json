@@ -1,0 +1,23 @@
+{
+  "status": "passed-one-pm-full-quarter-static-parity",
+  "scope": "One centred axial PM and isotropic nonlinear finite plate. Verifies mirror reduction, not a five-magnet or operating-motion prediction.",
+  "full_summary_sha256": "f8a2b221d99cb1b2a60139bbbb1bd46cc266645daf98923af296b7639bf9cd97",
+  "quarter_summary_sha256": "5e82b4eaed0ec7b044474a64310bbea701a1024c0558801f3260346038eedc62",
+  "source_project_sha256": "86c8d545ab17894cec93164a9f30440c0d8de2fa36ba7d630949a6ceb5fa6305",
+  "full_and_quarter_physical_models_identical": true,
+  "original_field_and_formulation_hashes_and_completed_receipts_verified": true,
+  "bare_full_quarter_vector_error": 0.014754019671259371,
+  "stack_full_quarter_vector_error": 0.011927267349818166,
+  "max_stack_normal_force_relative_error": 0.0010938732598226864,
+  "unchanged_field_and_force_parity_limit": 0.02,
+  "quarter_bare_magpylib_vector_error": 0.0074069832171031885,
+  "quarter_nonlinear_relative_residual": 4.600243935209757e-12,
+  "quarter_nonlinear_iterations": 9,
+  "quarter_bare_solve_seconds": 5.816171071986901,
+  "quarter_stack_solve_seconds": 53.6657666300016,
+  "quarter_stack_normal_force_by_clearance_n": {
+    "0.0001": 1.480384813036185,
+    "0.0002": 1.5016278753622199,
+    "0.0003": 1.5080367140876862
+  }
+}

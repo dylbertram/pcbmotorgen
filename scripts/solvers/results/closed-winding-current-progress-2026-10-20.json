@@ -1,0 +1,113 @@
+{
+  "status": "completed-cached-current-pilot-and-x-linkage-reciprocity-on-unqualified-mesh",
+  "current_scope":"DC windings only; AC/PWM qualification deferred by user. Finite saved-copper geometry and closed DC-current basis followup: dc-finite-copper-progress-2026-10-20.json.",
+  "scope": "Saved star_2-layer.pmmotor version1 copper with a balanced A=+I/B=-I, C=0 drive. An explicit two-waypoint external return is a screening scenario, not recovered hardware cable routing. Ideal DC filaments are evaluated off-wire only; no copper self/skin inductance or material core loss.",
+  "raw_archives": "$HOME/.local/opt/solver-prototypes-macos",
+  "copper_source": "winding-star2-v1-copper-20261020/free-space-copper-audit/mesh-80/fixture.json",
+  "finite_conductor_input_authority": {
+    "instruction":"User confirmed the PMMOTOR settings are authoritative for copper width, via size and copper layer weight/height. Do not replace them with generic dimensions or change the root input.",
+    "saved_version":1,
+    "trace_width_m":0.0002,
+    "outer_copper_oz":1.0,
+    "inner_copper_oz":1.0,
+    "copper_thickness_m":0.000035,
+    "via_drill_diameter_m":0.0003,
+    "via_annular_ring_m":0.0001,
+    "via_plating_m":0.000025,
+    "pcb_thickness_m":0.0008,
+    "winding_temperature_c":75.0,
+    "scope":"Dimensions exist in the saved file. Remaining work is to construct finite conductors and apply the exporter/stack depth convention consistently, not to request substitute dimensions."
+  },
+  "basis_translation_m": [-0.0534,-0.004,0.0008],
+  "source_segments": 620,
+  "maximum_endpoint_current_balance_error_a": 4.904188166676704e-12,
+  "closed_wire_field": {
+    "implementation": "closed_wire_source.py",
+    "checks": ["B matches independently evaluated Magpylib polyline after explicitly matching the declared mu0 convention", "finite-difference curl(A) matches B", "compiled NGSolve and NumPy kernels agree", "extended-line collinear observations stay finite", "open current paths and exact filament self-observations are rejected"],
+    "constant_convention": "Solver prototypes use historical mu0=4*pi*1e-7. Magpylib uses measured SI mu0. Test expectations explicitly rescale this known 1.3e-10 relative convention difference; no field or material constant is fitted.",
+    "stability": "Endpoint-product Biot-Savart form outside a segment avoids subtracting nearly identical axial cosines. Symmetric endpoint-length log form evaluates Coulomb A without exterior-collinear 0/0."
+  },
+  "return_scenario": {
+    "direction": "B terminal to A terminal",
+    "waypoints_m": [[-0.055,0.004888888888889,0.001],[-0.055,0.004444444444444,0.001]],
+    "phase_a_ohm": 2.4518291812920716,
+    "phase_b_ohm": 2.453160382950247,
+    "scope": "Star points coincide in the archived geometry. Unit trace and via currents are reconstructed independently; terminal return is explicit. Return resistance and driver geometry are not established."
+  },
+  "nonlinear_static_pilot": {
+    "implementation": "ngsolve_winding_static.py",
+    "work": "closed-winding-pm-ferrite-current-cached-v3-20261020",
+    "bias_source": "coupled-material-zero-v2-pilot-20261020",
+    "current_states_a": [0,0.1,-0.1,0.05,-0.05],
+    "planned_outputs": ["independently integrated PM force from wire currents plus full nonlinear ferrite magnetization", "central current differences for mover force, not negative copper force", "material linkage integral M.Bwire, checked against partial source-energy derivative", "material-only differential line inductance, not 2W/I^2 or total winding inductance"],
+    "status": "completed-closed-winding-nonlinear-current-response-unqualified",
+    "summary_sha256": "5ff567a8bbc6f114ddc557252979c80dfb10e961356bf161878d555217e24066",
+    "seconds": 439.66724254202563,
+    "maximum_equilibrium_relative_residual": 3.435958892650655e-15,
+    "fine_current_step_a": 0.05,
+    "independent_mover_force_current_derivative_n_per_a": [-0.04891957027340684,-0.006568351200493116,0.023248108193514305],
+    "unqualified_material_current_difference_h": 1.321976000208141e-7,
+    "current_difference_refinement_change_n_per_a": 6.688297186757035e-9,
+    "material_inductance_current_difference_change_h": 5.941402260091064e-10,
+    "solver_threads": 2,
+    "green_workers": 2,
+    "scope": "Five whole nonlinear equilibria with independent PM-force extraction and current-difference gates pass. Still one centred bias/explicit return scenario on the mesh whose static response-field controls fail. These are numerical pilot outputs, not qualified motor Kf or inductance ratings."
+  },
+  "preserved_uncached_timeout": {
+    "work": "closed-winding-pm-ferrite-current-v2-20261020",
+    "receipt_sha256": "a32e0c856f61ef363c1d870c896e914ea596415af13e74792b5e388a363bddee",
+    "timeout_s": 1800,
+    "recorded_current_states_a": [0],
+    "scope": "Unaccepted incomplete current sweep. A process sample identifies prescribed620-segment source evaluation inside the automatic-differentiation material tangent as the hot path; not sparse factorization. The original job and source snapshots remain intact."
+  },
+  "exact_source_cache": {
+    "implementation": "quadrature_source.py",
+    "kind": "Fixed analytical unit-wire B values at the declared material integration points only, not a spatial interpolator or frozen permeability.",
+    "controls": ["IR storage rule must be bitwise identical to the declared assembled quadrature rule", "each scalar component filled directly at transformed quadrature coordinates, not GridFunction.Set projection", "analytical/cache source L2 discrepancy must be <=1e-13", "energy, gradient and full nonlinear material tangent match the uncached source in pinned regression tests", "all off-rule force/material/linkage postprocessing retains the analytical wire source"],
+    "cache_scope": "Unit prescribed winding field only. Current amplitude remains a parameter, ferrite reaction remains fully nonlinear, and actual wire source data and cache vectors are archived separately.",
+    "completed_pilot_points":193104,
+    "completed_pilot_elements":894,
+    "completed_pilot_relative_source_l2_error":0.0,
+    "completed_pilot_build_seconds":9.660240667057224
+  },
+  "reciprocal_pm_linkage_groundwork": {
+    "implementation": "wire_pm_linkage.py",
+    "method": "Integrate PM polarization/mu0 dotted with the unit-current closed-wire B over physical PM volumes.",
+    "check": "Position derivative of this free-space PM linkage agrees with independently extracted current-to-PM face-kernel force; volume order and current sign checks pass.",
+    "scope": "Free-space linkage/reciprocity kernel test only. Full nonlinear pose/linkage sweeps and total winding self inductance remain unfinished."
+  },
+  "completed_pose_reciprocity": {
+    "work":["closed-winding-pose-plus100-20261020","closed-winding-pose-minus100-20261020","closed-winding-pose-plus50-20261020","closed-winding-pose-minus50-v2-20261020"],
+    "pm_x_offsets_m":[0.0001,-0.0001,0.00005,-0.00005],
+    "report":"closed-winding-kf-linkage-reciprocity-v2-20261020.json",
+    "status":"passed-x-mover-force-flux-linkage-reciprocity-one-mesh-only",
+    "report_sha256":"fa2cc88d9ad0cc98352fd20d197714f70e45c71d09ff7e5f001630aa6d016097",
+    "mover_force_current_derivative_x_n_per_a":-0.04891957027340684,
+    "total_pm_linkage_position_derivative_x_n_per_a":-0.048892464123458705,
+    "agreement_absolute_error_n_per_a":2.7106149948136204e-5,
+    "position_difference_refinement_change_n_per_a":1.711071997075736e-5,
+    "pm_volume_quadrature_refinement_change_n_per_a":3.3054767533124974e-6,
+    "unchanged_limit_n_per_a":0.0009783914054681368,
+    "preserved_cli_failure":"The minus50 command used a separate negative scientific-notation token, which argparse treated as an option. Exit2 and the failed preflight audit are preserved. A separate --pose-x=-0.00005 command/archive reruns that missing pose; no failed numerical result was accepted.",
+    "implementation":"audit_winding_reciprocity.py",
+    "scope":"All four PM-only nonlinear pose jobs and the whole audit completed. Fixed copper/material/return/mesh verified. X current derivative of independently extracted mover force agrees with x derivative of free-space-plus-nonlinear-material PM linkage, with separate pose-step and PM-volume-quadrature controls. This is one-mesh reciprocity, not spatial convergence or a motor rating."
+  },
+  "interface_source_limitation": "Saved bottom-copper centreline is at z=0, coincident with the prototype ferrite top. An ideal filament at a magnetic interface is not a finite copper cross-section. Current-step convergence on a fixed mesh does not establish convergence of differential inductance; finite-width/thickness current distribution and actual winding/ferrite clearance must be resolved before accepting that quantity. No numerical radius or failed-force floor has been fitted.",
+  "completed_interface_contact_audit": {
+    "report":"closed-winding-material-interface-contacts-20261020.json",
+    "sha256":"3228a9c235ad83a4bf1330deb671f7d58589d209ef945c1058697b6339008723",
+    "boundary_segments":79,
+    "boundary_length_m":0.3653333333333334,
+    "boundary_abs_current_length_a_m":0.34933333333088984,
+    "interior_segments":0,
+    "scope":"Nominal centreline/model geometry only, not measured copper surfaces or hardware clearance. Positive-length interface contact makes finite-source differential-inductance qualification mandatory."
+  },
+  "inductance_output_safeguard": "Future current jobs detect interface/interior filament contact and emit material_differential_line_inductance_h=null for that unsupported case. The finite-mesh central difference remains explicitly labeled unqualified_material_current_difference_h. Kf/linkage diagnostics and source data remain available; historical pilot JSON is preserved rather than rewritten.",
+  "preserved_return_failure": {
+    "work": "closed-winding-pm-ferrite-current-pilot-20261020",
+    "summary_sha256": "207efd66cfa7fce77d93996dfc5e6fc80ee0793708f5936c10bdee6b3c5b030f",
+    "reason": "The first declared return rose to z=3mm, above PM bottoms at1.3mm. The independent current-to-PM force kernel explicitly supports below-PM sources only, so it rejected the scenario instead of emitting a force. No current state was accepted.",
+    "new_scenario": "Separate archive and explicit return at z=1mm, below PMs. This is a changed external-return assumption, not recovery or acceptance of the original path."
+  },
+  "remaining": ["DC current-response spatial/domain/quadrature controls", "return-path sensitivity and actual hardware connectivity", "additional pose/axis/current operating sweeps", "finite copper current basis and winding/ferrite geometry", "copper self inductance and total differential DC linkage", "DC/motion coupling, measured material curves and hardware testing"]
+}

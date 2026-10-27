@@ -1,0 +1,88 @@
+! Same SI free-space geometry and physical tags as cuboid.geo/cuboid.pro.
+! This is a 3D vector-potential installation/formulation check, not a motor model.
+Include "mesh/mesh.names"
+Header
+  CHECK KEYWORDS Warn
+  Mesh DB "." "mesh"
+End
+Simulation
+  Coordinate System = Cartesian 3D
+  Simulation Type = Steady State
+  Steady State Max Iterations = 1
+  Max Output Level = 5
+End
+Constants
+  Permeability of Vacuum = 1.2566370614359173e-6
+End
+Body 1
+  Target Bodies(1) = 1
+  Equation = 1
+  Material = 1
+End
+Body 2
+  Target Bodies(1) = 2
+  Equation = 1
+  Material = 1
+  Body Force = 1
+End
+Material 1
+  Relative Permeability = 1
+  Relative Permittivity = 1
+  Electric Conductivity = 0
+End
+Body Force 1
+  Magnetization 3 = Real 1066338.1187162634
+End
+Equation 1
+  Active Solvers(3) = 1 2 3
+End
+Solver 1
+  Equation = MGDynamics
+  Procedure = "MagnetoDynamics" "WhitneyAVSolver"
+  Variable = AV
+  Optimize Bandwidth = False
+  Use Piola Transform = True
+  Edge Basis = True
+  Quadratic Approximation = False
+  Fix Input Current Density = True
+  Linear System Solver = Iterative
+  Linear System Iterative Method = BiCGStabL
+  BicGStabL Polynomial Degree = 2
+  Linear System Preconditioning = None
+  Linear System Max Iterations = 5000
+  Linear System Convergence Tolerance = 1e-10
+  Linear System Abort Not Converged = True
+  Linear System Residual Output = 50
+  Nonlinear System Consistent Norm = True
+End
+Solver 2
+  Equation = MGDynamicsCalc
+  Procedure = "MagnetoDynamics" "MagnetoDynamicsCalcFields"
+  Potential Variable = AV
+  Optimize Bandwidth = False
+  Calculate Magnetic Vector Potential = False
+  Calculate Magnetic Flux Density = True
+  Calculate Magnetic Field Strength = False
+  Calculate Nodal Fields = True
+  Linear System Solver = Iterative
+  Linear System Iterative Method = CG
+  Linear System Symmetric = True
+  Linear System Preconditioning = Diagonal
+  Linear System Convergence Tolerance = 1e-10
+  Linear System Max Iterations = 5000
+  Linear System Abort Not Converged = True
+  Linear System Residual Output = 0
+End
+Solver 3
+  Exec Solver = After All
+  Equation = ResultOutput
+  Procedure = "ResultOutputSolve" "ResultOutputSolver"
+  Output File Name = fields
+  Vtu Format = True
+  Binary Output = False
+  Save Geometry IDs = True
+End
+Boundary Condition 1
+  Target Boundaries(1) = $ outer
+  AV {e} = Real 0
+End

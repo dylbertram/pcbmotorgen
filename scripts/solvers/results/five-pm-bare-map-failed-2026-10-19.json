@@ -1,0 +1,12 @@
+{
+  "status": "failed-near-interface-off-symmetry-bare-field-map",
+  "scope": "Coarse completed star2-v1 five-PM quadratic quarter field, three planes 0.1/0.2/0.3mm below magnet bottoms, 64 by 24 midpoint X/Y probes per plane. Analytical Magpylib source equivalence only, not material physics or accepted force.",
+  "full_audit_sha256": "6bccacf8cfc27d8a0dc5198fb70a3235ef6f64aa0e9e98cb66825dac7dfdda3e",
+  "raw_probe_npz_sha256": "479c2961b778ff12846834bb461e5ee35c7e776fe65333286728d747bfbcad89",
+  "clearances_below_pm_m": [0.0001, 0.0002, 0.0003],
+  "vector_relative_l2_errors": [0.09899425558065299, 0.07882079363273685, 0.04922692729553599],
+  "maximum_absolute_vector_errors_t": [0.16801263748518236, 0.2435853657457463, 0.09834741997415716],
+  "unchanged_bare_vector_gate": 0.05,
+  "earlier_pcb_midplane_centreline_relative_error": 0.00797977260569359,
+  "conclusion": "The earlier centreline probes a different, more distant height and symmetry-constrained components. It does not qualify these near-PM stress-plane fields. Independent interface refinement is required; failed planes are not discarded and the 5% gate is not changed."
+}

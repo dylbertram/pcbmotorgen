@@ -24,6 +24,7 @@ fn main() {
             // menu is installed / any command resolves it.
             app.manage(menu::RecentFiles::default());
             app.manage(commands::workspace::ExitApproval::default());
+            app.manage(commands::dc_jobs::DcJobs::default());
             menu::install(app.handle())?;
             Ok(())
         })
@@ -64,12 +65,23 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             commands::physics::get_magnet_grades,
             commands::physics::compute_height_stack,
+            commands::physics::periodic_backplane_reference,
             commands::physics::generate_coils,
             commands::physics::evaluate_force_sweep,
             commands::physics::sample_b_field,
+            commands::visualization::sample_simulation_visualization,
             commands::physics::travel_envelope,
             commands::physics::compute_friction,
             commands::physics::analyze_drive,
+            commands::physics::analyze_housing_motion,
+            commands::physics::prepare_dc_winding_geometry,
+            commands::dc_jobs::dc_coupling_capability,
+            commands::dc_jobs::inspect_dc_coupling,
+            commands::dc_jobs::start_dc_coupling,
+            commands::dc_jobs::start_dc_preparation,
+            commands::dc_jobs::start_dc_winding_field,
+            commands::dc_jobs::dc_coupling_status,
+            commands::dc_jobs::cancel_dc_coupling,
             commands::kicad::connect_kicad,
             commands::kicad::write_coils_to_board,
             commands::kicad::write_sensor_to_board,
@@ -105,6 +117,9 @@ fn main() {
         .build(tauri::generate_context!())
         .expect("error while running pcbmotorgen tauri application");
     app.run(|app, event| {
+        if let tauri::RunEvent::Exit = event {
+            app.state::<commands::dc_jobs::DcJobs>().shutdown();
+        }
         if let tauri::RunEvent::ExitRequested { api, .. } = event {
             let approval = app.state::<commands::workspace::ExitApproval>();
             if !approval.inner().0.load(std::sync::atomic::Ordering::SeqCst) {

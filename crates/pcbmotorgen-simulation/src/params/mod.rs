@@ -29,6 +29,10 @@ pub use phase_band::{phase_bands_from_routing, PhaseBandPosition};
 /// Safety margin for minimum drive force calculation.
 pub(crate) const SAFETY_MARGIN: f64 = 1.3;
 
+/// Supported coreless screening input envelope, not an accuracy guarantee.
+pub const MAX_MAGNET_COUNT: u32 = 12;
+pub const MAX_PCB_LAYERS: u32 = 16;
+
 /// Default value for `num_layers` when the field is absent during serde
 /// deserialisation (e.g. legacy JSON payloads from before the field was
 /// added).
@@ -180,7 +184,7 @@ impl Default for SimulationInput {
             min_space_m: mils_to_m(5.0),
             min_via_drill_m: mm(0.2),
             min_via_annular_ring_m: mm(0.1),
-            max_layers: 12,
+            max_layers: MAX_PCB_LAYERS,
             num_layers: 4,
             drive_frequency_hz: 500.0,
             max_temperature_rise_c: 20.0,

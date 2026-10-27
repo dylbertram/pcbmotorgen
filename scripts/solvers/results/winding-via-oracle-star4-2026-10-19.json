@@ -1,0 +1,15 @@
+{
+  "status": "passed-independent-winding-and-free-space-force-only",
+  "scope": "Actual star_4-layer.pmmotor version 0 and its saved drive settings. Geometric-edge resistance, SciPy branch currents and 3D trace/via quadrature reconstructed independently. Connectivity and arc tessellation still come from Rust; Magpylib/magba cuboid agreement is analytical equivalence, not material validation.",
+  "full_study_sha256": "11f5173b171a68a767713b2b80a22f08d87f86214be4432f81d0931c2fd178b8",
+  "quadrature_levels": [10, 20, 40, 80],
+  "finest_force_curve_change_norm_n": 0.000003261440458960399,
+  "unchanged_finest_change_limit_n": 0.001947791722100687,
+  "finest_phase_resistances_ohm": [7.740527059725408, 7.744719816642141, 7.767779998430958],
+  "maximum_independent_current_share_error": 3.945022086782046e-11,
+  "maximum_independent_edge_resistance_error_ohm": 4.683753385137379e-17,
+  "finest_vertical_sample_counts_per_phase": [21040, 21040, 21040],
+  "mean_absolute_fixed_phase_a_force_n": 0.029506960711490806,
+  "force_metric_note": "Nine fixed phase-A excitation positions, not the commutated mean thrust or travel-ripple metric from earlier studies.",
+  "qualification_limits": ["No backplane or housing material in this oracle", "No independent graph extraction", "No terminal fan-out/return conductor model", "No waveform, hardware or finite moving housing qualification"]
+}

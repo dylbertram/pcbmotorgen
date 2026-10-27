@@ -1,0 +1,29 @@
+{
+  "status": "interrupted-incomplete-not-accepted",
+  "evidence": "Both GetDP processes were defunct and no check_periodic_motion.py worker remained. Original summaries and solver receipts still saying running are preserved unchanged. No accepted nonlinear static force or completed near-knee refinement is inferred from these files.",
+  "possible_cause": "These jobs overlapped the mocked-PID process-group regression in the test runner. The exact termination signals were not receipted, so causation is not established by these partial artifacts.",
+  "jobs": [
+    {
+      "name": "project-one-pm-quarter-stretched-mesh-v2",
+      "summary_sha256": "b1a15761d29b36dfa44e1531439e0e9e931f6fb662106b3dd42b4ffc5c396618",
+      "stack_receipt_sha256": "48d23b061ead87aad55fae903a7ac4419781e10ec2f67739b047ba7b2b2eea57",
+      "stack_log_sha256": "26650b8cfc1c0991dd2be88d35114fe3f723024af8fbe99051d6cf0dabb46c7c",
+      "last_logged_nonlinear_residual": 0.07023659542334
+    },
+    {
+      "name": "project-star2-v1-quarter-stretched-q2",
+      "summary_sha256": "87ab4f0ea39228c6bdd3716c28485f0bd717ffb5df8d2514dd4629f830119fe5",
+      "stack_receipt_sha256": "701cac358aab929ebee2360bca9ae8816cf56756c07a6a590166c5aa9c5a9abc",
+      "stack_log_sha256": "ed5212fb4c559466fe14a9b4e5755f7cc4662d8fa6d6b3d1b6705bba07cc2580",
+      "last_logged_nonlinear_residual": 0.0023667940081,
+      "fresh_retry": "project-star2-v1-quarter-stretched-q2-retry"
+    },
+    {
+      "name": "periodic-near-knee-flex1-refinements",
+      "summary_sha256": "bbd4882d1dbbd8d5803af1c98ab29f0abc40831959d1b0783f8af04720d063b7",
+      "completed_levels": ["base", "time", "depth", "modes", "angles"],
+      "missing_levels_and_controls": ["wall", "gap", "zero", "reverse", "slow"],
+      "fresh_retry": "periodic-near-knee-flex1-refinements-retry"
+    }
+  ]
+}

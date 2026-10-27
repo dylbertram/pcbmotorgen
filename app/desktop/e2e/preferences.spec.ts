@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { gotoDesignApp } from "./helpers";
+import { gotoDesignApp, selectDesignPanel, coilWorkspace } from "./helpers";
 import { fileURLToPath } from "node:url";
 
 test.beforeEach(async ({ page }) => {
@@ -29,6 +29,7 @@ test("driver library edits persist and feed the Simulation selector", async ({ p
 
   await dialog.getByRole("button", { name: "Add driver…", exact: true }).click();
   const modal = page.getByRole("dialog", { name: "Add driver", exact: true });
+  await expect(modal.getByLabel("Driver name")).toBeFocused();
   await modal.getByLabel("Driver name").fill("Settings driver");
   await modal.getByLabel("Min supply (V)", { exact: true }).fill("3");
   await modal.getByLabel("Max supply (V)", { exact: true }).fill("30");
@@ -64,8 +65,12 @@ test("driver library edits persist and feed the Simulation selector", async ({ p
 
   // The Simulation tab selects from the same library.
   await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
+  await selectDesignPanel(page, "Routing");
+  await page.getByRole("combobox", { name: "Winding connection", exact: true }).selectOption("2");
   await page.getByRole("tab", { name: /^Simulate/i }).click();
+  await coilWorkspace(page).getByRole("button", { name: "Driver settings", exact: true }).click();
   await page.getByRole("combobox", { name: "Driver to evaluate" }).selectOption("Settings driver v2");
+  await page.getByRole("region", { name: "Simulation results", exact: true }).getByRole("tab", { name: "Driver suitability", exact: true }).click();
   await expect(page.locator('section[aria-labelledby="driver-suitability-heading"]')).toContainText("Settings driver v2");
 });
 
@@ -84,6 +89,7 @@ test("bundled drivers live in the library, are deletable, and leave the selector
   // The Simulation tab reads the same library, so the removed driver is gone.
   await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
   await page.getByRole("tab", { name: /^Simulate/i }).click();
+  await coilWorkspace(page).getByRole("button", { name: "Driver settings", exact: true }).click();
   const selector = page.getByRole("combobox", { name: "Driver to evaluate" });
   await expect(selector.locator("option", { hasText: "DRV8313" })).toHaveCount(0);
   await expect(selector.locator("option", { hasText: "DRV8316" })).toHaveCount(1);

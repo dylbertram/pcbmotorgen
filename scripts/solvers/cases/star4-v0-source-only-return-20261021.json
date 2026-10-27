@@ -1,0 +1,11 @@
+{
+  "schema": "finite-dc-source-only-study-v1",
+  "source_project_sha256": "6a550dcb4327a6e846582fb883c4958a0d275cba85b33271337deee405794e81",
+  "snapshot_sha256": "2bb1eb84ffbc67a47ff7dc83a0bd986ddf315e29431fa8c06e45d1ef48b99e7a",
+  "version_index": 0,
+  "material_coupling": false,
+  "positive_phase": "A",
+  "negative_phase": "C",
+  "external_return_waypoints_m": [[-0.01, 0.009777776000000005, 0.0], [-0.01, 0.008888888000000001, 0.0]],
+  "scope": "Explicit finite-return numerical screening scenario only, not recovered cable CAD or a user-approved material correction. All original imported traces, three circular primitives, full via spans and explicit saved depths are preserved. No magnetic material or coupled-force qualification. Return cross-section uses the saved outer trace width and copper thickness; original project remains unchanged."
+}

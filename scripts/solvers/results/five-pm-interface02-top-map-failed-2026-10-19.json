@@ -1,0 +1,15 @@
+{
+  "status": "failed-above-pm-field-maps-despite-passing-below-maps",
+  "scope": "Same completed 0.2mm PM-interface bare control, identical 64x24 off-symmetry probes 0.1/0.2/0.3mm outside the top and bottom PM faces. Actual analytical source symmetry supplies equal reference RMS field magnitudes on each pair; FEM field errors are assessed separately.",
+  "audit_sha256": "85d7dd18662fb4876cd36c0e7a810438cc3a54d300472b258139a9019ee5b979",
+  "raw_probe_archive_sha256": "aa022e1130e1b1ca7550fa19e324417c46dc397e2f553d9675e0681ddac68bfc",
+  "clearances_m": [0.0001, 0.0002, 0.0003],
+  "below_vector_relative_errors": [0.028700300384499652, 0.018099479456469666, 0.012930056428183637],
+  "above_vector_relative_errors": [0.060109524153167934, 0.05511278475467795, 0.06181717010084973],
+  "unchanged_field_map_gate": 0.05,
+  "exact_top_z_traction_integrals_n": [3.210383, 2.408437, 1.902489],
+  "exact_bottom_z_traction_integrals_n": [-2.609928, -1.863632, -1.422515],
+  "traction_values_precision": "Rounded to six decimal places for this compact index; full precision is retained in the hashed bare-force diagnostic.",
+  "mesh_support_finding": "Legacy face-band half-width is the target size in CAD meshing coordinates. With Z stretch 4, a 0.2mm target supports only 0.05mm physical Z half-width before transition, not the complete 0.1/0.2/0.3mm force/map region. The stack-side mesh independently refines the bottom region. Narrowing the target alone also narrows that band.",
+  "next_control": "An explicit physical 0.4mm face-band half-width with unchanged 0.2mm mesh target is a separate prepared/running control. It preserves physical Z support after restoration and does not change geometry, material parameters or tolerances. No result is inferred before completion."
+}

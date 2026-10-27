@@ -1,0 +1,47 @@
+{
+  "status": "passed-static-vector-scalar-agreement-only",
+  "scope": "Centred five-PM finite prototype, 0.2mm flexible ferrite, provisional mu_initial=130 and saturation polarization=0.25T. The analytical particular field is shared, while B-energy HCurl reaction A and H-coenergy scalar potential use different field spaces/equations. No winding, induced current or moving nonlinear material qualification follows.",
+  "raw_archives": "$HOME/.local/opt/solver-prototypes-macos",
+  "vector_response": {
+    "work": "ngsolve-vector-static12-20261020",
+    "summary_sha256": "3a1287bad1bbfdd30db5236b7a7c6fe758a5f10e6f7a1e8e1afe4fc70e16e39a",
+    "completed_receipt_sha256": "0cd237d09b72c8ce4d0f14faf50a0d7863379a7a4e5da37baedbf23a9a0bd167",
+    "order": 2,
+    "mesh_source": "reduced-vector12-bare-20261020",
+    "near_mesh_m": 0.0012,
+    "dofs": 207964,
+    "free_dofs": 187049,
+    "newton_iterations": 13,
+    "relative_equation_residual": 3.369683168144731e-14,
+    "solve_seconds": 137.01364000001922,
+    "solver_threads": 16,
+    "gauge": "Exact tree; tangential A parity on x/y symmetry planes and remote exterior, no penalty mass"
+  },
+  "comparison": {
+    "report": "ngsolve-static-vector-scalar-agreement12-20261020.json",
+    "sha256": "c21be3a4dc9ba20e658f50c0a7d6d6b792ab4b83c561854fe019629621a3b33c",
+    "reference": "Completed ngsolve-near06-20261020 H-potential response",
+    "maximum_total_field_relative_error": 0.0007538513330110005,
+    "maximum_material_response_relative_error": 0.029474153554587174,
+    "force_absolute_difference_n": 7.108004681555258e-5,
+    "unchanged_reference_gate": 0.05,
+    "scope": "Different meshes/formulations agree for this pose, not yet independent vector-mesh refinement or dynamic coupling."
+  },
+  "material_force": {
+    "method": "Integrate volume magnetization as dipole sources. PM force uses exact rectangular face kernels and independently refined source-z derivatives, not a negative stator force. The common force functional is disclosed between scalar/vector cases.",
+    "scalar_report": "static-material-force-scalar06-20261020.json",
+    "scalar_sha256": "705c45e2f67afc290d7680f4c226d54d283a1408907b40b60c6a5328321d3cc8",
+    "scalar_force_z_n": -1.1900148094556742,
+    "vector_report": "static-material-force-vector12-20261020.json",
+    "vector_sha256": "e8aeb3544e64baa94467655c7d39aacf8916705163b74b2122e72e7d11f64eeb",
+    "vector_force_z_n": -1.1899437294088586,
+    "vector_volume_quadrature_change_n": 1.9642732529413407e-7,
+    "vector_derivative_refinement_change_n": 5.236504581762102e-10,
+    "unchanged_integration_gate": "max(10nN, 2%)"
+  },
+  "law_checks": "The full 3D B-energy gradient matches H, and radial energy/H match the previously checked isotropic two-slope law on both branches. Magnetization remains bounded by Bs/mu0. The vacuum particular-field transform is independent of source strength. No material parameter was fitted.",
+  "coupled_material_followup": "nonlinear-ferrite-housing-progress-2026-10-20.json",
+  "full_domain_coarse_air_failure_and_refinement": "material-local-air-progress-2026-10-20.json",
+  "qualified_static_exterior_output_followup": "material-local-air-progress-2026-10-20.json records completed full-domain mesh/domain/quadrature controls of reconstructed exterior fields and PM forces. Raw A-curl interpolation remains failed, and interior fields/tensors are separate.",
+  "remaining": ["interior-field and finite differential-tensor controls", "nonlinear ferrite plus conducting housing transient qualification", "finite-source winding differential/current/force coupling", "measured material laws and hardware checks"]
+}

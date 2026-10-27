@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { T } from "@threlte/core";
+  import { T, useThrelte } from "@threlte/core";
   import { BufferGeometry, Float32BufferAttribute, CurvePath, LineCurve3, TubeGeometry } from "three";
   import type { Vector3 } from "three";
   import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
@@ -11,6 +11,7 @@
     centerlines?: boolean;
     zScale?: number;
   } = $props();
+  const { invalidate } = useThrelte();
 
   // Magnify layer positions, not the copper's physical cross-section.
   let scaledPaths = $derived(paths.map(path => path.points.map(p => p.clone().setY(p.y * zScale))));
@@ -33,6 +34,11 @@
     const merged = tubes.length ? mergeGeometries(tubes) : new BufferGeometry();
     for (const tube of tubes) tube.dispose();
     return merged;
+  });
+  $effect(() => {
+    const current = geometry;
+    invalidate();
+    return () => current?.dispose();
   });
 </script>
 

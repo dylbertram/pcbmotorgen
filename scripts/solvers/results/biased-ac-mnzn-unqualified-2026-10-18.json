@@ -1,0 +1,28 @@
+{
+  "status": "failed-not-qualified",
+  "scope": "100 kHz periodic differential-tensor comparison for a 2 mm MnZn two-slope plate, mu_initial 2500, saturation polarization 0.45 T. Not measured frequency-dependent material data.",
+  "unchanged_reactive_gate": "max(0.001, 5% of the added reactive factor), applied separately to both spatial phases",
+  "trials": [
+    {
+      "name": "biased-ac-mnzn2-pilot",
+      "summary_sha256": "481af249c62685b85e90aa956cacd947c7cc4712ab5f4f9647b217212e0effe6",
+      "real_factor_absolute_errors": [0.0014632769669318257, 0.0010813298120602166]
+    },
+    {
+      "name": "biased-ac-mnzn2-refined",
+      "summary_sha256": "4fad0156493d965774ac827c98885c2b1952840148e75a38bccaca290100634b",
+      "real_factor_absolute_errors": [0.0012342862635419394, 0.0010706984005064424]
+    },
+    {
+      "name": "biased-ac-mnzn2-source192",
+      "summary_sha256": "3a6a61aa724a948e25d335dbca0582c3809b38735a58a52af88fdfdf3371835f",
+      "real_factor_absolute_errors": [0.0011997778478338716, 0.005556158008648282]
+    },
+    {
+      "name": "biased-ac-mnzn2-source192-mesh-half",
+      "summary_sha256": "2dc9ba3cc11b241b58dcf6f488eca7adaf0391bde6281748342a6c5524ffbb25",
+      "real_factor_absolute_errors": [0.0021652779453411597, 0.006301411802621004]
+    }
+  ],
+  "conclusion": "Increasing source strips and independently halving FEMM mesh size do not demonstrate convergence of the low-effect reactive comparison. The half-mesh loss comparison improves, but does not rescue the failed reactive gate. No model constant or tolerance was changed."
+}

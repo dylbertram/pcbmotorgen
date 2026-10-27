@@ -1,0 +1,28 @@
+{
+  "status": "matched-known-initial-mesh-defect-corrected",
+  "source": "User-supplied macOS crash report, correlated with retained solver command receipt and stderr. Unrelated machine identifiers and full binary inventory are not copied into this index.",
+  "matched_process": {
+    "pid": 51893,
+    "parent_pid": 51767,
+    "launch_utc": "2026-10-20T06:56:29.843038+00:00",
+    "crash_local": "2026-10-20T08:56:30.2842+02:00",
+    "boot_session_matches": true,
+    "receipt_exit_code": -11,
+    "receipt_elapsed_seconds": 0.46243483398575336,
+    "native_frame": "netgen::Mesh::AddSurfaceElement(netgen::Element2dRef const&)",
+    "exception": "EXC_BAD_ACCESS / SIGSEGV, invalid address 0x58"
+  },
+  "retained_receipt": "ngsolve-periodic-mnzn-pilot.log.command.json",
+  "retained_receipt_sha256": "d49b3d06bfc2a0815ce04a313fdad364e112fa5150520fc2fd340db9d90d52c4",
+  "retained_log": "ngsolve-periodic-mnzn-pilot.log",
+  "retained_log_sha256": "b476c3bb733e4bd8ab3140238980f61d021d1119dd14b5bab7b87771308e7fb2",
+  "stderr": "has no face descriptor: fd.size = 0, ind = 1",
+  "cause": "The first hand-built 2D pilot omitted required face descriptors before adding triangular surface elements. Netgen crashed on that invalid mesh input instead of raising a Python exception.",
+  "correction": "structured_mesh in ngsolve_periodic_ac.py creates descriptors for all three regions before any Element2D is added.",
+  "verification": "Subsequent actual mesh-construction/periodic-boundary tests and numerous nonlinear-bias/harmonic solver runs passed that construction stage. The original crash receipt stays failed.",
+  "scope_boundaries": [
+    "OpenChamber is the responsible launcher in the OS report, not the faulting native component.",
+    "This identifies the early mesh-construction segfault, not the cause of earlier GetDP/postprocessing SIGTERM interruptions.",
+    "The report is not evidence of an OOM termination, solver nonconvergence or invalidation of later completed studies."
+  ]
+}

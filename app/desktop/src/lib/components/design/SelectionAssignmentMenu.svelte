@@ -49,6 +49,14 @@
     tool?.apply(coilName, "");
     newCoilOpen = false;
   }
+  function focusOpenMenu(event: Event) {
+    event.preventDefault();
+    const active = contentRef?.ownerDocument.activeElement;
+    // Floating content can reattach its focus scope after a submenu opens.
+    // Do not restart roving focus when the user is already inside this menu.
+    if (newCoilOpen || (active && [contentRef, coilMenuRef, layerMenuRef].some(node => node?.contains(active)))) return;
+    contentRef?.focus();
+  }
 </script>
 
 <svelte:document onpointerdowncapture={dismissOutside} />
@@ -61,14 +69,16 @@
     <!-- The containing modal already locks page scroll. A menu scroll lock
          also disables body pointer events and blocks clicks on the CAD viewer. -->
     <Menu.Content bind:ref={contentRef} preventScroll={false} class={menuClass} aria-label={destination ? "Move selection" : "Selection actions"}
-      onCloseAutoFocus={(event) => { if (outsideDismissal) { event.preventDefault(); outsideDismissal = false; } }}>
+      onOpenAutoFocus={focusOpenMenu}
+      onCloseAutoFocus={(event) => { if (outsideDismissal || open || newCoilOpen) { event.preventDefault(); outsideDismissal = false; } }}>
       {#if destination}
         <Menu.Item class={itemClass} disabled={unavailable} onSelect={onMove}>Move to</Menu.Item>
       {:else}
         <Menu.Sub>
           <Menu.SubTrigger class={itemClass} disabled={unavailable}>Change to coil…<ChevronRight size={14} aria-hidden="true" /></Menu.SubTrigger>
           <Menu.Portal>
-            <Menu.SubContent bind:ref={coilMenuRef} class={menuClass} aria-label="Change to coil" sideOffset={4}>
+            <Menu.SubContent bind:ref={coilMenuRef} class={menuClass} aria-label="Change to coil" sideOffset={4}
+              onOpenAutoFocus={(event) => event.preventDefault()}>
               {#each geometry ? cadCoilNames(geometry) : [] as coil (coil)}
                 <Menu.Item class={itemClass} disabled={unavailable} onSelect={() => change(coil, "")}>{coil}</Menu.Item>
               {/each}
@@ -80,7 +90,8 @@
         <Menu.Sub>
           <Menu.SubTrigger class={itemClass} disabled={unavailable}>Change to layer…<ChevronRight size={14} aria-hidden="true" /></Menu.SubTrigger>
           <Menu.Portal>
-            <Menu.SubContent bind:ref={layerMenuRef} class={menuClass} aria-label="Change to layer" sideOffset={4}>
+            <Menu.SubContent bind:ref={layerMenuRef} class={menuClass} aria-label="Change to layer" sideOffset={4}
+              onOpenAutoFocus={(event) => event.preventDefault()}>
               {#each geometry?.layer_z_mm ?? [] as _, layer (layer)}
                 <Menu.Item class={itemClass} disabled={unavailable} onSelect={() => change("", String(layer))}>Layer {layer + 1}</Menu.Item>
               {/each}
@@ -95,7 +106,8 @@
 <Dialog.Root bind:open={newCoilOpen}>
   <Dialog.Portal>
     <Dialog.Overlay class="fixed inset-0 z-[160] bg-slate-950/70" />
-    <Dialog.Content class="fixed left-1/2 top-1/2 z-[161] w-80 max-w-[calc(100vw-2rem)] -translate-x-1/2 -translate-y-1/2 rounded-md border border-slate-700 bg-slate-900 p-4 text-slate-200 shadow-xl">
+    <Dialog.Content class="fixed left-1/2 top-1/2 z-[161] w-80 max-w-[calc(100vw-2rem)] -translate-x-1/2 -translate-y-1/2 rounded-md border border-slate-700 bg-slate-900 p-4 text-slate-200 shadow-xl"
+      onCloseAutoFocus={(event) => { event.preventDefault(); if (!open) triggerRef?.focus(); }}>
       <Dialog.Title class="text-sm font-semibold">Change to a new coil</Dialog.Title>
       <Dialog.Description class="mt-2 text-xs text-slate-400">Move selected segments to this coil. Their copper layers stay unchanged.</Dialog.Description>
       <form onsubmit={createCoil} class="mt-4 flex flex-col gap-3">

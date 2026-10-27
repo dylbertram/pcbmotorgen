@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { ConfigStore } from "../../../stores/config.svelte";
+  import { MAX_MAGNET_COUNT } from "../../../types/simulationLimits";
   import MagnetGradeHelper from "../MagnetGradeHelper.svelte";
   import MagnetIsoView from "../MagnetIsoView.svelte";
   import NumberField from "../../ui/NumberField.svelte";
@@ -18,7 +19,7 @@
             id="magnet-count"
             value={config.magnet_count}
             min={2}
-            max={64}
+            max={MAX_MAGNET_COUNT}
             step={1}
             integer
             ariaLabel="Magnet count"

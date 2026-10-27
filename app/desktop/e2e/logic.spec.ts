@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { ASIDE, eventually, gotoDesignApp, openCoilPreview } from "./helpers";
+import { ASIDE, eventually, gotoDesignApp, openCoilPreview, coilWorkspace, selectDesignPanel } from "./helpers";
 
 /**
  * Guards the frontend plumbing of the "traces follow the magnet pattern"
@@ -40,6 +40,7 @@ test.describe("magnet pattern -> trace regeneration", () => {
     expect(before).toBeGreaterThan(100);
 
     // 6 poles -> 12 active conductors per phase.
+    await selectDesignPanel(page, "Magnets");
     const magnetInput = page.locator("input#magnet-count");
     await magnetInput.fill("6");
 
@@ -67,7 +68,7 @@ test.describe("routing dimensions -> preview overlays", () => {
     });
 
     await openCoilPreview(page);
-    const dialog = page.getByRole("dialog", { name: "Coil Preview", exact: true });
+    const dialog = coilWorkspace(page);
     const modalCanvas = dialog.locator("canvas[data-pole-pitch]");
     await dialog.getByRole("button", { name: "Layers", exact: true }).click();
     const panel = page.getByRole("dialog", { name: "Coil preview layers", exact: true });
@@ -110,7 +111,7 @@ test.describe("routing dimensions -> preview overlays", () => {
     });
 
     await openCoilPreview(page);
-    const dialog = page.getByRole("dialog", { name: "Coil Preview", exact: true });
+    const dialog = coilWorkspace(page);
     const modalCanvas = dialog.locator("canvas[data-pole-regions]");
     await dialog.getByRole("button", { name: "Layers", exact: true }).click();
     const panel = page.getByRole("dialog", { name: "Coil preview layers", exact: true });

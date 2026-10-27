@@ -1,0 +1,16 @@
+{
+  "status": "passed-free-space-force-oracle-with-exported-model-excitation",
+  "scope": "Explicit generated 0.5mm trace / 3oz copper DRV8311 reference, not a hardware or independent controller-waveform qualification. Physical R, branch currents and all-phase 3D trace/via dL are independently reconstructed; excitation commands are exported from the Rust model.",
+  "full_study_sha256": "54c318acbee0680f23da0a3fa0293c6a042e4a310556d9dbabdbd57feafbc5aa",
+  "quadrature_levels": [10, 20],
+  "rust_kf_n_per_a": 0.5942095155363268,
+  "independent_magpylib_kf_n_per_a": 0.5942095155391054,
+  "maximum_independent_force_curve_discrepancy_n": 5.736411345935721e-12,
+  "maximum_independent_branch_current_share_discrepancy": 4.192013403070405e-11,
+  "model_thrust_at_1_1_a_n": 0.6536304670899595,
+  "model_speed_voltage_v": 4.095650048647874,
+  "unchanged_numeric_regression_absolute_tolerance": 1e-8,
+  "old_trace_only_and_full_board_via_pins": {"kf_n_per_a": 0.5939989478, "thrust_n": 0.6533988425, "speed_voltage_v": 4.4777041959},
+  "cause": "Via intervals now use actual copper-layer separation rather than a full PCB thickness per graph edge. Force sampling includes signed vertical via current. This default four-layer reference routes vias between layers 0 and 1, one-third of its 1.6mm PCB thickness.",
+  "limits": ["Current excitation is not an independently verified FOC/PWM waveform", "Inductance/ampacity/thermal checks retain their analytical screening limits", "Terminal fan-out and external return conductors are not modeled", "No backplane material or finite housing motion validation"]
+}

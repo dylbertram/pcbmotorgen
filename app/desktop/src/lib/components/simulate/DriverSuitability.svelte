@@ -91,7 +91,7 @@
 
   {#if !analysis && !error}
     <p class="mt-3 text-xs text-slate-500">Measuring the routed copper…</p>
-  {:else if verdict && budget}
+  {:else if analysis && verdict && budget}
     <p class="mt-3 flex items-start gap-2 text-sm text-slate-100" role="status">
       <span class="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full border text-xs font-bold {STATUS[verdict.status].tone}" aria-hidden="true">{STATUS[verdict.status].glyph}</span>
       {verdict.text}
@@ -153,7 +153,7 @@
                 {#if c.status !== "unknown" && c.status !== "pass"}
                   <div class="check-meter relative mt-1 h-1 rounded-full bg-slate-700/70" aria-hidden="true">
                     <div
-                      class="h-1 rounded-full {c.status === 'pass' ? 'bg-emerald-400' : c.status === 'warn' ? 'bg-amber-400' : 'bg-rose-400'}"
+                      class="h-1 rounded-full {c.status === 'warn' ? 'bg-amber-400' : 'bg-rose-400'}"
                       style:width="{fill(c) * 100}%"
                     ></div>
                     <div class="absolute top-[-2px] h-2 w-px bg-slate-300" style:left="80%"></div>

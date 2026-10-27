@@ -1,12 +1,12 @@
 import { test, expect } from "@playwright/test";
-import { ASIDE, designConstraintsPanel, gotoDesignApp, openCoilPreview } from "./helpers";
+import { ASIDE, designConstraintsPanel, gotoDesignApp, openCoilPreview, coilWorkspace, selectDesignPanel } from "./helpers";
 
 test("design settings stay in the drawer and keep winding details on demand", async ({ page }, testInfo) => {
   await page.emulateMedia({ colorScheme: "dark" });
   await gotoDesignApp(page);
   const preview = page.locator(ASIDE);
-  await expect(preview.locator("#backplane-heading")).toBeVisible();
-  await expect(preview.locator("#magnets-heading")).toBeVisible();
+  await expect(preview.locator("#backplane-heading")).toHaveCount(0);
+  await expect(preview.locator("#magnets-heading")).toHaveCount(0);
   const constraints = designConstraintsPanel(page);
   const diagram = constraints.getByRole("img", { name: "Three-quarter isometric view of the assembly" });
   expect((await diagram.boundingBox())!.height).toBeLessThanOrEqual(150);
@@ -38,18 +38,16 @@ test("math tooltips render LaTeX with accessible MathML and diagrams", async ({ 
   await expect(tooltip).toBeHidden();
 });
 
-test("simulation uses the available width and still opens the preview", async ({ page }, testInfo) => {
+test("simulation uses the available width and keeps the preview mounted", async ({ page }, testInfo) => {
   await gotoDesignApp(page);
   await page.getByRole("tab", { name: /^Simulate/i }).click();
-  await expect(page.locator(ASIDE)).toBeHidden();
-  const diagrams = page.getByRole("region", { name: "Simulation diagrams" });
+  await expect(coilWorkspace(page)).toBeVisible();
+  const diagrams = page.getByRole("region", { name: "Simulation results", exact: true });
   expect((await diagrams.boundingBox())!.width).toBeGreaterThan(page.viewportSize()!.width / 2);
   await expect(page.getByText("Performance iteration", { exact: true })).toHaveCount(0);
   await page.screenshot({ path: testInfo.outputPath("simulation.png"), fullPage: true });
-  await page.getByRole("button", { name: "Open coil preview", exact: true }).click();
-  const modal = page.getByRole("dialog", { name: "Coil Preview", exact: true });
-  await expect(modal).toBeVisible();
-  await modal.getByRole("button", { name: "Close coil preview", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Open coil preview", exact: true })).toHaveCount(0);
+  await expect(coilWorkspace(page).getByRole("img", { name: "Coil preview", exact: true })).toBeVisible();
 });
 
 test.describe("touch layout", () => {
@@ -73,9 +71,10 @@ test("mobile layout fits the viewport and keeps help reachable", async ({ page }
 test("driver inductance help explains the circuit without crowding the panel", async ({ page }, testInfo) => {
   await page.emulateMedia({ colorScheme: "dark" });
   await gotoDesignApp(page);
+  await selectDesignPanel(page, "Routing");
   await page.getByRole("combobox", { name: "Winding connection", exact: true }).selectOption("2");
   await openCoilPreview(page);
-  const modal = page.getByRole("dialog", { name: "Coil Preview", exact: true });
+  const modal = coilWorkspace(page);
   await modal.getByRole("button", { name: "Driver settings", exact: true }).click();
   const panel = page.getByRole("dialog", { name: "Preview driver settings", exact: true });
   await expect(panel.getByRole("region", { name: "Preview driver simulation results" })).toContainText("Current ripple");

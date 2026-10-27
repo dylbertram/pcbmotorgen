@@ -1,0 +1,41 @@
+{
+  "scope": "Audit the planar spectral prototype against separately qualified FEM subsets.\n\nPassing remains planar and static. It does not qualify a production backend,\nfinite motor/housing geometry, incremental inductance or biased AC transfer.\n",
+  "status": "passed-planar-static-reference",
+  "changes": {
+    "flex_0.1": {
+      "field_ratio_angle_change": 0.0,
+      "pressure_pa_angle_change": 0.0
+    },
+    "flex_0.2": {
+      "field_ratio_angle_change": 0.0,
+      "pressure_pa_angle_change": 0.0,
+      "field_ratio_independent_fem_error": -4.0331281470740166e-05,
+      "pressure_pa_independent_fem_error": 0.0022105365326361426
+    },
+    "flex_1": {
+      "field_ratio_angle_change": 1.6764849508632551e-09,
+      "pressure_pa_angle_change": 7.153783898594668e-09
+    },
+    "flex_5": {
+      "field_ratio_angle_change": 1.0656500126771107e-09,
+      "pressure_pa_angle_change": 6.098996863102002e-09,
+      "field_ratio_independent_fem_error": 0.00045455081378742435,
+      "pressure_pa_independent_fem_error": 0.0010565973241654092
+    },
+    "mnzn_2": {
+      "field_ratio_angle_change": 4.0895666741924686e-08,
+      "pressure_pa_angle_change": 1.9413285168301542e-07,
+      "field_ratio_independent_fem_error": 0.00029771150897972554,
+      "pressure_pa_independent_fem_error": 0.0013377632765416703
+    }
+  },
+  "failures": [],
+  "source_sha256": {
+    "/home/openchamber/.local/opt/solver-prototypes/coupled-spectral-pinned-baseline.json": "d5a175c2f6f5792d00f2cb0fcaf2080a32dada3624541cf6e4841099c7e25d41",
+    "/home/openchamber/.local/opt/solver-prototypes/coupled-spectral-pinned-refined.json": "c75de2c1f083a97962c208bec5be38d675b1ef4925ddfe81bc64e402a473f0d8",
+    "/home/openchamber/.local/opt/solver-prototypes/plate2d-flex_0.2-material-audit.json": "846882113d1987f7aef81bbaa0633108778b8c03286a0f93ac826f2a8c268021",
+    "/home/openchamber/.local/opt/solver-prototypes/plate2d-flex_5-material-audit.json": "54c37c436fe3dc428af61b7f19843f71a0eb16ce3a4d436ea10ba9afcad737e3",
+    "/home/openchamber/.local/opt/solver-prototypes/plate2d-mnzn_2-material-audit.json": "31314d374266b41d9974498f3e67064ded05f8e9af67a66417f29ef303fadffe"
+  },
+  "analysis_sha256": "6fcecb89c14c7ae46dba296891bca9c33ea61059a1d95e0b52e517e6da7f9d5e"
+}

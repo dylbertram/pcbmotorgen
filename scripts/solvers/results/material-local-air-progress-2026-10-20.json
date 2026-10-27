@@ -1,0 +1,61 @@
+{
+  "status": "passed-static-exterior-source-field-and-pm-force-controls-raw-a-curl-interpolation-unqualified",
+  "scope": "Full centred static ferrite/metal prototype with an explicitly resolved nearby vacuum region. No new material, fitted constant or boundary condition is introduced at the mesh partition. No transient or winding-current qualification follows.",
+  "raw_archives": "$HOME/.local/opt/solver-prototypes-macos",
+  "implementation": "ngsolve_material_air_static.py",
+  "reason": "static-full-vector-controls-20261020.json rejects the original coarse air mesh at up to18% material-response field change, even though total fields and integrated force look stable.",
+  "mesh_partition": {
+    "extent": "Axis-aligned bounds of all PMs and material bodies, plus2mm on each side.",
+    "local_spacing_m": [0.0012,0.0009],
+    "remote_air_spacing_m": 0.01,
+    "boundary": "Tangential A=0 only on remote spherical exterior. Both inner and outer air regions have identical vacuum constitutive law; their interface has no imposed field condition.",
+    "resource_cap_dofs": 700000
+  },
+  "tests": "Local partition covers PMs/materials, stays strictly inside exterior, preserves exact ferrite/conductor volumes, retains two vacuum tags and adds no remote boundary tag to the interior interface. Passed in the pinned NGSolve environment.",
+  "completed_baseline_reference": {
+    "work":"material-localair-base12-20261020",
+    "dofs":349816,
+    "report":"material-localair-base12-scalar-reference-20261020.json",
+    "sha256":"6444f06af5a079161bafb0d2e824e63a968b95c2c3c8f93bc35fc0ab2d1e02e6",
+    "status":"passed-static-full-vector-scalar-reference-only",
+    "maximum_material_response_relative_error":0.03921221981921831,
+    "maximum_total_field_relative_error":0.001247425251552576,
+    "force_absolute_error_n":0.0002128797832892614,
+    "scope":"Full-domain vector equilibrium, unchanged5% scalar-reference gate. This does not substitute for the separate2% refinement/domain/quadrature controls."
+  },
+  "completed_exterior_source_reconstruction": {
+    "report":"material-localair-base12-source-field-20261020.json",
+    "sha256":"a3566243771d61acc0a03d72e5df5b95cf319e193bc86c86cc2e8053230fb25c",
+    "implementation":"material_source_field.py and audit_material_source_field.py",
+    "status":"passed-exterior-magnetization-field-reference-and-volume-only",
+    "maximum_material_response_reference_relative_error":0.01332811996501893,
+    "maximum_volume_quadrature_relative_change":2.762002088753337e-5,
+    "method":"Outside the material only, sum the exact free-space dipole Green field of solved constitutive volume magnetization. No source-radius softening, field fitting or failed-force-floor subtraction.",
+    "independent_kernel_test":"Uniformly magnetized finite cuboid volume quadrature matches an independently evaluated analytic cuboid charge kernel.",
+    "scope":"Separate postprocessing evidence. Both reconstructed and raw A-curl maps are retained in the NPZ archive. Reconstructed field mesh/domain controls remain required, and this does not turn a failed raw A-curl result into a pass."
+  },
+  "pending_studies": {
+    "baseline": "material-localair-base12-20261020",
+    "mesh": "material-localair-mesh09-20261020",
+    "domain": "material-localair-domain60-20261020",
+    "quadrature": "material-localair-quad12-20261020",
+    "comparison": "material-localair-static-controls-20261020.json",
+    "scope": "All four jobs and force audits completed. Raw A-curl comparison fails response-field mesh/domain gates; separately reconstructed exterior-source outputs pass their own unchanged gates. No running job was accepted.",
+    "execution": "Two workers per static solve, after the two-worker winding trial. The 16-worker transient/periodic queue is separate."
+  },
+  "preserved_raw_a_curl_control_failure": {
+    "report":"material-localair-static-controls-20261020.json",
+    "sha256":"e0b1858738a704911a7f6136c99326a29ee19ed777d0e9afbfc6c34a53fe3840",
+    "maximum_response_relative_changes":{"mesh":0.046074759682884533,"domain":0.04870162321015306,"quadrature":7.170941746038155e-6},
+    "scope":"The raw sampled curl(A) exterior interpolation remains rejected at the unchanged2% refinement gate. Stable integrated force does not qualify that interpolation."
+  },
+  "completed_exterior_output_controls": {
+    "report":"material-localair-source-output-controls-20261020.json",
+    "sha256":"7a259a77783ed19cfc265ff4c276656778b43ae43d36ac62e8efab1930eeb775",
+    "status":"passed-exterior-source-field-and-force-static-controls-only",
+    "maximum_response_relative_changes":{"mesh":0.0008076108583464211,"domain":0.0003073608281057852,"quadrature":6.6035124241392104e-6},
+    "force_absolute_changes_n":{"mesh":9.398731323008127e-5,"domain":0.0001338025021993572,"quadrature":1.2894593259928597e-6},
+    "scope":"Every source reconstruction first passes independent5% scalar-reference and2% volume rules. Identical physical models/probes and isolated mesh/domain/quadrature changes are checked. Exterior fields and PM forces qualify numerically for this centred prototype only. This does not qualify raw A-curl interpolation, interior fields/tensor transfer, motion, winding source geometry or hardware."
+  },
+  "remaining": ["interior-field and finite differential-tensor controls", "translated nonlinear material/housing time and spatial controls", "finite winding-current source geometry and clearance", "held-out geometry and hardware validation"]
+}

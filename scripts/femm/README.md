@@ -15,6 +15,7 @@ scripts/femm/run_femm.sh scripts/femm/smoke_wire.lua ~/.local/opt/femm-runs/smok
 cat ~/.local/opt/femm-runs/smoke/smoke_wire.csv
 python3 -I scripts/femm/femm_backplane.py    # full comparison
 python3 -I scripts/femm/femm_backplane.py --new-only   # saturation and eddy-current part only
+python3 scripts/femm/check_convergence.py --work ~/.local/opt/femm-runs/convergence
 ```
 
 What `install_femm.sh` does, and why:
@@ -42,6 +43,28 @@ Lua (for example "Material properties have not been defined for all regions")
 still block. `FEMM_TIMEOUT` (default 300 s) ends such runs. To read the
 dialog text, use `WINEDEBUG=+msgbox`.
 
+Jobs lock their Wine prefix, so two runs cannot interfere with the same FEMM
+windows. On failure or timeout, cleanup matches the exact output directory and
+Wine prefix before killing orphan `fkn.exe`/`triangle.exe` workers. It does not
+kill unrelated Wine applications. Unit tests cover that scope.
+
+For solver progress in the headless Xvfb display, pass `show` as the third Lua
+argument and omit the main-window hiding option:
+
+```sh
+FEMM_WINDOWHIDE='' scripts/femm/run_femm.sh scripts/femm/solve_case.lua \
+  /absolute/path/to/case.lua /absolute/path/to/output show
+```
+
+The failed extra-fine thin-sheet job was inspected this way. It remained in
+node renumbering, not an accepted field solve, and timed out even at 1200 s.
+The convergence harness now refines material/gap mesh and far-air mesh
+independently. `--far-air-mesh` fixes the explicit far-air size during near-mesh
+and domain refinement; an extra `airhalf` run separately checks its halving.
+This avoids quartering all 80 mm of remote air merely to refine a 0.2 mm sheet.
+The 2% gates remain unchanged. `--case thin thick pwm drag` selects cases;
+`--mesh-scale 0.5` starts the local refinement one level finer.
+
 Notes for writing FEMM Lua: it is Lua 4.0, built with radians (`sin`, `cos`
 take radians). The post-processor call is `mo_getpointvalues`; `mo_getb` is
 only an Octave/Matlab wrapper.
@@ -60,3 +83,13 @@ FEMM's automatic one.
 | `solve_case.lua` | Generic planar case: one electrical period with periodic left and right edges, A = 0 40 mm above and below, horizontal material bands, and embedded rectangles. Materials can be nonlinear (B-H points) and sources complex. Writes A·J over the sources, the weighted-stress-tensor force (x and y, time-averaged when harmonic) and resistive loss of the stack, the force on the magnets, the Bx and By fundamentals and the travelling-wave By part on sample lines, and point values. Magnetostatic, time-harmonic when `freq` > 0, or incremental on a previous nonlinear solution (`previous`). |
 | `femm_backplane.py` | Builds the cases, runs FEMM and the Rust model, and prints the Markdown tables in RESULTS.md. Uses the stdlib only. |
 | `../../crates/pcbmotorgen-simulation/examples/backplane_dump.rs` | Prints the model's `BackplaneAnalysis` for given stacks (JSON in and out). |
+| `check_convergence.py` | Independently halves/quarters the near mesh, halves far-air mesh and extends the outer domain on thin/thick saturation, PWM screening and travelling-wave drag. Exits nonzero above 2% change or drag/Joule imbalance and writes `convergence.json`. A successful planar check is not 3D housing validation. |
+# Display health
+
+The runner checks an actual X connection with `xdpyinfo`, not only the presence
+of `/tmp/.X11-unix/X77`. A dead Xvfb can leave that socket behind, and Wine can
+then exit without solving or writing any output. A stale or inaccessible
+configured display now fails explicitly. Select an unused display with
+`FEMM_DISPLAY=:79` rather than deleting an unknown socket. `xdpyinfo` is required.
+The failed dense-knee MnZn launch is retained separately from its fresh-display
+retry; missing output is not physics evidence.

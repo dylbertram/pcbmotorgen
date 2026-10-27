@@ -63,6 +63,18 @@ pnpm run tauri dev
 
 ---
 
+## Frontend checks
+
+Run the desktop frontend checks from `app/desktop` after installing its locked dependencies:
+
+```bash
+pnpm check       # Svelte and TypeScript diagnostics
+pnpm test        # Frontend unit tests
+pnpm build      # Production frontend build
+```
+
+`pnpm check` uses the project's pinned checker and TypeScript dependencies, not an external `npx` environment. These checks do not establish numerical qualification or native WKWebView acceptance.
+
 ## Quick start
 
 ### 1. Enable the KiCad IPC API (one-time)

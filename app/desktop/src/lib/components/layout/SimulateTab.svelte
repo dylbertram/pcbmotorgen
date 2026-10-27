@@ -1,5 +1,6 @@
 <script lang="ts">
   import { Tabs } from "bits-ui";
+  import { tick } from "svelte";
   import { ChevronDown, ChevronUp } from "@lucide/svelte";
   import type { ConfigStore } from "../../stores/config.svelte";
   import type { ForceSweepResult, FrictionBudgetDto, HeightStackResultDto, DriveAnalysis, CadGeometry } from "../../types";
@@ -11,10 +12,11 @@
   import ForceSweepPlot from "../simulate/ForceSweepPlot.svelte";
   import MetricsPanel from "../simulate/MetricsPanel.svelte";
   import DriverSuitability from "../simulate/DriverSuitability.svelte";
+  import DcCouplingPanel from "../simulate/DcCouplingPanel.svelte";
 
   let { config, active, open, availableHeight, sweep, friction, height, drive,
     driveError = null, error, cadGeometry = null, onConfigureWinding,
-    onSelectEnds, onUseInferredEnds }: {
+    onSelectEnds, onUseInferredEnds, onShow3D }: {
     config: ConfigStore;
     active: boolean;
     open: boolean;
@@ -29,6 +31,7 @@
     onConfigureWinding?: () => void;
     onSelectEnds?: () => void;
     onUseInferredEnds?: () => void;
+    onShow3D?: () => void;
   } = $props();
 
   const results = [
@@ -36,6 +39,7 @@
     { id: "thrust", label: "Thrust vs. position" },
     { id: "driver", label: "Driver suitability" },
     { id: "summary", label: "Summary (live metrics)" },
+    { id: "dc", label: "Static DC (experimental)" },
   ];
   let selected = $state("flux");
   let requestedHeight = $state(320);
@@ -46,6 +50,52 @@
   const dockId = $props.id();
   let drag: { pointer: number; y: number; height: number } | null = null;
   const coilEnds = $derived(cadGeometry ? inferMissingCoilEnds(cadGeometry) : null);
+  let dock = $state<HTMLElement | null>(null);
+  const scrollOffsets: Record<string, number> = {};
+  let restoringScroll = false;
+  function rememberScroll(event: Event) {
+    const panel = event.target;
+    if (!open || collapsed || restoringScroll || !(panel instanceof HTMLElement) || !panel.clientHeight) return;
+    const key = panel.dataset.dockPanel;
+    const maximum = panel.scrollHeight - panel.clientHeight;
+    // Pending results can temporarily remove the scrollable content. That
+    // browser-generated clamp is not a request to forget the user's position.
+    if (!key || maximum <= 0 || (maximum < (scrollOffsets[key] ?? 0) && panel.scrollTop >= maximum)) return;
+    scrollOffsets[key] = panel.scrollTop;
+  }
+  $effect(() => {
+    const node = dock, visible = open && !collapsed, tab = selected;
+    if (!node || !visible) return;
+    let cancelled = false;
+    let cleanup = () => {};
+    restoringScroll = true;
+    void tick().then(() => {
+      if (cancelled) return;
+      const panel = node.querySelector<HTMLElement>(`[data-dock-panel="${tab}"]`);
+      restoringScroll = false;
+      if (!panel) return;
+      const restore = () => {
+        // Do not overwrite a fresh user scroll before its queued scroll event
+        // has updated the memory. Restore only a lost positive offset at zero.
+        if (cancelled || !(scrollOffsets[tab] > 0) || panel.scrollTop !== 0) return;
+        restoringScroll = true;
+        panel.scrollTop = scrollOffsets[tab];
+        restoringScroll = false;
+      };
+      const observer = new ResizeObserver(restore);
+      const observeChildren = () => {
+        observer.disconnect();
+        observer.observe(panel);
+        for (const child of panel.children) observer.observe(child);
+        restore();
+      };
+      const mutations = new MutationObserver(observeChildren);
+      mutations.observe(panel, { childList: true });
+      observeChildren();
+      cleanup = () => { observer.disconnect(); mutations.disconnect(); };
+    });
+    return () => { cancelled = true; restoringScroll = false; cleanup(); };
+  });
 
   function resize(value: number): void {
     collapsed = false;
@@ -74,7 +124,7 @@
   }
 </script>
 
-<section id={dockId} aria-label="Simulation results" hidden={!open}
+<section bind:this={dock} id={dockId} aria-label="Simulation results" hidden={!open} onscrollcapture={rememberScroll}
   class="relative min-h-0 shrink-0 border-t border-slate-700 bg-slate-900 {open ? 'flex flex-col' : 'hidden'}"
   style:height={collapsed ? "auto" : `${panelHeight}px`}>
   {#if !collapsed}
@@ -94,26 +144,32 @@
           <Tabs.Trigger value={result.id} onclick={() => { selected = result.id; collapsed = false; }} class="relative flex h-full shrink-0 items-center justify-center whitespace-nowrap px-3 text-xs text-slate-400 after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 after:bg-transparent hover:text-slate-100 data-[state=active]:text-emerald-300 data-[state=active]:after:bg-emerald-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400"><span class="block leading-none">{result.label}</span></Tabs.Trigger>
         {/each}
       </Tabs.List>
+      {#if onShow3D}
+        <button type="button" onclick={onShow3D} class="shrink-0 border-l border-slate-700 px-3 text-xs text-emerald-300 hover:bg-slate-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400" aria-label="Show 3D fields and heat">3D fields &amp; heat</button>
+      {/if}
       <button type="button" aria-label={collapsed ? "Expand simulation panel" : "Collapse simulation panel"} aria-expanded={!collapsed} aria-controls={`${dockId}-content`} onclick={() => (collapsed = !collapsed)} class="flex w-11 shrink-0 items-center justify-center self-stretch text-slate-400 hover:bg-slate-800 hover:text-slate-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400">
         {#if collapsed}<ChevronUp size={16} aria-hidden="true" />{:else}<ChevronDown size={16} aria-hidden="true" />{/if}
       </button>
     </div>
     <div id={`${dockId}-content`} hidden={collapsed} class="min-h-0 flex-1 flex-col {collapsed ? 'hidden' : 'flex'}">
-    <Tabs.Content value="flux" class="min-h-0 flex-1 overflow-auto p-3">
+    <Tabs.Content value="flux" data-dock-panel="flux" class="min-h-0 flex-1 overflow-auto p-3">
       {@render warnings()}
       <div class="h-full min-h-40"><FluxDiagram {config} active={active && open && !collapsed && selected === "flux"} embedded /></div>
     </Tabs.Content>
-    <Tabs.Content value="thrust" class="min-h-0 flex-1 overflow-auto p-3">
+    <Tabs.Content value="thrust" data-dock-panel="thrust" class="min-h-0 flex-1 overflow-auto p-3">
       {@render warnings()}
       <div class="h-full min-h-40"><ForceSweepPlot result={sweep} embedded /></div>
     </Tabs.Content>
-    <Tabs.Content value="driver" class="min-h-0 flex-1 overflow-auto p-3">
+    <Tabs.Content value="driver" data-dock-panel="driver" class="min-h-0 flex-1 overflow-auto p-3">
       {@render warnings()}
       <DriverSuitability embedded analysis={drive} error={driveError} onConfigureWinding={usesDeltaConnection(config.toIpc(), !!cadGeometry && !unmappedCoils(cadGeometry).length) ? onConfigureWinding : undefined} />
     </Tabs.Content>
-    <Tabs.Content value="summary" class="min-h-0 flex-1 overflow-auto p-3">
+    <Tabs.Content value="summary" data-dock-panel="summary" class="min-h-0 flex-1 overflow-auto p-3">
       {@render warnings()}
       <MetricsPanel {config} {sweep} {friction} {height} />
+    </Tabs.Content>
+    <Tabs.Content value="dc" data-dock-panel="dc" class="min-h-0 flex-1 overflow-auto p-3">
+      <DcCouplingPanel {config} {cadGeometry} active={active && open && !collapsed && selected === "dc"} />
     </Tabs.Content>
     </div>
   </Tabs.Root>

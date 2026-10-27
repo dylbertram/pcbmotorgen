@@ -1,0 +1,21 @@
+{
+  "status": "converged-static-solve-but-failed-mover-force-controls",
+  "scope": "Actual star_2-layer.pmmotor version 1, explicit centred pose and 36 by 12 mm common stack footprint, scalar quarter-domain GetDP Q2. One anisotropic mesh only.",
+  "completed_source_summary_sha256": "fcd592136c2d63c41d33f94bb16bd27f3df9982df3e419f5b70a36a90f26cfa5",
+  "exact_stress_audit_sha256": "2ca153a33c6c6ccd93d06056920b168e1e8aac823a0f23f81cd668227b1f0f92",
+  "nonlinear_relative_residual": 3.6668673042335297e-10,
+  "nonlinear_iterations": 21,
+  "bare_magpylib_field_relative_error": 0.00797977260569359,
+  "solver_reported_dofs": 92802,
+  "solver_reported_wall_seconds": 1169.55,
+  "solver_reported_final_memory_mb": 710.32,
+  "memory_scope": "GetDP Stopped log measurement, not independently sampled peak RSS",
+  "clearances_m": [0.0001, 0.0002, 0.0003],
+  "exact_stator_force_z_n": [1.1933769558956424, 1.1945675477681696, 1.1934562530307753],
+  "exact_bare_mover_force_z_n": [0.9640716605756641, 0.7631210509007715, 0.8490362912603933],
+  "exact_stack_mover_force_z_n": [-0.21711871111078107, -0.4269832246441152, -0.34307887337185416],
+  "direct_action_reaction_errors_n": [0.9762582447848613, 0.7675843231240544, 0.8503773796589211],
+  "unchanged_reaction_limits_n": [0.02386753911791285, 0.023891350955363395, 0.023869125060615507],
+  "maximum_force_face_area_relative_error": 1.0103029524088925e-14,
+  "conclusion": "The original stator-only force-floor/path controls pass, but the stricter separate mover controls fail badly. No accepted finite-array attraction follows. Refined near mesh solve is running; separate far-air and radius studies remain required. No self-force subtraction, force scaling or gate loosening."
+}

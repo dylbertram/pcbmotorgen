@@ -101,6 +101,11 @@
 use std::f64::consts::PI;
 
 use nalgebra::Complex;
+
+mod periodic;
+pub use periodic::{PeriodicStaticReference, PeriodicStaticRun};
+mod housing_motion;
+pub use housing_motion::{HousingMotionEstimate, HousingMotionAnalysis, HousingMotionProfile};
 use serde::{Deserialize, Serialize};
 
 use crate::params::SimulationInput;
@@ -109,8 +114,14 @@ use crate::params::SimulationInput;
 const MU_0: f64 = 4.0e-7 * PI;
 /// Switching frequency above which silicon steel is flagged [Hz].
 pub const SILICON_STEEL_PWM_LIMIT_HZ: f64 = 20e3;
-/// Largest accepted thickness for one layer or the housing [m].
-pub const MAX_THICKNESS_M: f64 = 0.02;
+/// Largest accepted thickness for one backplane layer [m].
+pub const MAX_THICKNESS_M: f64 = 0.002;
+/// At most three backplane layers; this is not a 2 mm aggregate cap.
+pub const MAX_BACKPLANE_LAYERS: usize = 3;
+/// Largest accepted wall thickness for a supported housing [m].
+pub const MAX_HOUSING_THICKNESS_M: f64 = 0.005;
+/// Largest accepted gap below the backplane [m].
+pub const MAX_HOUSING_GAP_M: f64 = 0.01;
 /// Largest accepted relative permeability override.
 pub const MAX_MU_R: f64 = 1e6;
 /// Largest accepted saturation flux density override [T].
@@ -223,6 +234,12 @@ pub enum HousingMaterial {
 }
 
 impl HousingMaterial {
+    /// Legacy enum variants remain readable, but magnetic housings are not
+    /// supported by the current coreless screening model.
+    pub fn supported_for_coreless(self) -> bool {
+        matches!(self, Self::Aluminum6061 | Self::Aluminum5052 | Self::Stainless304 | Self::Stainless316)
+    }
+
     /// Relative permeability (typical starting value).
     pub fn mu_r(self) -> f64 {
         match self {
@@ -521,9 +538,12 @@ impl BackplaneStack {
 
     /// Check thicknesses, gaps and overrides. Returns the first problem found.
     pub fn validate(&self) -> Result<(), String> {
+        if self.layers.len() > MAX_BACKPLANE_LAYERS {
+            return Err(format!("backplane supports at most {MAX_BACKPLANE_LAYERS} layers"));
+        }
         for (i, layer) in self.layers.iter().enumerate() {
             let what = format!("backplane layer {}", i + 1);
-            check_thickness(&what, layer.thickness_m)?;
+            check_thickness(&what, layer.thickness_m, MAX_THICKNESS_M)?;
             if let Some(mu) = layer.mu_r {
                 if !mu.is_finite() || !(1.0..=MAX_MU_R).contains(&mu) {
                     return Err(format!("{what} μr must be between 1 and {MAX_MU_R:.0}"));
@@ -538,11 +558,14 @@ impl BackplaneStack {
             }
         }
         if let Some(h) = &self.housing {
-            check_thickness("housing", h.thickness_m)?;
-            if !h.gap_m.is_finite() || h.gap_m < 0.0 || h.gap_m > MAX_THICKNESS_M {
+            if !h.material.supported_for_coreless() {
+                return Err(format!("housing material {} is unsupported for coreless screening; select aluminum or non-magnetic stainless 304/316", h.material.label()));
+            }
+            check_thickness("housing", h.thickness_m, MAX_HOUSING_THICKNESS_M)?;
+            if !h.gap_m.is_finite() || h.gap_m < 0.0 || h.gap_m > MAX_HOUSING_GAP_M {
                 return Err(format!(
                     "housing gap must be between 0 and {} mm",
-                    MAX_THICKNESS_M * 1e3
+                    MAX_HOUSING_GAP_M * 1e3
                 ));
             }
         }
@@ -704,6 +727,7 @@ impl BackplaneStack {
                 s,
                 linear_image_strength,
                 image_strength,
+                lin_faces[i].normal * b0,
             );
         }
         if let (Some(h), Some(s)) = (&self.housing, &housing_state) {
@@ -718,7 +742,20 @@ impl BackplaneStack {
                 s,
                 linear_image_strength,
                 image_strength,
+                lin_faces[solved.free.len() - 1].normal * b0,
             );
+        }
+
+        if layer_states
+            .iter()
+            .chain(housing_state.iter())
+            .any(|s| s.mu_initial > 1.0 && s.bsat_t.map_or(false, |bsat| s.linear_peak_b_t > bsat))
+        {
+            warnings.push("Coil inductance varies with mover position and coil phase when the backplane or housing saturates. This screening estimate is not the minimum. Measure or solve the lowest inductance across travel before relying on the PWM ripple limit.".into());
+        }
+
+        if solved.conducts() {
+            warnings.push("Eddy-current results are screening estimates for infinite planar layers. FEMM checks cover linear 2D fields only, not finite housing edges, slots, current return paths or nonlinear motion. Drag, loss and drag-limited speed are not validated operating predictions. PWM impedance uses an approximate bias permeability, not a spatial differential-tensor solve; hysteresis and core loss are excluded.".into());
         }
 
         let peak = |s: &MagneticState| {
@@ -761,10 +798,16 @@ fn saturation_warning(
     s: &MagneticState,
     r_linear: f64,
     r_eff: f64,
+    linear_normal_b_t: f64,
 ) {
     let Some(bsat) = s.bsat_t.filter(|_| s.mu_initial > 1.0) else {
         return;
     };
+    if linear_normal_b_t > bsat {
+        warnings.push(format!(
+            "{what}: normal-face saturation is not resolved by this model. Reflection, Kf, attraction and coil inductance are uncertain; thick near-knee plates overpredicted attraction by up to 52% in the archived FEMM cases. Use nonlinear FEM before selecting thickness or bearing loads. Thickness suggestions are lower bounds, not a guarantee against saturation."
+        ));
+    }
     if s.saturated() {
         let fix = match (s.required_thickness_m, s.mnzn_thickness_m) {
             (Some(t), Some(m)) => format!(
@@ -1114,11 +1157,11 @@ fn copper_weight(k: f64, depths: &[f64]) -> f64 {
     depths.iter().map(|d| (-2.0 * k * d).exp()).sum::<f64>() / depths.len() as f64
 }
 
-fn check_thickness(what: &str, t: f64) -> Result<(), String> {
-    if !t.is_finite() || t <= 0.0 || t > MAX_THICKNESS_M {
+fn check_thickness(what: &str, t: f64, maximum: f64) -> Result<(), String> {
+    if !t.is_finite() || t <= 0.0 || t > maximum {
         return Err(format!(
             "{what} thickness must be greater than 0 and at most {} mm",
-            MAX_THICKNESS_M * 1e3
+            maximum * 1e3
         ));
     }
     Ok(())

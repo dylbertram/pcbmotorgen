@@ -24,6 +24,7 @@ import {
 } from "../layerConstraints";
 import { mm, listRoutingPatterns, routingPatternParameters, loadInstalledPlugins, fetchMagnetGrades } from "../ipc";
 import { readPreferences } from "../preferences";
+import { MAX_PCB_LAYERS } from "../types/simulationLimits";
 
 export class ConfigStore {
   constructor() {
@@ -117,7 +118,7 @@ export class ConfigStore {
   min_via_drill_mm = $state(0.2);
   min_via_annular_ring_mm = $state(0.1);
   pcb_thickness_mm = $state(1.6);
-  max_layers = $state(12);
+  max_layers = $state<number>(MAX_PCB_LAYERS);
   drive_frequency_hz = $state(500);
   max_temperature_rise_c = $state(20);
 
@@ -200,6 +201,9 @@ export class ConfigStore {
    * set is empty (the Rust validation reports that case).
    */
   constrainLayersToPattern(): void {
+    // Never silently shorten an out-of-envelope imported/saved stack.
+    // The backend and design validation report the unsupported geometry.
+    if (this.num_layers > MAX_PCB_LAYERS) return;
     const options = this.layerOptions;
     if (options.length === 0 || options.includes(this.num_layers)) return;
     this.num_layers = nearestLayer(this.num_layers, options);

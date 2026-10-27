@@ -1,0 +1,21 @@
+{
+  "status": "reproduced-fixed-and-browser-regression-verified",
+  "scope": "Application stale-result safety, not numerical material-response qualification.",
+  "failure": "With a valid old sweep and a pending replacement, changing bus voltage to 12V let driver analysis receive old Kf 2.569594895700252 instead of null. The old rejection-only test did not inspect the pending interval.",
+  "fix": "Invalidate sweep and driver state when the simulation generation changes, before the 120ms driver debounce can precede the 150ms sweep debounce.",
+  "component_sha256": "07696699a7f82134b2130754cf390392fadaa209096fc08c0aee8f4916465eea",
+  "driver_browser_test_source_sha256": "f91a7ba03c8f3f8c388b00b7c9ea48380bcb1f106c6b8315d2ef340911a84ddc",
+  "verification": {
+    "before_fix": "New pending-replacement test failed with the old non-null Kf.",
+    "after_fix": "All 8 driver browser tests passed; fresh combined coil/driver/reference run passed all 22 tests.",
+    "frontend": "436 passed, 1 skipped",
+    "build": "passed; existing large-chunk warning remains",
+    "svelte_autofixer": "No issues; general effect/state suggestions remain."
+  },
+  "raw_logs": "$HOME/.local/opt/solver-prototypes-macos/review-rerun-20261019",
+  "log_sha256": {
+    "frontend.log": "bc1fe9ccbe8dbda18503ed6102345369019c0dc4a869e7b5214331ef1159e61c",
+    "build.log": "6db85feae66d7b92d0f8f3be8d8ec6a01d140b0108787f31a5e7e0c5718c2bdb",
+    "browser.log": "52d5bb230f201579d812d06421a3867751f4586db6c0ec7720ee00ec5f8b6219"
+  }
+}

@@ -80,6 +80,7 @@ pub struct ForceEvaluator {
     /// Whether self-calibration has been performed.
     calibrated: bool,
     routed_samples: Option<Vec<Vec<ConductorSample>>>,
+    routed_phase_names: Vec<String>,
     routed_x_bounds_m: Option<(f64, f64)>,
 }
 
@@ -93,15 +94,38 @@ impl Default for ForceEvaluator {
             phase_shift: 0.0,
             calibrated: false,
             routed_samples: None,
+            routed_phase_names: Vec::new(),
             routed_x_bounds_m: None,
         }
     }
 }
 
 impl ForceEvaluator {
+    fn coils_match_routing(&self, coils: &[PhaseCoil]) -> bool {
+        !coils.is_empty() && self.routed_samples.as_ref().map_or(true, |samples| {
+            samples.len() == coils.len() && coils.iter().enumerate().all(|(i, coil)| {
+                coil.phase_idx == i as u32 && coil.phase_name == self.routed_phase_names[i]
+            })
+        })
+    }
+
     /// Read-only SI samples for independent field/force cross-validation.
     pub fn routed_conductor_samples(&self) -> Option<&[Vec<ConductorSample>]> {
         self.routed_samples.as_deref()
+    }
+
+    /// Reproduce the excitation used by a completed, calibrated force run.
+    /// This records the model's command, not a validated controller waveform.
+    pub fn excitation_currents_at(&self, config: &SimulationInput, coils: &[PhaseCoil], position_m: f64) -> Result<Vec<f64>, SimulationError> {
+        if !self.calibrated || !self.coils_match_routing(coils) || !position_m.is_finite() {
+            return Err(SimulationError("Excitation diagnostics require a calibrated run, matching coils and finite position".into()));
+        }
+        let labels: Vec<&str> = coils.iter().map(|coil| coil.phase_name.as_str()).collect();
+        let currents = commutation_currents(self.commutation, self.phase_shift, config, position_m, &labels);
+        if currents.iter().any(|current| !current.is_finite()) {
+            return Err(SimulationError("Excitation diagnostics produced a nonfinite current".into()));
+        }
+        Ok(currents)
     }
     /// Integrate signed branch currents solved from the physical resistor network.
     pub fn with_routed_currents(
@@ -118,14 +142,14 @@ impl ForceEvaluator {
             || hints.layer_z_m.iter().any(|z| !z.is_finite()) {
             return Err(SimulationError("Invalid copper dimensions or layer depths for force current solve".into()));
         }
+        crate::drive::validate_copper_placement(config, routing, hints)?;
         let rho = crate::drive::rho_cu_at(settings.winding_temp_c);
-        let via_r = crate::drive::via_resistance_ohm(config.min_via_drill_m, settings.via_plating_m, config.pcb_thickness_m, rho);
         let mut coils = Vec::new();
         let mut all_samples = Vec::new();
         let mut x_bounds = (f64::INFINITY, f64::NEG_INFINITY);
         for net in extract_phase_networks_with_terminals(routing, &hints.terminals) {
             let resistances: Vec<f64> = net.edges.iter().map(|edge| match &edge.kind {
-                EdgeKind::Via => via_r,
+                EdgeKind::Via { layers, .. } => crate::drive::via_resistance_ohm(config.min_via_drill_m, settings.via_plating_m, hints.via_length_m(config, *layers), rho),
                 EdgeKind::Trace { layer, length_m, .. } => {
                     let inner = config.num_layers > 2 && *layer != 0 && *layer + 1 != config.num_layers;
                     let oz = if inner { settings.inner_copper_oz } else { settings.outer_copper_oz };
@@ -145,9 +169,7 @@ impl ForceEvaluator {
                             x_bounds.1 = x_bounds.1.max(point[0]);
                         }
                     }
-                    let z = hints.layer_z_m.get(*layer as usize).copied().unwrap_or_else(|| {
-                        -(*layer as f64) * config.pcb_thickness_m / config.num_layers.saturating_sub(1).max(1) as f64
-                    });
+                    let z = hints.layer_z(config, *layer);
                     for pair in points.windows(2) {
                         let dx = pair[1][0] - pair[0][0];
                         let dy = pair[1][1] - pair[0][1];
@@ -159,6 +181,16 @@ impl ForceEvaluator {
                             });
                         }
                     }
+                } else if let EdgeKind::Via { layers, position_m } = &edge.kind {
+                    let za = hints.layer_z(config, layers[0]);
+                    let zb = hints.layer_z(config, layers[1]);
+                    for j in 0..self.meshing {
+                        let t = (j as f64 + 0.5) / self.meshing as f64;
+                        samples.push(ConductorSample {
+                            midpoint_3d: [position_m[0], position_m[1], za + t * (zb - za)],
+                            dl_3d: [0.0, 0.0, (zb - za) * share / self.meshing as f64],
+                        });
+                    }
                 }
             }
             coils.push(PhaseCoil { phase_name: net.net, phase_idx: coils.len() as u32, ..PhaseCoil::default() });
@@ -168,6 +200,7 @@ impl ForceEvaluator {
             return Err(SimulationError("No conductor networks available for force evaluation".into()));
         }
         self.routed_samples = Some(all_samples);
+        self.routed_phase_names = coils.iter().map(|coil| coil.phase_name.clone()).collect();
         self.routed_x_bounds_m = Some(x_bounds);
         self.calibrated = false;
         Ok((self, coils))
@@ -193,6 +226,7 @@ impl ForceEvaluator {
             phase_shift: 0.0,
             calibrated: false,
             routed_samples: None,
+            routed_phase_names: Vec::new(),
             routed_x_bounds_m: None,
         }
     }
@@ -234,7 +268,7 @@ impl ForceEvaluator {
         config: &SimulationInput,
         coils: &[PhaseCoil],
     ) -> Result<ForceResult, SimulationError> {
-        if coils.is_empty() || self.routed_samples.as_ref().is_some_and(|s| s.len() != coils.len()) {
+        if !self.coils_match_routing(coils) {
             return Err(SimulationError("Force coils do not match the solved conductor networks".into()));
         }
         let (start, end) = self.sweep_center_limits_m(config)?;
@@ -365,7 +399,7 @@ impl ForceEvaluator {
         coils: &[PhaseCoil],
         mover_position_m: f64,
     ) -> Result<([f64; 3], [f64; 3]), SimulationError> {
-        if coils.is_empty() || self.routed_samples.as_ref().is_some_and(|s| s.len() != coils.len()) {
+        if !self.coils_match_routing(coils) {
             return Err(SimulationError("Force coils do not match the solved conductor networks".into()));
         }
         if !self.calibrated {

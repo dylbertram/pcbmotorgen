@@ -1,0 +1,44 @@
+{
+  "status": "passed-export-and-free-space-winding-audits-only",
+  "scope": "Review of force extraction and physical conductor samples. Not finite-force, nonlinear winding, inductance, AC amplitude or housing motion qualification.",
+  "getdp_export_audit": {
+    "work_relative_to_solver_opt": "five-pm-export-audit-20261019",
+    "summary_sha256": "49b3d94e86745de06f9f50a980915a8b73baa38a5329ec1e1ef9bcf0801b4c1a",
+    "off_symmetry_interior_points": 32,
+    "maximum_absolute_direct_vs_affine_error_t": 3.552713678800501e-15,
+    "unchanged_export_path_gate_t": 1e-10,
+    "conclusion": "The archived affine field and reader reproduce direct GetDP evaluations to roundoff. The ~0.46N bare self-force is not explained by this export/reader path."
+  },
+  "star_four_layer_winding": {
+    "project_sha256": "6a550dcb4327a6e846582fb883c4958a0d275cba85b33271337deee405794e81",
+    "version": 0,
+    "work_relative_to_solver_opt": "winding-star4-arm64-goal-20261019",
+    "summary_sha256": "b07e1e8d657ad98993577eb5a25cb664d32435cb7598ed410fa4bfef0dd9567e",
+    "conductor_quadrature_levels": [10, 20, 40, 80],
+    "phase_resistance_ohm": [7.740527059713146, 7.744719816663723, 7.767779998395708],
+    "maximum_current_share_absolute_error": 4.21835899544476e-11,
+    "maximum_edge_resistance_error_ohm": 4.683753385137379e-17,
+    "vertical_samples_per_phase_at_finest_level": 21040,
+    "finest_force_vector_change_n": 3.2614404589436157e-06,
+    "finest_refinement_limit_n": 0.001947791722100687
+  },
+  "star_two_layer_winding": {
+    "project": "star_2-layer.pmmotor",
+    "version": 0,
+    "work_relative_to_solver_opt": "winding-star2-arm64-goal-20261019",
+    "summary_sha256": "b4c900864bef202e296b52e3c9d23306e533640e1a50eb47c23f50b0a15636b7",
+    "conductor_quadrature_levels": [10, 20, 40, 80],
+    "status": "passed-independent-winding-and-free-space-force-only"
+  },
+  "dxf_exchange": {
+    "input": "star-wye_4-layer.dxf",
+    "status": "passed-read-only-import-and-exchange",
+    "segments": 1055,
+    "curves": 3,
+    "vias": 789,
+    "physical_layer_z_mm": [-4.8, -3.2, -1.6, 0.0],
+    "warnings": []
+  },
+  "raw_archives": "$HOME/.local/opt/solver-prototypes-macos",
+  "qualification_boundary": "Electrical connectivity and arc tessellation are exported from Rust. Resistance, sparse branch currents and signed 3D trace/via samples are independently reconstructed. Magpylib checks analytical source equivalence only."
+}

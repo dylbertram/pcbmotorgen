@@ -1,0 +1,20 @@
+# Pinned DC worker environment (macOS arm64, CPython 3.12). Verified by check_dc_worker.py.
+# Exact versions of the qualified solver venv; do not loosen without requalification.
+contourpy==1.4.0
+cycler==0.12.1
+fonttools==4.67.0
+kiwisolver==1.5.1
+magpylib==5.2.3
+matplotlib==3.11.2
+narwhals==2.27.1
+netgen-mesher==6.2.2608
+netgen_occt==7.8.1
+ngsolve==6.2.2608
+numpy==2.4.6
+packaging==26.3
+pillow==13.0.0
+plotly==7.1.0
+pyparsing==3.3.3
+python-dateutil==2.9.0.post0
+scipy==1.17.1
+six==1.17.0

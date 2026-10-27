@@ -1,0 +1,27 @@
+{
+  "status": "stale-running-summaries-not-accepted-results",
+  "observed_at_utc": "2026-10-19T12:26:06Z",
+  "band_control": {
+    "work": "project-star2-v1-quarter-face02-band04-bare",
+    "observed_state": "stale-running",
+    "original_worker_pid": 263796,
+    "worker_exists": false,
+    "last_solver_log_phase": "GenerateJac[S], 631981 DOFs",
+    "observation_sha256": "0eb8634ee9507ae39c8daf4473272a21ed9369ba7c3bc6bb24731171a498a5c2",
+    "cause": "Worker disappearance confirmed; cause not established. No field result accepted."
+  },
+  "mnzn_dense_knee": {
+    "work": "biased-ac-mnzn2-source192-mesh-half-knee6-display79",
+    "observed_state": "incomplete-with-failed-child",
+    "failed_case": "biased-ac.none.p1.1",
+    "receipt_status": "timeout",
+    "exit_code": 124,
+    "receipt_seconds": 1972.0643674320017,
+    "observation_sha256": "13ad6b637de728f382d30631cd047b41da5852bf23da4cdf098e10061ec42df7",
+    "conclusion": "Completed individual cases do not qualify this incomplete comparison batch. Original receipts and outputs remain intact."
+  },
+  "retry": {
+    "work": "project-star2-v1-quarter-face02-band04-bare-retry-bounded",
+    "scope": "One bare-only GetDP retry, same geometry/mesh/tolerances, reused validated mesh, 900-second solver timeout. FEMM remains stopped. No result inferred before completion."
+  }
+}

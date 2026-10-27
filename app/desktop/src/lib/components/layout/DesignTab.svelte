@@ -138,7 +138,7 @@
     <ValidationWarning {config} />
     {:else if section === "stackup"}
 
-    <BackplanePanel {config} {backplaneAnalysis} {driveBackplane} />
+    <BackplanePanel {config} {backplaneAnalysis} {driveBackplane} {cadGeometry} />
     {:else if section === "routing"}
 
     <!-- Topology (routing pattern + parameters + generator load) and the

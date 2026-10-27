@@ -1,0 +1,13 @@
+{
+  "schema": "linear-dc-source-qualification-evidence-v1",
+  "scope": "Already completed actual Case A electrical and fixed-probe field gates, to be reverified together with the missing downstream source-refinement force controls. No failed curvature4 or near-field degree6/10 evidence is admitted.",
+  "reports": {
+    "passive": "linear-dc-day-case-a-passive-m200-c6-p50-v1-20261022.json",
+    "return": "linear-dc-day-case-a-return-m200-c6-p50-v1-20261022.json",
+    "independent_h1": "linear-dc-day-case-a-primal-m200-c6-p50-v1-20261022",
+    "near_field": "linear-dc-day-case-a-near-field-v2-20261022",
+    "mesh_field": "linear-dc-day-case-a-near-field-mesh-v1-20261022",
+    "port_field": "linear-dc-day-case-a-near-field-port-v1-20261022",
+    "curvature_field": "linear-dc-day-case-a-curvature6-8-v1-20261022"
+  }
+}

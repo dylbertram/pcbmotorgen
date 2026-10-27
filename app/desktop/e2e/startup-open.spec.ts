@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { selectDesignPanel } from "./helpers";
 
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
@@ -37,7 +38,9 @@ for (const action of ["recent", "browse"] as const) {
     const startup = page.getByRole("region", { name: "Project workspace" });
     if (action === "browse") await startup.getByRole("button", { name: "Open file or project…" }).click();
     await expect(startup).toBeHidden();
+    await selectDesignPanel(page, "Routing");
     await expect(page.locator("#num-layers")).toContainText("6");
+    await selectDesignPanel(page, "Magnets");
     await expect(page.locator("#magnet-count")).toHaveValue("8");
     await expect(page.getByLabel("Unsaved changes", { exact: true })).toHaveCount(0);
     await page.locator("#magnet-count").fill("10");

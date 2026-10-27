@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { gotoDesignApp } from "./helpers";
+import { gotoDesignApp, selectDesignPanel } from "./helpers";
 import type { CadGeometry, SensorGeometry } from "../src/lib/types";
 
 const geometry: SensorGeometry = {
@@ -53,6 +53,7 @@ test("CAD import retains spline-only geometry in its preview and the motor desig
     await route.fulfill({ response, body: `${body}\nexport async function importCadDxf() { return ${JSON.stringify({ geometry: cad, warnings: [] })}; }` });
   });
   await gotoDesignApp(page);
+  await selectDesignPanel(page, "Routing");
   await page.getByRole("button", { name: "Routing source", exact: true }).click();
   await page.getByRole("option", { name: "Load design from file…" }).click();
   const dialog = page.getByRole("dialog", { name: "Import CAD", exact: true });

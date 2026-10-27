@@ -10,8 +10,7 @@ test("3D reports unavailable WebGL and can return to top-down", async ({ page })
     } as typeof getContext;
   });
   await gotoDesignApp(page);
-  await page.getByRole("button", { name: "Expand coil preview" }).click();
-  const dialog = page.getByRole("dialog", { name: "Coil Preview", exact: true });
+  const dialog = page.getByRole("region", { name: "Coil design workspace", exact: true });
   await dialog.getByRole("button", { name: "Display", exact: true }).click();
   const display = page.getByRole("dialog", { name: "Coil preview display", exact: true });
   await display.getByRole("radio", { name: "3D", exact: true }).check();
