@@ -1,4 +1,7 @@
 <script lang="ts">
+  import { Tabs } from "bits-ui";
+  import PowerRequirements from "../simulate/PowerRequirements.svelte";
+  import type { PowerRequirementsInput } from "../../powerRequirements";
   import type { ConfigStore } from "../../stores/config.svelte";
   import type {
     ForceSweepResult,
@@ -31,6 +34,7 @@
     onConfigureWinding,
     onSelectEnds,
     onUseInferredEnds,
+    powerInput,
   }: {
     config: ConfigStore;
     active: boolean;
@@ -45,11 +49,21 @@
     /** Open the coil-ends panel for the active copper. */
     onSelectEnds?: () => void;
     onUseInferredEnds?: () => void;
+    powerInput: PowerRequirementsInput;
   } = $props();
 
   let coilEnds = $derived(cadGeometry ? inferMissingCoilEnds(cadGeometry) : null);
+  let view = $state("overview");
 </script>
 
+<Tabs.Root bind:value={view}>
+  <Tabs.List class="mb-4 flex gap-1 border-b border-slate-700" aria-label="Simulation output">
+    {#each [{ id: "overview", label: "Performance" }, { id: "power", label: "Power requirements" }] as tab (tab.id)}
+      <Tabs.Trigger value={tab.id} class="border-b-2 border-transparent px-3 py-2 text-sm text-slate-400 hover:text-slate-200 data-[state=active]:border-sky-400 data-[state=active]:text-sky-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-400">{tab.label}</Tabs.Trigger>
+    {/each}
+  </Tabs.List>
+  <Tabs.Content value="power"><PowerRequirements input={powerInput} /></Tabs.Content>
+  <Tabs.Content value="overview">
 <div class="grid gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
   <section class="min-w-0 space-y-4" aria-label="Simulation diagrams">
     <div class="rounded-lg border border-slate-700 bg-slate-800/40 px-4 py-3">
@@ -97,7 +111,7 @@
         Computation error: {error}
       </div>
     {/if}
-    <FluxDiagram {config} {active} />
+    <FluxDiagram {config} active={active && view === "overview"} />
     <ForceSweepPlot result={sweep} />
     <DriverSuitability analysis={drive} error={driveError} onConfigureWinding={usesDeltaConnection(config.toIpc(), !!cadGeometry && !unmappedCoils(cadGeometry).length) ? onConfigureWinding : undefined} />
   </section>
@@ -117,3 +131,5 @@
     </div>
   </aside>
 </div>
+  </Tabs.Content>
+</Tabs.Root>

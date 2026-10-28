@@ -14,6 +14,7 @@
     exportCadGeometryDxf,
     exportCoilsDxf,
     debounce,
+    isTauriAvailable,
   } from "./lib/ipc";
   import type {
     ForceSweepResult,
@@ -91,6 +92,16 @@
   let driveError = $state<string | null>(null);
   let loading = $state(false);
   let error = $state<string | null>(null);
+
+  // Reports must not combine retained results with edited inputs. Other
+  // performance panels deliberately retain their last good values.
+  let sweepInputKey = $state<string | null>(null);
+  let driveInputKey = $state<string | null>(null);
+  let forceInputKey = $derived(JSON.stringify([config.toIpc(), geometryKey(projects.cadGeometry),
+    config.drive.outer_copper_oz, config.drive.inner_copper_oz, config.drive.winding_temp_c, config.drive.via_plating_m]));
+  let powerInputKey = $derived(JSON.stringify([config.toIpc(), config.drive, geometryKey(projects.cadGeometry)]));
+  let powerSweep = $derived(sweepInputKey === forceInputKey ? sweep : null);
+  let powerDrive = $derived(driveInputKey === powerInputKey ? drive : null);
 
   // Whether the current config produces a valid travel range.
   let valid = $derived(config.travel_mm > 0);
@@ -331,6 +342,8 @@
     loading = true;
     error = null;
     const ipc = config.toIpc();
+    const inputKey = forceInputKey;
+    sweepInputKey = null;
 
     try {
       const results = await Promise.allSettled([
@@ -344,7 +357,10 @@
       const [s, f, h] = results;
       // Apply each successful result independently. A failed calculation does
       // not erase the last good value from the other simulation panels.
-      if (s.status === "fulfilled") sweep = s.value;
+      if (s.status === "fulfilled") {
+        sweep = s.value;
+        sweepInputKey = inputKey;
+      }
       if (f.status === "fulfilled") friction = f.value;
       if (h.status === "fulfilled") height = h.value;
 
@@ -371,6 +387,7 @@
   // intentionally inside the effect so config changes outside Simulation
   // only invalidate/cancel a pending run; they never invoke simulation IPC.
   $effect(() => {
+    void forceInputKey;
     void [
       config.desired_travel_mm,
       config.active_area_length_mm,
@@ -448,11 +465,15 @@
       driveError = null;
       return;
     }
-    const kf = sweep && sweep.current_a > 0 ? Math.abs(sweep.mean_thrust_n) / sweep.current_a : null;
+    const inputKey = powerInputKey;
+    const currentSweep = sweepInputKey === forceInputKey ? sweep : null;
+    const kf = currentSweep && currentSweep.current_a > 0 ? Math.abs(currentSweep.mean_thrust_n) / currentSweep.current_a : null;
+    driveInputKey = null;
     try {
       const result = await analyzeDrive(config.toIpc(), $state.snapshot(config.drive), kf, simulationCad());
       if (generation !== driveGeneration) return;
       drive = result;
+      driveInputKey = inputKey;
       driveError = null;
     } catch (e) {
       if (generation !== driveGeneration) return;
@@ -463,6 +484,7 @@
 
   $effect(() => {
     void sweep;
+    void sweepInputKey;
     // Read all IPC inputs synchronously: reads inside the debounced async
     // run are not effect dependencies. A failed sweep must not block updates.
     void JSON.stringify(config.toIpc());
@@ -688,6 +710,7 @@
             class="h-full overflow-y-auto p-4 lg:pr-0"
           >
             <SimulateTab
+              powerInput={{ config: config.toIpc(), driveSettings: config.drive, desiredTravelMm: config.desired_travel_mm, topology: config.topology, cadGeometry: projects.cadGeometry, sweep: powerSweep, drive: powerDrive, native: isTauriAvailable() }}
               onConfigureWinding={() => selectTab("design")}
               {config}
               active={active && activeTab === "simulate"}
