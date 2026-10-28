@@ -29,9 +29,9 @@ describe("power requirements", () => {
     expect(item(input, "PWM frequency").value).toBe("100000 Hz");
     expect(item(input, "External series inductance per phase").value).toBe("0.000047 H");
     expect(item(input, "Electrical travel period").value).toBe("12 mm");
-    expect(item(input, "Pole pitch").value).toBe("6 mm");
+    expect(item(input, "Electrical travel period").detail).toContain("pole pitch 6 mm");
     expect(item(input, "Configured carriage mass").value).toBe("0.015 kg");
-    expect(item(input, "Fader cap mass / total verified moving mass").source).toBe("Unknown");
+    expect(item(input, "Configured carriage mass").detail).toContain("fader cap is unknown");
   });
 
   it("separates target speed and ripple-inclusive analytical phase peak from supply demand", () => {
@@ -41,7 +41,7 @@ describe("power requirements", () => {
     expect(item(input, "Voltage-limited speed threshold").value).toBe("16.99 m/s");
     expect(item(input, "Phase peak including analytical ripple").value).toBe("1.15 A");
     expect(item(input, "Phase peak including analytical ripple").detail).toContain("ripple_pp/2");
-    for (const label of ["Supply-source current and sign convention", "Peak supply power during a move", "Average supply power over a move", "Electrical energy per move", "Complete-system feasibility at 60 W"])
+    for (const label of ["Peak supply power during a move", "Average supply power over a move", "Electrical energy per move", "Move duration and motion profile", "External load and damping", "Additional driver losses", "Braking energy and supply return path"])
       expect(item(input, label).value).toBe("Unknown");
     expect(item(input, "One-motor copper loss at setpoint").detail).toContain("not total or average input power");
   });
@@ -82,18 +82,23 @@ describe("power requirements", () => {
     expect(item(input, "Phase connection").value).toBe("Unknown");
   });
 
-  it("exports all eight checklist sections, definitions and unknowns", () => {
+  it("exports only the single-drive calculation data, definitions and essential unknowns", () => {
     const sections = powerRequirements(fixture());
-    expect(sections).toHaveLength(8);
+    expect(sections.map(section => section.title)).toEqual(["Power demand", "Move and load", "Motor electrical parameters", "Supply and driver"]);
     const markdown = powerReportMarkdown(sections);
     expect(markdown).toContain("Unknown means unavailable, not zero");
     expect(markdown).toContain("Peak supply power during a move | Unknown");
-    expect(markdown).toContain("Switching losses and dead time | Unknown");
-    expect(markdown).toContain("8. Remaining system decisions");
+    expect(markdown).toContain("Additional driver losses | Unknown");
+    expect(markdown).toContain("Scope: one linear drive");
     const csv = powerRequirementsCsv(sections);
     expect(csv).toContain('"value_with_units","source","definition_or_limitation"');
     expect(csv).toContain('"Desired travel","63 mm","Configured"');
     expect(csv).toContain("\r\n");
+    const snapshot = JSON.parse(powerModelSnapshot(fixture()));
+    expect(snapshot.sections).toEqual(sections);
+    for (const content of [markdown, csv, JSON.stringify(snapshot.sections)]) {
+      expect(content).not.toMatch(/scribble|LED|USB|grid|adapter|17 faders|60 W|haptic|65 mm|1\.15 A|Source and dependencies|Remaining system decisions/i);
+    }
   });
 
   it("exports position-domain data without fabricating time/current/velocity columns", () => {

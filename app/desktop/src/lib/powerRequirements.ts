@@ -31,7 +31,6 @@ export function powerRequirements(input: PowerRequirementsInput): RequirementSec
   const { config: c, driveSettings: s, cadGeometry: cad } = input;
   // Browser fallback data are UI examples, never engineering evidence.
   const d = input.native ? input.drive : null;
-  const f = input.native ? input.sweep : null;
   const simulated = (label: string, value: number | null | undefined, unit: string, detail: string) => {
     const formatted = number(value, unit);
     return formatted === "Unknown" ? unknown(label, "No current native simulation result. " + detail) : row(label, formatted, "Simulated", detail);
@@ -46,104 +45,65 @@ export function powerRequirements(input: PowerRequirementsInput): RequirementSec
       ? ["Closed individual coils", "Delta", "Star (wye)"][Math.round(c.routing_params.connection ?? 0)] ?? "Unknown"
       : "Unknown";
   return [
-    { title: "1. Simulation and assumptions", rows: [
-      row("Software", `pcbmotorgen ${version}`, "Model", "Rust simulation backend with Tauri/Svelte UI. Build revision and external solver versions are unknown."),
-      row("Result provenance", input.native ? "Simulated, not measured" : "Demo mode; numerical results withheld", "Model", "No measured motor or system power data are attached. Results are analytical/static calculations, not a hardware validation."),
-      row("Model scope", "One motor / fader", "Model", "No coupled 17-fader supply or shared DC-link simulation."),
-      row("Motion calculation", "Position sweep; speed is imposed", "Model", "No integration of force and moving mass. No trajectory, acceleration, braking or settling simulation."),
-      row("Reproducibility", "Download model snapshot JSON", "Model", "Includes current SI configuration, drive settings, imported copper and available results. This is not an executable simulator or the original versioned .pmmotor file; save that separately."),
-      row("Source and dependencies", "crates/pcbmotorgen-simulation/src/drive/ and magnetic/force_eval/", "Model", "Model implementation is in the repository. Cargo.toml, Cargo.lock, app/desktop/package.json and app/desktop/pnpm-lock.yaml define dependencies; source and installed binaries are not bundled. Custom routing-plugin binaries/versions are unknown."),
+    { title: "Power demand", rows: [
+      unknown("Peak supply power during a move", "Requires a move trajectory, supply-current data and driver losses. Copper loss is not maximum input power."),
+      unknown("Average supply power over a move", "Integral of supply voltage × supply current over the move, divided by move duration. No time-domain result available."),
+      unknown("Electrical energy per move", "Integral of supply voltage × supply current over the move. No time-domain result available."),
+      simulated("One-motor copper loss at setpoint", d?.copper_loss_w, "W", "Sinusoidal check: 1.5 × I_amplitude² × R_phase_hot. Excludes ripple heating and driver losses; not total or average input power."),
     ] },
-    { title: "2. Motor and mechanical parameters", rows: [
-      row("Motor construction", `${input.topology} coreless PCB stator; permanent-magnet mover`, "Configured", `${c.phases} phases; ${c.num_layers} configured copper layers; ${c.magnet_count} magnets, ${c.magnet_grade}, ${number(c.magnet_remanence_t, "T")}.`),
+    { title: "Move and load", rows: [
+      configured("Desired travel", input.desiredTravelMm, "mm", "Configured track travel, not a defined move trajectory or verified mechanical limit. Imported copper may have different usable bounds."),
+      configured("Target speed", s.target_speed_m_s, "m/s", "Configured operating point, not a demonstrated achievable trajectory."),
+      configured("Acceleration constraint", c.max_accel_m_s2, "m/s²", "Design input only; not an applied motion profile."),
+      unknown("Move duration and motion profile", "No position/velocity trajectory or deceleration profile is defined. The force sweep samples imposed positions, not motion calculated from force and mass."),
+      configured("Configured carriage mass", c.carriage_mass_kg, "kg", "Whether this includes the complete moving assembly and fader cap is unknown."),
+      configured("Friction input", c.friction_n, "N", "Configured force allowance, not a measured speed-dependent friction law."),
+      unknown("External load and damping", "No opposing load or damping law is defined for the move."),
+      configured("Target force", c.target_force_n, "N", "Design target, not simulated available thrust."),
+      configured("Peak force target", c.peak_force_n, "N"),
+      simulated("Available thrust at setpoint", d?.thrust_n, "N", "Force constant × phase-current amplitude. Does not establish a complete move profile."),
+    ] },
+    { title: "Motor electrical parameters", rows: [
       row("Winding arrangement", cad ? `Imported copper: ${cad.source_file_name}` : c.routing_pattern, "Configured", cad ? `Uses imported geometry, not generated routing parameters. Trace width ${number(cad.trace_width_mm, "mm")}; layer Z ${cad.layer_z_mm.join(", ")} mm. See snapshot for terminals and all traces.` : `Routing parameters ${JSON.stringify(c.routing_params)}; ${c.strands_per_phase} configured strands per phase.`),
+      configured("Phase count", c.phases, "phases"),
       connection === "Unknown" ? unknown("Phase connection", "Not declared by this geometry/pattern. A source filename is not proof of electrical connection.") : row("Phase connection", connection, "Configured", "Connection declaration, not a measured continuity check."),
       simulated("Winding resistance per phase", d?.phase_resistance_ohm, "Ω", `Worst hot DC phase value at ${s.winding_temp_c} °C; excludes driver. Per-net values are in the electrical CSV.`),
       simulated("Phase-to-phase resistance", d?.line_resistance_ohm, "Ω", "Star-only analytical value, 2 × phase resistance."),
       simulated("Winding self-inductance per phase", d?.phase_inductance_h, "H", "Copper-only self-inductance; distinct from mutual, synchronous and external inductance."),
       simulated("Phase-to-phase inductance", d?.line_inductance_h, "H", "Copper line inductance from the backend, excluding external series inductors."),
-      simulated("Synchronous inductance", d?.synchronous_inductance_h, "H", "Copper synchronous phase inductance; see model notes for backplane frequency dependence."),
+      simulated("Synchronous inductance", d?.synchronous_inductance_h, "H", "Copper synchronous phase inductance; backplane frequency dependence is recorded in the model snapshot."),
       configured("External series inductance per phase", s.series_inductance_h, "H", "Configured driver-terminal series inductance, not winding self-inductance."),
       simulated("Force constant Kf", d?.thrust_constant_n_per_a, "N/A", "Absolute force-sweep mean thrust / sweep current. Current is the configured commutation amplitude, not DC supply current."),
       simulated("Back-EMF constant Ke", d?.back_emf_constant_v_s_per_m, "V·s/m", "Backend assumes sinusoidal FOC, id = 0: phase-peak EMF = Ke × speed and Ke = 2/3 × Kf. Not measured; applicability to other commutation is unverified."),
-      configured("Electrical travel period", 2 * c.magnet_pitch_m * 1000, "mm", "360 electrical degrees = two alternating pole pitches."),
-      configured("Pole pitch", c.magnet_pitch_m * 1000, "mm"),
-      configured("Configured carriage mass", c.carriage_mass_kg, "kg", "Whether this includes the fader cap is unknown. Mass does not drive a dynamic trajectory in this model."),
-      unknown("Fader cap mass / total verified moving mass", "No mass breakdown or measured assembly mass supplied."),
-      configured("Friction input", c.friction_n, "N", "Configured force allowance, not a measured speed-dependent friction law."),
-      unknown("Damping and expected external load", "No damping coefficient or user-obstruction load model supplied."),
-      configured("Driver continuous rating", s.driver.continuous_rms_a, "A RMS/phase", "Driver preset/input; not a validated continuous winding-current limit."),
-      configured("Driver peak / OCP rating", s.driver.peak_current_a, "A", "Driver preset/input, not a programmed trip threshold or winding rating."),
+      configured("Electrical travel period", 2 * c.magnet_pitch_m * 1000, "mm", `360 electrical degrees; pole pitch ${number(c.magnet_pitch_m * 1000, "mm")}.`),
+      configured("Assumed winding temperature", s.winding_temp_c, "°C", "Hot-resistance input, not a temperature prediction."),
       simulated("Analytical continuous-current check", d?.max_continuous_current_a, "A", `Backend suitability bound, not a validated winding rating; limiting factor: ${d?.limiting_factor ?? "unknown"}.`),
-      unknown("Validated winding continuous / peak limits and peak duration", "No winding qualification, permitted peak duration or shutdown response supplied."),
-      configured("Assumed winding temperature", s.winding_temp_c, "°C", "Resistance calculation input, not a simulated or measured temperature."),
-      configured("Drive allowed temperature rise", s.allowed_rise_c, "°C", "Ampacity check input, not a thermal transient or shutdown limit."),
-      configured("Design temperature-rise constraint", c.max_temperature_rise_c, "°C", "Separate design constraint; no measured thermal limit."),
-      configured("Desired travel", input.desiredTravelMm, "mm", "Configured travel, not verified usable mechanical travel. Imported copper may have different bounds. A requested 65 mm move must not replace this value."),
-      unknown("Usable mechanical travel and end stops", "No mechanical end-stop coordinates or verified travel supplied. Force sweep coordinates are absolute first-magnet-center positions, not fader end stops."),
+      configured("Allowed temperature rise", s.allowed_rise_c, "°C", "Input to the winding ampacity check, not a predicted rise or shutdown limit."),
+      unknown("Winding current limits and peak duration", "No validated continuous/peak winding rating or permitted peak duration supplied."),
     ] },
-    { title: "3. Required movement", rows: [
-      configured("Target speed", s.target_speed_m_s, "m/s", "Configured operating point, not a demonstrated achievable trajectory."),
-      simulated("Voltage-limited speed threshold", d?.max_speed_m_s, "m/s", "Voltage-envelope intersection at configured current. Not the target speed or fastest full-travel result."),
-      unknown("Required time for a complete 65 mm move", "No move-time requirement or force-integrated trajectory supplied; desired travel is reported separately."),
-      configured("Acceleration constraint", c.max_accel_m_s2, "m/s²", "Design input only; not an applied motion profile."),
-      unknown("Deceleration and jerk limits", "Not defined in the current motion model."),
-      unknown("Movement frequency and longest continuous operating period", "No repeated movement recording or duty cycle supplied."),
-      unknown("Full performance while touched or obstructed", "No requirement or contact-force model supplied."),
-      unknown("Separate haptic force requirement", `Target force ${number(c.target_force_n, "N")} and peak force ${number(c.peak_force_n, "N")} are design targets, not a declared haptic requirement.`),
-    ] },
-    { title: "4. Drive and control settings", rows: [
-      configured("Motor supply", c.supply_voltage_v, "V", "Nominal configured source, not a simulated driver DC-link waveform."),
-      configured("PWM frequency", s.pwm_hz, "Hz"),
+    { title: "Supply and driver", rows: [
+      configured("Motor supply", c.supply_voltage_v, "V", "Nominal source voltage; driver DC-link voltage and supply current during a move are not simulated."),
       row("Driver", s.driver.name, "Configured"),
-      row("Commutation assumption", c.commutation === "max_thrust" ? "Max-thrust current allocation" : "Phase A only", "Configured", "Static commutation model. Firmware control loop, sensing bandwidth and actual modulation scheme are unknown."),
-      row("Ripple model", "Steady-state two-phase RL square-wave approximation", "Model", "50% duty, ±Vbus/2 across the two-phase loop. This does not simulate actual PWM switching, dead time, control response or supply current."),
-      configured("Phase-current amplitude setpoint", c.max_current_a, "A", "Simulation input; not a hardware current-limit setting or supply-source current."),
-      simulated("Phase ripple, peak-to-peak", d?.ripple_pp_a, "A", "Analytical RL ripple, not switching-resolution samples."),
-      simulated("Phase peak including analytical ripple", d?.peak_current_a, "A", "I_peak = configured phase-current amplitude + ripple_pp/2. Thus this result includes the model's ripple allowance, but is not a measured or switching-resolved peak. No fixed 1.15 A value is assumed."),
-      unknown("Programmed current limit and shutdown timing", "Driver preset OCP rating does not specify actual firmware/hardware protection settings."),
-      configured("Driver conduction-path resistance", s.driver.rds_on_ohm, "Ω", "HS + LS. Voltage check adds I × Rds_on; not a complete driver power-loss calculation."),
-      configured("Voltage headroom fraction", s.voltage_headroom, "fraction", "Fraction of bus voltage available to the analytical voltage check."),
-      d ? row("Driver suitability findings", d.checks.map(check => `${check.label}: ${check.status}`).join("; ") || "No checks returned", "Simulated", d.notes.join(" ")) : unknown("Driver suitability findings", "No current native driver analysis available."),
-      unknown("Switching losses and dead time", "Not modelled; no switching energy or gate-drive loss parameters."),
+      configured("PWM frequency", s.pwm_hz, "Hz"),
+      row("Commutation assumption", c.commutation === "max_thrust" ? "Max-thrust current allocation" : "Phase A only", "Configured", "Static current model; actual controller and PWM scheme are unknown."),
+      configured("Phase-current amplitude setpoint", c.max_current_a, "A", "Simulation input, not supply current or a programmed hardware trip threshold."),
+      simulated("Phase ripple, peak-to-peak", d?.ripple_pp_a, "A", "Analytical 50%-duty two-phase RL square-wave approximation, not switching-resolution samples."),
+      simulated("Phase peak including analytical ripple", d?.peak_current_a, "A", "I_peak = phase-current amplitude + ripple_pp/2. Includes analytical ripple, not a measured or switching-resolved peak."),
+      configured("Driver continuous rating", s.driver.continuous_rms_a, "A RMS/phase", "Driver rating, not a winding-current limit."),
+      configured("Driver peak / OCP rating", s.driver.peak_current_a, "A", "Driver rating, not a programmed trip threshold or permitted winding peak."),
+      configured("Driver conduction-path resistance", s.driver.rds_on_ohm, "Ω", "HS + LS. Voltage check adds I × Rds_on; not a complete driver-loss calculation."),
+      configured("Voltage headroom fraction", s.voltage_headroom, "fraction", "Bus-voltage fraction available to the voltage check."),
+      simulated("Voltage-limited speed threshold", d?.max_speed_m_s, "m/s", "Voltage-envelope intersection at configured current. Not the target speed or fastest full-travel result."),
+      unknown("Additional driver losses", "Switching, dead-time and controller consumption are not included. Total electrical input power cannot be established from copper loss alone."),
       configured("Supply capacitor bank", c.capacitor_bank_uf, "µF", "Design input only; no DC-link voltage, ESR, ripple-current or regeneration transient simulation."),
-      unknown("Braking / regeneration circuit", "No braking resistor, clamp, adapter sink capability or regeneration circuit defined."),
-    ] },
-    { title: "5. Simulation exports", rows: [
-      f ? row("Position-domain force CSV", `${f.positions_m.length} samples`, "Simulated", "Absolute first-magnet-center position [m], force X/Y/Z [N]. Not a time series. Per-phase force contributions are not phase currents.") : unknown("Position-domain force CSV", "No current native force sweep available."),
-      d ? row("Phase electrical CSV", `${d.phases.length} phase nets`, "Simulated", "Per-net resistance at 20 °C and hot, self-inductance, connectivity and copper length. No time axis.") : unknown("Phase electrical CSV", "No current native electrical analysis available."),
-      unknown("Time", "No time-domain solver or recording available."),
-      unknown("Supply-source current and sign convention", "No source-current waveform. Phase current is not supply current; no sign convention can be assigned to missing data."),
-      unknown("DC-link voltage at driver", "Only nominal configured supply is known."),
-      unknown("Phase A, B and C current waveforms", "Only setpoint and analytical ripple/peak checks are available."),
-      unknown("Position, velocity and motor force versus time", "Force versus imposed position is available separately; no velocity trajectory."),
-      unknown("PWM duty / commanded phase-voltage waveforms", "No controller or switching time trace."),
-      unknown("Switching-resolution and repeated-movement recordings", "Idle, startup, acceleration, travel, braking and settling stages are not recorded. Peak/ripple validation and average supply power remain unknown."),
-    ] },
-    { title: "6. Operating cases", rows: [
-      unknown("Peak supply power during a move", "No move trajectory, source-current waveform or complete driver-loss model. Not bounded by the static copper-loss result."),
-      unknown("Average supply power over a move", "Requires integral of source voltage × source current over the specified move, divided by move duration."),
-      unknown("Electrical energy per move", "Requires integral of source voltage × source current over the move. No time-domain result available."),
-      ...["Fastest full-travel move", "Short move / rapid direction reversal", "Repeated simultaneous movement of 17 faders", "Blocked / stalled fader until limiting or shutdown", "Braking / externally pushed fader and regenerated energy"].map(label => unknown(label, "Not supported by the current static model. No transient result available.")),
-      unknown("Conservative one-fader supply-power scaling", "No one-fader supply waveform or validated worst-case supply power to scale. Multiplying phase current by 17 would not establish supply demand."),
-      simulated("One-motor copper loss at setpoint", d?.copper_loss_w, "W", "Backend sinusoidal check: 1.5 × I_amplitude² × R_phase_hot. Excludes ripple heating, driver losses and all other system loads; not total or average input power."),
-      unknown("Complete-system feasibility at 60 W", "Cannot establish from copper loss alone. Requires movement duty cycle, supply traces, regeneration handling and other system loads."),
-    ] },
-    { title: "7. Other system loads", rows: [
-      unknown("Scribble-strip displays", "Candidates, supply voltages, maximum power and backlight/OLED image dependence not supplied."),
-      unknown("LED current / brightness limits", "The provisional 5 mA/channel is not confirmed; channel counts and brightness policy are unknown."),
-      unknown("Master-module controls and powered components", "Button/knob counts and additional powered components not supplied."),
-      unknown("Measured controller / sensor / communications idle power", "No measured idle-power data supplied."),
-    ] },
-    { title: "8. Remaining system decisions", rows: [
-      ...["Closed electrical loops in the grid", "Maximum grid dimensions and connector spacing", "Two-adapter standby handover or power combining", "Load-shedding priority after adapter removal", "USB-data-only discovery scope", "Preserve stored targets/settings or also physical positions"].map(label => unknown(label, "System decision not recorded in the motor model.")),
+      unknown("Braking energy and supply return path", "No braking trajectory or regeneration model is defined; returned energy and the supply's ability to absorb it are unknown."),
     ] },
   ];
 }
 
 export function powerReportMarkdown(sections: RequirementSection[]): string {
   const escape = (text: string) => text.replaceAll("|", "\\|").replaceAll(/\r?\n/g, " ");
-  return "# Power requirements\n\nUnknown means unavailable, not zero. Configured values are inputs, not measurements.\n\n" + sections.map(section =>
+  return "# Linear-drive power requirements\n\nScope: one linear drive. Values are configured inputs or static simulation results, not measurements. No time-domain move or supply-current calculation is available.\n\nUnknown means unavailable, not zero.\n\n" + sections.map(section =>
     `## ${section.title}\n\n| Item | Value | Source | Definition / limitation |\n| --- | --- | --- | --- |\n` + section.rows.map(r => `| ${[r.label, r.value, r.source, r.detail].map(escape).join(" | ")} |`).join("\n")
   ).join("\n\n") + "\n";
 }

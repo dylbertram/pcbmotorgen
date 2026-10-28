@@ -12,7 +12,8 @@ test("power tab discloses demo data and downloads a report without fabricated wa
   await gotoDesignApp(page);
   const panel = await openPower(page);
   await expect(panel).toContainText("Demo mode");
-  await expect(panel.getByRole("heading", { level: 3 })).toHaveCount(8);
+  await expect(panel.getByRole("heading", { level: 3 })).toHaveText(["Power demand", "Move and load", "Motor electrical parameters", "Supply and driver"]);
+  await expect(panel).not.toContainText(/Scribble|LED|USB|17 faders|60 W|Remaining system decisions/);
   await expect(panel.getByRole("button", { name: "Force sweep CSV", exact: true })).toBeDisabled();
   await expect(panel.getByRole("button", { name: "Phase electrical CSV", exact: true })).toBeDisabled();
   for (const [button, filename] of [["Download report", "power-requirements-report.md"], ["Requirements CSV", "power-requirements-summary.csv"], ["Model snapshot JSON", "power-requirements-model.json"]]) {
@@ -22,6 +23,7 @@ test("power tab discloses demo data and downloads a report without fabricated wa
     expect(download.suggestedFilename()).toBe(filename);
     const content = await readFile((await download.path())!, "utf8");
     expect(content).toContain("Unknown");
+    expect(content).not.toMatch(/Scribble-strip|LED current|USB-data-only|17 faders|60 W|Remaining system decisions/);
     if (filename.endsWith(".json")) {
       const snapshot = JSON.parse(content);
       expect(snapshot.results_provenance).toBe("demo_results_withheld");
@@ -100,7 +102,7 @@ test("current results export; pending and failed updates never export retained d
   const snapshot = JSON.parse(await page.evaluate(() => (window as any).__savedPower.content));
   expect(snapshot.config.supply_voltage_v).toBe(12);
   expect(snapshot.drive).toBeNull();
-  expect(snapshot.sections[5].rows.find((row: any) => row.label === "Peak supply power during a move").value).toBe("Unknown");
+  expect(snapshot.sections.flatMap((section: any) => section.rows).find((row: any) => row.label === "Peak supply power during a move").value).toBe("Unknown");
 });
 
 test("failed force updates remove force exports and do not supply an old force constant", async ({ page }) => {

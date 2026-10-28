@@ -53,11 +53,9 @@
 <section class="min-w-0 space-y-4" aria-label="Power requirements">
   <header class="space-y-2">
     <h2 class="text-base font-semibold text-slate-100">Power requirements</h2>
-    <p class="max-w-3xl text-sm text-slate-300">Peak supply power during a move: <strong class="text-amber-300">Unknown</strong></p>
     <p class="max-w-3xl text-xs leading-relaxed text-slate-400">
-      Average power and energy per move are also unknown. The current model sweeps imposed positions and checks a fixed speed;
-      it does not simulate a move or the supply current. Copper loss alone is not maximum input power.
-      A move calculation needs a defined motion profile, verified moving mass and load, and a driver/supply model.
+      Inputs and results for one linear drive. The current model provides static force and electrical checks,
+      not a time-domain move or supply-current calculation. Copper loss alone is not maximum input power.
     </p>
     {#if !input.native}
       <p class="rounded border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-200" role="status">Demo mode. Browser mock results are excluded from this report. Run the desktop app for native simulation results.</p>
@@ -70,7 +68,7 @@
   </div>
   {#if message}<p role="status" class="break-all text-xs text-emerald-300">{message}</p>{/if}
   {#if failure}<p role="alert" class="text-xs text-rose-300">{failure}</p>{/if}
-  <p class="text-xs text-slate-400">Unknown means unavailable, not zero. Configured values are inputs, not measurements. CSV exports cover static results only; no time-series recording is available.</p>
+  <p class="text-xs text-slate-400">Unknown means unavailable, not zero. Configured values are inputs, not measurements. Force CSV contains force versus position; electrical CSV contains winding resistance and inductance. Neither is a time series.</p>
   {#each sections as section (section.title)}
     <section class="overflow-hidden rounded-lg border border-slate-700 bg-slate-800/40" aria-label={section.title}>
       <h3 class="border-b border-slate-700 px-4 py-3 text-sm font-semibold text-slate-200">{section.title}</h3>
@@ -79,7 +77,7 @@
           <div class="grid gap-1 px-4 py-3 text-xs sm:grid-cols-[minmax(10rem,1fr)_minmax(0,2fr)] sm:gap-4">
             <dt class="text-slate-400">{row.label}</dt>
             <dd class="min-w-0 space-y-1">
-              <div class="flex flex-wrap items-baseline gap-2"><span class={["break-words font-medium text-slate-100", { unknown: row.source === "Unknown" }]}>{row.value}</span><span class="text-slate-500">{row.source}</span></div>
+              <div class="flex flex-wrap items-baseline gap-2"><span class={["break-words font-medium text-slate-100", { unknown: row.source === "Unknown" }]}>{row.value}</span>{#if row.source !== "Unknown"}<span class="text-slate-500">{row.source}</span>{/if}</div>
               <p class="break-words leading-relaxed text-slate-400">{row.detail}</p>
             </dd>
           </div>
