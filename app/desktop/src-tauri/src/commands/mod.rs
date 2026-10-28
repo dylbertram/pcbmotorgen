@@ -7,6 +7,12 @@
 //! |-------------------------------|---------------|------------------------------------------|
 //! | `get_magnet_grades`           | REAL          | Reads core `magnet_grades::MAGNET_GRADES`.|
 //! | `compute_height_stack`        | REAL          | Uses core `HeightStackCalculator`.       |
+//! | `prepare_dc_winding_geometry` | REAL (pure)   | Actual routed copper/terminal/depth snapshot only; no force or return substitution. |
+//! | `start_dc_coupling`           | EXPERIMENTAL | Opt-in installed worker; exact registered geometry only; fresh magnetic solve. |
+//! | `dc_coupling_status`          | REAL (sync)  | Request-bound supervised status, verified fresh result only. |
+//! | `cancel_dc_coupling`          | REAL (sync)  | Cancels the owned numerical process group; no cancelled force. |
+//! | `dc_coupling_capability`      | REAL (sync)  | Host installation availability, not general geometry qualification. |
+//! | `inspect_dc_coupling`         | REAL (async) | Rebuild copper and inspect exact qualified-case applicability; no magnetic job or force. |
 //! | `generate_coils`              | REAL          | Resolves the selected routing pattern and returns geometry plus dimensions. |
 //! | `evaluate_force_sweep`        | REAL          | Uses core `ForceEvaluator` (Lorentz).    |
 //! | `compute_friction`            | REAL          | Uses core `FrictionEstimator`.           |
@@ -62,6 +68,8 @@
 //! flat `commands::` paths, whichever the caller prefers.
 
 pub mod cad_source;
+pub mod dc_jobs;
+pub mod visualization;
 pub mod dxf;
 pub mod kicad;
 pub mod physics;

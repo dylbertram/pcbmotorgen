@@ -1,0 +1,40 @@
+{
+  "schema": "linear-dc-source-force-controls-v1",
+  "scope": "Predetermined missing downstream nonlinear-force stability controls for Case A's accepted source refinements. No physical changes or reuse of coupled unknowns. Full declared current/pose states and unchanged 2% vector/floor controls. Not per-body coil/shield force, general app qualification or interpolation acceptance.",
+  "prefix": "linear-dc-day-case-a-source-force-",
+  "copper_work": "linear-dc-day-case-a-copper-v1-20261022",
+  "magnetic_controls": {"far":0.06,"air_mesh":0.01,"material_mesh":0.0012,"order":1,"degree":8},
+  "baseline": {
+    "current": "linear-dc-day-case-a-source-m200-c6-p50-v1-20261022",
+    "magnetic_mesh": "linear-dc-day-case-a-mesh-coarse-v1-20261022",
+    "active_sections": "linear-dc-day-case-a-active-m200-c6-p50-v1-20261022.json",
+    "jobs": {
+      "nominal": "linear-dc-day-case-a-nonlinear-vector-coarse-nominal-v2-20261022",
+      "plus100um": "linear-dc-day-case-a-nonlinear-vector-coarse-plus100um-v2-20261022",
+      "minus100um": "linear-dc-day-case-a-nonlinear-vector-coarse-minus100um-v2-20261022"
+    }
+  },
+  "variants": {
+    "mesh": {
+      "current": "linear-dc-day-case-a-source-m150-c6-p50-v1-20261022",
+      "rt0": "linear-dc-day-case-a-rt0-m150-c6-p50-v1-20261022",
+      "active_sections": "linear-dc-day-case-a-active-m150-c6-p50-v1-20261022.json"
+    },
+    "port": {
+      "current": "linear-dc-day-case-a-source-m200-c6-p40-v1-20261022",
+      "rt0": "linear-dc-day-case-a-rt0-m200-c6-p40-v1-20261022",
+      "active_sections": "linear-dc-day-case-a-active-m200-c6-p40-v1-20261022.json"
+    },
+    "curvature": {
+      "current": "linear-dc-day-case-a-source-m200-c8-p50-v1-20261022",
+      "rt0": "linear-dc-day-case-a-rt0-m200-c8-p50-v1-20261022",
+      "active_sections": "linear-dc-day-case-a-active-m200-c8-p50-v1-20261022.json",
+      "reason": "Curvature4 failed local barrel-area gates and remains preserved. Independently accepted curvature6 and8 sources are compared, without admitting the failed4 report."
+    }
+  },
+  "currents_loop_a": [0.0,0.1,-0.1,0.5,-0.5],
+  "linear_offsets_x_m": [0.0,0.0001,-0.0001],
+  "relative_refinement_gate": 0.02,
+  "force_vector_floor_n": 1e-8,
+  "policy": "Stage1 preflights must pass and their measured forecasts fit explicit budgets before stage2. Every whole budget fits before acceptance reserve; no automatic extension or new physical correction."
+}

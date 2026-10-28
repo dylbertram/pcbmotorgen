@@ -1,0 +1,31 @@
+{
+  "status": "verified-display-only-field-slice-and-controls-followup",
+  "base_commit": "cc38cc8",
+  "authorization": "User requested using remaining time to review field lines leaving the moving slice and improve control integration, layout and alignment.",
+  "issue": "pcbmotorgen#ytgr",
+  "evidence_directory": "/Users/dylanbertram/.local/opt/solver-prototypes-macos/field-slice-ui-20261026-v1",
+  "changes": {
+    "projection": "Projected lines + slice is the default. Integrate normalized Bx/Bz on the selected physical XZ plane, including direction cues. Do not flatten an already integrated 3D trajectory. Colors still show full |B| including By; a purely normal field has no projected line but retains magnitude.",
+    "explicit_volume_view": "3D field lines follows full XYZ from the selected seed plane. Projected lines, magnitude-only slice and 3D sample arrows remain separately selectable. Magnet masks, domain limits, null/loop/step stops and native sample-only interpolation are retained.",
+    "controls": "Collapsible right-hand inspector with Source and Display sections, aligned labels/selects, full-width slice/opacity sliders, tabular physical Y readout in mm and an explicit 3D seed-plane label. Narrow viewers start collapsed. Hiding settings keeps qualified coil controls mounted, preserving valid samples without another request.",
+    "camera": "Screenshot review found XZ section selected without an actual orthogonal view: a separate Bounds controller retained cached isometric angles. One orbit owner and a tested orthographic fit now control framing, preserve current orbit direction during extent changes, and apply explicit section/reset presets.",
+    "documentation": "Updated field rendering and PM-only path descriptions. Qualified coil-generated B remains primary; magnet visibility and contribution remain independent. No saved design or physical model change."
+  },
+  "verification": {
+    "report": "verification.json",
+    "sha256": "340fbcf5f660d995967af42264fb50d814bd33728087a4f7db82d74731635dfb",
+    "frozen_source_and_test_files": 9,
+    "unit": "510 passed, 1 existing cadMapping skip, 58 files. Includes 11 field-grid/projection and 3 camera-fit tests.",
+    "typecheck": "0 errors, 0 warnings.",
+    "svelte_mcp": "All four changed Svelte components return zero issues. Effect suggestions reviewed as intentional Three.js camera/invalidation/disposal or native sampling lifecycle side effects.",
+    "affected_browser": "54 Chromium tests passed, 0 skips/unexpected/flaky, 66.450s. Includes native frozen Case A winding/PM rendering, mobile/light/dark layout, real WebGL, actual XZ camera, source controls, stale clearing and cancellation boundaries.",
+    "full_browser": "384 Chromium tests passed, 0 skips/unexpected/flaky, 362.658s. Both desktop-tauri and desktop-wide are browser project names, not observed native WKWebView acceptance.",
+    "native_build": "Debug --no-bundle --ci build passed in native-no-bundle-v2.log. Includes production frontend build. Existing large-chunk build warnings remain; no installer or delivery bundle.",
+    "projection_checks": "All line/arrowhead vertices coplanar at slice endpoints and 25/75 percent, including large normal By. A normal component cannot change the projected trajectory. Null/normal-only fields, magnet boundaries, finite domain, unchanged samples and Z-independent colors covered.",
+    "interaction_checks": "Slice/style/opacity/Z/settings visibility changes do not request new physical samples. Settings collapse preserves qualified coil results. Selects align and inspector clears camera/Z rail. Camera fit unit tests and a copper-only masked screenshot verify actual section orientation."
+  },
+  "diagnostics": "Three new projection cases failed before the fix. Initial browser status-count assertion incorrectly included output elements' implicit status roles; it now targets rendering errors. Camera pixel probe initially included HTML controls, now masked to isolate copper. Signed-zero camera assertion corrected to numeric direction tolerance. First native launcher lacked cargo in PATH; corrected launcher v2 passed. Failed logs/screenshots retained. No production gate relaxed.",
+  "preservation": "Original five root design hashes AND mtimes, all 41 successful preparation evidence hashes and 378 frozen source/input/binary hashes unchanged. No solver code, source/force qualification, returns, resistivity, housing UI or Mutagen changes. Existing native field data only read for browser rendering, not a new field-accuracy claim.",
+  "cleanup": "All verification commands ended and own isolated Vite listener 1543 is absent. Earlier managed-night services remain absent; old schedules were not reopened. Exact local commit recorded in external local-checkpoint.json, no push.",
+  "remaining": "General geometry/source refinement/admission, observed native WKWebView, isolated ARM install and license clearance remain open. Case B force/pilot/refinement-force chains remain unapproved. No new numerical campaign was launched."
+}

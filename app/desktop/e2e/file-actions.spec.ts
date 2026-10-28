@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { gotoDesignApp } from "./helpers";
+import { gotoDesignApp, selectDesignPanel } from "./helpers";
 
 test.beforeEach(async ({ page }) => {
   // The browser has no native menu. Replace only the menu-event transport,
@@ -58,11 +58,14 @@ test("DXF exports directly and New adds a file without clearing an edited design
   expect(saved.fileName).toBe("motor-coil.dxf");
   expect(saved.extensions).toEqual(["dxf"]);
   expect(saved.content).toContain("SECTION");
+  await selectDesignPanel(page, "Magnets");
   await page.locator("input#magnet-count").fill("6");
   await page.locator("input#magnet-count").press("Enter");
   await page.evaluate(() => window.dispatchEvent(new CustomEvent("test-file-action", { detail: "newFile" })));
   await page.getByRole("dialog", { name: "New coil file" }).getByRole("button", { name: /^Motor coil/ }).click();
+  await selectDesignPanel(page, "Magnets");
   await expect(page.locator("input#magnet-count")).toHaveValue("12");
   await page.getByRole("tab", { name: /^M Untitled motor 1/ }).click();
+  await selectDesignPanel(page, "Magnets");
   await expect(page.locator("input#magnet-count")).toHaveValue("6");
 });

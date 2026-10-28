@@ -19,6 +19,9 @@ impl LinearMotorConfig {
 
     /// Validate all fields (mirrors Python `_validate_base` + `_validate_linear`).
     pub fn validate(&self) -> Result<(), ConfigError> {
+        if let Some(stack) = &self.backplane {
+            stack.validate().map_err(ConfigError)?;
+        }
         // --- Base validation ---
         if self.magnet_dims_m.len() != 3 {
             return Err(ConfigError(
@@ -36,6 +39,9 @@ impl LinearMotorConfig {
                 "magnet_count must be ≥ 2, got {}",
                 self.magnet_count
             )));
+        }
+        if self.magnet_count > pcbmotorgen_simulation::params::MAX_MAGNET_COUNT {
+            return Err(ConfigError(format!("magnet_count must be ≤ {}, got {}", pcbmotorgen_simulation::params::MAX_MAGNET_COUNT, self.magnet_count)));
         }
         if self.magnet_pitch_m <= 0.0 {
             return Err(ConfigError(format!(
@@ -130,6 +136,9 @@ impl LinearMotorConfig {
                 "max_layers must be an even number ≥ 2, got {}",
                 self.max_layers
             )));
+        }
+        if self.max_layers > pcbmotorgen_simulation::params::MAX_PCB_LAYERS || self.num_layers > pcbmotorgen_simulation::params::MAX_PCB_LAYERS {
+            return Err(ConfigError(format!("PCB copper layer count and max_layers must be ≤ {}", pcbmotorgen_simulation::params::MAX_PCB_LAYERS)));
         }
         if self.num_layers < 2 || self.num_layers % 2 != 0 {
             return Err(ConfigError(format!(
@@ -307,6 +316,24 @@ mod tests {
             let cfg = LinearMotorConfig { magnet_count, ..LinearMotorConfig::default() };
             assert!(cfg.validate().is_ok(), "Rejected {magnet_count} magnets");
         }
+    }
+
+    #[test]
+    fn test_coreless_envelope_is_enforced_before_generation() {
+        let mut cfg = LinearMotorConfig { magnet_count: 12, max_layers: 16, num_layers: 16, ..LinearMotorConfig::default() };
+        assert!(cfg.validate().is_ok());
+        cfg.magnet_count = 13;
+        assert!(cfg.validate().unwrap_err().to_string().contains("≤ 12"));
+        cfg.magnet_count = 12; cfg.max_layers = 18; cfg.num_layers = 18;
+        assert!(cfg.validate().unwrap_err().to_string().contains("≤ 16"));
+        cfg.max_layers = 16; cfg.num_layers = 16;
+        cfg.backplane = Some(pcbmotorgen_simulation::backplane::BackplaneStack {
+            layers: vec![], housing: Some(pcbmotorgen_simulation::backplane::HousingSpec {
+                material: pcbmotorgen_simulation::backplane::HousingMaterial::Steel1018,
+                thickness_m: 0.001, gap_m: 0.0,
+            }),
+        });
+        assert!(cfg.validate().unwrap_err().to_string().contains("unsupported"));
     }
 
     #[test]

@@ -34,19 +34,21 @@
 <script lang="ts">
   import { confirm } from "@tauri-apps/plugin-dialog";
   import { untrack } from "svelte";
+  import type { Snippet } from "svelte";
+  import { isDesignPanel, isLeftPanel, type DesignPanelId, type PreviewPanelId } from "./previewPanels";
   import type { PreviewCamera } from "../../utils/coilPreviewGestures.svelte";
   import { editableCoilGeometry } from "../../ipc/dxf";
   import type { ConfigStore } from "../../stores/config.svelte";
   import type { MotionStore } from "../../stores/motion.svelte";
-  import type { CadGeometry, CoilPathDto } from "../../types";
+  import type { CadGeometry, CoilPathDto, DriveAnalysis } from "../../types";
   import { CadSimplifyTool } from "../../utils/cadSimplifyTool.svelte";
   import { CoilTerminalTool } from "../../utils/coilTerminalTool.svelte";
-  import CoilTerminalOverlay from "./CoilTerminalOverlay.svelte";
   import { withAutomaticCadTerminals } from "../../cadTerminals";
   import { generatedTerminalGeometry } from "../../generatedTerminalGeometry";
   import {
     clientToVirtual,
     computePreviewGeometry,
+    computePreviewSummary,
     computeMagnets,
     computeUniqueLayers,
     computeUniquePhases,
@@ -78,24 +80,36 @@
     bandRowInOnePeriod,
   } from "./coilPreviewCanvas";
   import { CoilPreviewViewState } from "./coilPreviewViewState.svelte";
+  import type { VisualizationInput } from "../../types/simulationVisualization";
 
   let {
     config,
     coils,
     motion,
+    expanded = $bindable(false),
+    workspace = false,
+    active = true,
+    simulationActive = false,
+    designSettings,
+    sidePanel = $bindable<PreviewPanelId | null>(null),
+    drive = null,
+    driveError = null,
+    drivePending = false,
     importedGeometry = null,
     onGeometryChange,
     camera,
     view = new CoilPreviewViewState(),
-  }: { config: ConfigStore; coils: CoilPathDto | null; motion: MotionStore; importedGeometry?: CadGeometry | null; onGeometryChange?: (geometry: CadGeometry) => void; camera?: PreviewCamera; view?: CoilPreviewViewState } =
+  }: { config: ConfigStore; coils: CoilPathDto | null; motion: MotionStore; expanded?: boolean; workspace?: boolean; active?: boolean; simulationActive?: boolean; designSettings?: Snippet<[DesignPanelId]>; sidePanel?: PreviewPanelId | null; drive?: DriveAnalysis | null; driveError?: string | null; drivePending?: boolean; importedGeometry?: CadGeometry | null; onGeometryChange?: (geometry: CadGeometry) => void; camera?: PreviewCamera; view?: CoilPreviewViewState } =
     $props();
+
+  export function showDesignSettings(section: DesignPanelId = "constraints"): void { sidePanel = section; }
 
   const simplifyTool = new CadSimplifyTool({ getGeometry: () => importedGeometry, onChange: (geometry) => onGeometryChange?.(geometry) });
   let canUndoSimplify = $derived(simplifyTool.canUndo);
   let simplifyNotice = $derived(simplifyTool.notice);
   async function startSegmentEditing(): Promise<boolean> {
     if (!onGeometryChange) return false;
-    const accepted = await confirm("Create editable geometry from this design? Segment edits will no longer follow routing settings. You can return to generated geometry from Import CAD.", { title: "Edit generated segments", kind: "warning", okLabel: "Create editable geometry", cancelLabel: "Keep generated" });
+    const accepted = await confirm("Create editable geometry? Segment edits will stop following routing settings. Choose a generator in Design settings to return to generated geometry.", { title: "Edit generated segments", kind: "warning", okLabel: "Create editable geometry", cancelLabel: "Keep generated" });
     if (!accepted) return false;
     const requested = config.toIpc();
     const requestedKey = JSON.stringify(requested);
@@ -116,10 +130,10 @@
   // these virtual px so it matches the SVG markup exactly. The paint routines
   // live in ./coilPreviewCanvas.ts, which shares these constants.
   const W = PREVIEW_W;
-  let expanded = $state(false);
-  let modalWidth = $state(PREVIEW_W);
-  let modalHeight = $state(PREVIEW_H);
-  const H = $derived(expanded && modalWidth > 0 ? W * modalHeight / modalWidth : PREVIEW_H);
+  let viewportWidth = $state(PREVIEW_W);
+  let viewportHeight = $state(PREVIEW_H);
+  const interactive = $derived(workspace || expanded);
+  const H = $derived(interactive && viewportWidth > 0 ? W * viewportHeight / viewportWidth : PREVIEW_H);
   const PAD = 30;
 
   // -------------------------------------------------------------------
@@ -146,7 +160,7 @@
     measure.mode = false;
     measure.clear();
     view.oneSection = false;
-    expanded = true;
+    if (!workspace) expanded = true;
     terminalTool.begin(coil);
   }
   // An ends request from elsewhere (the Simulation tab's alert) opens the
@@ -198,7 +212,14 @@
    *  `routing_dimensions` overlay geometry (pole-pitch ruler, band-width
    *  rows, pole regions) so the camera never clips an annotation. */
   function worldTransformFor(zoom: number): WorldTransform {
-    const fitWidth = expanded && view.terminalPanelOpen ? W * Math.max(0.15, 1 - 284 / modalWidth) : W;
+    const drawerWidth = isDesignPanel(sidePanel) ? 400 : sidePanel ? 240 : 0;
+    const leftInset = interactive && designSettings ? 44 + (isLeftPanel(sidePanel) ? Math.min(drawerWidth, Math.max(0, viewportWidth - 132)) : 0) : 0;
+    const inset = interactive ? leftInset + 44 + (sidePanel && !isLeftPanel(sidePanel) ? Math.min(drawerWidth, Math.max(0, viewportWidth - 132)) : 0) : 0;
+    const fitWidth = W * Math.max(0.15, 1 - inset / Math.max(viewportWidth, 1));
+    const fit = (bounds: typeof overlayFitBounds) => {
+      const transform = fitWorldToView(bounds, fitWidth, H, PAD, zoom);
+      return { ...transform, tx: transform.tx + W * leftInset / Math.max(viewportWidth, 1) };
+    };
     // A command focuses the selected coil, not the unrelated magnet array.
     if (terminalTool.active && terminalTool.coil) {
       const points = terminalTool.candidates.map((p) => p.position);
@@ -208,10 +229,10 @@
         const minX = Math.min(...xs), maxX = Math.max(...xs);
         const minY = Math.min(...ys), maxY = Math.max(...ys);
         const pad = Math.max(maxX - minX, maxY - minY, 0.001) * 0.08;
-        return fitWorldToView({ minX: minX - pad, minY: minY - pad, maxX: maxX + pad, maxY: maxY + pad }, fitWidth, H, PAD, zoom);
+        return fit({ minX: minX - pad, minY: minY - pad, maxX: maxX + pad, maxY: maxY + pad });
       }
     }
-    return fitWorldToView(overlayFitBounds, fitWidth, H, PAD, zoom);
+    return fit(overlayFitBounds);
   }
 
   // All pan/pinch/zoom state, cursor maths, touch/pointer coordination and
@@ -219,7 +240,7 @@
   // reads its reactive view state and binds its handlers.
   const gestures = new CoilPreviewGestures({
     camera: untrack(() => camera),
-    get interactionMode() { return expanded ? "cad" : "navigation"; },
+    get interactionMode() { return interactive ? "cad" : "navigation"; },
     virtualW: W,
     get virtualH() { return H; },
     minZoom: MIN_ZOOM,
@@ -256,11 +277,7 @@
   let uniqueLayers = $derived(computeUniqueLayers(coils));
 
   // Header stat line, shared verbatim by the inline card and the lightbox.
-  let stats = $derived(
-    coils
-      ? `${uniquePhases.length} phase${uniquePhases.length === 1 ? "" : "s"} · ${g.renderedLayerCount} layer${g.renderedLayerCount === 1 ? "" : "s"} · ${coils.phases.length} coil group${coils.phases.length === 1 ? "" : "s"}`
-      : "no coils yet",
-  );
+  let stats = $derived(computePreviewSummary(coils));
 
   let visibleSegments = $derived(
     computeVisibleSegments(coils, view.oneSection, oneSectionConductorCount),
@@ -277,6 +294,8 @@
   // fit always includes them so reset-view never clips an annotation.
   // -------------------------------------------------------------------
   let firstMagnetCentreX = $derived(magnetCenterX(visibleMagnets));
+  const visualizationInput = $derived<VisualizationInput | null>(active && simulationActive && firstMagnetCentreX !== null
+    ? { config: config.toIpc(), drive: config.drive, cadGeometry: importedGeometry, moverPositionM: firstMagnetCentreX } : null);
   let poleRuler = $derived(
     computePolePitchRuler(
       coils?.routing_dimensions,
@@ -323,10 +342,10 @@
         g.magnetTop,
         0.003,
       ),
-      // Keep the camera independent of overlay visibility and phase selection.
-      poleRuler,
-      bandRows,
-      poleRegionZones,
+      // Fit diagnostics only in the expanded viewer; the small preview is geometry-only.
+      interactive ? poleRuler : null,
+      interactive ? bandRows : [],
+      interactive ? poleRegionZones : [],
       g.boardRect.y,
       g.boardRect.y + g.boardRect.h,
     );
@@ -350,12 +369,12 @@
   );
 
   // -------------------------------------------------------------------
-  // Lightbox measure ruler. Two-click dimension tool: click 1 sets the
+  // Workspace measure ruler. Two-click dimension tool: click 1 sets the
   // start point, click 2 locks the dimension, click 3 clears it. The
   // reset button (visible while measure mode is on) clears without a
   // click. Taps are distinguished from pan-drags by a movement threshold,
-  // so pan/pinch/zoom keep working while measuring. Lightbox only — the
-  // overlay draws only while `expanded`.
+  // so pan/pinch/zoom keep working while measuring. Shared by the full-tab
+  // workspace and expanded viewer.
   //
   // ALL measure state + tap bookkeeping (mode, points, live cursor,
   // pointer/touch maps, tap threshold) lives in the utility class
@@ -366,7 +385,7 @@
   // -------------------------------------------------------------------
   const measure = new CoilPreviewMeasure({
     screenToWorld: (clientX, clientY) => {
-      const frame = modalFrameRef;
+      const frame = activeFrame;
       if (!frame) return null;
       const rect = frame.getBoundingClientRect();
       const v = clientToVirtual(clientX, clientY, rect, W, H);
@@ -382,7 +401,7 @@
 
   /** Locked-dimension fit bounds (camera-fit input, lightbox only). */
   let lockedMeasureBounds = $derived(
-    expanded && measure.mode && measure.lockedBounds
+    interactive && measure.mode && measure.lockedBounds
       ? measure.lockedBounds
       : null,
   );
@@ -390,20 +409,17 @@
   // -------------------------------------------------------------------
   // Frame + backing-store sizing. A ResizeObserver keeps the canvas backing
   // store in lockstep with the rendered CSS box (dpr-capped at 2×); writing
-  // `frameSize` re-triggers the draw effect below.
+  // `frameRevision` re-triggers the draw effect below.
   //
-  // Two view instances exist — the inline (collapsed card) pair and the
-  // modal (lightbox) pair — but only ONE is drawn per render tick. Each
-  // mounted pair gets its own ResizeObserver; every sizing write happens
-  // inside a RO callback only (never in the effect body) and observers
-  // disconnect on cleanup. The modal pair's refs bind up from the
-  // CoilPreviewLightbox (it owns the Dialog markup).
+  // One ResizeObserver follows the active frame, either the embedded
+  // workspace or expanded viewer. Sizing writes happen in its callback;
+  // switching views disconnects the old observer before observing the new frame.
   // -------------------------------------------------------------------
   let frameRef: HTMLDivElement | undefined = $state();
   let canvasRef: HTMLCanvasElement | undefined = $state();
   let modalFrameRef: HTMLDivElement | undefined = $state();
   let modalCanvasRef: HTMLCanvasElement | undefined = $state();
-  let frameSize = $state(0); // frame CSS-pixel width, measured by the RO
+  let frameRevision = $state(0);
 
   // The pair that is currently visible: the inline canvas while collapsed,
   // the modal canvas while expanded. The draw effect paints only this pair.
@@ -411,41 +427,26 @@
   let activeCanvas = $derived(expanded ? modalCanvasRef : canvasRef);
 
   $effect(() => {
-    const frame = frameRef;
-    const canvas = canvasRef;
-    if (!frame || !canvas) return;
+    const frame = activeFrame;
+    const canvas = activeCanvas;
+    if (!frame) return;
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
     // All sizing happens inside the RO callbacks only (no state writes in the
     // effect body). observe() guarantees an initial delivery before paint, so
-    // the backing store + `frameSize` (which re-triggers the draw effect) are
+    // the backing store + `frameRevision` (which re-triggers the draw effect) are
     // always set before the first render is presented.
-    const inlineRo = new ResizeObserver(() => {
-      canvas.width = Math.round(frame.clientWidth * dpr);
-      canvas.height = Math.round(frame.clientHeight * dpr);
-      frameSize = frame.clientWidth;
+    const observer = new ResizeObserver(() => {
+      if (frame.clientWidth <= 0 || frame.clientHeight <= 0) return;
+      if (canvas) {
+        canvas.width = Math.round(frame.clientWidth * dpr);
+        canvas.height = Math.round(frame.clientHeight * dpr);
+      }
+      frameRevision += 1;
+      viewportWidth = frame.clientWidth;
+      viewportHeight = frame.clientHeight;
     });
-    inlineRo.observe(frame);
-
-    // The modal pair only exists while expanded (bound on open, unbound on
-    // close) — observe it only while it is mounted.
-    const modalFrame = modalFrameRef;
-    const modalCanvas = modalCanvasRef;
-    let modalRo: ResizeObserver | undefined;
-    if (modalFrame && modalCanvas) {
-      modalRo = new ResizeObserver(() => {
-        modalCanvas.width = Math.round(modalFrame.clientWidth * dpr);
-        modalCanvas.height = Math.round(modalFrame.clientHeight * dpr);
-        frameSize = modalFrame.clientWidth;
-        modalWidth = modalFrame.clientWidth;
-        modalHeight = modalFrame.clientHeight;
-      });
-      modalRo.observe(modalFrame);
-    }
-
-    return () => {
-      inlineRo.disconnect();
-      modalRo?.disconnect();
-    };
+    observer.observe(frame);
+    return () => observer.disconnect();
   });
 
   // -------------------------------------------------------------------
@@ -468,6 +469,10 @@
   $effect(() => {
     const frame = activeFrame;
     const canvas = activeCanvas;
+    // Keep resize tracking even while hidden. Otherwise the zero-width guard
+    // drops this dependency and a same-size return leaves a cleared canvas.
+    void frameRevision;
+    if (!active) return;
     if (!frame || !canvas) return;
     if (frame.clientWidth <= 0) return;
     void worldTransform;
@@ -489,7 +494,6 @@
     void bandRows;
     void overlayFitBounds;
     void g;
-    void frameSize;
     void expanded;
     renderer.draw(frame, canvas, {
       coils,
@@ -510,9 +514,9 @@
       viaDrillMm: config.min_via_drill_mm,
       viaAnnularRingMm: config.min_via_annular_ring_mm,
       poleRuler,
-      showPolePitch: view.showPolePitch,
-      bandRows: visibleBandRows,
-      poleRegions: view.showPoleRegions ? visiblePoleRegionZones : [],
+      showPolePitch: interactive && view.showPolePitch,
+      bandRows: interactive ? visibleBandRows : [],
+      poleRegions: interactive && view.showPoleRegions ? visiblePoleRegionZones : [],
       measure: null,
     });
   });
@@ -532,6 +536,9 @@
 
 </script>
 
+{#if workspace}
+  <div class="h-full min-h-0">{#if !expanded}{@render viewer(true)}{/if}</div>
+{:else}
 <div class="rounded-lg bg-slate-800/40 border border-slate-700 p-4">
   <!-- The inline preview is read-only. Tools live in the expanded viewer. -->
   <div class="flex items-center justify-between mb-2 flex-wrap gap-2">
@@ -553,34 +560,44 @@
   <!-- Frame div owns the ARIA label (the canvas is the paint surface; data-*
        attributes on the canvas carry the introspection counters). All pan/
        pinch/scroll-zoom handling is delegated to the gesture utility. -->
-  <PreviewFrame bind:frame={frameRef} {gestures} label="Coil preview" aspectRatio={W / PREVIEW_H} ondblclick={onInlineDoubleClick}>
+  <PreviewFrame bind:frame={frameRef} {gestures} navigationEnabled={view.viewMode === "top"} label="Coil preview" aspectRatio={W / PREVIEW_H} ondblclick={onInlineDoubleClick}>
     <!-- data-segments / data-vias / data-pole-pitch / data-band-widths /
          data-pole-regions / data-revision are written imperatively by the
          renderer (canvas.dataset in coilPreviewCanvas.ts), NOT bound
          reactively — see the counter comment there. -->
     {#if view.viewMode === "iso"}
-      <CoilPreviewIsoView geometry={terminalGeometry} {view} isVisible={isTerminalVisible} />
+      <CoilPreviewIsoView geometry={terminalGeometry} {view} isVisible={isTerminalVisible} showTerminals={false} simulation={visualizationInput} />
     {:else}
       <canvas bind:this={canvasRef} class="block h-full w-full"></canvas>
-      {#if terminalGeometry}
-        <CoilTerminalOverlay geometry={terminalGeometry} transform={worldTransform} panX={gestures.panX} panY={gestures.panY} width={W} height={H} isVisible={isTerminalVisible} showMarkers={view.showTerminals} />
-      {/if}
     {/if}
   </PreviewFrame>
 
   {#if coils && coils.phases.length > 0}
     <p class="mt-2 text-xs text-slate-500">
       <span class="text-slate-600"
-        >Drag to pan. Pinch or Ctrl-scroll to zoom. Open the expanded viewer to edit.</span
+        >{view.viewMode === "iso" ? "Drag to orbit · Scroll or pinch to zoom · Switch to Top-down to edit" : "Drag to pan · Pinch or Ctrl-scroll to zoom · Expand to edit"}</span
       >
     </p>
   {/if}
 
-  {#if expanded}
+</div>
+{/if}
+
+{#if expanded}{@render viewer(false)}{/if}
+
+{#snippet viewer(inline: boolean)}
     <CoilPreviewLightbox
+      embedded={inline}
+      {active}
+      simulation={visualizationInput}
+      {designSettings}
+      bind:sidePanel
       bind:expanded
       height={H}
       {config}
+      {drive}
+      {driveError}
+      {drivePending}
       {motion}
       {view}
       {gestures}
@@ -603,8 +620,7 @@
       {hasBandWidthData}
       {hasPoleRegionData}
       {poleRegionPhases}
-      bind:modalFrameRef
-      bind:modalCanvasRef
+      bind:modalFrameRef={() => inline ? frameRef : modalFrameRef, (ref) => { if (inline) frameRef = ref; else modalFrameRef = ref; }}
+      bind:modalCanvasRef={() => inline ? canvasRef : modalCanvasRef, (ref) => { if (inline) canvasRef = ref; else modalCanvasRef = ref; }}
     />
-  {/if}
-</div>
+{/snippet}

@@ -3,8 +3,8 @@ import { expect, type Locator, type Page } from "@playwright/test";
 /** The Design tab's scrollable settings container. */
 export const DESIGN_SCROLL = "#design-settings-scroll";
 
-/** The persistent left column (aside) of the main grid. */
-export const ASIDE = "aside[aria-label='Persistent design reflection']";
+/** The embedded motor workspace, retained as ASIDE for shared preview tests. */
+export const ASIDE = "#panel-design";
 
 /** Open a motor document with generated defaults in the workspace. */
 export async function gotoDesignApp(page: Page): Promise<void> {
@@ -13,6 +13,29 @@ export async function gotoDesignApp(page: Page): Promise<void> {
   const dialog = page.getByRole("dialog", { name: "New coil file", exact: true });
   await dialog.getByRole("button", { name: /^Motor coil/ }).click();
   await expect(dialog).toBeHidden();
+}
+
+/** Focus the persistent workspace. Retains the old helper name for callers
+ * being migrated; there is no expanded viewer or modal to open. */
+export async function openCoilPreview(page: Page): Promise<void> {
+  const workspace = coilWorkspace(page);
+  await expect(workspace).toBeVisible();
+  for (const name of ["Design side tools", "Preview side tools"]) {
+    const selected = workspace.getByRole("toolbar", { name, exact: true }).locator('button[aria-expanded="true"]');
+    if (await selected.count()) await selected.click();
+  }
+}
+
+export function coilWorkspace(page: Page): Locator {
+  return page.getByRole("region", { name: "Coil design workspace", exact: true });
+}
+
+export async function selectDesignPanel(page: Page, name: string): Promise<void> {
+  const trigger = coilWorkspace(page).getByRole("toolbar", { name: "Design side tools", exact: true })
+    .getByRole("button", { name, exact: true });
+  if (await trigger.getAttribute("aria-expanded") !== "true") await trigger.click();
+  await expect(coilWorkspace(page).getByRole("dialog", { name, exact: true })).toBeVisible();
+  await expect(coilWorkspace(page).locator("#design-settings-scroll")).toHaveCount(1);
 }
 
 /**
@@ -25,40 +48,29 @@ export async function box(page: Page, locator: Locator) {
   return { x: b.x, y: b.y, w: b.width, h: b.height };
 }
 
-/** The Design panel's outer box (includes its p-4 padding). */
+/** The full Design tab's outer box. */
 export function designPanel(page: Page) {
   return page.locator("#panel-design");
 }
 
-/**
- * The first card of the left column (TravelDiagram). The reflection column
- * is a Bits UI ScrollArea since kata 2npg: the card sits inside the
- * viewport's content wrapper.
- */
-export function leftColumnFirstCard(page: Page) {
-  return page.locator(
-    `${ASIDE} [data-scroll-area-content] > :first-child`,
-  );
-}
-
-/** Active-area length readout in the Design-dimensions box. */
+/** Active-area length readout in Design constraints. */
 export function activeLengthReadout(page: Page) {
   return page.locator(
-    `section[aria-labelledby="design-dimensions-heading"] dt:has(> span:text-is("Active copper region")) + dd`,
+    `#design-constraints-heading dt:has(> span:text-is("Active copper region")) + dd`,
   );
 }
 
 /** The "PCB trace total (X)" live output (traces' first-to-last X span). */
 export function traceTotalReadout(page: Page) {
   return page.locator(
-    `section[aria-labelledby="design-dimensions-heading"] dt:has(> span:text-is("PCB trace total (X)")) + dd`,
+    `#design-constraints-heading dt:has(> span:text-is("PCB trace total (X)")) + dd`,
   );
 }
 
-/** The Design constraints box (right column, top of the Design settings). */
+/** The constraints section in the preview's Design settings drawer. */
 export function designConstraintsPanel(page: Page) {
   return page.locator(
-    `section[aria-labelledby="design-constraints-heading"]`,
+    `#design-constraints-heading`,
   );
 }
 

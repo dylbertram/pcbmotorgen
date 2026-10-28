@@ -1,8 +1,9 @@
 import { test, expect } from "@playwright/test";
-import { gotoDesignApp } from "./helpers";
+import { gotoDesignApp, selectDesignPanel } from "./helpers";
 
 test("via guide distinguishes hole diameter from ring width and updates live", async ({ page }) => {
   await gotoDesignApp(page);
+  await selectDesignPanel(page, "Routing");
   const hole = page.getByRole("spinbutton", { name: "Via hole size (mm)", exact: true });
   const ring = page.getByRole("spinbutton", { name: "Annular ring width (mm)", exact: true });
   await hole.fill("0.2");
@@ -22,17 +23,18 @@ test("via guide distinguishes hole diameter from ring width and updates live", a
   expect(inputBox.x + inputBox.width).toBeLessThan(graphicBox.x);
   await expect(guide.getByText("Ring width, each side", { exact: true })).toHaveCount(0);
   await expect(page.getByRole("spinbutton", { name: "Strands per phase", exact: true })).toHaveCount(0);
-  await expect(page.getByText("Via diameter = hole size + 2 × ring width.", { exact: false })).toHaveCount(0);
+  await expect(page.getByText("Outer copper diameter.", { exact: false })).toHaveCount(0);
   await page.getByRole("button", { name: "About via diameter", exact: true }).focus();
-  await expect(page.getByText("Via diameter = hole size + 2 × ring width.", { exact: false })).toBeVisible();
-  await expect(page.getByText("Allow at least 0.10 mm extra diameter;", { exact: false })).toBeVisible();
-  await page.keyboard.press("Escape");
+  await expect(page.getByText("Outer copper diameter.", { exact: false })).toBeVisible();
+  await expect(page.getByRole("tooltip").locator("math")).toHaveCount(1);
+  await page.getByRole("button", { name: "About via diameter", exact: true }).blur();
   await page.getByRole("button", { name: "About annular ring width", exact: true }).focus();
   await expect(page.getByText("Copper width on one side of the hole.", { exact: false })).toBeVisible();
 });
 
 test("CAD import shares the same via sizing guide and help", async ({ page }) => {
   await gotoDesignApp(page);
+  await selectDesignPanel(page, "Routing");
   await page.getByRole("button", { name: "Routing source", exact: true }).click();
   await page.getByRole("option", { name: "Load design from file…" }).click();
   const dialog = page.getByRole("dialog", { name: "Import CAD" });

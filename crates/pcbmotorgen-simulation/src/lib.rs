@@ -23,6 +23,7 @@
 
 pub mod backplane;
 pub mod drive;
+pub mod dc_geometry;
 pub mod magnet_grades;
 pub mod magnetic;
 pub mod params;
@@ -30,6 +31,7 @@ pub mod equilibrium;
 pub mod physics;
 pub mod stackup;
 pub mod units;
+pub mod visualization;
 
 // Re-export public types from the moved modules.
 pub use magnetic::{CommutationMode, ForceEvaluator, ForceResult, MagnetArray, BFieldSample2D};

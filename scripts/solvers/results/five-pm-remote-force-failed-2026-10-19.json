@@ -1,0 +1,13 @@
+{
+  "status": "failed-on-both-global-meshes",
+  "scope": "Separate exact stress diagnostic family selected from geometry, with middle-gap planes at 35/50/65 percent and outer face expansions 1/2/3mm. Original near-interface failures remain unchanged. Both complete archived bare and nonlinear stack fields are checked without subtracting self-force.",
+  "coarse_audit_sha256": "2db6e79d69c058912a854d60d99d7983dd4a0e8e2ad7baa788c1ea5e27a1c2b2",
+  "near_refined_audit_sha256": "7597f8b6a88ae801e276b104977ca16ad8565612125784d135a485a302b37ee6",
+  "coarse_bare_mover_z_n": [0.4999178801178942, 0.16786598988618284, 0.010283987862953974],
+  "near_refined_bare_mover_z_n": [0.3880672839363023, 0.13005602480884743, 0.0494443245396679],
+  "coarse_direct_reaction_imbalance_n": [0.5079182324435245, 0.1883679843664292, 0.036760100165672105],
+  "near_refined_direct_reaction_imbalance_n": [0.3921735414683055, 0.14134683801252024, 0.0730153204530204],
+  "coarse_reaction_limits_n": [0.02390411678436401, 0.024207004228823107, 0.024336069938030582],
+  "near_refined_reaction_limits_n": [0.02384654620565651, 0.024017060887090703, 0.024279290151446992],
+  "conclusion": "Moving surfaces away from ideal magnet corners reduces some errors but does not satisfy the unchanged bare-floor/path/reaction gates. Errors are not uniformly monotone under global near-mesh refinement. Selecting the one smallest floor would discard failed controls and is not accepted. No finite-array force is qualified."
+}

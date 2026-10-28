@@ -1,0 +1,34 @@
+{
+  "schema": "linear-dc-generated-case-declarations-v1",
+  "template": "star_2-layer.pmmotor",
+  "template_version_index": 1,
+  "template_sha256": "0ed215f6ff403b927dbeac1ea3d4d9587489a1f1c0680e4ce3a2a48658475d82",
+  "scope": "Explicit new app-generated linear designs,not repairs to the original project. V1 derivations/export preserved as incomplete acceptance evidence because their inherited41.4mm pose exceeded new travel. V2 explicitly declares new valid poses; no automatic clamp or physical material correction.",
+  "cases": [
+    {
+      "id": "linear-star-compact-two-strand-four-layer-board",
+      "config_overrides": {"desired_travel_mm":12.0,"active_area_width_mm":8.0,"magnet_count":3,"num_layers":4,"pcb_thickness_mm":1.2,"routing_params":{"num_strands":2.0,"connection":2.0}},
+      "drive_overrides": {},
+      "state_overrides": {"mover_position_mm":6.0},
+      "coverage": "Actual two-strand generated graph:77segments/54vias on active layers0/1 with blind0-to-1 vias,4declared layer planes. Unused2/3 retained,not claimed active.29mm active length,three magnets,0.4mm active layer spacing."
+    },
+    {
+      "id": "linear-star-five-strand-six-layer-board-inner-two-ounce",
+      "config_overrides": {"desired_travel_mm":24.0,"active_area_width_mm":10.0,"magnet_count":5,"num_layers":6,"pcb_thickness_mm":1.5,"min_trace_mm":0.127,"trace_width_mm":0.127,"routing_params":{"num_strands":5.0,"connection":2.0}},
+      "drive_overrides": {"inner_copper_oz":2.0},
+      "state_overrides": {"mover_position_mm":12.0},
+      "coverage": "Actual five-strand graph:545segments/384vias,active layers0/1,6declared planes. Different parallel-current graph and via density,0.3mm blind-via span and70um layer1copper. Unused2..5 remain empty.53mm active length/five magnets; no six-active-layer claim."
+    }
+  ],
+  "physical_model_policy": "Use unchanged saved app-defined magnet/material settings and nominal PCB-bottom stack placement. Board is centred by rigid coordinate transformation only; array centre follows declared saved first-magnet position. Exact material/copper disjointness must pass before coupling. No inherited35um correction.",
+  "return_policy": "Explicit A-positive/C-negative study return outside actual routed copper,sized from saved outer copper. Record exact waypoints/closure;not recovered cable CAD or automatic cable inference.",
+  "acceptance": {
+    "current_loop_a":[0.0,0.1,-0.1,0.5,-0.5],
+    "linear_offset_x_m":[0.0,0.0001,-0.0001],
+    "relative_refinement_gate":0.02,
+    "relative_independent_reference_gate":0.05,
+    "force_vector_floor_n":1e-8,
+    "source_section_current_floor_per_loop_a":1e-8,
+    "required":["actual saved-design host export","CAD/material disjointness and tagging","global and local source controls","source mesh/curvature/port and independent electrical reference","exact affine RT0/near-source integration","nonlinear magnitude/polarity/linear-pose matrix","zero and linear/vacuum limits","total/incremental/per-body balance","mesh/domain/quadrature/source2percent","independent magnetic5percent","real app request/cache/lifecycle tests"]
+  }
+}

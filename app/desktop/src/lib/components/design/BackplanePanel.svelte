@@ -4,6 +4,10 @@
     BACKPLANE_MAX_BSAT_T,
     BACKPLANE_MAX_MU_R,
     BACKPLANE_MAX_THICKNESS_M,
+    BACKPLANE_MAX_LAYERS,
+    HOUSING_MAX_THICKNESS_M,
+    HOUSING_MAX_GAP_M,
+    isSupportedHousingMaterial,
     DEFAULT_HOUSING,
     HOUSING_MATERIAL_OPTIONS,
     LAYER_DEFAULT_BSAT_T,
@@ -21,8 +25,12 @@
     type MagneticState,
   } from "../../types/backplane";
   import type { DriveBackplane } from "../../types/drive";
+  import type { CadGeometry } from "../../types";
   import NumberField from "../ui/NumberField.svelte";
   import HelpTag from "../ui/HelpTag.svelte";
+  import TravelStackupView from "./TravelStackupView.svelte";
+  import PeriodicReferencePanel from "./PeriodicReferencePanel.svelte";
+  import HousingMotionPanel from "./HousingMotionPanel.svelte";
 
   /**
    * Backplane and housing below the PCB (t707). Every edit replaces
@@ -33,12 +41,14 @@
     config,
     backplaneAnalysis = null,
     driveBackplane = null,
+    cadGeometry = null,
   }: {
     config: ConfigStore;
     /** Output of the last simulation run. Null until a run has a backplane. */
     backplaneAnalysis?: BackplaneAnalysis | null;
     /** Eddy-current results of the last driver analysis, if any. */
     driveBackplane?: DriveBackplane | null;
+    cadGeometry?: CadGeometry | null;
   } = $props();
 
   const fieldClass = "w-24 shrink-0 px-2 py-1 text-xs font-mono text-emerald-200";
@@ -107,17 +117,22 @@
 
   function removeLayer(index: number) {
     const layers = config.backplane?.layers;
-    // A backplane keeps at least one layer. Use "Remove backplane" to clear it.
-    if (!layers || layers.length <= 1) return;
+    // A housing may be simulated without adding a magnetic backing layer.
+    if (!layers || (layers.length <= 1 && !config.backplane?.housing)) return;
     setLayers(layers.filter((_, i) => i !== index));
   }
 
   function addLayer() {
+    if ((config.backplane?.layers.length ?? 0) >= BACKPLANE_MAX_LAYERS) return;
     setLayers([...(config.backplane?.layers ?? []), newLayer("mn_zn_ferrite")]);
   }
 
   function addBackplane() {
     setBackplane({ layers: [newLayer("mn_zn_ferrite")], housing: null });
+  }
+
+  function addHousingOnly() {
+    setBackplane({ layers: [], housing: { ...DEFAULT_HOUSING } });
   }
 
   function setHousingEnabled(enabled: boolean) {
@@ -134,28 +149,35 @@
 </script>
 
 <section
-  class="rounded-md border border-slate-700 bg-slate-800/40 px-3 py-2.5"
-  aria-labelledby="backplane-heading"
+  id="backplane-heading"
+  aria-label="Stackup"
 >
-  <h2
-    id="backplane-heading"
-    class="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-200"
-  >
-    Backplane &amp; housing<HelpTag
-      label="About the backplane model"
-      tip="Planar layered model of the magnet fundamental. Saturation uses one effective permeability per layer; eddy currents use the layers' conductivity at the PWM frequency and at the mover speed. Boundaries are infinite planes, so edges are ignored. Core and hysteresis losses are not modelled."
-    />
-  </h2>
+
+  <div class="stackup-fields mb-2 grid items-center gap-3">
+    <div class="space-y-2.5">
+      <label class="flex items-center justify-between gap-2 text-xs text-slate-300">
+        <span>Air gap (mm)<HelpTag label="About air gap" tip="Clearance from the top of the PCB to the magnets. A smaller gap increases field strength." /></span>
+        <NumberField id="air-gap" value={config.air_gap_mm} min={0} step={0.05} ariaLabel="Air gap (mm)" class={fieldClass} onCommit={(value) => (config.air_gap_mm = value)} />
+      </label>
+      <label class="flex items-center justify-between gap-2 text-xs text-slate-300">
+        <span>PCB thickness (mm)</span>
+        <NumberField id="pcb-thickness" value={config.pcb_thickness_mm} min={0.1} step={0.1} ariaLabel="PCB thickness (mm)" class={fieldClass} onCommit={(value) => (config.pcb_thickness_mm = value)} />
+      </label>
+    </div>
+    <div class="mx-auto w-full max-w-[160px]"><TravelStackupView {config} /></div>
+  </div>
 
   {#if !backplane}
-    <p class="mb-2 text-[11px] leading-relaxed text-slate-400">
-      No backplane is set, so the field model is unchanged.
-    </p>
     <button type="button" class={buttonClass} onclick={addBackplane}>Add backplane</button>
+    <button type="button" class={buttonClass} onclick={addHousingOnly}>Add housing only</button>
   {:else}
     <div class="space-y-2">
       <p class="text-[11px] leading-relaxed text-slate-400">
-        Layer 1 touches the PCB. Order runs from the PCB downward.
+        {#if backplane.layers.length}
+          Layers run downward from the PCB. Up to {BACKPLANE_MAX_LAYERS} layers, each at most 2 mm.
+        {:else}
+          No shielding layer. Housing gap is measured below the PCB.
+        {/if}
       </p>
 
       <ol class="space-y-1.5" aria-label="Backplane layers, from the PCB downward">
@@ -201,7 +223,7 @@
                 type="button"
                 class={buttonClass}
                 aria-label="Remove layer {i + 1}"
-                disabled={backplane.layers.length <= 1}
+                disabled={backplane.layers.length <= 1 && !housing}
                 onclick={() => removeLayer(i)}
               >Remove</button>
             </div>
@@ -242,14 +264,14 @@
           </li>
         {/each}
       </ol>
+      <PeriodicReferencePanel {config} />
       {#if hasFlexSheet}
         <p class="text-[11px] leading-relaxed text-slate-400">
-          Enter the ferrite thickness of a sheet only. Datasheet totals include adhesive and
-          cover film. Put datasheet μr and Bsat in the fields above.
+          Use ferrite thickness only, excluding adhesive and cover film.
         </p>
       {/if}
 
-      <button type="button" class={buttonClass} onclick={addLayer}>Add layer</button>
+      <button type="button" class={buttonClass} disabled={backplane.layers.length >= BACKPLANE_MAX_LAYERS} onclick={addLayer}>Add layer</button>
     </div>
 
     <div class="mt-3 space-y-2.5 border-t border-slate-700/70 pt-2.5">
@@ -272,6 +294,9 @@
               onchange={(e) => patchHousing({ material: e.currentTarget.value as HousingMaterial })}
               class={selectClass}
             >
+              {#if !isSupportedHousingMaterial(housing.material)}
+                <option value={housing.material} disabled>{housing.material} (unsupported legacy material)</option>
+              {/if}
               {#each HOUSING_MATERIAL_OPTIONS as option (option.value)}
                 <option value={option.value}>{option.label}</option>
               {/each}
@@ -285,7 +310,7 @@
             <NumberField
               value={toMm(housing.thickness_m)}
               min={0.1}
-              max={BACKPLANE_MAX_THICKNESS_M * 1e3}
+              max={HOUSING_MAX_THICKNESS_M * 1e3}
               step={0.1}
               ariaLabel="Housing wall thickness (mm)"
               class={fieldClass}
@@ -300,7 +325,7 @@
             <NumberField
               value={toMm(housing.gap_m)}
               min={0}
-              max={BACKPLANE_MAX_THICKNESS_M * 1e3}
+              max={HOUSING_MAX_GAP_M * 1e3}
               step={0.1}
               ariaLabel="Housing gap to backplane (mm)"
               class={fieldClass}
@@ -315,11 +340,12 @@
           role="status"
           class="rounded border border-amber-500/40 bg-amber-500/10 px-2 py-1.5 text-[11px] leading-relaxed text-amber-200"
         >
-          Silicon steel is selected with PWM at {(config.drive.pwm_hz / 1e3).toFixed(1)} kHz,
-          above {SILICON_STEEL_PWM_LIMIT_HZ / 1e3} kHz. Eddy and core losses rise steeply here
-          are only partly modelled. Consider sintered MnZn or NiZn ferrite, or soft magnetic
-          composite (SMC).
+          Silicon steel losses rise above {SILICON_STEEL_PWM_LIMIT_HZ / 1e3} kHz PWM and are only partly modelled. Consider ferrite or SMC.
         </p>
+      {/if}
+
+      {#if housing}
+        <HousingMotionPanel {config} {cadGeometry} />
       {/if}
 
       <button type="button" class={buttonClass} onclick={() => setBackplane(null)}>
@@ -331,7 +357,12 @@
   {#if backplane && backplaneAnalysis}
     <div class="mt-3 border-t border-slate-700/70 pt-2.5">
       <p class="mb-1.5 text-[10px] uppercase tracking-wider text-slate-500">
-        From the last simulation run; may lag recent edits
+        Analytical screening estimates from the last run; may lag recent edits
+      </p>
+      <p class="mb-2 text-[11px] leading-relaxed text-amber-200" role="note">
+        Infinite flat layers, not the finite housing shape. Edges, slots and current return
+        paths need a 3D solve. Near-knee saturation, drag and operating speed need independent
+        validation before choosing material thickness or bearing loads.
       </p>
       <dl class="grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
         <dt class="text-slate-400">Image strength R</dt>
@@ -343,7 +374,7 @@
         </dd>
         <dt class="text-slate-400">Inductance factor</dt>
         <dd class="font-mono text-slate-200">{backplaneAnalysis.inductance_factor.toFixed(2)}×</dd>
-        <dt class="text-slate-400">Normal attraction</dt>
+        <dt class="text-slate-400">Estimated normal attraction</dt>
         <dd class="font-mono text-slate-200">{backplaneAnalysis.attraction_n.toPrecision(3)} N</dd>
         {#if housing && backplaneAnalysis.housing_state && backplaneAnalysis.housing_state.mu_initial > 1}
           <dt class="text-slate-400">Housing</dt>
@@ -364,7 +395,7 @@
 
       {#if driveBackplane}
         <p class="mt-2.5 mb-1 text-[10px] uppercase tracking-wider text-slate-500">
-          Eddy currents, from the last driver analysis
+          Eddy-current screening, from the last driver analysis
         </p>
         <dl class="grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
           <dt class="text-slate-400">L at {(config.drive.pwm_hz / 1e3).toFixed(0)} kHz PWM</dt>
@@ -386,7 +417,7 @@
             </dd>
           {/if}
           {#if driveBackplane.drag_limited_speed_m_s != null}
-            <dt class="text-slate-400">Drag equals thrust at</dt>
+            <dt class="text-slate-400">Estimated drag/thrust crossing</dt>
             <dd class="font-mono text-amber-200">{driveBackplane.drag_limited_speed_m_s.toPrecision(3)} m/s</dd>
           {/if}
         </dl>
@@ -406,3 +437,9 @@
     </p>
   {/if}
 </section>
+
+<style>
+  @container (min-width: 560px) {
+    .stackup-fields { grid-template-columns: minmax(0, 1fr) 160px; }
+  }
+</style>

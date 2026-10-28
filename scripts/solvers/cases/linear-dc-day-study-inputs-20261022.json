@@ -1,0 +1,28 @@
+{
+  "schema": "actual-linear-dc-study-inputs-v1",
+  "design_archive": "linear-dc-day-generated-designs-v2-20261022",
+  "scope": "Explicit source-study returns and ordinary saved app-defined rectangular stack. No imported magnetic CAD,no corrections. Exact material CAD/tagging and source/force qualification remain required.",
+  "cases": [
+    {
+      "id": "linear-star-compact-two-strand-four-layer-board",
+      "source_project_sha256": "804443cbc1a3c5e5de1ada59378b8d1a63278a31a7520ab6c4f5ea1b158ec1ef",
+      "snapshot_sha256": "f910e4ca892cb33a6a355d11ed5f23fd3ce533b329bc309a3b859f58ff179fbe",
+      "positive_phase": "A", "negative_phase": "C",
+      "external_return_waypoints_m": [[-0.0195,0.006,0.0007999999999999999],[-0.0195,0.004666666666666666,0.0007999999999999999]]
+    },
+    {
+      "id": "linear-star-five-strand-six-layer-board-inner-two-ounce",
+      "source_project_sha256": "b829f8f92d1745e20c2f88bc45b1f5e29a28d00b19f945e3d6b33f58b6875040",
+      "snapshot_sha256": "39aff02bf9b7b545c5b19674fc6b71dd1550d644776ce00bd6f1ffffe90fbe03",
+      "positive_phase": "A", "negative_phase": "C",
+      "external_return_waypoints_m": [[-0.0315,0.005999999999999999,0.0012000000000000001],[-0.0315,0.005333333333333335,0.0012000000000000001]]
+    }
+  ],
+  "support_envelope": {
+    "candidate_geometry": "Generated infinity-braid,three-phase star,finite straight traces with declared widths/thicknesses and actual0-to-1 plated vias;declared additional planes retained but not claimed active. Per-design source/field/magnetic qualification required,not blanket geometry acceptance.",
+    "copper_limits": "Existing host10000primitive/2048nodes-per-network cap,no truncation. No curved/spline/IO copper or delta admission in this candidate family. Saved finite dimensions/rho and graph connectivity must match.",
+    "model": "Saved app-defined alternating+/-z rectangular magnets,common finite rectangular stack footprint from actual active length/width,nominal PCB-bottom placement. Existing material and dimensional app restrictions remain in force.",
+    "force_states": "Only explicitly qualified currents0,+/-0.1,+/-0.5loop A and linear x offsets0,+/-100um initially;no extrapolation/interpolation or torque claim.",
+    "admission": "Until full per-design evidence exists,only the original registered request is force-admitted. Future preparation path may create new qualification evidence from actual requests;it must not substitute these case fixtures or replay archived forces."
+  }
+}

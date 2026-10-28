@@ -15,7 +15,7 @@
    * not yet fetched) the endpoints are a fixed reference pin and the
    * store's `envelopeWarning` is rendered below — never silent (kata ab30).
    *
-   * Used by the Design reflection (TravelDiagram) and the CoilPreview
+    * Used by Design constraints and the CoilPreview
    * lightbox so both screens expose identical position controls on the same
    * shared store.
    */
@@ -24,6 +24,7 @@
   import { stripBoundsDomainMm } from "../../previewGeometry";
   import NumberField from "../ui/NumberField.svelte";
   import Slider from "../ui/Slider.svelte";
+  import HelpTag from "../ui/HelpTag.svelte";
   import HoldingForceChart from "./HoldingForceChart.svelte";
 
   let { config, motion, showWaveform = true, compact = false }: { config: ConfigStore; motion: MotionStore; showWaveform?: boolean; compact?: boolean } =
@@ -87,7 +88,8 @@
     <!-- Placeholder travel envelope in effect (kata ab30): the bounds are a
          fixed reference pin, NOT backend physics — say so, loudly. -->
     <p class="mt-1 text-[10px] text-amber-400" role="status">
-      {motion.envelopeWarning.message}
+      Travel limits are estimated. Simulation backend unavailable.
+      <HelpTag label="About estimated travel limits" tip="The slider uses placeholder limits, not calculated electromagnetic limits. Run the desktop app for simulated travel." />
     </p>
   {/if}
 </div>

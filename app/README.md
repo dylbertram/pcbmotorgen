@@ -51,6 +51,57 @@ planes, matching the electrical graph. Disconnected islands within a coil are
 reported as errors. Internal active/end-turn labels do not remove imported
 copper from force calculations, so they are not exposed as editing controls.
 
+## Experimental housing motion and heating
+
+Open **Stackup**, then choose **Add housing only** for a coreless design without
+magnetic shielding. Alternatively add backplane layers and enable the housing
+below them. Housing choices are aluminum 6061/5052 and nominally non-magnetic
+stainless 304/316. Magnetic steel and stainless 430 housing are not supported.
+
+Enable **Motion-induced housing drag and heating**, then enter speed in m/s
+and steady exposure duration in seconds. The panel reports housing-equivalent
+opposing drag, total stack drag, housing Joule power and exposure energy, and
+separate total stack power. Conducting shielding loss is not mislabeled as
+housing heat. A replacement calculation clears old values; failed, unsupported
+or late requests never restore a previous estimate.
+
+Housing physics runs independently of electrical-driver compatibility. Delta
+driver restrictions still apply to electrical analysis, but do not prevent a
+PM-induced housing estimate. Imported geometry must still have valid mapping
+and physical conductor placement. No substitute housing physics is fabricated
+in a browser preview without the desktop backend.
+
+The model assumes an established steady travelling field over planar layers,
+with magnetic feedback and an effective DC shielding state. It does not resolve
+finite housing edges, slots, entry/exit, starts/stops, full moving nonlinear
+shielding, winding-current reaction or induced PCB-copper shielding. Duration
+is steady exposure, not a validated accelerating or reversing trajectory.
+Housing conductivity remains fixed at its room-temperature value.
+
+Heat generation is not temperature rise. No temperature is predicted without
+explicit thermal mass, ambient and cooling assumptions. The desired **100°C
+absolute ceiling** is not a 100°C allowed rise or a guaranteed safe hotspot
+rating. These are theoretical screening estimates, not hardware ratings.
+
+The input envelope is 2–12 magnets, even PCB copper counts from 2–16, at most
+three backplane layers each no thicker than 2 mm, housing walls up to 5 mm and
+housing gaps from 0–10 mm. Three 2 mm layers may total 6 mm. Legacy files retain
+their geometry and material values; unsupported simulation requests are
+reported rather than silently clamped or remapped.
+
+For regression and local unsigned macOS builds, from `app/desktop`:
+
+```sh
+npm exec --yes --package=node@24.18.0 -- pnpm test:coreless
+npm exec --yes --package=node@24.18.0 -- pnpm build:experimental:mac
+```
+
+The browser command uses an isolated server and the current workspace/dock
+tests. It is not a claim that obsolete expanded-modal tests pass; their
+migration is tracked in Kata `0z3q`. The native build produces
+`target/debug/bundle/macos/pcbmotorgen.app` from the repository root. It is a
+local unsigned experimental build, not a notarized or cross-platform release.
+
 ## Files and projects
 
 Motor coils use `.pmmotor` files. Sensor coils use `.pmsensor` files. These are
@@ -169,6 +220,17 @@ straight line and imports as one trace. Vertical lines or polyline edges encode
 via spans. Fitted or mesh polylines, classic bulged vertices, non-default classic
 polyline extrusion, and sloped 3D edges are reported as unsupported. Review these
 warnings before accepting an import.
+
+### Inspect copper in 3D
+
+Expand the coil preview, open **Display**, and select **3D**. The Threlte viewer
+supports generated and imported geometry. Drag to orbit, right-drag to pan, and
+scroll or pinch to zoom. **Reset 3D view** fits the copper back into the viewer.
+Layer, coil, via, terminal, and trace/centerline settings also apply in 3D.
+Z height defaults to the physical 1× scale. Use the vertical slider on the left
+to magnify it up to 20×; saved coordinates and exports are unchanged.
+Return to **Top-down** to edit or measure geometry.
+If WebGL is unavailable, the viewer reports it and Top-down remains usable.
 
 ### Set coil IN and OUT
 

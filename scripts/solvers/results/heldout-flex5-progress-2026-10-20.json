@@ -1,0 +1,23 @@
+{
+  "status":"historical-out-of-scope-five-mm-study-user-cancelled-queued-controls",
+  "scope":"Hypothetical5mm flexible-ferrite thickness stress case, unchanged reversible material law and five-PM geometry. Not a proposed hardware sheet or explanation/relabeling of the historical failed2D FEMM result.",
+  "raw_archives":"$HOME/.local/opt/solver-prototypes-macos",
+  "input":"heldout-flex5-input-20261020/summary.json records the only derived-project change,0.2mm to5mm magnetic layer thickness. Root PMMOTOR bytes and other settings remain unchanged; housing depth follows the declared stack.",
+  "scalar_work":"heldout-flex5-scalar12-20261020",
+  "vector_work":"heldout-flex5-vector12-20261020",
+  "comparison":"heldout-flex5-scalar-vector-agreement-20261020.json",
+  "comparison_sha256":"8f2b171aa2a5e0fa8541179c509f8db8df2f54e8462de8cff92ccd0e20c9b990",
+  "maximum_response_relative_difference":0.034419286389769814,
+  "maximum_total_field_relative_difference":0.006412722338071581,
+  "scalar_material_pm_force_z_n":-7.58363691960583,
+  "vector_material_pm_force_z_n":-7.525320358451221,
+  "force_absolute_difference_n":0.05831656115460859,
+  "cancelled_scalar_controls":{
+    "mesh":"heldout-flex5-scalar-mesh09-20261020",
+    "domain":"heldout-flex5-scalar-domain80-20261020",
+    "mesh_controls_m":{"near":0.0009,"gap":0.000075,"observation":0.0009,"radius":0.06},
+    "domain_controls_m":{"near":0.0012,"gap":0.0001,"observation":0.0012,"radius":0.08},
+    "scope":"User restricts coreless-motor magnetic shielding to2mm maximum. The5mm scalar mesh solve had completed but its force audit was interrupted by identity-checked SIGTERM to its owned supervisor; queued domain80 control did not start. No partial audit accepted. Cancellation record heldout-flex5-user-scope-cancellation-20261020.json. Preserve all historical evidence, but run no further5mm ferrite followups and do not treat them as current completion gates. Root project remains unchanged."
+  },
+  "scope_limits":"Historical scalar-H/vector-B-energy agreement is retained in its original limited scope, not a realistic flexible-sheet recommendation or current program requirement. User confirms max3 backplane layers EACH<=2mm, not2mm aggregate; ALL housing walls<=5mm, gap<=10mm, max12 magnets and16 PCB copper layers. Housing scope is aluminum and nominally non-magnetic304/316 stainless only; steel1018 and magnetic430 housing are deferred. Ferrite shielding remains supported. Replace held-out qualification with realistic sheets and supported materials; a monolithic5mm ferrite layer remains out of scope even though a valid3-layer stack can total6mm. Larger historical geometry does not establish acceptance at new bounds."
+}

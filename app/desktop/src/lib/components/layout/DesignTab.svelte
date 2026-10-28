@@ -1,64 +1,75 @@
 <script lang="ts">
   import type { ConfigStore } from "../../stores/config.svelte";
-  import type { BackplaneAnalysis, CadGeometry, DriveBackplane } from "../../types";
+  import type { BackplaneAnalysis, DriveBackplane, CadGeometry, RoutingDimensionsDto } from "../../types";
   import BackplanePanel from "../design/BackplanePanel.svelte";
+  import MagnetsPanel from "../design/parameters/MagnetsPanel.svelte";
+  import DrivePanel from "../design/parameters/DrivePanel.svelte";
+  import CopperPanel from "../design/parameters/CopperPanel.svelte";
+  import type { MotionStore } from "../../stores/motion.svelte";
+  import { stripBoundsDomainMm, type TraceMeasure } from "../../previewGeometry";
+  import TravelIsoView from "../design/TravelIsoView.svelte";
+  import ConstraintReadouts from "../design/ConstraintReadouts.svelte";
   import TopologySelector from "../design/TopologySelector.svelte";
   import TracesBoardPanel from "../design/parameters/TracesBoardPanel.svelte";
-  import MagnetsPanel from "../design/parameters/MagnetsPanel.svelte";
   import ValidationWarning from "../design/ValidationWarning.svelte";
   import NumberField from "../ui/NumberField.svelte";
   import HelpTag from "../ui/HelpTag.svelte";
+  import Formula from "../ui/Formula.svelte";
   import ScrollArea from "../ui/ScrollArea.svelte";
   import electricalPitchSvg from "../../assets/electrical-pitch.svg";
+  import type { DesignPanelId } from "../design/previewPanels";
 
   let {
     config,
+    motion,
+    measuredTrace = null,
+    routingDimensions = null,
     cadGeometry = null,
     onImportCad,
     onUseGenerated,
     onGeometryChange,
     backplaneAnalysis = null,
     driveBackplane = null,
+    section = "constraints",
   }: {
     config: ConfigStore;
+    motion: MotionStore;
+    measuredTrace?: TraceMeasure | null;
+    routingDimensions?: RoutingDimensionsDto | null;
     cadGeometry?: CadGeometry | null;
     onImportCad: () => void;
     onUseGenerated: () => void;
     onGeometryChange?: (geometry: CadGeometry) => void;
-    /** Backplane results from the last simulation run, if any. */
     backplaneAnalysis?: BackplaneAnalysis | null;
-    /** Backplane results at the drive's operating point, if analysed. */
     driveBackplane?: DriveBackplane | null;
+    section?: DesignPanelId;
   } = $props();
+  const stripBounds = $derived(stripBoundsDomainMm(config, motion));
 </script>
 
 <ScrollArea
   id="design-settings-scroll"
-  class="h-full lg:pr-1"
-  aria-label="Design settings"
+  class="h-full"
+  viewportClass="p-3"
+  aria-label={`${section} settings`}
 >
-  <div class="space-y-3">
-    <!-- General geometry + clearance. No driver toggle: every field here is
-         a normal user input. Derived values (travel, pole pitch, mover span,
-         rest offset, preview metrics) stay read-only in the reflection. -->
+  <div class="design-settings space-y-3">
+    <!-- Travel inputs, live assembly geometry and derived sizing readouts. -->
+    {#if section === "constraints"}
     <section
-      class="rounded-md border border-slate-700 bg-slate-800/40 px-3 py-2.5"
-      aria-labelledby="design-constraints-heading"
+      id="design-constraints-heading"
+      aria-label="Design constraints"
     >
-      <h2
-        id="design-constraints-heading"
-        class="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-200"
-      >
-        Design constraints
-      </h2>
-      <div class="grid gap-x-3 gap-y-2.5 sm:grid-cols-2">
+      <div class="grid gap-x-3 gap-y-2.5">
         <label
           class="min-w-0"
         >
           <span class="flex items-center justify-between gap-2">
             <span class="min-w-0 truncate text-xs text-slate-300"
-              >Desired travel (center-to-center)<HelpTag
-                tip="Center-to-center travel you want; active-area length follows (mover span + travel)."
+              >Travel (mm)<HelpTag
+                label="About desired travel"
+                tip="Center-to-center travel. The copper must cover the mover span plus this distance."
+                equation={String.raw`L_{\mathrm{active}} = L_{\mathrm{mover}} + d`}
               /></span
             >
             <NumberField
@@ -92,31 +103,14 @@
 
         <label class="min-w-0">
           <span class="flex items-center justify-between gap-2">
-            <span class="min-w-0 truncate text-xs text-slate-300">PCB thickness (mm)</span>
-            <NumberField
-              id="pcb-thickness"
-              value={config.pcb_thickness_mm}
-              min={0.1}
-              step={0.1}
-              ariaLabel="PCB thickness (mm)"
-              class="w-24 shrink-0 px-2 py-1 text-xs font-mono text-emerald-200"
-              onCommit={(value) => (config.pcb_thickness_mm = value)}
-            />
-          </span>
-        </label>
-
-        <label class="min-w-0">
-          <span class="flex items-center justify-between gap-2">
             <span class="min-w-0 truncate text-xs text-slate-300"
-              >Electrical pitch <span class="italic">P<sub>e</sub></span> (mm)<HelpTag
+              >Electrical pitch <Formula tex="P_e" /> (mm)<HelpTag
                 label="About electrical pitch"
                 image={electricalPitchSvg}
-                imageAlt="Diagram: one electrical cycle spans two alternating poles N and S; the pole pitch is half of it."
-              >
-                Length of one full electrical cycle: two alternating poles. Pole
-                pitch <span class="italic">τ<sub>p</sub></span> =
-                <span class="italic">P<sub>e</sub></span> ÷ 2.
-              </HelpTag></span
+                imageAlt="One electrical cycle spans a north and south pole."
+                tip="One electrical cycle spans two alternating poles."
+                equation={String.raw`\tau_p = \frac{P_e}{2}`}
+              /></span
             >
             <NumberField
               id="electrical-pitch"
@@ -133,38 +127,27 @@
           </span>
         </label>
 
-        <label class="min-w-0">
-          <span class="flex items-center justify-between gap-2">
-            <span class="min-w-0 truncate text-xs text-slate-300">Air gap (mm)</span>
-            <NumberField
-              id="air-gap"
-              value={config.air_gap_mm}
-              min={0}
-              step={0.05}
-              ariaLabel="Air gap (mm)"
-              class="w-24 shrink-0 px-2 py-1 text-xs font-mono text-emerald-200"
-              onCommit={(value) => (config.air_gap_mm = value)}
-            />
-          </span>
-        </label>
       </div>
+      <div class="mt-2">
+        <div class="w-full">
+          <TravelIsoView {config} {measuredTrace} stripStartMm={stripBounds.startMm} stripEndMm={stripBounds.endMm} />
+        </div>
+      </div>
+      <ConstraintReadouts {config} measuredTraceLengthMm={measuredTrace?.traceLengthMm ?? null} {routingDimensions} />
     </section>
+    <ValidationWarning {config} />
+    {:else if section === "stackup"}
 
-    <BackplanePanel {config} {backplaneAnalysis} {driveBackplane} />
+    <BackplanePanel {config} {backplaneAnalysis} {driveBackplane} {cadGeometry} />
+    {:else if section === "routing"}
 
     <!-- Topology (routing pattern + parameters + generator load) and the
          board/winding fields share one panel so winding geometry can be
          reviewed and edited side by side. -->
     <section
-      class="rounded-md border border-slate-700 bg-slate-800/40 px-3 py-2.5"
-      aria-labelledby="topology-board-heading"
+      id="topology-board-heading"
+      aria-label="Routing"
     >
-      <h2
-        id="topology-board-heading"
-        class="mb-2.5 text-xs font-semibold uppercase tracking-wider text-slate-200"
-      >
-        Topology &amp; Board
-      </h2>
       <div class="space-y-3">
         <TopologySelector {config} cadGeometryActive={cadGeometry !== null} cadSourceFileName={cadGeometry?.source_file_name} {onImportCad} {onUseGenerated} />
         {#if cadGeometry}
@@ -185,7 +168,7 @@
               </span>
             </div>
             <p class="mt-2 text-[11px] leading-relaxed text-slate-400">
-              The DXF centerlines are active. Trace width, clearance and via dimensions remain editable below. Generator settings are hidden because they do not describe these paths. Choose a generator in Routing source to return to generated geometry.
+               Imported paths are active. Edit trace and via sizes below, or choose a generator to replace them.
             </p>
             <dl class="mt-3 grid grid-cols-3 gap-2 border-t border-slate-700/70 pt-2">
               <div>
@@ -208,11 +191,19 @@
         <TracesBoardPanel {config} traceWidthMm={cadGeometry?.trace_width_mm}
           onTraceWidthChange={cadGeometry && onGeometryChange ? (width) => {
             if (cadGeometry) onGeometryChange?.({ ...cadGeometry, trace_width_mm: width });
-          } : undefined} />
+           } : undefined} />
+        <CopperPanel {config} />
       </div>
     </section>
 
-    <MagnetsPanel {config} />
-    <ValidationWarning {config} />
+    {:else if section === "magnets"}
+      <MagnetsPanel {config} />
+    {:else if section === "drive"}
+      <DrivePanel {config} />
+    {/if}
   </div>
 </ScrollArea>
+
+<style>
+  .design-settings { container-type: inline-size; }
+</style>

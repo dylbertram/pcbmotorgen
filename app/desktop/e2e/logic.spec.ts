@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { ASIDE, eventually, gotoDesignApp } from "./helpers";
+import { ASIDE, eventually, gotoDesignApp, openCoilPreview, coilWorkspace, selectDesignPanel } from "./helpers";
 
 /**
  * Guards the frontend plumbing of the "traces follow the magnet pattern"
@@ -40,6 +40,7 @@ test.describe("magnet pattern -> trace regeneration", () => {
     expect(before).toBeGreaterThan(100);
 
     // 6 poles -> 12 active conductors per phase.
+    await selectDesignPanel(page, "Magnets");
     const magnetInput = page.locator("input#magnet-count");
     await magnetInput.fill("6");
 
@@ -63,13 +64,11 @@ test.describe("routing dimensions -> preview overlays", () => {
 
     await eventually(async () => {
       expect(await inlineCanvas.getAttribute("data-pole-pitch")).toBe("1");
-      expect(Number(await inlineCanvas.getAttribute("data-band-widths"))).toBeGreaterThan(0);
+      expect(await inlineCanvas.getAttribute("data-band-widths")).toBe("0");
     });
 
-    await page
-      .locator(`${ASIDE} button[aria-label='Expand coil preview']`)
-      .click();
-    const dialog = page.getByRole("dialog", { name: "Coil Preview", exact: true });
+    await openCoilPreview(page);
+    const dialog = coilWorkspace(page);
     const modalCanvas = dialog.locator("canvas[data-pole-pitch]");
     await dialog.getByRole("button", { name: "Layers", exact: true }).click();
     const panel = page.getByRole("dialog", { name: "Coil preview layers", exact: true });
@@ -81,8 +80,10 @@ test.describe("routing dimensions -> preview overlays", () => {
     });
 
     await expect(modalCanvas).toBeVisible();
+    await expect(modalCanvas).toHaveAttribute("data-pole-pitch", "1");
     await expect(polePitch).toBeChecked();
-    await expect(bandWidths).toBeChecked();
+    await expect(bandWidths).not.toBeChecked();
+    await bandWidths.check();
 
     await polePitch.uncheck();
     await eventually(async () => {
@@ -106,13 +107,11 @@ test.describe("routing dimensions -> preview overlays", () => {
     const inlineCanvas = preview.locator("canvas[data-pole-regions]");
     await expect(inlineCanvas).toBeVisible();
     await eventually(async () => {
-      expect(Number(await inlineCanvas.getAttribute("data-pole-regions"))).toBeGreaterThan(0);
+      expect(await inlineCanvas.getAttribute("data-pole-regions")).toBe("0");
     });
 
-    await page
-      .locator(`${ASIDE} button[aria-label='Expand coil preview']`)
-      .click();
-    const dialog = page.getByRole("dialog", { name: "Coil Preview", exact: true });
+    await openCoilPreview(page);
+    const dialog = coilWorkspace(page);
     const modalCanvas = dialog.locator("canvas[data-pole-regions]");
     await dialog.getByRole("button", { name: "Layers", exact: true }).click();
     const panel = page.getByRole("dialog", { name: "Coil preview layers", exact: true });
@@ -121,7 +120,8 @@ test.describe("routing dimensions -> preview overlays", () => {
     const phaseB = panel.getByRole("checkbox", { name: "Show phase B" });
 
     await expect(modalCanvas).toBeVisible();
-    await expect(regionsToggle).toBeChecked();
+    await expect(regionsToggle).not.toBeChecked();
+    await regionsToggle.check();
     await expect(phaseSelect).toBeEnabled();
     await expect(phaseB).toBeChecked();
 

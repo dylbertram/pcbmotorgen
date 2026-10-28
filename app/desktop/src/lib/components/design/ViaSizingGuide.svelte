@@ -14,7 +14,8 @@
     <dl>
       <div><dt>Via diameter<HelpTag
         label="About via diameter"
-        tip="Via diameter = hole size + 2 × ring width. Allow at least 0.10 mm extra diameter; 0.15 mm preferred."
+        tip="Outer copper diameter. The ring surrounds both sides of the drilled hole."
+        equation={String.raw`D_{\mathrm{via}} = D_{\mathrm{hole}} + 2w_{\mathrm{ring}}`}
       /></dt><dd>{mm(diameterMm)}</dd></div>
     </dl>
   </figcaption>
@@ -50,6 +51,10 @@
   dd { color: rgb(var(--slate-200)); font-variant-numeric: tabular-nums; }
   @media (max-width: 480px) {
     .via-guide { grid-template-columns: minmax(0, 1fr) 6rem; }
+    .via-inputs :global(label) { flex-wrap: wrap; }
+    .via-inputs :global(label > span:first-child) { flex-basis: 100%; }
+  }
+  @container (max-width: 420px) {
     .via-inputs :global(label) { flex-wrap: wrap; }
     .via-inputs :global(label > span:first-child) { flex-basis: 100%; }
   }

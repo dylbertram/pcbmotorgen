@@ -12,8 +12,10 @@
   import { sampleBField, debounce, mm } from "../../ipc";
   import { computeMagnets } from "../../previewGeometry";
   import type { BFieldGridDto } from "../../types";
+  import HelpTag from "../ui/HelpTag.svelte";
+  import Formula from "../ui/Formula.svelte";
 
-  let { config, active }: { config: ConfigStore; active: boolean } = $props();
+  let { config, active, embedded = false }: { config: ConfigStore; active: boolean; embedded?: boolean } = $props();
 
   // --- SVG canvas (matches CoilPreview width) -----------------------
   const W = 760;
@@ -40,6 +42,7 @@
 
   /** Arrowhead size (px). */
   const HEAD_PX = 4;
+  const clipId = $props.id();
 
   /**
    * 5-stop colour-blind-safe sequential palette (per ADR-0002):
@@ -209,25 +212,26 @@
   let magnetBars = $derived(computeMagnets(config));
 </script>
 
-<div class="rounded-lg bg-slate-800/40 border border-slate-700 p-4">
+<div class={embedded ? "flex h-full min-h-0 flex-col" : "rounded-lg bg-slate-800/40 border border-slate-700 p-4"}>
   <div class="flex items-center justify-between mb-2 flex-wrap gap-2">
     <h3 class="text-sm font-semibold text-slate-200">
-      Magnetic flux density B (X–Z cross-section, Y averaged)
+      Magnetic flux density <Formula tex={String.raw`\mathbf{B}`} />
+      <HelpTag label="About the magnetic field plot" tip="X–Z section averaged across Y. Arrows show field direction and relative strength. Geometry is not to scale." />
     </h3>
     <span class="text-xs text-slate-400">
-      Alternating poles
-      {#if loading} · sampling…{/if}
+      {#if loading}Sampling…{/if}
     </span>
   </div>
 
-  <svg viewBox="0 0 {W} {H}" class="w-full h-auto" role="img" aria-label="B-field flux density">
+  <svg viewBox="0 0 {W} {H}" class={embedded ? "min-h-0 w-full flex-1" : "w-full h-auto"} role="img" aria-label="B-field flux density">
+    <defs><clipPath id={clipId}><rect x={PAD_L} y={PAD_T} width={W - PAD_L - PAD_R} height={H - PAD_T - PAD_B} /></clipPath></defs>
     <!-- Plot frame -->
     <rect
       x={PAD_L - 8}
       y={PAD_T - 8}
       width={W - PAD_L - PAD_R + 16}
       height={H - PAD_T - PAD_B + 16}
-      fill="#0f172a"
+      fill="rgb(var(--slate-900))"
       stroke="#334155"
       stroke-width="1"
       rx="6"
@@ -412,6 +416,7 @@
       {/each}
 
       <!-- Arrows -->
+      <g clip-path={`url(#${clipId})`}>
       {#each plot.arrows as a, i (i)}
         {@const dx = a.x2 - a.x1}
         {@const dy = a.y2 - a.y1}
@@ -440,24 +445,14 @@
           />
         </g>
       {/each}
-
-      <!-- Schematic caption -->
-      <text
-        x={W - 8}
-        y={PAD_T + 4}
-        text-anchor="end"
-        class="fill-slate-500"
-        style="font-size:9px"
-      >
-        X = travel axis · Z = air-gap normal · magnitudes normalised · geometry not to scale
-      </text>
+      </g>
     {/if}
   </svg>
 
   {#if plot && !error}
     <div class="mt-2 flex items-center justify-between flex-wrap gap-2 text-xs">
       <div class="flex items-center gap-2">
-        <span class="text-slate-400">max |B| =</span>
+        <span class="text-slate-400"><Formula tex={String.raw`\max |\mathbf{B}|`} /></span>
         <span class="font-mono text-sky-300">{plot.maxMag.toFixed(3)} T</span>
         <span class="text-slate-500">·</span>
         <span class="text-slate-400">{plot.arrows.length} arrows</span>

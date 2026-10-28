@@ -17,6 +17,8 @@
 export class CoilPreviewViewState {
   /** Top-down canvas or the layer-aware isometric view (kata zje4). */
   viewMode = $state<"top" | "iso">("top");
+  /** Display-only Z magnification, shared by the inline and expanded viewer. */
+  zScale = $state(1);
   /** Copper uses physical widths; centerlines use a thin screen-width stroke. */
   traceMode = $state<"traces" | "centerlines">("traces");
   /** Phase waveform below the mover slider in the expanded preview. */
@@ -28,10 +30,9 @@ export class CoilPreviewViewState {
   /** Pole-pitch ruler toggle. Kept even when no sidecar data exists (the
    *  toggle row simply is not rendered then). */
   showPolePitch = $state(true);
-  /** Band-width diagnostics toggle. */
-  showBandWidths = $state(true);
-  /** Pole-region zone toggle. Default on, like the other overlays. */
-  showPoleRegions = $state(true);
+  /** Detailed diagnostics are opt-in so they do not obscure the working drawing. */
+  showBandWidths = $state(false);
+  showPoleRegions = $state(false);
   /** Pole-region phase-picker selection; "" = "All phases". Independent of
    *  the per-phase trace visibility toggles. */
   poleRegionPhase = $state("");

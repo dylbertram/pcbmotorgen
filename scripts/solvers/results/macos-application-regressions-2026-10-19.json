@@ -1,0 +1,48 @@
+{
+  "status": "passed-application-regressions-only",
+  "scope": "Local rerun after repairing the transferred worktree. Does not qualify finite motor force, actual winding/material response, housing currents or hardware performance.",
+  "source_commit": "22e602b9e23e209c6264a6aa3c3387f9381fb077",
+  "application_sources_match_commit": true,
+  "platform": "macOS 26.6.2 arm64",
+  "cargo": "1.98.0",
+  "node_for_frontend_and_browser": "24.18.0",
+  "pnpm": "11.25.0",
+  "playwright": "1.48.2 bundled Chromium 130.0.6723.31 build 1140",
+  "rust_environment": "CARGO_BUILD_JOBS=2 RAYON_NUM_THREADS=2 RUST_TEST_THREADS=2",
+  "checks": {
+    "simulation_library": {
+      "command": "cargo test -p pcbmotorgen-simulation --lib",
+      "passed": 180,
+      "ignored": 2,
+      "log_sha256": "53ccbcff9f6f09fb537bdbf9a5ea19e0ec6ddf6ca4d9616c94b247e8ec66eb8c"
+    },
+    "desktop_host": {
+      "command": "cargo test -p pcbmotorgen --bin pcbmotorgen",
+      "passed": 101,
+      "ignored": 5,
+      "log_sha256": "d2bd5b429067b1dd1ccd38f16a71ad26c03c52a70e27fbcc32e93890d7fbef43"
+    },
+    "frontend": {
+      "command": "pnpm test --maxWorkers=2",
+      "passed": 436,
+      "skipped": 1,
+      "log_sha256": "e045d7cb9bd1b7a9ac275fa86e43a219913fd7d5a4fe791c8c76933040584056"
+    },
+    "production_build": {
+      "command": "pnpm build",
+      "passed": true,
+      "warning": "Vite reports a minified chunk larger than 500kB. No warning threshold was changed.",
+      "log_sha256": "bf6ce8e152a61a3d0f54ff588ed51fcf0b3badbd5d11e9c6cc44390654ad3c6a"
+    },
+    "targeted_browser_regressions": {
+      "command": "pnpm exec playwright test e2e/driver-simulation.spec.ts e2e/coil-layers.spec.ts e2e/periodic-reference.spec.ts --project=desktop-tauri --workers=1",
+      "passed": 21,
+      "log_sha256": "a2877098c0f0d89c96187f9ee16d24ab0569fc8b18974f58704d47f4fb6cd4ed",
+      "scope": "Chromium/Vite with browser mocks and explicit test IPC bridges, not a macOS WKWebView/Tauri end-to-end run or actual solver validation. Other browser suites and desktop-wide viewport were not run."
+    }
+  },
+  "setup_limits": "Browser installer timed out/stalled under Node 26.5.0; its owned retry was stopped. Installation succeeded under Node 24.18.0. A queue-helper error occurred before frontend checks started and was corrected. Neither setup attempt is counted as a passed application check.",
+  "raw_logs": "$HOME/.local/opt/solver-prototypes-macos/application-rerun-20261019",
+  "root_examples_unchanged": true,
+  "no_new_solver_studies": true
+}

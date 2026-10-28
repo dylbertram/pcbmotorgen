@@ -1,5 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
-import { gotoDesignApp } from "./helpers";
+import { gotoDesignApp, selectDesignPanel } from "./helpers";
 
 async function selectDesignType(page: Page, name: string) {
   const tab = page.getByRole("tab", { name: name === "Sensor" ? /^S Untitled sensor/ : /^M Untitled motor/ }).first();
@@ -25,12 +25,13 @@ test("file tabs replace the type toggle and support keyboard switching", async (
   await page.keyboard.press("ArrowLeft");
   await expect(motor).toHaveAttribute("aria-selected", "true");
   await expect(sensor).toHaveAttribute("aria-selected", "false");
-  await expect(page.getByRole("heading", { name: "Magnets", exact: true })).toBeVisible();
+  await expect(page.getByRole("dialog", { name: "Constraints", exact: true })).toBeVisible();
 });
 
 test("motor magnet settings stay visible when clicking the section heading", async ({ page }) => {
   await gotoDesignApp(page);
-  const magnets = page.getByRole("region", { name: "Magnets", exact: true });
+  await selectDesignPanel(page, "Magnets");
+  const magnets = page.getByRole("dialog", { name: "Magnets", exact: true });
   await expect(magnets.locator("details, summary")).toHaveCount(0);
   await magnets.getByRole("heading", { name: "Magnets", exact: true }).click();
   await expect(magnets.getByLabel("Magnet count", { exact: true })).toBeVisible();
@@ -63,6 +64,7 @@ test("sensor is a design type whose full workflow lives in the Design tab", asyn
 
 test("motor trace and via settings are editable and retained across design types", async ({ page }) => {
   await gotoDesignApp(page);
+  await selectDesignPanel(page, "Routing");
   for (const [id, value] of [
     ["motor-trace-width", "0.2"],
     ["motor-trace-gap", "0.15"],
@@ -75,6 +77,7 @@ test("motor trace and via settings are editable and retained across design types
   await expect(page.getByRole("figure", { name: "Via sizing guide" }).locator("dl > div").filter({ hasText: "Via diameter" }).locator("dd")).toHaveText("0.600 mm");
   await selectDesignType(page, "Sensor");
   await selectDesignType(page, "Motor coil");
+  await selectDesignPanel(page, "Routing");
   await expect(page.locator("#motor-trace-width")).toHaveValue("0.2");
   await expect(page.locator("#motor-via-drill")).toHaveValue("0.3");
 });
@@ -163,6 +166,7 @@ test("switching from motor simulation to sensor opens sensor design", async ({ p
 
 test("routing source offers file import last and cancellation keeps the generator", async ({ page }) => {
   await gotoDesignApp(page);
+  await selectDesignPanel(page, "Routing");
   const source = page.getByRole("button", { name: "Routing source", exact: true });
   const originalSource = await source.textContent();
   await source.click();

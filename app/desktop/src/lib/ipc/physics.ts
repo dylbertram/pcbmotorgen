@@ -2,9 +2,9 @@
  * Physics IPC calls with deterministic mock fallback.
  *
  * The UI schedules coil generation independently for the design reflection
- * and gates Simulation-tab calculations on the active tab. Their failure is
- * recoverable — the user just sees stale data. When the Tauri runtime is
- * missing (plain `vite dev`), the corresponding mock is returned instead.
+ * and gates Simulation-tab calculations on the active tab. Errors propagate
+ * so controllers clear old results. Some legacy previews have a browser-only
+ * mock; housing motion and the periodic reference never fabricate one.
  */
 
 import { invoke } from "@tauri-apps/api/core";
@@ -23,7 +23,10 @@ import type {
   DriveAnalysis,
   CadGeometry,
 } from "../types";
+import type { HousingMotionAnalysis } from "../types/drive";
 import { isTauriAvailable } from "./core";
+import type { PeriodicStaticReference } from "../types/periodicReference";
+import type { DcWindingGeometry } from "../types/dcCoupling";
 import {
   mockCoils,
   mockForceSweep,
@@ -68,6 +71,7 @@ export async function evaluateForceSweep(
 ): Promise<ForceSweepResult> {
   assertCadMapping(cadGeometry, config);
   if (cadGeometry?.terminal_connection === "delta") throw new Error("Imported delta force analysis is not available. Select Star (wye) coil terminals.");
+  if (!drive) throw new Error("Force analysis requires explicit drive settings matching driver analysis.");
   if (!isTauriAvailable()) return mockForceSweep(config);
   return await invoke<ForceSweepResult>("evaluate_force_sweep", { config, cadGeometry, drive });
 }
@@ -77,6 +81,16 @@ export async function computeHeightStack(
 ): Promise<HeightStackResultDto> {
   if (!isTauriAvailable()) return mockHeightStack(config);
   return await invoke<HeightStackResultDto>("compute_height_stack", { config });
+}
+
+/** No mock fallback: a reference result must come from the real solver. */
+export async function periodicBackplaneReference(
+  config: LinearMotorConfig,
+): Promise<PeriodicStaticReference> {
+  if (!isTauriAvailable()) {
+    throw new Error("The periodic reference requires the desktop app. Browser previews do not run this solver.");
+  }
+  return await invoke<PeriodicStaticReference>("periodic_backplane_reference", { config });
 }
 
 export async function computeFriction(
@@ -107,6 +121,33 @@ export async function analyzeDrive(
     thrustConstantNPerA: kf,
     cadGeometry,
   });
+}
+
+/** Actual winding geometry only, with no browser physics substitute. */
+export async function prepareDcWindingGeometry(
+  config: LinearMotorConfig,
+  driveSettings: DriveSettings,
+  cadGeometry: CadGeometry | null = null,
+): Promise<DcWindingGeometry> {
+  assertCadMapping(cadGeometry, config);
+  if (!isTauriAvailable()) {
+    throw new Error("Finite DC geometry preparation requires the desktop app. Browser previews do not substitute winding geometry or forces.");
+  }
+  return await invoke<DcWindingGeometry>("prepare_dc_winding_geometry", { config, driveSettings, cadGeometry });
+}
+
+/** Independent PM/housing capability. Never fabricates a browser substitute. */
+export async function analyzeHousingMotion(
+  config: LinearMotorConfig,
+  profile: { duration_s: number },
+  speed: number,
+  cadGeometry: CadGeometry | null = null,
+): Promise<HousingMotionAnalysis> {
+  assertCadMapping(cadGeometry, config);
+  if (!isTauriAvailable()) {
+    throw new Error("Housing motion estimates require the desktop app. Browser previews do not substitute physics results.");
+  }
+  return await invoke<HousingMotionAnalysis>("analyze_housing_motion", { config, profile, speed, cadGeometry });
 }
 
 /**

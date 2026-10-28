@@ -1,0 +1,49 @@
+{
+  "status": "passed-independent-finite-current-closure-low-rm-only",
+  "scope": "Finite 36x12x1mm isolated nonmagnetic housing in analytical five-PM source, closed and 0.5mm one-sided slotted geometries. Conductivity 25MS/m, conductor speed 0.001m/s in stationary-PM frame. Induced magnetic reaction, nonlinear backplane response, memory, operating-speed drag and hardware accuracy are not qualified.",
+  "raw_archives": "$HOME/.local/opt/solver-prototypes-macos",
+  "magnetic_reynolds_number": 0.0011309733552923257,
+  "maximum_allowed_rm": 0.01,
+  "operating_speed_boundary": "At 20m/s the same length/conductivity would give Rm about 22.6. The tool rejects that request; no v-squared extrapolation is accepted.",
+  "finite_element": {
+    "backend": "NGSolve 6.2.2608, quadratic electric potential plus independent mean-zero gauge multiplier",
+    "equations": "J=sigma*(-grad(V)+u cross B), div(J)=0, natural insulating exterior and slot walls",
+    "q4_report": "finite-housing-lowrm-v2-q4-20261020/summary.json",
+    "q4_sha256": "725e7433eb9704c01b4bc2da6f4612024fa14cba49b3094e6abf976a94693256",
+    "q8_report": "finite-housing-lowrm-v2-q8-20261020/summary.json",
+    "q8_sha256": "ba852f3def77fa79b4ad16eac0f49b9b68276393e82c2676a9dc2e932e4805cd",
+    "mesh_sizes_m": [0.003,0.002,0.0015],
+    "fine_mesh_loss_relative_changes": {"closed":0.0018577979280758328,"slotted":0.0016636927687412317},
+    "fine_mesh_force_relative_changes": {"closed":0.0018582153742302716,"slotted":0.001664705694384866},
+    "controls": ["zero speed", "reverse-speed force odd/loss even", "uniform-B translation charge cancellation", "assembled continuity residual", "zero integrated volume current", "passive drag/Joule balance"],
+    "independent_gradient_benchmark": {
+      "field": "B=(z-zc,0,x-xc) T, curl-free and divergence-free",
+      "reference": "Independent rectangular streamfunction Poisson/torsional-rigidity Fourier series, not used in FE assembly",
+      "exact_loss_w": 1.0237762277338348e-10,
+      "relative_error": 2.2835506193086275e-5,
+      "unchanged_agreement_gate": 0.05
+    }
+  },
+  "quadrature": {
+    "report": "finite-housing-lowrm-quadrature-v2-20261020.json",
+    "sha256": "fc727fc9f791b22d2e55f9eba1d5894c73a4eba94c8174297cc730702343258f",
+    "bonus_orders": [4,8],
+    "meshes_byte_identical": true,
+    "maximum_relative_change": 7.528138454686871e-7,
+    "unchanged_refinement_gate": 0.02
+  },
+  "independent_resistor_grid": {
+    "report": "finite-housing-lowrm-independent-v3-20261020.json",
+    "sha256": "c3c2321e61ddf1d27c2e1f198f5e2d84c934df9bbed88248d63801c3e304b17d",
+    "implementation": "Existing SciPy finite-volume resistor/charge-continuity solve, no exterior current edges, own gauge on each connected conductor. Proper 90-degree coordinate rotation aligns the same physical slot and source.",
+    "requested_grids": [[24,72,3],[36,108,4],[48,144,6]],
+    "loss_agreement_relative_error": {"closed":0.003465733974619356,"slotted":0.004134850726404404},
+    "force_agreement_relative_error": {"closed":0.0034670229735753923,"slotted":0.004134901543144996},
+    "maximum_finest_grid_change": 0.002297714261569262,
+    "physical_volume_relative_agreement": 1.7985612998927536e-14,
+    "unchanged_agreement_gate": 0.05,
+    "unchanged_refinement_gate": 0.02
+  },
+  "preserved_trials": ["original source-only FE trial", "initial independent comparison failed before execution because the base environment had no NGSolve; its failed receipt remains archived", "earlier comparison reports retained before stricter receipt/input checks"],
+  "remaining": ["coupled induced magnetic response", "nonlinear backplane bias contribution", "finite-speed transient/moving geometry", "operating-speed and AC losses", "independent 3D dynamic reference or measurement"]
+}

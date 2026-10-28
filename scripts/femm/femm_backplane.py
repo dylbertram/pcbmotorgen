@@ -36,9 +36,11 @@ geometry (0.8 mm PCB) unless noted:
 import argparse
 import json
 import math
+import hashlib
 import os
 import subprocess
 import sys
+import time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(os.path.dirname(HERE))
@@ -146,15 +148,21 @@ def stack_bands(stack, freq, nonlinear=False):
     """Bands below y = 0 (bottom to top) and the materials they use."""
     mats, bands = {}, []
     y = 0.0
-    for lay in stack["layers"]:
+    for index, lay in enumerate(stack["layers"]):
         t = lay["thickness_m"] * 1e3
         mu, sig = LAYER[lay["material"]]
         name = lay["material"]
-        if "mu_r" in lay:
-            mu, name = lay["mu_r"], f"{name}_mu{lay['mu_r']:.4g}"
+        if lay.get("mu_r") is not None:
+            mu = lay["mu_r"]
+        bsat = lay.get("bsat_t")
+        if bsat is None:
+            bsat = BSAT.get(lay["material"])
+        if lay.get("mu_r") is not None or lay.get("bsat_t") is not None:
+            # Per-layer identity avoids collisions between distinct overrides.
+            name = f"{name}_layer{index}"
         mats[name] = dict(name=name, mu=mu, sigma=sig if freq else 0.0)
-        if nonlinear and name in BSAT:
-            mats[name]["bh"] = bh_points(mu, BSAT[name], nonlinear == "knee")
+        if nonlinear and mu > 1 and bsat is not None:
+            mats[name]["bh"] = bh_points(mu, bsat, nonlinear == "knee")
         bands.append(dict(y0=y - t, y1=y, mat=name if mu > 1 else "air",
                           mesh=mesh_for(t), group=2 if mu > 1 else 0))
         y -= t
@@ -288,25 +296,112 @@ def build_case(name, stack, source, freq=0.0, upper=None, extra_mats=(), nonline
     return case
 
 
+def parse_femm_result(case, path):
+    result = {}
+    with open(path) as stream:
+        for line in stream:
+            key, value = line.split()
+            if key in result:
+                raise ValueError(f"Duplicate FEMM output field: {key}")
+            result[key] = float(value)
+    required = {"energy_total"}
+    groups = {region.get("group", 0) for kind in ["bands", "rects", "labels"] for region in case.get(kind, [])}
+    if 1 in groups:
+        required.update(["AJ_sources_re", "AJ_sources_im"])
+    if 2 in groups:
+        required.update(["Fx_stack", "Fy_stack", "loss_stack"])
+    if 3 in groups:
+        required.add("Fy_magnets")
+    for line in case.get("lines", []):
+        required.update(line["name"] + suffix for suffix in ["_By1", "_Bx1", "_By1f"])
+    for point in case.get("points", []):
+        required.update(point["name"] + suffix for suffix in ["_Bx", "_By"])
+    if required - result.keys() or not all(math.isfinite(value) for value in result.values()):
+        raise ValueError(f"Incomplete/nonfinite FEMM output; missing {sorted(required-result.keys())}")
+    return result
+
+
+def _archive_file(path, state):
+    if not os.path.exists(path):
+        return
+    with open(path, "rb") as stream:
+        data = stream.read()
+    destination = path + "." + state + "." + hashlib.sha256(data).hexdigest()
+    try:
+        with open(destination, "xb") as stream:
+            stream.write(data)
+    except FileExistsError:
+        with open(destination, "rb") as stream:
+            if stream.read() != data:
+                raise ValueError("Changed content-addressed FEMM artifact")
+
+
+def cached_femm_result(case, work):
+    """Read only an identical complete case; honour any known process receipt."""
+    work = os.fspath(work)
+    text = "case = " + lua(case) + "\n"
+    path = os.path.join(work, case["name"] + ".case.lua")
+    out = os.path.join(work, case["name"] + ".out")
+    with open(path) as stream:
+        if stream.read() != text:
+            raise ValueError("FEMM reference describes different inputs")
+    result = parse_femm_result(case, out)
+    receipt_path = os.path.join(work, case["name"] + ".receipt.json")
+    if os.path.exists(receipt_path):
+        with open(receipt_path) as stream:
+            receipt = json.load(stream)
+        with open(out, "rb") as stream:
+            output_hash = hashlib.sha256(stream.read()).hexdigest()
+        if not (receipt.get("status") == "completed" and receipt.get("exit_code") == 0
+                and receipt.get("input_sha256") == hashlib.sha256(text.encode()).hexdigest()
+                and receipt.get("output_sha256") == output_hash):
+            raise ValueError("FEMM reference has a failed or mismatched receipt")
+    return result
+
+
 def run_femm(case, work):
+    work = os.fspath(work)
     path = os.path.join(work, case["name"] + ".case.lua")
     text = "case = " + lua(case) + "\n"
     out = os.path.join(work, case["name"] + ".out")
-    # Reuse a finished run of the identical case.
-    fresh = os.path.exists(path) and os.path.exists(out) and open(path).read() == text
+    receipt_path = os.path.join(work, case["name"] + ".receipt.json")
+    input_hash = hashlib.sha256(text.encode()).hexdigest()
+    # Legacy complete outputs remain usable, but do not invent an old process
+    # receipt. New runs require a committed, matching successful receipt.
+    try:
+        return cached_femm_result(case, work)
+    except (ValueError, FileNotFoundError):
+        pass
+    for suffix in [".case.lua", ".out", ".fem", ".ans", ".receipt.json"]:
+        _archive_file(os.path.join(work, case["name"] + suffix), "previous")
     with open(path, "w") as f:
         f.write(text)
-    if not fresh:
+    if os.path.exists(out):
+        os.remove(out)
+    command = [os.path.join(HERE, "run_femm.sh"), os.path.join(HERE, "solve_case.lua"), path, work]
+    receipt = {"status": "running", "command": command, "input_sha256": input_hash}
+    with open(receipt_path, "w") as stream:
+        json.dump(receipt, stream, indent=2)
+    started = time.monotonic()
+    try:
+        subprocess.run(command, check=True, stdin=subprocess.DEVNULL)
+        result = parse_femm_result(case, out)
+    except BaseException as error:
+        code = getattr(error, "returncode", None)
+        receipt.update(status="interrupted" if isinstance(error, KeyboardInterrupt) else ("timeout" if code == 124 else "failed"),
+                       exit_code=code, seconds=time.monotonic()-started)
         if os.path.exists(out):
-            os.remove(out)
-        subprocess.run([os.path.join(HERE, "run_femm.sh"), os.path.join(HERE, "solve_case.lua"),
-                        path, work], check=True, stdin=subprocess.DEVNULL)
-    res = {}
-    with open(out) as f:
-        for line in f:
-            k, v = line.split()
-            res[k] = float(v)
-    return res
+            _archive_file(out, "incomplete")
+            os.remove(out)  # This file was produced by the failed run above.
+        with open(receipt_path, "w") as stream:
+            json.dump(receipt, stream, indent=2)
+        raise
+    with open(out, "rb") as stream:
+        output_hash = hashlib.sha256(stream.read()).hexdigest()
+    receipt.update(status="completed", exit_code=0, seconds=time.monotonic()-started, output_sha256=output_hash)
+    with open(receipt_path, "w") as stream:
+        json.dump(receipt, stream, indent=2)
+    return result
 
 
 # --------------------------------------------------------------------------

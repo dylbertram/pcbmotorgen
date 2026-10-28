@@ -1,0 +1,15 @@
+{
+  "status": "passed-full-quarter-static-parity",
+  "scope": "Source-pinned single-PM symmetry audit recomputed from original raw fields, not a five-magnet or motion qualification.",
+  "accepted_full_audit_sha256": "24cc6200ddfaac9e645f694ff485febff76b64241661acab0491ba211f4f21a3",
+  "bare_field_vector_relative_error": 0.01475401967125937,
+  "stack_field_vector_relative_error": 0.011927267349818173,
+  "stack_force_vector_absolute_errors_n": [0.0012587274640775206, 0.002238280799417448, 0.0002549820790724183],
+  "stack_force_vector_limits_n": [0.029584020263582204, 0.02999975704351246, 0.03016177297632326],
+  "full_reported_dofs": 86586,
+  "quarter_reported_dofs": 21899,
+  "full_solver_reported_final_memory_mb": 661.84,
+  "quarter_solver_reported_final_memory_mb": 208.059,
+  "memory_scope": "GetDP Stopped log measurements, not independently sampled peak RSS",
+  "provenance_note": "The first audit was superseded because end-of-run source capture raced a source edit. The accepted rerun snapshots sources before calculation and rejects source/input changes before publishing. Both reports and the provenance warning are retained."
+}

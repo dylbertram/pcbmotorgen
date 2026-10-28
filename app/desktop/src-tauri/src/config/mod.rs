@@ -214,7 +214,7 @@ impl Default for LinearMotorConfig {
             min_space_m: mils_to_m(5.0),
             min_via_drill_m: mm(0.2),
             min_via_annular_ring_m: mm(0.1),
-            max_layers: 12,
+            max_layers: pcbmotorgen_simulation::params::MAX_PCB_LAYERS,
             // User's actual layer selection. Default to the UI's typical
             // 4-layer choice rather than the DFM upper limit so that
             // `validate_write_preconditions` does not warn against a

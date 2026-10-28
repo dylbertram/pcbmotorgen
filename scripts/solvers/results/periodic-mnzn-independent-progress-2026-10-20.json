@@ -1,0 +1,215 @@
+{
+  "status": "passed-independent-periodic-tensor-ac-numerical-controls-only",
+  "current_scope":"Historical AC evidence retained. User explicitly restricted current work to DC motor windings; further AC/PWM/envelope studies are deferred and are not completion blockers. The remaining owned AC queue was stopped with identity-checked supervisor cleanup; see ac-scope-stop-20261020.json.",
+  "scope": "100kHz, periodic infinite-depth 2D, 2mm MnZn provisional two-slope law with mu_initial=2500 and saturation polarization=0.45T. Spatial differential tensor about DC PM bias, finite conducting Al wall. No real frequency-dependent material data, finite motor, nonlinear ripple/transient, PWM or hardware qualification.",
+  "raw_archives": "$HOME/.local/opt/solver-prototypes-macos",
+  "spectral_refinement": {
+    "report": "spectral-periodic-mnzn-independent-20261020/summary.json",
+    "sha256": "536c3ae1e4bbecf9652ac720b01dfaf81a3cacbad02a00da421df56bd5931b30",
+    "status": "passed-periodic-spectral-refinement-only",
+    "separate_axes": ["layer depth", "coupled spatial modes", "angular samples", "conducting wall depth", "gap depth"]
+  },
+  "preliminary_fe_comparison": {
+    "report": "periodic-mnzn-ngsolve-spectral-comparison-20261020.json",
+    "sha256": "a66a5a8e190147b19856d45869569647d9652ee1ba6f946cbee13ad2f5f80d8e",
+    "interpretation": "Diagonal phase-response/refinement and source-work/loss checks passed, but this was before checking the required cross-phase symmetry. It is retained as preliminary, not final qualification.",
+    "unaccepted_cross_phase_reflection": [-1.6963455441107303e-5,1.4583888921826248e-6],
+    "unchanged_cross_phase_gate": 1e-8
+  },
+  "symmetry_fix": {
+    "mesh": "Triangle diagonals are reflected across x=period/2 instead of uniformly aligned.",
+    "quadrature": "Close each triangle integration rule under all six barycentric permutations, preserving total weight and polynomial degree. Mesh symmetry alone did not pass the cross-phase check for the nonsmooth differential material law.",
+    "failed_mesh_only_trial": "ngsolve-periodic-mnzn-symmetric-base-v3-20261020",
+    "failed_mesh_only_cross_phase_reflection": [1.7732502624987928e-5,4.418241591542758e-7],
+    "completed_pilot_report": "ngsolve-periodic-mnzn-symmetric-base-v4-20261020/summary.json",
+    "completed_pilot_sha256": "e1f0e835fe14ff5db74d067a5dbf75115712497a2d301ea8e407e20a961b1666",
+    "completed_pilot_cross_phase_maximum_below": 1.36e-15,
+    "scope": "This corrects integration symmetry, not any material constant or acceptance gate. No phase-coupling term is subtracted from a failed result."
+  },
+  "unreached_v4_comparison_target": "periodic-mnzn-symmetric-v4-ngsolve-spectral-comparison-20261020.json",
+  "v4_refinement_interruption": "The lateral fine case reached iteration 14 but hit its 180s cap. It stays unaccepted. A new same-physics FE initial-guess retry is supervised separately with no changed numerical gate.",
+  "completed_seeded_retry_comparison": "periodic-mnzn-symmetric-v5-ngsolve-spectral-comparison-20261020.json",
+  "completed_symmetric_comparison": {
+    "report": "periodic-mnzn-symmetric-v5-ngsolve-spectral-comparison-20261020.json",
+    "sha256": "425af5191419557021122c3d462e74f32b3c3f526bf02ed969ce50ab2a08388f",
+    "receipt_sha256": "6f206a9e9ea52b622fba128dad0dc1efc3c990216f8e22020fc1870da18e5189",
+    "status": "passed-independent-periodic-tensor-ac-only",
+    "maximum_cross_phase_reflection": 7.527605636166036e-15,
+    "coil_factor_absolute_real_errors": [0.0001459761706930074,2.2717493881829753e-5],
+    "coil_factor_absolute_imaginary_errors": [4.79731147151434e-6,5.768370453988845e-7],
+    "loss_relative_errors": [0.00038283318995113724,0.0003352889889896016],
+    "fine_seeded_job": {"seconds":251.71711133397184,"maximum_resident_bytes":1217953792,"dofs":129745},
+    "expanded_air_seeded_job": {"seconds":35.50419637502637,"maximum_resident_bytes":1685274624,"dofs":160545},
+    "scope": "Independent FE/spectral implementations, all separate mesh/source/domain controls and unchanged cross-phase gate pass. FE refinement steps share only earlier FE initial guesses, not spectral solutions. Additional explicit FE quadrature-order control is pending."
+  },
+  "completed_quadrature_comparison": {
+    "report": "periodic-mnzn-symmetric-v6-ngsolve-spectral-comparison-20261020.json",
+    "sha256": "eba6ac88494c13abb7a1885508c844dcf1d9fc1762b486be2202f4fdc91ea45c",
+    "receipt_sha256": "65940f237b4bde9a07aa1756eca75bab0462a09542fc3c57087e6bce0c7d628e",
+    "status": "passed-independent-periodic-tensor-ac-only",
+    "integration_bonus_orders": [4,8],
+    "loss_relative_refinement_changes": [1.3142386041664622e-6,0.00022598503882187426],
+    "loss_relative_agreement_errors": [0.00038414692369470593,0.000561400896014641],
+    "coil_factor_real_absolute_errors": [0.00017056609770871312,6.3190632881848785e-6],
+    "coil_factor_imaginary_absolute_errors": [4.813773967811061e-6,9.658439279376391e-7],
+    "seconds": 161.7342876669718,
+    "maximum_resident_bytes": 1397276672,
+    "unchanged_gates": "2% refinement, 5% agreement, existing 0.001/1e-5 added-factor floors, 1e-8 cross-phase gate",
+    "scope": "Independent bias/tensor AC implementation agreement for this periodic provisional-material case. Not a nonlinear amplitude envelope, actual winding-current/inductance rating or a finite motor result."
+  },
+  "user_crash_correlation": "netgen-mesh-crash-correlation-2026-10-20.json",
+  "nonlinear_midpoint_smoke": {
+    "report": "transient-mnzn-warm-smoke-20261020/summary.json",
+    "sha256": "c4c2fece7e9b16f1ec74d9bd0c679da186c0a0229c1d82e75fc5f964debb40d4",
+    "audit": "transient-mnzn-warm-smoke-audit-20261020.json",
+    "audit_sha256": "f3125a55445a343ab10d90d8d498756f46657cb709bf0fdff3e217048370c715",
+    "resolution": "8 layer cells, 3 modes/phase, 128 angles, 16 wall cells, 64 steps/period, 8 periods, spatial phase 0",
+    "incident_fraction": 0.001,
+    "layer_conductivity_s_m": 0.2,
+    "initial_guess": "Exact discrete tangent harmonic orbit, followed by full nonlinear midpoint equations",
+    "recomputed_trace_steps": 128,
+    "maximum_recomputed_relative_residual": 9.782301619650313e-11,
+    "periodic_settlement_relative_change": 6.157219140478527e-6,
+    "source_work_joule_relative_balance": 9.22350941068295e-6,
+    "linearized_loss_relative_error": 0.0009547532722360419,
+    "sampled_knee_crossing_fraction": 0.001953125,
+    "scope": "Raw-state nonlinear-equation audit of a coarse smoke case only. No time/spatial qualification, independent nonlinear agreement, accepted amplitude envelope, winding-current or PWM rating."
+  },
+  "independent_nonlinear_fe_trial": {
+    "implementation": "ngsolve_periodic_transient.py",
+    "work": "ngsolve-midpoint-mnzn-small-p0-20261020",
+    "status": "timeout-unaccepted",
+    "timeout_seconds": 450,
+    "completed_steps_at_last_checkpoint": 384,
+    "scope": "Full nonlinear FE midpoint equations with explicit residual checks, a tangent-only initial guess, periodic-settlement/power gates and absolute last-two-period states. No accepted amplitude envelope from one trial."
+  },
+  "completed_independent_nonlinear_fe_trial": {
+    "work": "ngsolve-midpoint-mnzn-small-p0-thread16-20261020",
+    "summary_sha256": "402b17f1f9972499ae8a683438e2d2a966b63bd61d5aa508cdc5de73e4cb2f18",
+    "status": "completed-independent-periodic-nonlinear-transient-unqualified",
+    "solver_threads": 16,
+    "seconds": 39.50324387499131,
+    "actual_periods": 4,
+    "steps_per_period": 64,
+    "incident_fraction": 0.001,
+    "phase": 0,
+    "relative_settlement": 8.297766092593617e-6,
+    "maximum_step_relative_residual": 9.634864408810495e-11,
+    "relative_source_work_joule_balance": 2.9663654921296967e-6,
+    "linearized_loss_relative_error": 0.00040541637268787234,
+    "sampled_knee_crossing_fraction": 0.00390625,
+    "scope": "Every time step used the full nonlinear FE energy and automatic tangent. Explicit early stopping preserves the original 1e-5 settlement gate after >=4 periods. Time/spatial refinement, independent nonlinear comparison and amplitude envelope remain separate."
+  },
+  "thread_performance": "solver-thread-performance-2026-10-20.json",
+  "completed_nonlinear_spectral_fine_trial": {
+    "work": "transient-mnzn-nonlinear-fine-p0-20261020",
+    "summary_sha256": "7f20a29ec0cb32eac8e907604a41ef89c4d60b734ef671e061e4612809874e79",
+    "status": "completed-periodic-nonlinear-transient-unqualified",
+    "resolution": "32 depth cells,9 modes/phase,512 angular samples,32 wall cells,8 gap cells,128 steps/period,8 periods",
+    "incident_fraction": 0.001,
+    "phase": 0,
+    "relative_settlement": 3.914159679286896e-6,
+    "relative_source_work_joule_balance": 7.988746741904862e-7,
+    "joule_coefficient_w_m2_t2": 8360596.149399827,
+    "absolute_state_audit": "transient-mnzn-nonlinear-fine-p0-audit-20261020.json",
+    "recomputed_trace_steps": 256,
+    "maximum_recomputed_relative_residual": 9.758484053405322e-11
+  },
+  "completed_nonlinear_fe_absolute_state_audit": {
+    "report": "ngsolve-midpoint-mnzn-small-p0-trace-audit-20261020.json",
+    "sha256": "988d2cda5d58a84123165cfd36a111c829724a4c7e725918844fb37c733c944c",
+    "implementation": "audit_ngsolve_transient_trace.py",
+    "status": "passed-ngsolve-midpoint-trace-equations-only",
+    "recomputed_trace_steps": 128,
+    "maximum_recomputed_relative_residual": 9.634864738347943e-11,
+    "scope": "Reassembles full nonlinear FE equations and independent source-work/Joule integrals from absolute states; does not substitute harmonic/tangent equations. An internal trace audit is separate from independent nonlinear-implementation agreement."
+  },
+  "completed_independent_nonlinear_comparison": {
+    "report": "periodic-nonlinear-fe-spectral-small-p0-20261020.json",
+    "sha256": "ca92a019a374a1fd35a3a66f13d9ff4372c16395923e96d47d8beb43150133c9",
+    "status": "passed-independent-nonlinear-periodic-single-amplitude-only",
+    "incident_fraction": 0.001,
+    "phase": 0,
+    "loss_relative_difference": 0.0005850620886725943,
+    "coil_factor_absolute_real_difference": 0.00024633295683940126,
+    "coil_factor_absolute_imaginary_difference": 1.4908468016428672e-5,
+    "gate": "Unchanged5% reference agreement and recorded absolute added-factor floors.",
+    "scope": "Both complete full-nonlinear midpoint implementations pass absolute-state equation/energy audits and agree at one small amplitude. The analytical PM particular field and provisional constitutive law are shared, not nonlinear solutions. No independent space/time convergence or amplitude envelope follows yet."
+  },
+  "pending_nonlinear_refinements": {
+    "spectral": [],
+    "fe": ["ngsolve-midpoint-mnzn-auto-coarse-small-p1-20261020", "ngsolve-midpoint-mnzn-auto-coarse-amplitude01-p0-20261020", "ngsolve-midpoint-mnzn-auto-coarse-amplitude01-p1-20261020"],
+    "amplitudes": "0.1% incident fundamental for refinements/both phases; separate1% trials for the proposed larger-ripple step. These are magnetic sheet amplitudes, not permissible winding current or PWM.",
+    "audit_implementation": "audit_periodic_nonlinear_controls.py",
+    "status": "dispatched-not-accepted",
+    "scope": "Separate2% time/lateral/depth/mode/angular axes. Combined spatial-fine cases remain additional checks, not substitutes for isolated axes. FE jobs wait for the finite-motion supervisor to finish before using16 workers."
+  },
+  "completed_finer_phase0_nonlinear_agreement": {
+    "report":"periodic-nonlinear-fe-fine-spectral-spatial-fine-p0-20261020.json",
+    "sha256":"25df8314ec05685bc9072a3be93e3732bf8905d0499e922f0c0eb95723bf2717",
+    "status":"passed-independent-nonlinear-periodic-single-amplitude-only",
+    "loss_relative_difference":0.0006171511138204355,
+    "scope":"The finer48-depth-cell FE case and audited spectral case agree at0.1% incident fundamental, phase0. Both absolute-state nonlinear equation audits pass. This remains one amplitude/phase, not a larger-amplitude envelope."
+  },
+  "preserved_fine_phase1_timeout": {
+    "work":"ngsolve-midpoint-mnzn-spatial-fine-p1-20261020",
+    "receipt_sha256":"e72cd1c197f3a3281f052366ef03f13d066735494b2196660b3625a6337698a2",
+    "timeout_s":1500,
+    "scope":"Unaccepted incomplete trial; the original queued1% cases were not reached."
+  },
+  "completed_operator_equivalence": {
+    "explicit_report":"ngsolve-periodic-nonlinear-assembly-equivalence-20261020.json",
+    "explicit_sha256":"ea1b0aca1a33db9798caaf574fe7aeea3a7928bba3e670d5d5757f0569375f38",
+    "pcg_report":"ngsolve-periodic-pcg-assembly-equivalence-20261020.json",
+    "pcg_sha256":"4c8ffcfb83f06b4f77ca1066fb8d8f0d2d678a486dfe4f32501a9096c6736db9",
+    "pcg_relative_ripple_state_difference":8.286778995041477e-11,
+    "pcg_relative_loss_difference":1.9917401061775308e-13,
+    "wall_seconds":{"historical_automatic":39.50324387499131,"explicit":73.59450970799662,"explicit_pcg":75.18533570889849},
+    "scope":"Full explicit gradient/tangent recomputed each iterate agrees with automatic energy and whole absolute-state audits. Factor reuse changes only linear preconditioning, with current-matrix residual checks. No speedup is demonstrated; the faster original automatic route remains the default."
+  },
+  "preserved_operator_retry_cancellations": [
+    "ngsolve-explicit-direct-retry-cancellation-20261020.json",
+    "periodic-explicit-pcg-cancellation-20261020.json"
+  ],
+  "completed_nonlinear_spectral_controls": {
+    "time128_to256": {"report":"transient-mnzn-nonlinear-time256-control-20261020.json","sha256":"12a221de054df8f630a3a72915c94bd77a8eed0d52e359ecc130411f605df858","loss_relative_change":8.610310055656711e-5},
+    "depth32_to64": {"report":"transient-mnzn-nonlinear-depth64-control-20261020.json","sha256":"484f34ea48ae3f16766b336e41719fea813ba5de5790a3e9f271c94a08142c3c","loss_relative_change":0.0008043907705121978},
+    "modes9_to17": {"report":"transient-mnzn-nonlinear-modes17-control-20261020.json","sha256":"295b7701015e26d10009ec7429071cad8d6b394a2b20849ce75da9761d22561f","loss_relative_change":0.00026662238898622626},
+    "angles512_to1024": {"report":"transient-mnzn-nonlinear-angles1024-control-20261020.json","sha256":"a000449a1925509ec136521ea748bd0aa0c12a579e80c4190d51eb7506df1757","loss_relative_change":5.4473399373256015e-5},
+    "status":"passed-four-isolated-nonlinear-refinement-axes-at-fraction0.001-phase0-only",
+    "scope":"Each whole nonlinear job and absolute-state audit passes the original2% loss/factor refinement gates and recorded absolute factor floors. This is not a larger-amplitude or other-phase envelope."
+  },
+  "completed_nonlinear_fe_controls": {
+    "time64_to128": {"report":"ngsolve-midpoint-mnzn-time128-control-20261020.json","sha256":"5ccf5939e9366e0ef82a9001c7565fa33430b1300e57016fa218d6f15fcbe7c9","loss_relative_change":0.0003444828431262703},
+    "lateral48_to96": {"report":"ngsolve-midpoint-mnzn-x96-control-20261020.json","sha256":"497ecc8df63a0ff80d3a70bc103b59f2d169ab7f28e76ed81009fa8c1c0a6c3a","loss_relative_change":0.0006268391598166501},
+    "depth12_to24": {"report":"ngsolve-midpoint-mnzn-depth24-control-20261020.json","sha256":"5fd9ae71ea4f8a11fc86edce3d11101476be8c389824d6ed6eec694b65f81941","loss_relative_change":0.00013067489784512887},
+    "depth24_to48": {"report":"ngsolve-midpoint-mnzn-depth48-control-20261020.json","sha256":"4c75fbfdfe2aa4b1874a54e6d7035d300ca2fd5fbecdbde7f8de17293a4c166c","loss_relative_change":4.714263038241295e-5},
+    "status":"passed-time-lateral-and-two-depth-nonlinear-refinements-at-fraction0.001-phase0-only",
+    "scope":"Both last periods of each job reassembled from absolute states before comparison. No frozen tensor is used during the nonlinear time steps. Additional depth/both-phase/amplitude controls remain pending."
+  },
+  "completed_nonlinear_spectral_second_phase_smoke": {
+    "work":"transient-mnzn-nonlinear-small-p1-20261020",
+    "audit":"transient-mnzn-nonlinear-small-p1-audit-20261020.json",
+    "incident_fraction":0.001,
+    "phase":1,
+    "periodic_settlement_relative_change":4.434044865909892e-6,
+    "scope":"Completed/audited internal nonlinear trial only; no independent other-phase or refinement qualification yet."
+  },
+  "preserved_one_percent_spectral_failure": {
+    "work":"transient-mnzn-nonlinear-amplitude01-p0-20261020",
+    "status":"failed-periodic-settlement",
+    "periods":8,
+    "measured_last_two_period_relative_change":2.2855605695523787e-5,
+    "unchanged_limit":1e-5,
+    "retry":"Separate24-period trials from their initial equilibria, same physics/time/spatial settings and unchanged numerical gates. The failed8-period job remains unaccepted."
+  },
+  "completed_one_percent_spectral_retries": {
+    "phase0": {"work":"transient-mnzn-nonlinear-amplitude01-p0-24periods-20261020","summary_sha256":"95986e2ef4499ccd4e6453c04b2314f425f216f0d991f80ef73fdc7c63690853","settlement_relative_change":1.8390115682527718e-7,"power_relative_balance":4.9777546322626876e-6,"maximum_step_relative_residual":9.966617342637839e-11,"sampled_knee_crossing_fraction":0.02685546875},
+    "phase1": {"work":"transient-mnzn-nonlinear-amplitude01-p1-24periods-20261020","summary_sha256":"ec2ba481214aa4628e7929c24cbb36d5a0ef784f448797101209f6886338a016","settlement_relative_change":2.947818306367056e-7,"power_relative_balance":1.2568271437030099e-5,"maximum_step_relative_residual":9.927917423243846e-11,"sampled_knee_crossing_fraction":0.0169677734375},
+    "status":"completed-and-absolute-trace-audited-at-fraction0.01-both-phases-only",
+    "scope":"Longer24-period trials pass unchanged settlement/nonlinear-equation/power gates and their absolute-state audits. Spatial/time controls at this larger amplitude and independent nonlinear FE agreement remain required before accepting an envelope. Original8-period failure stays failed."
+  },
+  "fe_refinement_axes": ["lateral cells", "magnetic depth cells", "remote-air spacing", "conducting wall depth", "gap depth", "source harmonics", "outer domain at fixed physical air spacing", "triangle quadrature degree"],
+  "historical_femm": "All four original failed FEMM comparisons stay failed. Their missing Linux raw archives were not recreated. A new independent agreement is not an explanation of that discrepancy.",
+  "preserved_failures": ["initial hand-built mesh had no face descriptors and crashed; its receipt records exit -11", "mesh-only symmetry trials fail the unchanged cross-phase gate", "original uniformly diagonal FE comparison remains preliminary"]
+}

@@ -1,0 +1,22 @@
+{
+  "status": "timeout-no-field-result-not-accepted",
+  "scope": "One finer bare-only native ARM GetDP 4.0.0 control. Same physical geometry, 0.4mm refinement band, 0.8mm near mesh, 0.1mm gap mesh, 10mm far mesh and 60mm radius as the completed 0.2mm interface control; only the interface target was reduced to 0.1mm.",
+  "work_relative_to_solver_opt": "five-pm-wideband-face01-arm64-20261019",
+  "summary_sha256": "7e284939787604a3b72a31e52735272f40b17c898978c7d2a74a60f42da34a1d",
+  "solver_log_sha256": "7fce2c58933b5b9456a9ce53e6405b2caa28d42cf660818494963431b00c1766",
+  "solver_receipt_sha256": "f5ce2cef48268ae8a07b3211066453d7fd2a7454b7301efcf52da3c5e41f57cb",
+  "resource_receipt_sha256": "595f681107819bdba0d7dbbf4a5a8693fdf99ea51bd36b9cbe4fa6ace14c0ed2",
+  "post_timeout_observation_sha256": "02eef42fbdd6fdd0e68506dd43a88b013ed9178e526d02035f48945452cd1231",
+  "solver_reported_dofs": 3934366,
+  "last_log_phase": "GenerateJac[S]",
+  "solver_cap_seconds": 900,
+  "solver_receipt_seconds": 900.2221572499839,
+  "whole_job_wall_seconds": 958.53,
+  "whole_job_time_l_maximum_resident_set_size_bytes": 6289965056,
+  "memory_scope": "Literal macOS /usr/bin/time -l whole-job measurement, not aggregate simultaneous process-tree memory or a controlled capacity benchmark. No out-of-memory cause is inferred.",
+  "recorded_summary_status": "running",
+  "observed_status": "incomplete-with-failed-child",
+  "solver_receipt_status": "timeout",
+  "worker_present_after_cleanup": false,
+  "conclusion": "No field map, self-force refinement result or nonlinear/material prediction can be accepted from this timeout. Original summary and receipts remain intact; the inspector correctly overrides the stale running summary. No additional heavy retry launched."
+}

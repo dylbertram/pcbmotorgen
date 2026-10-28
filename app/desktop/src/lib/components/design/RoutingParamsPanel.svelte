@@ -26,21 +26,23 @@
 
 <div class="space-y-2">
   {#if config.routing_param_defs.length === 0}
-    <p class="text-xs italic text-slate-500">No user-editable parameters for this pattern.</p>
+    <p class="text-xs text-slate-400">No pattern settings.</p>
   {:else}
-    <div class="grid gap-x-3 gap-y-1.5 sm:grid-cols-2" role="list">
+    <div class="routing-fields grid gap-x-3 gap-y-2" role="list">
       {#each config.routing_param_defs as def (def.key)}
         <label class="min-w-0">
           <span class="flex items-center justify-between gap-2">
-            <span class="min-w-0 truncate text-xs text-slate-300">
+            <span class="min-w-0 text-xs text-slate-300">
               {def.label}
-              <span class="font-mono text-[10px] text-slate-500">({def.key})</span>
               {#if hasDiagram(def)}
                 <HelpTag label="About winding connection">
                   <WindingConnectionHelp />
                 </HelpTag>
-              {:else if def.description}
-                <HelpTag tip={def.description} />
+              {:else if def.description || def.min !== undefined || def.max !== undefined}
+                <HelpTag label={`About ${def.label}`}>
+                  {#if def.description}<p>{def.description}</p>{/if}
+                  {#if def.min !== undefined || def.max !== undefined}<p class="mt-1">Range: {def.min ?? "unbounded"} to {def.max ?? "unbounded"}{def.multiple_of ? `, multiples of ${def.multiple_of}` : ""}.</p>{/if}
+                </HelpTag>
               {/if}
             </span>
             {#if def.options?.length}
@@ -70,15 +72,14 @@
               />
             {/if}
           </span>
-          {#if !def.options?.length && (def.min !== undefined || def.max !== undefined || def.multiple_of)}
-            <span class="mt-0.5 block text-[10px] text-slate-500">
-              range {def.min ?? "-"} to {def.max ?? "-"}{def.multiple_of
-                ? ` · multiples of ${def.multiple_of}`
-                : ""}
-            </span>
-          {/if}
         </label>
       {/each}
     </div>
   {/if}
 </div>
+
+<style>
+  @container (min-width: 560px) {
+    .routing-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
+</style>

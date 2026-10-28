@@ -29,8 +29,8 @@ test("power tab discloses demo data and downloads a report without fabricated wa
       expect(snapshot.sweep).toBeNull();
     }
   }
-  await page.getByRole("tab", { name: "Performance", exact: true }).click();
-  await expect(page.getByRole("combobox", { name: "Driver to evaluate" })).toBeVisible();
+  await page.getByRole("tab", { name: "Magnetic flux density", exact: true }).click();
+  await expect(page.locator('[data-dock-panel="flux"]')).toBeVisible();
 });
 
 // These tests inject synthetic DTOs at the transport boundary. They verify
@@ -82,10 +82,11 @@ test("current results export; pending and failed updates never export retained d
   expect(await page.evaluate(() => (window as any).__savedPower.content)).toContain('"resistance_hot_ohm"');
 
   await page.evaluate(() => { (window as any).__holdDrive = true; });
-  await page.getByRole("tab", { name: "Performance", exact: true }).click();
+  await page.getByRole("button", { name: "Drive & force targets", exact: true }).click();
   const voltage = page.getByRole("spinbutton", { name: "Bus voltage (V)", exact: true });
   await voltage.fill("12");
   await voltage.press("Enter");
+  await page.getByRole("button", { name: "Drive & force targets", exact: true }).click();
   await page.getByRole("tab", { name: "Power requirements", exact: true }).click();
   await expect(electrical).toBeDisabled();
   await expect(panel.locator("dl > div").filter({ has: page.getByText("Winding resistance per phase", { exact: true }) })).toContainText("Unknown");
@@ -109,16 +110,23 @@ test("failed force updates remove force exports and do not supply an old force c
   await expect(panel.getByRole("button", { name: "Force sweep CSV", exact: true })).toBeEnabled();
   await page.evaluate(() => { (window as any).__failForce = true; });
   await page.getByRole("tab", { name: /^Design/i }).click();
+  await page.getByRole("button", { name: "Magnets", exact: true }).click();
   await page.locator("input#magnet-count").fill("6");
   await page.locator("input#magnet-count").press("Enter");
   await page.getByRole("tab", { name: /^Simulate/i }).click();
   await expect(panel.getByRole("button", { name: "Force sweep CSV", exact: true })).toBeDisabled();
+  await expect(page.getByRole("alert").filter({ hasText: "Computation error: Synthetic force failure" })).toBeVisible();
   await expect(panel.getByRole("button", { name: "Phase electrical CSV", exact: true })).toBeEnabled();
-  await panel.getByRole("button", { name: "Model snapshot JSON", exact: true }).click();
-  const snapshot = JSON.parse(await page.evaluate(() => (window as any).__savedPower.content));
-  expect(snapshot.config.magnet_count).toBe(6);
-  expect(snapshot.sweep).toBeNull();
-  expect(snapshot.drive.thrust_constant_n_per_a).toBeNull();
+  // Sweep completion schedules another driver check. Wait for that check's
+  // published snapshot rather than racing its legitimate pending/null state.
+  await expect(async () => {
+    await panel.getByRole("button", { name: "Model snapshot JSON", exact: true }).click();
+    const snapshot = JSON.parse(await page.evaluate(() => (window as any).__savedPower.content));
+    expect(snapshot.config.magnet_count).toBe(6);
+    expect(snapshot.sweep).toBeNull();
+    expect(snapshot.drive).not.toBeNull();
+    expect(snapshot.drive.thrust_constant_n_per_a).toBeNull();
+  }).toPass();
 
   await page.evaluate(() => { (window as any).__failSave = true; });
   await panel.getByRole("button", { name: "Download report", exact: true }).click();

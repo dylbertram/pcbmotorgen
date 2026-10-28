@@ -1,0 +1,48 @@
+{
+  "schema": "linear-dc-generated-case-declarations-v1",
+  "template": "star_2-layer.pmmotor",
+  "template_version_index": 1,
+  "template_sha256": "0ed215f6ff403b927dbeac1ea3d4d9587489a1f1c0680e4ce3a2a48658475d82",
+  "scope": "Explicit new app-generated linear designs, not repairs to the original project. No imported magnetic geometry or inherited recorded-case clearance correction.",
+  "cases": [
+    {
+      "id": "linear-star-compact-two-strand-four-layer-board",
+      "config_overrides": {
+        "desired_travel_mm": 12.0,
+        "active_area_width_mm": 8.0,
+        "magnet_count": 3,
+        "num_layers": 4,
+        "pcb_thickness_mm": 1.2,
+        "routing_params": {"num_strands": 2.0, "connection": 2.0}
+      },
+      "drive_overrides": {},
+      "coverage": "Two-strand parallel braid on a four-layer board; actual generator uses layers0/1 and blind0-to-1 vias. Unused declared layers2/3 are retained, not claimed as active current layers. Smaller active length and three-magnet alternating mover."
+    },
+    {
+      "id": "linear-star-five-strand-six-layer-board-inner-two-ounce",
+      "config_overrides": {
+        "desired_travel_mm": 24.0,
+        "active_area_width_mm": 10.0,
+        "magnet_count": 5,
+        "num_layers": 6,
+        "pcb_thickness_mm": 1.5,
+        "min_trace_mm": 0.127,
+        "trace_width_mm": 0.127,
+        "routing_params": {"num_strands": 5.0, "connection": 2.0}
+      },
+      "drive_overrides": {"inner_copper_oz": 2.0},
+      "coverage": "Five-strand parallel graph and different via density on a six-layer board, actual active layers0/1 with a different blind-via depth and70um inner copper. Declared unused layers2..5 remain empty. Different graph,conductor widths/thicknesses,layer spacing,board width and mover length; not a renamed exact reference."
+    }
+  ],
+  "physical_model_policy": "Use saved app-defined magnet dimensions/materials and nominal PCB-bottom stack placement, with explicit finite rectangular footprint and saved mover pose. Exact disjointness must be measured before coupling. No geometry moves or35um corrections are authorized by these declarations.",
+  "return_policy": "Explicit A-positive/C-negative source-study return outside the actual routed winding, sized from saved outer copper; not recovered cable CAD. Record exact waypoints and graph closure before source solve.",
+  "acceptance": {
+    "current_loop_a": [0.0, 0.1, -0.1, 0.5, -0.5],
+    "linear_offset_x_m": [0.0, 0.0001, -0.0001],
+    "relative_refinement_gate": 0.02,
+    "relative_independent_reference_gate": 0.05,
+    "force_vector_floor_n": 1e-8,
+    "source_section_current_floor_per_loop_a": 1e-8,
+    "required": ["actual host geometry export", "CAD/material disjointness and tagging", "source continuity/current/power/local sections", "isolated source refinements and independent electrical reference", "exact affine RT0 and near-source integration controls", "nonlinear magnitude/polarity/linear-pose matrix", "zero-current/linear-vacuum limits", "total/incremental/per-body balance", "mesh/domain/quadrature/source2percent controls", "independent magnetic formulations5percent", "actual saved-design app request/lifecycle tests"]
+  }
+}

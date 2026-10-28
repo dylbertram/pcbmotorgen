@@ -1,0 +1,10 @@
+{
+  "status": "passed-periodic-implementation-parity",
+  "scope": "Static and isolated-sheet DC reference only. Adds explicit nonfinite benchmark rejection, not a new physical model or finite-motor qualification.",
+  "full_report_sha256": "c34151947f8430195465706814dc77761f49e0f3a6a2016a965bbf2a0e7a4db5",
+  "binary_sha256": "9f636d12a6830b04babb865c5e6eeb4d76cec3083adfea4efbbad0bd6d469aa3",
+  "rust_source_sha256": "8d7f891d5dd9adea47a875780208ea4e49bc7029ae95752721b8ba8618429d9c",
+  "previous_full_report_sha256": "93828fe9c678da5b376837e01f3b4c866b528160113e886b6410ee730e9eae6b",
+  "all_four_cases_and_four_resolution_run_records_identical_to_previous_report": true,
+  "maximum_combined_parity_error": 4.3229864132854345e-12
+}

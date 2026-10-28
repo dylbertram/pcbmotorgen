@@ -1,0 +1,35 @@
+{
+  "status": "passed-refined-free-space-only",
+  "scope": "Native Apple Silicon GetDP installation and current-free cuboid formulation. Not finite motor force, nonlinear material, actual winding, housing motion or production packaging qualification.",
+  "platform": "macOS 26.6.2 arm64",
+  "host_memory_bytes": 25769803776,
+  "backend": {
+    "getdp": "4.0.0 MacOSARM, PETSc 3.17.4 complex arithmetic",
+    "archive_sha256": "6fe77e17aac2ec29aefd12e70db80fd54033016d55ed3e2c4c1e1470afd27b2f",
+    "executable_sha256": "05ec5eddda98d14dcea9623335f1d2d705cab30cabebff4e571423001b78b94f",
+    "gmsh": "4.13.1 native ARM Python wheel",
+    "magpylib": "5.2.3",
+    "numpy": "2.4.6",
+    "scipy": "1.17.1",
+    "threads": "OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 VECLIB_MAXIMUM_THREADS=1"
+  },
+  "initial_rejected_study": {
+    "work_relative_to_solver_opt": "free-space-arm64-20261019",
+    "summary_sha256": "89032666a17bae18789cfee08f6a96128d14f12ecb24ff79270cc60aa77c055f",
+    "reason": "0.4/0.3mm mesh change 2.236% exceeds unchanged 2% gate. Original failed study retained."
+  },
+  "refined_study": {
+    "work_relative_to_solver_opt": "free-space-arm64-refined-20261019",
+    "summary_sha256": "03f5604cc72b1194d4041554d7f0963b767f645db3e48d7f4f4f55d03951d8f8",
+    "mesh_sizes_m": [0.0003, 0.0002, 0.0002],
+    "air_radii_m": [0.03, 0.03, 0.045],
+    "field_relative_errors": [0.011807342825482394, 0.0029796468285629993, 0.003479919310291882],
+    "solve_seconds": [5.982871625048574, 19.6463146659662, 27.403795332997106],
+    "mesh_relative_change": 0.011952226206434184,
+    "domain_relative_change": 0.00458215760497572,
+    "field_gate": 0.05,
+    "refinement_gate": 0.02
+  },
+  "raw_archive_location": "$HOME/.local/opt/solver-prototypes-macos; raw studies are external to git",
+  "comparison_limit": "Historical Debian 3.5.0 timings use different binaries, meshes and shared-host conditions. No controlled speedup is inferred."
+}

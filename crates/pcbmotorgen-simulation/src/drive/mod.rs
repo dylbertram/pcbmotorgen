@@ -156,6 +156,9 @@ pub struct DriveSettings {
     /// the per-phase (synchronous) inductance used for the ripple, time
     /// constant, and ω·L voltage terms; zero means none.
     pub series_inductance_h: f64,
+    /// Opt-in experimental steady-travel housing heat exposure, not PWM loss.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub housing_motion: Option<crate::backplane::HousingMotionProfile>,
 }
 
 impl Default for DriveSettings {
@@ -172,6 +175,7 @@ impl Default for DriveSettings {
             ripple_limit_fraction: 0.3,
             voltage_headroom: 0.85,
             series_inductance_h: 0.0,
+            housing_motion: None,
         }
     }
 }
@@ -326,6 +330,9 @@ pub struct DriveAnalysis {
 /// 04n2, q9nw). See [`crate::backplane`] for the model.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DriveBackplane {
+    /// Separate per-region steady-motion estimate; absent unless opted in.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub housing_motion: Option<crate::backplane::HousingMotionAnalysis>,
     /// Low-frequency inductance factor, with the magnets' bias on saturated
     /// layers.
     pub inductance_factor: f64,
@@ -421,7 +428,65 @@ pub struct DriveGeometryHints {
     pub terminals: std::collections::BTreeMap<String, Vec<TerminalPair>>,
 }
 
-/// [`analyze_drive`] with imported-geometry hints.
+impl DriveGeometryHints {
+    /// Physical conductor height. Generated copper uses PCB top z=0 and
+    /// negative depths; imported copper retains its explicit layer heights.
+    pub fn layer_z(&self, sim: &SimulationInput, layer: u32) -> f64 {
+        self.layer_z_m.get(layer as usize).copied().unwrap_or_else(|| {
+            -(layer as f64) * sim.pcb_thickness_m / sim.num_layers.saturating_sub(1).max(1) as f64
+        })
+    }
+
+    /// Length of one electrically landed barrel interval, not the full PCB.
+    pub fn via_length_m(&self, sim: &SimulationInput, layers: [u32; 2]) -> f64 {
+        (self.layer_z(sim, layers[1]) - self.layer_z(sim, layers[0])).abs()
+    }
+}
+
+/// The layered image/AC screening model is defined on the PCB side of the
+/// first responding medium. Imported copper below it needs a transmitted-field
+/// or finite geometry model; never flatten it or silently relocate the stack.
+pub fn validate_copper_placement(sim: &SimulationInput, routing: &RoutingResult, hints: &DriveGeometryHints) -> Result<(), crate::params::SimulationError> {
+    use crate::params::SimulationError;
+    let Some(stack) = &sim.backplane else { return Ok(()) };
+    stack.validate().map_err(SimulationError)?;
+    let mut depth = sim.pcb_thickness_m;
+    let mut surface = None;
+    for layer in &stack.layers {
+        if layer.mu_r() != 1.0 || layer.material.sigma_s_per_m() > 0.0 {
+            surface = Some(-depth); break;
+        }
+        depth += layer.thickness_m;
+    }
+    if surface.is_none() {
+        if let Some(housing) = &stack.housing {
+            if housing.material.mu_r() != 1.0 || housing.material.sigma_s_per_m() > 0.0 {
+                surface = Some(-depth - housing.gap_m);
+            }
+        }
+    }
+    let Some(surface) = surface else { return Ok(()) };
+    if !surface.is_finite() || !sim.pcb_thickness_m.is_finite() || sim.pcb_thickness_m <= 0.0 {
+        return Err(SimulationError("Invalid PCB/stack depth for conductor placement".into()));
+    }
+    let layers = routing.segments.iter().map(|s| s.layer)
+        .chain(routing.curves.iter().map(|s| s.layer))
+        .chain(routing.splines.iter().map(|s| s.layer))
+        .chain(routing.vias.iter().flat_map(|via| [via.from_layer, via.to_layer]));
+    for layer in layers {
+        let z = hints.layer_z(sim, layer);
+        if !z.is_finite() || z < surface - 1e-9 {
+            return Err(SimulationError(format!(
+                "Copper layer {} at {:.3} mm is below the first magnetic/conducting stack surface at {:.3} mm. Layered screening requires copper above that surface. Correct the PCB thickness or imported layer depths; geometry has not been moved.",
+                layer + 1, z * 1e3, surface * 1e3)));
+        }
+    }
+    Ok(())
+}
+
+/// [`analyze_drive`] with imported-geometry hints. Call
+/// [`validate_copper_placement`] before applying a backplane to imported copper;
+/// application commands do this and return the error without screening fallback.
 pub fn analyze_drive_with(
     sim: &SimulationInput,
     routing: &RoutingResult,
@@ -435,14 +500,8 @@ pub fn analyze_drive_with(
     let rho_20 = rho_cu_at(RHO_REF_C);
     let via_len = sim.pcb_thickness_m;
     let r_via_hot = via_resistance_ohm(sim.min_via_drill_m, settings.via_plating_m, via_len, rho_hot);
-    let layer_pitch = if num_layers > 1 {
-        sim.pcb_thickness_m / (num_layers - 1) as f64
-    } else {
-        0.0
-    };
-
     let networks = extract_phase_networks_with_terminals(routing, &hints.terminals);
-    let layer_z = |l: u32| hints.layer_z_m.get(l as usize).copied().unwrap_or(l as f64 * layer_pitch);
+    let layer_z = |l: u32| hints.layer_z(sim, l);
     let mut notes = Vec::new();
     let via_amp = ipc2221_ampacity_a(
         std::f64::consts::PI * sim.min_via_drill_m,
@@ -452,21 +511,28 @@ pub fn analyze_drive_with(
     );
 
     // --- Resistance per phase (nodal solve) -----------------------------
-    let edge_resistances = |net: &PhaseNetwork, via_r: f64| -> Vec<f64> {
+    let edge_resistances = |net: &PhaseNetwork| -> Vec<f64> {
         net.edges
             .iter()
             .map(|e| match &e.kind {
                 EdgeKind::Trace { layer, length_m, .. } => {
                     rho_hot * length_m / (width * copper_m(*layer, num_layers, settings))
                 }
-                EdgeKind::Via => via_r,
+                EdgeKind::Via { layers, .. } => via_resistance_ohm(sim.min_via_drill_m, settings.via_plating_m, hints.via_length_m(sim, *layers), rho_hot),
             })
             .collect()
     };
     let solutions: Vec<NetworkSolution> = networks
         .iter()
-        .map(|net| solve_network(net, &edge_resistances(net, r_via_hot)))
+        .map(|net| solve_network(net, &edge_resistances(net)))
         .collect();
+    if networks.iter().zip(&solutions).any(|(net, solution)| {
+        net.edges.iter().zip(&solution.current_share).any(|(edge, share)| {
+            matches!(edge.kind, EdgeKind::Via { .. }) && share.abs() > 1e-9
+        })
+    }) {
+        notes.push("Inductance is a trace-only screening estimate: vertical via-barrel inductance and terminal returns are omitted. Resistance uses the physical via spans.".into());
+    }
     let mut phase_ampacity = Vec::new();
     let mut phases: Vec<PhaseElectrical> = networks
         .iter()
@@ -476,9 +542,10 @@ pub fn analyze_drive_with(
             // to equivalent resistance. Avoid an ill-conditioned second
             // solve with ideal-short vias, whose failure could attribute
             // the entire phase resistance to the vias.
-            let via_resistance: f64 = net.edges.iter().zip(&sol.current_share)
-                .filter(|(edge, _)| matches!(edge.kind, EdgeKind::Via))
-                .map(|(_, share)| share * share * r_via_hot).sum();
+            let resistances = edge_resistances(net);
+            let via_resistance: f64 = net.edges.iter().zip(&sol.current_share).zip(&resistances)
+                .filter(|((edge, _), _)| matches!(edge.kind, EdgeKind::Via { .. }))
+                .map(|((_, share), resistance)| share * share * resistance).sum();
             let strands = net.strands().max(1);
             let total_len = net.trace_length_m();
             let vias = net.via_count();
@@ -501,7 +568,7 @@ pub fn analyze_drive_with(
                             is_inner(*layer, num_layers),
                         )
                     }
-                    EdgeKind::Via => via_amp,
+                    EdgeKind::Via { .. } => via_amp,
                 };
                 amp = amp.min(limit / share);
             }
@@ -714,6 +781,9 @@ pub fn analyze_drive_with(
             .sum();
         let at_target = s.magnet_forces(sim, settings.target_speed_m_s);
         DriveBackplane {
+            housing_motion: settings.housing_motion.map(|profile| {
+                sim.backplane.as_ref().expect("solved stack exists").housing_motion(sim, settings.target_speed_m_s, profile)
+            }),
             inductance_factor: s.coil_factor(0.0).re,
             pwm_inductance_factor: s.coil_factor(settings.pwm_hz).re,
             pwm_inductance_h: l_ripple,
@@ -941,12 +1011,12 @@ pub fn analyze_drive_with(
         if s.conducts() {
             let v = settings.target_speed_m_s;
             let limit = match bp.drag_limited_speed_m_s {
-                Some(v_lim) => format!("Drag reaches the full-current thrust at {v_lim:.2} m/s."),
-                None => format!("Drag stays below the full-current thrust up to {top:.1} m/s."),
+                Some(v_lim) => format!("The screening model reaches full-current thrust at {v_lim:.2} m/s."),
+                None => format!("The screening model stays below full-current thrust up to {top:.1} m/s."),
             };
             checks.push(DriveCheck {
                 id: "eddy_drag".into(),
-                label: format!("Eddy drag at {v:.2} m/s vs thrust"),
+                label: format!("Screening eddy drag at {v:.2} m/s vs thrust"),
                 status: match thrust {
                     Some(f) => status(bp.drag_n <= 0.1 * f, bp.drag_n < f),
                     None => CheckStatus::Unknown,
@@ -955,7 +1025,7 @@ pub fn analyze_drive_with(
                 limit: thrust.map_or(0.0, |f| 0.1 * f),
                 unit: "N".into(),
                 detail: format!(
-                    "Eddy currents in the backplane and housing drag the mover with {:.3} N ({:.2} W) at {v:.2} m/s. {limit} Passes below 10 % of the thrust.",
+                    "Estimated eddy drag is {:.3} N ({:.2} W) at {v:.2} m/s. {limit} Screening threshold: 10 % of thrust. Finite 3D housing drag is unvalidated; this check does not qualify an operating speed.",
                     bp.drag_n, bp.drag_power_w
                 ),
             });

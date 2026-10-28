@@ -31,6 +31,9 @@ impl SimulationInput {
                 self.magnet_count
             )));
         }
+        if self.magnet_count > super::MAX_MAGNET_COUNT {
+            return Err(SimulationError(format!("magnet_count must be ≤ {}, got {}", super::MAX_MAGNET_COUNT, self.magnet_count)));
+        }
         if self.magnet_pitch_m <= 0.0 {
             return Err(SimulationError(format!(
                 "magnet_pitch_m must be positive, got {}",
@@ -112,6 +115,9 @@ impl SimulationInput {
                 "max_layers must be an even number ≥ 2, got {}",
                 self.max_layers
             )));
+        }
+        if self.max_layers > super::MAX_PCB_LAYERS || self.num_layers > super::MAX_PCB_LAYERS {
+            return Err(SimulationError(format!("PCB copper layer count and max_layers must be ≤ {}", super::MAX_PCB_LAYERS)));
         }
         if self.num_layers < 2 || self.num_layers % 2 != 0 {
             return Err(SimulationError(format!(
@@ -231,6 +237,25 @@ impl SimulationInput {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn coreless_magnet_and_pcb_layer_upper_bounds() {
+        let mut input = SimulationInput { magnet_count: 12, max_layers: 16, num_layers: 16, ..SimulationInput::default() };
+        assert!(input.validate().is_ok());
+        input.magnet_count = 13;
+        assert!(input.validate().unwrap_err().to_string().contains("≤ 12"));
+        input.magnet_count = 12; input.max_layers = 18; input.num_layers = 18;
+        assert!(input.validate().unwrap_err().to_string().contains("≤ 16"));
+    }
+
+    #[test]
+    fn explicit_conductor_depth_json_round_trips_without_one_ulp_normalization() {
+        let raw = "[-0.0048000000000000004,-0.0032,-0.0016,0.0]";
+        let depths: Vec<f64> = serde_json::from_str(raw).unwrap();
+        assert_eq!(depths[0].to_bits(), (-0.0048000000000000004_f64).to_bits());
+        let restored: Vec<f64> = serde_json::from_str(&serde_json::to_string(&depths).unwrap()).unwrap();
+        assert_eq!(depths.iter().map(|v| v.to_bits()).collect::<Vec<_>>(), restored.iter().map(|v| v.to_bits()).collect::<Vec<_>>());
+    }
 
     #[test]
     fn test_default_validates() {

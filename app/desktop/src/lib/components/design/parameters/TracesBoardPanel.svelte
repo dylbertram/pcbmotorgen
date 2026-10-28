@@ -12,9 +12,9 @@
   } = $props();
 
   const sizingFields = [
-    { key: "trace_width_mm", id: "motor-trace-width", label: "Trace width (mm)", min: 0.01 },
-    { key: "min_trace_mm", id: "motor-min-trace-width", label: "Minimum trace width (mm)", min: 0.01 },
-    { key: "min_space_mm", id: "motor-trace-gap", label: "Minimum trace gap (mm)", min: 0.01 },
+    { key: "trace_width_mm", id: "motor-trace-width", label: "Trace width (mm)", min: 0.01, help: "Copper width used in the board and DXF. Must be at least the minimum trace width." },
+    { key: "min_trace_mm", id: "motor-min-trace-width", label: "Minimum trace width (mm)", min: 0.01, help: "Smallest trace your PCB manufacturer can make." },
+    { key: "min_space_mm", id: "motor-trace-gap", label: "Minimum trace gap (mm)", min: 0.01, help: "Smallest allowed clearance between copper traces." },
   ] as const;
   const viaFields = [
     { key: "min_via_drill_mm", id: "motor-via-drill", label: "Via hole size (mm)", min: 0.01 },
@@ -28,16 +28,17 @@
   <Separator class="bg-slate-700/80" />
 
   <div class="pt-2.5">
-    <h4 class="mb-2 text-[11px] font-semibold uppercase tracking-wider text-slate-300">
-      Traces &amp; Board
+    <h4 class="mb-2 text-xs font-medium text-slate-300">
+      Traces &amp; board
     </h4>
 
-    <div class="grid gap-x-3 gap-y-2.5 sm:grid-cols-2">
+    <div class="trace-fields grid gap-x-3 gap-y-2.5">
       {#each sizingFields as field (field.key)}
         <label class="min-w-0">
           <span class="flex items-center justify-between gap-2">
             <span class="min-w-0 text-xs text-slate-300">
               {field.label}
+              <HelpTag label={`About ${field.label}`} tip={field.help} />
             </span>
             <NumberField
               id={field.id}
@@ -55,18 +56,15 @@
         </label>
       {/each}
     </div>
-    <p class="mt-2 text-[11px] text-slate-500">
-      Trace width is the nominal copper width written to the board and DXF; it must be at least the minimum. Minimum trace width is the manufacturing floor. Gap is the minimum manufacturing clearance. Via dimensions apply to generated and imported paths.
-    </p>
     <ViaSizingGuide holeMm={config.min_via_drill_mm} ringMm={config.min_via_annular_ring_mm}>
       {#each viaFields as field (field.key)}
         <label class="min-w-0 flex items-center justify-between gap-2">
           <span class="min-w-0 text-xs text-slate-300">
             {field.label}
             {#if field.key === "min_via_drill_mm"}
-              <HelpTag label="About via hole size" tip="The diameter of the drilled hole, excluding the surrounding copper ring. This is not the outer via diameter." />
+              <HelpTag label="About via hole size" tip="Drilled hole diameter, excluding the copper ring." />
             {:else}
-              <HelpTag label="About annular ring width" tip="Copper width on one side of the hole. A 0.075 mm ring adds 0.15 mm to the via diameter, because it surrounds both sides." />
+              <HelpTag label="About annular ring width" tip="Copper width on one side of the hole. Both sides count toward the outer diameter." equation={String.raw`D_{\mathrm{via}} = D_{\mathrm{hole}} + 2w_{\mathrm{ring}}`} />
             {/if}
           </span>
           <NumberField id={field.id} value={config[field.key]} min={field.min} step={0.01}
@@ -77,3 +75,9 @@
     </ViaSizingGuide>
   </div>
 </div>
+
+<style>
+  @container (min-width: 560px) {
+    .trace-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
+</style>

@@ -230,6 +230,14 @@ export function computeUniqueLayers(
     .map((idx) => ({ idx }));
 }
 
+/** Geometry summary shared by the viewer header and workspace status bar. */
+export function computePreviewSummary(coils: CoilPathDto | null): string {
+  if (!coils) return "no coils yet";
+  const phases = computeUniquePhases(coils).length;
+  const layers = computeUniqueLayers(coils).length;
+  return `${phases} phase${phases === 1 ? "" : "s"} · ${layers} layer${layers === 1 ? "" : "s"} · ${coils.phases.length} coil group${coils.phases.length === 1 ? "" : "s"}`;
+}
+
 /** First solid-magnet x position for the preview.
  *
  * The phase-band start/end boundaries come from the pattern-owned

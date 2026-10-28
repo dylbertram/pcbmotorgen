@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { gotoDesignApp } from "./helpers";
+import { gotoDesignApp, selectDesignPanel } from "./helpers";
 
 /**
  * In-app plugin authoring guide + routing-pattern select suite (kata bprp,
@@ -36,6 +36,7 @@ test.describe("routing pattern select (Bits UI) @interaction @desktop", () => {
     page,
   }) => {
     await gotoDesignApp(page);
+    await selectDesignPanel(page, "Routing");
 
     const trigger = page.locator(PATTERN_TRIGGER);
     await expect(trigger).toContainText(MOCK_PATTERN_LABEL);
@@ -74,6 +75,7 @@ test.describe("routing pattern select (Bits UI) @interaction @desktop", () => {
     page,
   }) => {
     await gotoDesignApp(page);
+    await selectDesignPanel(page, "Routing");
 
     const trigger = page.locator(PATTERN_TRIGGER);
     await trigger.click();
@@ -86,7 +88,7 @@ test.describe("routing pattern select (Bits UI) @interaction @desktop", () => {
 
     // The braid exposes user-editable parameters (num_strands, connection);
     // choosing it must render its controls rather than the empty-state note.
-    await expect(page.getByLabel("Strands per period")).toBeVisible();
+    await expect(page.getByLabel("Strands per period", { exact: true })).toBeVisible();
   });
 });
 
@@ -95,6 +97,7 @@ test.describe("plugin authoring guide @interaction @desktop", () => {
     page,
   }) => {
     await gotoDesignApp(page);
+    await selectDesignPanel(page, "Routing");
 
     // Open the "Load new generator" modal via the pattern-select sentinel.
     await page.locator(PATTERN_TRIGGER).click();

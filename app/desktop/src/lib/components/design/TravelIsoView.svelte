@@ -4,6 +4,7 @@
   import {
     ISO_Z_EXAG,
     isoBoxPath,
+    isoVisibleFaces,
     isoCenter as computeIsoCenter,
     isoProject,
   } from "../../geometry";
@@ -24,7 +25,7 @@
 
   // ====================================================================
   // 3/4 ISOMETRIC VIEW — axonometric projection of the assembly (PCB
-  // wireframe + magnet wireframe). Z is exaggerated so the thin stackup
+  // solid PCB and magnet faces). Z is exaggerated so the thin stackup
   // is visible. The magnet block sits at the current mover position
   // along the travel axis.
   //
@@ -35,18 +36,28 @@
   // (the braid floors whole periods, so it is shorter than the nominal
   // domain).
   // ====================================================================
-  const ISO_W = 220;
-  const ISO_H = 220;
-  const ISO_PAD = 14;
+  const ISO_W = 360;
+  const ISO_H = 152;
+  const AXIS_GUTTER = 40;
+  const SCENE_TOP = 16;
+  const SCENE_W = ISO_W - AXIS_GUTTER - 12;
+  const SCENE_H = ISO_H - SCENE_TOP - 34;
 
   let boardLengthMm = $derived(
     measuredTrace?.traceLengthMm ?? config.trace_total_length_mm,
   );
   let boardStartMm = $derived(measuredTrace?.traceStartMm ?? 0);
 
-  let isoScale = $derived(
-    (ISO_W - 2 * ISO_PAD) / Math.max(boardLengthMm * 1.45, 1),
-  );
+  const scene = $derived({
+    minX: Math.min(boardStartMm, 0, stripStartMm),
+    maxX: Math.max(boardStartMm + boardLengthMm, config.active_area_length_mm, stripEndMm),
+    width: config.active_area_width_mm,
+    height: config.pcb_thickness_mm + config.air_gap_mm + config.magnet_height_mm,
+  });
+  const isoScale = $derived(Math.min(
+    SCENE_W / Math.max(scene.maxX - scene.minX + 0.45 * scene.width, 1),
+    SCENE_H / Math.max(scene.height * ISO_Z_EXAG + 0.45 * scene.width, 1),
+  ));
 
   // Axonometric projection (delegates to the shared lib/geometry helper
   // with the Z-exaggerated scale baked in):
@@ -57,21 +68,13 @@
   ): [number, number] => isoProject(x, y, z, cx, cy, isoScale, isoScale * ISO_Z_EXAG);
 
   // Center the assembly's bounding box in the iso canvas.
-  let isoCenter = $derived(
-    computeIsoCenter(
-      {
-        length: boardLengthMm,
-        width: config.active_area_width_mm,
-        totalHeight:
-          config.pcb_thickness_mm +
-          config.air_gap_mm +
-          config.magnet_height_mm,
-      },
-      ISO_W,
-      ISO_H,
-      project,
-    ),
-  );
+  const isoCenter = $derived.by(() => {
+    const center = computeIsoCenter(
+      { length: scene.maxX - scene.minX, width: scene.width, totalHeight: scene.height },
+      SCENE_W, SCENE_H, project,
+    );
+    return { cx: center.cx + AXIS_GUTTER - scene.minX * isoScale, cy: center.cy + SCENE_TOP };
+  });
 
   let isoGeom = $derived.by(() => {
     const pcbT = config.pcb_thickness_mm;
@@ -97,7 +100,7 @@
     };
   });
 
-  // Pre-computed wireframe boxes for the iso view.
+  // Project the boxes once, then draw only their three visible faces.
   let isoStatorBox = $derived(
     isoBoxPath(isoGeom.boardX0, 0, 0, isoGeom.boardL, isoGeom.W, isoGeom.pcbT, isoCenter.cx, isoCenter.cy, project),
   );
@@ -111,47 +114,50 @@
       isoGeom.magnetEndX - isoGeom.magnetStartX, isoGeom.W, isoGeom.mh,
       isoCenter.cx, isoCenter.cy, project),
   );
+  const boardFaces = $derived(isoVisibleFaces(isoStatorBox.corners));
+  const activeFace = $derived(isoVisibleFaces(isoActiveBox.corners).top);
+  const magnetFaces = $derived(isoVisibleFaces(isoMagnetBox.corners));
 
   // Dimension line under the board's front-bottom edge: ties the printed
   // "routed traces" number to the drawn span (measured when a payload exists).
   let isoDim = $derived.by(() => {
-    const [x1, y1] = project(isoGeom.boardX0, 0, 0, isoCenter.cx, isoCenter.cy);
-    const [x2, y2] = project(isoGeom.boardX0 + isoGeom.boardL, 0, 0, isoCenter.cx, isoCenter.cy);
-    const y = Math.max(y1, y2) + 9;
-    return { x1, x2, y };
+    const [x1, y1] = isoStatorBox.corners[3];
+    const [x2, y2] = isoStatorBox.corners[2];
+    const sourceY = Math.max(y1, y2);
+    return { x1, x2, sourceY, y: sourceY + 12 };
   });
 </script>
 
 <div class="min-w-0">
-  <div class="text-[10px] uppercase tracking-wider text-slate-500 mb-1">3/4 view</div>
-  <svg viewBox="0 0 {ISO_W} {ISO_H}" class="w-full h-auto"
+  <svg viewBox="0 0 {ISO_W} {ISO_H}" class="h-36 w-full"
        role="img" aria-label="Three-quarter isometric view of the assembly">
-    <!-- Stator (PCB) wireframe box: MEASURED routed-trace extent -->
-    <path d={isoStatorBox.d} fill="#1e293b" fill-opacity="0.35" stroke="#94a3b8" stroke-width="1" />
-    <text x={isoStatorBox.corners[0][0] - 4} y={isoStatorBox.corners[0][1] + 12} text-anchor="end"
-          class="fill-slate-400" style="font-size:9px">PCB {boardLengthMm.toFixed(0)} mm</text>
-
-    <!-- Dimension line: routed-trace span (measured from the payload) -->
-    <g class="text-slate-400" stroke="currentColor" stroke-width="0.7">
-      <line x1={isoDim.x1} y1={isoDim.y} x2={isoDim.x2} y2={isoDim.y} />
-      <line x1={isoDim.x1} y1={isoDim.y - 3} x2={isoDim.x1} y2={isoDim.y + 3} />
-      <line x1={isoDim.x2} y1={isoDim.y - 3} x2={isoDim.x2} y2={isoDim.y + 3} />
-      <text x={(isoDim.x1 + isoDim.x2) / 2} y={isoDim.y + 9} text-anchor="middle"
-            class="fill-slate-400" stroke="none" style="font-size:8px"
-            >routed traces {boardLengthMm.toFixed(1)} mm{measuredTrace ? " ·meas." : ""}</text>
+    <g data-assembly>
+      <g data-solid="board" stroke="rgb(var(--slate-400))" stroke-width="0.8" stroke-linejoin="round">
+        <polygon points={boardFaces.end} fill="rgb(var(--slate-700))" />
+        <polygon points={boardFaces.front} fill="rgb(var(--slate-800))" />
+        <polygon points={boardFaces.top} fill="rgb(var(--slate-900))" />
+      </g>
+      <!-- The opaque mover covers the copper outline wherever it passes in front. -->
+      <polygon points={activeFace} fill="none" stroke="#10b981" stroke-width="0.8" stroke-dasharray="3 2" />
+      <g data-solid="mover" stroke="#10b981" stroke-width="0.8" stroke-linejoin="round">
+        <polygon points={magnetFaces.end} class="magnet-end" />
+        <polygon points={magnetFaces.front} class="magnet-front" />
+        <polygon points={magnetFaces.top} class="magnet-top" />
+      </g>
+      <text x={(isoMagnetBox.corners[4][0] + isoMagnetBox.corners[5][0]) / 2}
+            y={isoMagnetBox.corners[4][1] - 6} text-anchor="middle"
+            class="fill-slate-300" style="font-size:10px">Magnets</text>
     </g>
 
-    <!-- Copper active-region outline on the PCB top face -->
-    <path d={isoActiveBox.d} fill="none" stroke="#34d399" stroke-width="0.8" stroke-dasharray="3 2" />
-    <text x={(isoActiveBox.corners[0][0] + isoActiveBox.corners[1][0]) / 2}
-          y={(isoActiveBox.corners[0][1] + isoActiveBox.corners[1][1]) / 2 - 3} text-anchor="middle"
-          class="fill-emerald-300" style="font-size:8px">active copper {config.active_area_length_mm.toFixed(0)} mm</text>
-
-    <!-- Magnet array wireframe box (positioned by the mover-position field) -->
-    <path d={isoMagnetBox.d} fill="#065f46" fill-opacity="0.35" stroke="#10b981" stroke-width="1" />
-    <text x={(isoMagnetBox.corners[4][0] + isoMagnetBox.corners[5][0]) / 2}
-          y={isoMagnetBox.corners[4][1] - 4} text-anchor="middle"
-          class="fill-emerald-300" style="font-size:9px">Magnets</text>
+    <!-- Dimension line: routed-trace span (measured from the payload) -->
+    <g data-trace-dimension class="text-slate-400" stroke="currentColor" stroke-width="0.7">
+      <line x1={isoDim.x1} y1={isoDim.sourceY + 2} x2={isoDim.x1} y2={isoDim.y + 3} />
+      <line x1={isoDim.x2} y1={isoDim.sourceY + 2} x2={isoDim.x2} y2={isoDim.y + 3} />
+      <line x1={isoDim.x1} y1={isoDim.y} x2={isoDim.x2} y2={isoDim.y} />
+      <text x={(isoDim.x1 + isoDim.x2) / 2} y={isoDim.y + 13} text-anchor="middle"
+            class="fill-slate-300" stroke="none" style="font-size:10px"
+            >Routed traces {boardLengthMm.toFixed(1)} mm</text>
+    </g>
 
     <!-- Axis legend (bottom-left corner) -->
     <g style="font-size:8px" stroke-linecap="round">
@@ -167,3 +173,12 @@
     </g>
   </svg>
 </div>
+
+<style>
+  .magnet-end { fill: #064e3b; }
+  .magnet-front { fill: #065f46; }
+  .magnet-top { fill: #047857; }
+  :global(:root[data-theme="light"]) .magnet-end { fill: #059669; }
+  :global(:root[data-theme="light"]) .magnet-front { fill: #34d399; }
+  :global(:root[data-theme="light"]) .magnet-top { fill: #a7f3d0; }
+</style>

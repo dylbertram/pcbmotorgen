@@ -1,0 +1,21 @@
+{
+  "status": "completed-nonlinear-solve-but-failed-mover-force-and-nearest-field-map",
+  "scope": "Actual centred star_2-layer.pmmotor v1 five-PM array with explicit 36x12mm footprint. Independent near-mesh refinement 0.8 to 0.4mm, fixed 0.1mm gap mesh, 60mm radius, 10mm far-air mesh, quarter symmetry and CAD Z stretch 4. No material parameters or acceptance gates changed.",
+  "summary_sha256": "ba41eb573b13b5438c862a893e8d68895b1ccb8b0f179507d7a79699e59be061",
+  "exact_stress_audit_sha256": "ef260b17f29be80b27858560025149a92e64d0292e7165866d9206fc15093a0f",
+  "off_symmetry_bare_map_audit_sha256": "f84323b4dfd78e75b33cc5f8cb48a0e48ed2f85c54bfc560c241cc0f56b37a42",
+  "bare_solve_seconds": 196.53012534798472,
+  "stack_solve_seconds": 2924.46186707,
+  "stack_nonlinear_residual": 8.867525339358831e-10,
+  "stack_nonlinear_iterations": 20,
+  "solver_receipts": {"bare": {"status": "completed", "exit_code": 0}, "stack": {"status": "completed", "exit_code": 0}},
+  "clearances_m": [0.0001, 0.0002, 0.0003],
+  "exact_stator_z_n": [1.1925920808748476, 1.1921567090570195, 1.195126262552412],
+  "exact_mover_z_n": [-0.41677847316945105, -0.44458707149240473, -0.6197879923315606],
+  "bare_mover_self_force_z_n": [0.7728070753794651, 0.7460295873899023, 0.5705760119944634],
+  "direct_reaction_imbalance_n": [0.7758136077053965, 0.7475696375646148, 0.5753382702208514],
+  "reaction_limits_n": [0.02385184161749695, 0.023843134181140393, 0.02390252525104824],
+  "bare_field_map_relative_vector_errors": [0.061979109538867275, 0.03387589621380468, 0.024549829755416912],
+  "unchanged_field_map_gate": 0.05,
+  "conclusion": "The finer global mesh improves the off-symmetry field map but does not qualify near-interface mover stress or action/reaction. Stable stator results are not accepted complete attraction evidence. Bare force floors are not subtracted. Separate PM-interface refinement and remote closed-air surface diagnostics remain independent work."
+}

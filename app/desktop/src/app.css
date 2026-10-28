@@ -40,7 +40,7 @@
   :root[data-theme="light"] :is(.text-emerald-100, .text-emerald-200, .text-emerald-300, .text-emerald-400) { color: #047857; }
   :root[data-theme="light"] :is(.text-amber-100, .text-amber-200, .text-amber-300, .text-amber-400) { color: #92400e; }
   :root[data-theme="light"] :is(.text-rose-100, .text-rose-200, .text-rose-300, .text-rose-400, .text-red-300, .text-red-400) { color: #be123c; }
-  :root[data-theme="light"] :is(.text-blue-200, .text-blue-300, .text-blue-400, .text-sky-300, .text-sky-400) { color: #1d4ed8; }
+  :root[data-theme="light"] :is(.text-blue-200, .text-blue-300, .text-blue-400, .text-sky-200, .text-sky-300, .text-sky-400) { color: #1d4ed8; }
 }
 
 /*

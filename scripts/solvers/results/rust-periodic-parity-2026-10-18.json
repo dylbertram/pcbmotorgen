@@ -1,0 +1,37 @@
+{
+  "status": "passed-periodic-implementation-parity",
+  "scope": "Rust/Python implementation parity for a periodic static vector-saturation reference. Not finite-array, coil, motion, eddy-current or hardware validation.",
+  "full_report_sha256": "832bf2343d221053680c0f6441e4dba0a8807cdef3a887b8e9df4548ffc4fb56",
+  "binary_sha256": "f2c35a972669af39c580b4e68af20140e06f42eb02f2280c04ea99c16e9db1c3",
+  "periodic_rust_source_sha256": "42a4decc0b0fb1c07c2cc53b0837835d5d5d6021b0654bfa66885fe0bcf1aa6c",
+  "python_static_source_sha256": "0af82b8e36946656a94a9a0726aca4f39aa49ea282dfb53e1d9c4af66eb486b0",
+  "parity_check_source_sha256": "5b188131946ed08f4bb5bd516cab4254c3e622570003d349c511285cd22b46e1",
+  "resolutions": [[32, 9, 512], [64, 9, 512], [64, 17, 512], [64, 17, 1024]],
+  "maximum_combined_parity_error": 8.737455203799982e-14,
+  "cases": {
+    "baseline/flex_0.2": {
+      "elapsed_seconds": 1.084544185,
+      "field_ratio": 1.045567376022692,
+      "periodic_pressure_pa": 7443.798224779592,
+      "largest_pressure_refinement_change": 0.00004034589005263989
+    },
+    "baseline/flex_5": {
+      "elapsed_seconds": 1.659757115,
+      "field_ratio": 1.2970768283273169,
+      "periodic_pressure_pa": 66005.56489664945,
+      "largest_pressure_refinement_change": 0.00010723772952203614
+    },
+    "baseline/mnzn_2": {
+      "elapsed_seconds": 3.708285616,
+      "field_ratio": 1.4053393422744245,
+      "periodic_pressure_pa": 84663.11638598512,
+      "largest_pressure_refinement_change": 0.00008480433937263498
+    },
+    "heldout/override": {
+      "elapsed_seconds": 2.223104752,
+      "field_ratio": 1.1319761355546563,
+      "periodic_pressure_pa": 13711.838011632592,
+      "largest_pressure_refinement_change": 0.000005332217271836193
+    }
+  }
+}

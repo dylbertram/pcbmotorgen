@@ -1,0 +1,115 @@
+{
+  "status": "closed-early-verified-exact-case-baseline-source-only",
+  "plan_id": "029f25f8-c2b8-476a-93a8-e5827b5a7792",
+  "authorization": "User requested planning and implementation during an eleven-hour uninterrupted window.",
+  "start_utc": "2026-10-26T20:10:32Z",
+  "numerical_cutoff_audit_reserve_utc": "2026-10-27T05:40:32Z",
+  "hard_stop_utc": "2026-10-27T07:10:32Z",
+  "base_commit": "b68cfca",
+  "latest_user_steering": "Do not wait for responses/permission to rerun necessary failed tests if time remains. Continue bounded software fixes and verification autonomously. Original finish target retained; up to30minutes extra only if needed to finish/verify existing work, not expand scope or relax resource/numerical gates. No CaseBforce or physical changes authorized.",
+  "scope": "Actual unchanged saved generated Case A through the production-shared managed host. Initial one-attempt limit was amended by the explicit retry approvals recorded below, then autonomous necessary test-rerun steering. Three fresh attempts total: two failed software checks, one verified prepared baseline. No further baseline solve needed; window closed early and unused retry budget expired.",
+  "evidence_directory": "/Users/dylanbertram/.local/opt/solver-prototypes-macos/managed-preparation-night-20261026-v1",
+  "tasks": {
+    "health": "3469a4aa-b130-43d8-923f-3e74687a9bb1",
+    "audit": "253c2b59-4590-4152-8918-432ce56d830e",
+    "hard_stop": "f15690a6-82c3-4bf2-a25f-343e94dbb295"
+  },
+  "initial_evidence": "Tracked checkout clean at b68cfca with five preserved untracked root designs. No candidate numerical workers or20261026owned services;81.19GiB disk free,46percent system memory free. Clean pinned preparation-worker/AMG check passes. Current focused managed-host tests14pass1explicitexportignored.",
+  "live_attempt": {
+    "launched_utc": "2026-10-26T20:12:56.437199Z",
+    "job_directory": "/Users/dylanbertram/.local/opt/solver-prototypes-macos/dc-desktop-jobs/dc-CiVQft",
+    "worker_pid": 20591,
+    "worker_label": "com.pcbmotorgen.dc.20261026.managed-night-once-v1",
+    "watch_label": "com.pcbmotorgen.dc.20261026.managed-night-once-v1-watch",
+    "launch_record": "managed-preparation-night-20261026-v1/launch-record.json",
+    "declaration_sha256": "c93077d26fd324cc9e1705af7656018d673d9d92ded7891e7b0421af75f184ff",
+    "first_live_observation_utc": "2026-10-26T20:13:16.341658Z",
+    "verified": "Host/child receipts live with matching start/boot identities; both one-shot services and independent watcher running, no alerts.378code/input/binaryhashes unchanged. CAD completed7.456s and source stage running;0.435GiB aggregate observed owned host+worker memory;80.65GiB disk free.",
+    "current_state": "Historical initial live observation only. This attempt subsequently failed; see attempt_outcome. No owned process remains live."
+  },
+  "attempt_outcome": {
+    "result": "Failed55.04s after meshing and source solve, during final input verification. No successful whole source receipt or prepared source published; computed fields remain failed/unaccepted and must not be reused.",
+    "error": "NameError: study is not defined. b68cfca extracted study loading into validate_source_inputs but left final production verification referencing the removed local variable. This is an agent-introduced regression.",
+    "cleanup": "20:16:28Z actual host/child/stage PID-start identities all absent,378frozenhashes unchanged. Only ended owned once/watch labels unloaded, logs/plists retained. failure-and-cleanup.json preserves evidence hashes.",
+    "fix": "Use the validator's complete validated_hashes at final production verification. Added a mocked production mesh-only path test that first reproduced the exact NameError beyond validation-only mode. No actual meshing/solve in this regression test.",
+    "retry": "Historical restriction at first failure, subsequently amended by explicit retry_authorization. This failed attempt remains unaccepted and was not reused."
+  },
+  "bounded_fix_verification": {
+    "helpers": "485scopedhelpers pass0skip; unchanged memory-heavy four-test test_ngsolve_eddy_av excluded explicitly. Not a full-suite pass.",
+    "red_green": "Mocked production mesh-only path first reproduced the exact undefined-study NameError at final verification, then passed after replacing that stale reference with the validator's frozen validated_hashes. Initial incomplete mock fixture error retained separately.",
+    "real_probe": "Corrected actual saved CaseA input validation-only still passes; no new real mesh/current/field/force solve or artifact adoption.",
+    "evidence": "managed-preparation-night-20261026-v1/fix-verification.json",
+    "remaining": "Historical state at4f6867f: complete preparation was unverified. Superseded for this exact saved CaseA/environment by verified_completion, not by repair or adoption of the failed run."
+  },
+  "retry_authorization": "User explicitly selected Run one fresh retry (Recommended) after disclosure of the agent-introduced regression and fixed/tested4f6867f. Authorizes exactly one additional fresh source-only attempt with unchanged physical inputs,14400s cap,no failed-solution reuse,same05:40:32ZOct27cutoff and07:10:32Zhardstop. No further automatic attempt or CaseBforce work.",
+  "latest_attempt": {
+    "launched_utc": "2026-10-26T21:52:08.716319Z",
+    "evidence_directory": "/Users/dylanbertram/.local/opt/solver-prototypes-macos/managed-preparation-night-20261026-v1/software-retry-v3",
+    "job_directory": "/Users/dylanbertram/.local/opt/solver-prototypes-macos/dc-desktop-jobs/dc-UuzZ9B",
+    "launch_record": "software-retry-v3/launch-record.json",
+    "worker_pid": 58425,
+    "worker_label": "com.pcbmotorgen.dc.20261026.managed-night-software-v3",
+    "watch_label": "com.pcbmotorgen.dc.20261026.managed-night-software-v3-watch",
+    "declaration_sha256": "391429cf3c62a9e854e94b145e9e63b090e21dde8d037d569fca72f0d56f1f21",
+    "frozen_inputs": "378hashes recomputed; only prepare_dc_request.py and its new whole-pipeline regression differ from v2. Saved physical inputs and other code unchanged. Fresh job; no prior mesh or solution used.",
+    "additional_software_retry_budget_used": 1,
+    "additional_software_retry_budget_remaining": 1,
+    "restrictions": "Latest attempt is successfully prepared and ended. No further attempt is needed; unused retry budget expired at early closure. Source baseline is not field/force/general admission."
+  },
+  "retry_v2_outcome": {
+    "state": "Failed68.625s at final preparation-summary validation; geometry/source/active/passive/return/independent/RT0 stages all recorded completed. Whole operation and all computed artifacts remain failed/unaccepted; no field or mesh reuse.",
+    "cause": "prepare_dc_request.main reused digest for study-binding hash iteration, overwriting the original request digest before validate_prepared_summary. Wrong final expected digest rejected an otherwise populated report.",
+    "cleanup": "21:36:25Z exact host/child/stage identities absent,378frozenhashes unchanged, only ended own retry worker/watch labels unloaded; evidence in retry-approved-v2/failure-and-cleanup.json. Logs/plists/solutions retained unaccepted.",
+    "fix": "Rename study-binding loop value to expected. New fully mocked whole-orchestration regression reproduced final-summary rejection before fix; no numerical job is run by this test.",
+    "further_attempts": "Historical state at v2 failure, subsequently amended by additional_retry_authorization. Failed outputs remain unaccepted and were not reused."
+  },
+  "additional_retry_authorization": {
+    "user_answer": "Allow two software-only retries (Recommended)",
+    "budget": "At most TWO additional fresh software-only attempts after v2; each must fit14400s plus outer/termination margins before05:40:32Z. Same hardstop07:10:32Z. No failed outputs reused, no physical or numerical-gate corrections; stop on numerical/physical failure.",
+    "fix": "19d847b preserves original request digest through final orchestration. New fully mocked whole-pipeline regression reproduced validation rejection before fix;486scopedhelpertests pass0skip excluding unchanged4-test AC/gauge module."
+  },
+  "verified_completion": {
+    "job_directory": "/Users/dylanbertram/.local/opt/solver-prototypes-macos/dc-desktop-jobs/dc-UuzZ9B",
+    "host_state": "prepared",
+    "host_elapsed_seconds": 70.264250667,
+    "preparation_elapsed_seconds": 67.61798066704068,
+    "stages": "All seven geometry/source/active/passive/return/independent/rt0 stages completed; all whole and stage receipts successful integer exit0. Rust opt-in real saved-design test passed1/0failed/0ignored, using the production-shared host path.",
+    "artifact_bindings": "41evidencehashes and378frozeninput/code/binaryhashes reverified. Host preparation payload exactly equals the bound final report; force and winding-field result payloads remain null.",
+    "own_loop_current_a_at_one_volt": 1.2848939323436648,
+    "effective_loop_resistance_ohm": 0.7782743577720737,
+    "independent_resistance_ohm": 0.7755346559570462,
+    "independent_relative_difference": 0.0035326620080524673,
+    "independent_limit": 0.05,
+    "relative_equation_residual": 4.1179725760248093e-14,
+    "relative_power_balance": 1.1102230246251565e-14,
+    "mesh_elements": 276498,
+    "source_dofs": 929212,
+    "peak_preparation_footprint_gib": 1.350161574780941,
+    "evidence": "software-retry-v3/completion-verification.json",
+    "cleanup": "All owned processes ended and only ended own v3 worker/watch labels unloaded; plists/logs retained. Earlier failed fields remain unaccepted and were not reused.",
+    "scope": "Successful baseline source preparation for this exact saved CaseA request and configured worker only. Source remains prepared-baseline-needs-refinement; force unqualified. No new field/force admission, general geometry, native UI, isolation or license clearance. No further full solve is needed merely to use the window."
+  },
+  "final_acceptance": {
+    "evidence": "final-acceptance-v1/verification.json",
+    "sha256": "dc719509bf3855893e568422197a6398518d48ad7c6c7acb67fe448926998079",
+    "helpers": "486passed0skips under240s/4GiB guard; unchanged four-test test_ngsolve_eddy_av excluded. Not a full-helper-suite pass.",
+    "desktop": "124passed0failed12explicitignored under240s/6GiB guard. The real numerical acceptance test was separately run explicitly and passed1/0failed/0ignored.",
+    "artifacts": "Production Evidence review rechecked41bindings, successful exact-job receipts and archived implementation snapshots. All79active/42passive/4return sections pass. Study/mesh/solution/independent/RT0 bindings unchanged.",
+    "unchanged_acceptance": "git diff b68cfca for app and build inputs is empty. Prior44affectedChromium passes and successful native no-bundle build reused by unchanged revision with report/receipt hashes in verification.json. No new WKWebView observation or full frontend rerun claimed.",
+    "dependency_review": "Read-only Homebrew formula/receipt/license metadata for Python/OpenSSL/mpdecimal/xz and prior inventory rehashed. Added ownership/provenance evidence only, not corresponding-source/relinking/notice fulfillment or redistribution clearance.",
+    "remaining": "General geometry/source refinement/new field-force admission remain open. Native WKWebView and isolated ARM install blocked without supplied observed session/environment. Native/transitive license clearance and full helper-suite acceptance remain open. CaseBforce/pilots/refinement-force chains remain deferred and unapproved."
+  },
+  "closure": {
+    "observed_at_utc": "2026-10-26T22:03:00.140501Z",
+    "evidence": "final-acceptance-v1/closure.json",
+    "sha256": "d8f42b2ee0857e5360b27fba96bc237acf3fea27ee15215e24a188a68e78698f",
+    "ownership": "All54recorded numerical receipt/owner identities ended, final helper/desktop processes ended, owned managed-night labels absent and listener1542absent. Ended own labels only unloaded; failures/logs/plists preserved.",
+    "preservation": "41successful evidence and378frozeninput/code/binaryhashes unchanged after final tests, both failed-evidence hash sets unchanged,88morning evidence hashes unchanged,5originalroot hashes AND mtimes unchanged, qualified registry unchanged. No physical/housingUI/Mutagen changes.",
+    "tasks": "Health3469a4aa, audit253c2b59 and hardstopf15690a6 all disabled via schedule.toggle after verified completion. Old disabled schedules left unchanged.",
+    "extension_used": false,
+    "diagnostics": "First closure audit stopped before output because historical relative evidence keys were resolved against cwd. Rerun resolved them against their recorded morning evidence directory; all88hashes passed with no evidence edits or relaxed gate.",
+    "checkpoint": "Verified outcome checkpointed locally on simulation/add-femm-and-improve; exact commit in external local-checkpoint.json. No push/installers/ZIP/delivery bundle. Historical morning4/5 and parent1/6 plans are not relabeled complete."
+  },
+  "resources": "14400s host/child cap;14100s total stage caps.13GiB preparation+1GiB host+2GiB headroom=16GiB below18GiB target.8GiB evidence cap;24GiB admission free-disk requirement. One heavy job; no concurrent tests/builds.",
+  "constraints": "No CaseBforce/pilot/refinement-cache/reference chain/matrix/per-body/admission work, no heavy AC/gauge rerun, no physical/return/resistivity/geometry repairs, no housingUI/Mutagen edits, no push/installers/ZIP/bundles. Strict2%/5%/1e-8N gates and all failures preserved. Source-only completion cannot qualify fields/forces or general/native/isolation/license acceptance."
+}

@@ -1,8 +1,7 @@
 import { expect, test } from "@playwright/test";
 import fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
-import { gotoDesignApp } from "./helpers";
+import { gotoDesignApp, openCoilPreview } from "./helpers";
 
 /**
  * Mover screenshot tooling (kata 8tc4).
@@ -13,7 +12,7 @@ import { gotoDesignApp } from "./helpers";
  * (kata xb16 / 5c7r).
  *
  * Run with: `pnpm shot:mover` (desktop-tauri project, 1280×800).
- * Output: screenshots/mover-at-min.png and screenshots/mover-at-max.png.
+ * Output: the run's Playwright artifacts, or MOVER_SCREENSHOT_DIR when set.
  *
  * The browser (vite dev) build runs on the mock IPC, which since kata ab30
  * returns a FIXED placeholder travel envelope — the pinned output of the
@@ -28,17 +27,17 @@ import { gotoDesignApp } from "./helpers";
  * travel (75 mm) exactly, matching the authority's output for this build.
  */
 
-const OUT_DIR = fileURLToPath(new URL("../screenshots", import.meta.url));
 const MOVER_BLOCK = 'div[aria-label="Mover position"]';
 // Bits UI slider thumb (kata 2npg): a span with role="slider" carrying the
 // accessible name — no native <input type="range"> anymore.
 const SLIDER = `${MOVER_BLOCK} [role="slider"][aria-label="Mover position slider (mm)"]`;
-const READOUT = `${MOVER_BLOCK} div[aria-live="polite"]`;
+const READOUT = '[role="group"][aria-label="Preview status"]';
 
 test("capture the mover at the min and max travel endpoints", async ({
   page,
-}) => {
+}, testInfo) => {
   await gotoDesignApp(page);
+  await openCoilPreview(page);
   const slider = page.locator(SLIDER).first();
   await slider.waitFor({ state: "visible", timeout: 15_000 });
 
@@ -46,16 +45,17 @@ test("capture the mover at the min and max travel endpoints", async ({
   // The "travel envelope unavailable" warning must be VISIBLE so the
   // placeholder numbers are never silently mistaken for real physics.
   await expect(
-    page.getByText("Travel envelope unavailable — backend required").first(),
+    page.getByText("Travel limits are estimated. Simulation backend unavailable.").first(),
   ).toBeVisible({ timeout: 10_000 });
 
   // Wait for the debounced preview/envelope stream to settle. The
   // placeholder envelope (36 → 111 mm at defaults) gives the 75 mm sweep
   // the readout prints — the readout pins below carry the assertion.
   const readout = page.locator(READOUT).first();
-  await expect(readout).toContainText("/ 75.0 mm", { timeout: 10_000 });
+  await expect.poll(async () => Number(await slider.getAttribute("aria-valuemax")) - Number(await slider.getAttribute("aria-valuemin"))).toBe(75);
 
-  fs.mkdirSync(OUT_DIR, { recursive: true });
+  const outDir = process.env.MOVER_SCREENSHOT_DIR ?? testInfo.outputDir;
+  fs.mkdirSync(outDir, { recursive: true });
 
   const setEndpoint = async (which: "min" | "max") => {
     // Bits slider thumbs jump to the exact endpoints on Home/End (keyboard
@@ -76,19 +76,19 @@ test("capture the mover at the min and max travel endpoints", async ({
     // the inline CoilPreview canvas draws the magnet strip over the traces;
     // the app scrolls internally so a plain fullPage shot misses it.
     await page.screenshot({
-      path: path.join(OUT_DIR, `mover-at-${label}.png`),
+      path: path.join(outDir, `mover-at-${label}.png`),
       fullPage: true,
     });
     const canvas = page.locator("canvas:visible").first();
     await canvas.scrollIntoViewIfNeeded();
     await canvas.screenshot({
-      path: path.join(OUT_DIR, `mover-at-${label}-canvas.png`),
+      path: path.join(outDir, `mover-at-${label}-canvas.png`),
     });
   };
 
   // Frontend defaults with the placeholder envelope (36 → 111 mm), span
   // 70.5 mm (physical outer-edge span) → strip 0.8 → 71.3 mm at min,
   // 75.8 → 146.3 mm at max — readout = array centre ± span / 2.
-  await shoot("min", "0.8 - 71.3 mm");
-  await shoot("max", "75.8 - 146.3 mm");
+  await shoot("min", "0.8 – 71.3 mm");
+  await shoot("max", "75.8 – 146.3 mm");
 });

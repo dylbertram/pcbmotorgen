@@ -128,3 +128,19 @@ export function isoBoxPath(
     .join(" ");
   return { d, corners: s };
 }
+
+/** Visible faces for isoProject's above/front/left viewing direction.
+ * Draw opaque polygons in this order, never the rear or bottom wireframe edges.
+ */
+export function isoVisibleFaces(corners: readonly [number, number][]): {
+  end: string;
+  front: string;
+  top: string;
+} {
+  const points = (indices: number[]) => indices.map((i) => corners[i].join(",")).join(" ");
+  return {
+    end: points([0, 3, 7, 4]),
+    front: points([3, 2, 6, 7]),
+    top: points([4, 5, 6, 7]),
+  };
+}

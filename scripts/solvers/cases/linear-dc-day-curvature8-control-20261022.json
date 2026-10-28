@@ -1,0 +1,16 @@
+{
+  "schema": "declared-linear-dc-acceptance-matrix-v1",
+  "study_inputs": "scripts/solvers/cases/linear-dc-day-study-inputs-20261022.json",
+  "scope": "Supplemental numerical curvature control for the accepted case-A curvature6 source. Original4/6 declaration and failed4 barrel-area evidence remain unchanged. No geometry,force-scope or app-admission extension.",
+  "reason": "Do not use a failed coarse local-area report as an accepted refinement reference. Compare completed passing curvature6 and8 sources at the identical physical mesh-size and drive settings,with all eligible local signed sections and fixed accepted near/app-region field probes.",
+  "source_controls": {
+    "mesh_m": [0.0002],
+    "curvature_safety": [6.0,8.0],
+    "port_fraction": [0.5]
+  },
+  "relative_refinement_gate": 0.02,
+  "section_current_floor_per_loop_a": 1e-8,
+  "field_floor_t_per_loop_a": 1e-12,
+  "max_dofs": 24000000,
+  "policy": "Fresh1V mixed source,current normalized only by its own saved loop current. No fitted correction,failed-field reuse,probe relocation or physical modification. No coupled-force acceptance from this source-only check."
+}

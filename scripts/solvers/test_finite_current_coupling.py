@@ -1,0 +1,70 @@
+from copy import deepcopy
+import unittest
+
+from finite_current_coupling import CACHE_UNIT, control_model, current_pairs, validate_cache, cache_mesh_path
+
+
+class FiniteCurrentCouplingInputTest(unittest.TestCase):
+    def test_exact_consumed_mesh_not_reserialization_bytes_establishes_identity(self):
+        cache = {'model': {'case': 'actual'}, 'mesh_work': '/case/original',
+                 'input_hashes': {'/case/original/mesh.vol': 'immutable-original'}}
+        bias = {'model': cache['model'], 'mesh_sha256': 'reserialized',
+                'input_hashes': dict(cache['input_hashes'])}
+        self.assertEqual(str(cache_mesh_path(cache, bias)), '/case/original/mesh.vol')
+        bias['input_hashes']['/case/original/mesh.vol'] = 'different-original'
+        with self.assertRaises(ValueError):
+            cache_mesh_path(cache, bias)
+
+    def test_cache_can_consume_exact_mesh_produced_by_accepted_bias_job(self):
+        cache = {'model': {'case': 'actual'}, 'mesh_work': '/case/bias',
+                 'input_hashes': {'/case/bias/mesh.vol': 'produced-mesh'}}
+        bias = {'model': cache['model'], 'mesh_sha256': 'produced-mesh', 'input_hashes': {}}
+        self.assertEqual(str(cache_mesh_path(cache, bias, '/case/bias')), '/case/bias/mesh.vol')
+        with self.assertRaises(ValueError):
+            cache_mesh_path(cache, bias, '/case/different-bias')
+        bias['mesh_sha256'] = 'changed'
+        with self.assertRaises(ValueError):
+            cache_mesh_path(cache, bias, '/case/bias')
+
+    def test_pose_requires_explicit_expected_baseline_model(self):
+        cache = {'model': {'pose': 0.}, 'mesh_work': '/case/original',
+                 'input_hashes': {'/case/original/mesh.vol': 'immutable-original'}}
+        bias = {'model': {'pose': .0001}, 'input_hashes': dict(cache['input_hashes'])}
+        with self.assertRaises(ValueError):
+            cache_mesh_path(cache, bias)
+        self.assertEqual(str(cache_mesh_path(cache, bias, requested_model={'pose': .0001})), '/case/original/mesh.vol')
+
+    def cache(self):
+        return dict(status='passed-finite-source-material-quadrature-only', failures=[], unit=CACHE_UNIT,
+                    evaluated_points=100, total_material_points=100,
+                    maximum_pointwise_opening_relative_change=.01,
+                    maximum_direct_reference_relative_difference=.02,
+                    storage={'maximum_relative_storage_error': 0.})
+
+    def test_partial_failed_wrong_unit_or_nonfinite_cache_cannot_supply_results(self):
+        validate_cache(self.cache())
+        for key, value in [('status', 'running'), ('failures', ['unaccepted']), ('unit', 'tesla per1V'),
+                           ('evaluated_points', 10), ('maximum_pointwise_opening_relative_change', .02001),
+                           ('maximum_direct_reference_relative_difference', float('nan'))]:
+            report = self.cache()
+            report[key] = value
+            with self.subTest(key=key), self.assertRaises(ValueError):
+                validate_cache(report)
+
+    def test_control_material_changes_are_explicit_and_do_not_mutate_original(self):
+        model = {'stack': [{'name': 'ferrite', 'mu_r': 130., 'bsat_t': .25}, {'name': 'housing', 'mu_r': 1., 'bsat_t': None}]}
+        original = deepcopy(model)
+        self.assertEqual(control_model(model, 'nonlinear'), model)
+        self.assertIsNone(control_model(model, 'linear')['stack'][0]['bsat_t'])
+        self.assertEqual(control_model(model, 'vacuum')['stack'][0]['mu_r'], 1.)
+        self.assertEqual(model, original)
+
+    def test_declared_zero_and_polarity_states_are_not_synthesized(self):
+        self.assertEqual(current_pairs([0., .1, -.1, .5, -.5]), [.1, .5])
+        for values in [[.1, -.1], [0., 0.], [0., float('inf')]]:
+            with self.assertRaises(ValueError):
+                current_pairs(values)
+
+
+if __name__ == '__main__':
+    unittest.main()
