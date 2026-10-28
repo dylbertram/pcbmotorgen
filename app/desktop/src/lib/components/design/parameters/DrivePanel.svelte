@@ -14,7 +14,7 @@
 <section id="drive-targets-heading" aria-label="Drive & force targets" class="space-y-4">
   <fieldset class="space-y-2">
     <legend class="mb-2 text-xs font-semibold text-slate-300">Current &amp; force</legend>
-    <SettingRow label="Phase current (A)"><NumberField id="phase-current" value={config.max_current_a} min={0.01} step={0.05} ariaLabel="Phase current (A)" class={field} onCommit={(v) => (config.max_current_a = v)} /></SettingRow>
+    <SettingRow label="Phase amplitude (A)" help="Selected phase-current amplitude before PWM ripple, not DC supply current."><NumberField id="phase-current" value={config.max_current_a} min={0.01} step={0.05} ariaLabel="Phase current (A)" class={field} onCommit={(v) => (config.max_current_a = v)} /></SettingRow>
     <SettingRow label="Continuous target (N)"><NumberField id="target-force" value={config.target_force_n} min={0.001} step={0.01} ariaLabel="Continuous target force (N)" class={field} onCommit={(v) => (config.target_force_n = v)} /></SettingRow>
     <SettingRow label="Peak target (N)"><NumberField id="peak-force" value={config.peak_force_n} min={0.001} step={0.01} ariaLabel="Peak target force (N)" class={field} onCommit={(v) => (config.peak_force_n = v)} /></SettingRow>
     <SettingRow label="Friction (N)" help="Estimated mechanical resistance to motion. Net force must exceed it to move the load." equation={String.raw`F_{\mathrm{net}} = F_{\mathrm{motor}} - F_{\mathrm{friction}}`}><NumberField id="friction-estimate" value={config.friction_n} min={0} step={0.005} ariaLabel="Friction estimate (N)" class={field} onCommit={(v) => (config.friction_n = v)} /></SettingRow>

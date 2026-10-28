@@ -4,6 +4,7 @@
   import VoltageEnvelopePlot from "./VoltageEnvelopePlot.svelte";
   import HelpTag from "../ui/HelpTag.svelte";
   import Formula from "../ui/Formula.svelte";
+  import CurrentBudget from "./CurrentBudget.svelte";
 
   let {
     analysis,
@@ -75,7 +76,7 @@
     <h3 id="driver-suitability-heading" class="text-sm font-semibold text-slate-200">Driver suitability</h3>
     {#if analysis}
       <span class="text-xs text-slate-400">
-        {analysis.phase_current_a.toFixed(2)} A per phase at {analysis.bus_voltage_v.toFixed(1)} V, {formatSi(analysis.pwm_hz, "Hz")} PWM
+        Selected operating point: {analysis.phase_current_a.toFixed(2)} A phase amplitude, {analysis.bus_voltage_v.toFixed(1)} V bus, {formatSi(analysis.pwm_hz, "Hz")} PWM
       </span>
     {/if}
   </div>
@@ -96,6 +97,9 @@
       <span class="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full border text-xs font-bold {STATUS[verdict.status].tone}" aria-hidden="true">{STATUS[verdict.status].glyph}</span>
       {verdict.text}
     </p>
+
+    <p class="mt-2 text-xs text-slate-400">The selected current is a simulation input, not a measured draw or a calculated current limit.</p>
+    <div class="mt-3"><CurrentBudget {analysis} /></div>
 
     <div class="driver-layout">
     <section class="result-section voltage-section" aria-label="Voltage and speed">
@@ -171,12 +175,13 @@
       <h4 class="mb-3 text-xs font-semibold text-slate-300">Operating limits</h4>
         <dl class="grid grid-cols-2 gap-x-4 gap-y-4 text-xs">
           <div>
-            <dt class="text-slate-400">Highest continuous current</dt>
+            <dt class="text-slate-400">Calculated continuous phase-current ceiling</dt>
             <dd class="font-mono text-slate-100">{analysis.max_continuous_current_a.toFixed(2)} A</dd>
             <dd class="text-[11px] text-slate-500">limited by {analysis.limiting_factor}</dd>
+            <dd class="text-[11px] text-slate-500">Standstill estimate, not supply draw. PWM ripple and target-speed checks still apply.</dd>
           </div>
           <div>
-            <dt class="text-slate-400">Thrust at that current</dt>
+            <dt class="text-slate-400">Thrust at the calculated ceiling</dt>
             <dd class="font-mono text-slate-100">{analysis.max_continuous_thrust_n !== null ? `${analysis.max_continuous_thrust_n.toFixed(3)} N` : "—"}</dd>
             <dd class="text-[11px] text-slate-500">K_f {analysis.thrust_constant_n_per_a !== null ? `${analysis.thrust_constant_n_per_a.toFixed(3)} N/A` : "pending"}</dd>
           </div>
@@ -191,7 +196,7 @@
             {/if}
           </div>
           <div>
-            <dt class="text-slate-400">Copper loss</dt>
+            <dt class="text-slate-400">Copper loss at the selected current</dt>
             <dd class="font-mono text-slate-100">{formatSi(analysis.copper_loss_w, "W")}</dd>
             <dd class="text-[11px] text-slate-500"><Formula tex={String.raw`\tau = \frac{L}{R}`} /> = {formatSi(analysis.time_constant_s, "s")}</dd>
           </div>

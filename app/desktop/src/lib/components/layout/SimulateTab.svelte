@@ -166,7 +166,7 @@
     </Tabs.Content>
     <Tabs.Content value="summary" data-dock-panel="summary" class="min-h-0 flex-1 overflow-auto p-3">
       {@render warnings()}
-      <MetricsPanel {config} {sweep} {friction} {height} />
+      <MetricsPanel {config} {sweep} {friction} {height} {drive} />
     </Tabs.Content>
     <Tabs.Content value="dc" data-dock-panel="dc" class="min-h-0 flex-1 overflow-auto p-3">
       <DcCouplingPanel {config} {cadGeometry} active={active && open && !collapsed && selected === "dc"} />

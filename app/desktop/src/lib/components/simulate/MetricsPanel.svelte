@@ -5,9 +5,11 @@
     ForceSweepResult,
     FrictionBudgetDto,
     HeightStackResultDto,
+    DriveAnalysis,
   } from "../../types";
   import { rippleStatus } from "../../format";
   import HelpTag from "../ui/HelpTag.svelte";
+  import CurrentBudget from "./CurrentBudget.svelte";
 
   // Human-readable labels for the raw `CommutationMode` wire values — the UI
   // must not echo snake_case wire values back to the user.
@@ -23,11 +25,13 @@
     sweep,
     friction,
     height,
+    drive = null,
   }: {
     config: ConfigStore;
     sweep: ForceSweepResult | null;
     friction: FrictionBudgetDto | null;
     height: HeightStackResultDto | null;
+    drive?: DriveAnalysis | null;
   } = $props();
 
   let netUsableN = $derived.by(() => {
@@ -108,8 +112,16 @@
 
   <!-- Drive config echo -->
   <div class="text-xs text-slate-400">
-    Drive: {commutationLabel(config.commutation)} · {config.phases} phase · {config.max_current_a.toFixed(2)} A @ {config.supply_voltage_v.toFixed(1)} V
+    Selected simulation inputs: {commutationLabel(config.commutation)} · {config.phases} phase · {config.max_current_a.toFixed(2)} A phase amplitude · {config.supply_voltage_v.toFixed(1)} V bus.
+    This is not the DC supply current.
   </div>
+  {#if drive}
+    <CurrentBudget analysis={drive} />
+    <p class="text-xs text-slate-400">
+      Calculated continuous phase-current ceiling: <span class="font-mono text-slate-200">{drive.max_continuous_current_a.toFixed(2)} A</span>,
+      limited by {drive.limiting_factor}. Standstill estimate; see driver checks for PWM ripple and target-speed limits.
+    </p>
+  {/if}
 </div>
 
 <style>
