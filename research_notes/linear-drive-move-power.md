@@ -7,6 +7,44 @@ remain as a record of what was implemented and tested, not current requirements.
 
 ## Supported model
 
+### User-requested 0.8 mm Fader PCB scenario, 2026-10-30
+
+An explicit test-only `PCB_MOTOR_FADER_PCB_THICKNESS_M=0.0008` override changes
+the Fader scenario configuration, not its archive or app defaults. Every other
+baseline input was checked equal to the 1.6 mm corrected-Z run. The two-layer
+star control stays unchanged. Regenerated the loss declaration from the new
+native R/L analysis; no old geometry-bound coefficients were reused.
+Physical Fader layers are now -0.8, -0.5333333, -0.2666667, 0 mm. The same
+63 mm/1 s and 1 mm/0.25 s quintic moves, pi/2 phase reference, 50 mN friction,
+15 g mover, 75 C winding, 12 V/100 kHz and 47 µH per phase remain explicit.
+
+| Fader move | 1.6 mm peak W | 0.8 mm peak W | 1.6 mm net J | 0.8 mm net J |
+| --- | ---: | ---: | ---: | ---: |
+| Full forward | 56.5753 | 37.6338 | 15.2938 | 10.3766 |
+| Short forward | 3.85262 | 2.68357 | 0.717165 | 0.504599 |
+| Short return | 3.96737 | 2.76087 | 0.727275 | 0.511402 |
+
+The 0.8 mm full scenario has 3.13615 A sampled positive source peak and
+10.3766 W move-average power. The short forward/return averages are
+2.01840/2.04561 W and source peaks 0.223631/0.230073 A. All three have zero
+returned energy, so drawn equals net. Full peak falls 33.5% and net energy
+32.2%. Phase R falls only about 0.6%, from approximately 4.86 to 4.83 Ω;
+the main benefit is stronger coupling to the now-closer lower layers.
+The full move still requires up to 19.011 V line voltage, above the 12 V link.
+It remains imposed demand, not achieved motion or a board/current rating.
+Short cases have no voltage tracking finding. This does not validate the
+pi/2 phase alignment or the friction estimate, nor resolve omitted losses.
+
+The three Fader cases and unchanged star controls passed the same independent
+energy balances and 2% time/force-map energy/peak convergence checks. Seventeen
+native-receipt report/export tests and six Python formula/summary tests passed.
+Receipt `scripts/solvers/results/practical-move-pcb08-2026-10-30.json` records
+the thickness and explicit override. Full receipts are in approved temp
+`move-pcb08-{baselines,models,results}-20261030`. Reproduce using the earlier
+export/build/evaluate commands with this explicit Fader-only environment override
+on the baseline-export command and fresh output directories. Supplied files
+remain unchanged; this scenario does not switch the user's active saved design.
+
 ### Simulation height audit after the PCB correction
 
 Audited the active desktop simulation entry points, not just move power:

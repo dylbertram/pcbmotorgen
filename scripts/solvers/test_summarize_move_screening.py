@@ -16,9 +16,10 @@ class SummaryValidationTest(unittest.TestCase):
                 path.mkdir()
             model = {'omitted_losses': ['not modeled'], 'reference': 'fixture',
                      'ripple': {'reference': 'fixture'}, 'domain': {}}
-            initial = {'move_request': {'loss_model': None, 'force_positions': 129,
+            initial = {'config': {'pcb_thickness_m': .0008}, 'move_request': {'loss_model': None, 'force_positions': 129,
                                         'profile': {'time_step_s': .0005}}}
             baseline = {'archive': 'fixture', 'archive_sha256': 'fixture', 'version': 1,
+                        'scenario_overrides': {'pcb_thickness_m': .0008},
                         'native': {'inputs': initial, 'input_sha256': 'fixture'}}
             source = {'net_energy_j': 1.0, 'drawn_energy_j': 1.0, 'returned_energy_j': 0.0,
                       'sampled_positive_peak_power_w': 1.0}
@@ -26,7 +27,7 @@ class SummaryValidationTest(unittest.TestCase):
                       'accounted_loss_energy_j': 1.0, 'source_balance_residual_j': 0.0,
                       'mechanical_balance_residual_j': 0.0, 'actual_time_step_s': .0005,
                       'limiting_factors': [], 'electrical': {'loss_model': model}}
-            inputs = {'move_request': {'loss_model': model, 'force_positions': 129,
+            inputs = {'config': {'pcb_thickness_m': .0008}, 'move_request': {'loss_model': model, 'force_positions': 129,
                                        'profile': {'time_step_s': .0005}}}
             record = {'inputs': inputs, 'input_sha256': 'fixture', 'result': {'demand': demand}}
             for design in ('fader', 'star2'):
@@ -36,7 +37,10 @@ class SummaryValidationTest(unittest.TestCase):
                                         (result_dir, [record, record, record])):
                         (path / name).write_text(json.dumps(value))
             kwargs = dict(engineering_estimate=True, builder=Path(__file__))
-            self.assertEqual(len(summarize(baseline_dir, model_dir, result_dir, **kwargs)['cases']), 6)
+            summary = summarize(baseline_dir, model_dir, result_dir, **kwargs)
+            self.assertEqual(len(summary['cases']), 6)
+            self.assertEqual(summary['cases']['fader-full-forward']['pcb_thickness_m'], .0008)
+            self.assertEqual(summary['cases']['fader-full-forward']['scenario_overrides'], {'pcb_thickness_m': .0008})
             path = result_dir / 'fader-full-forward.json'
             records = json.loads(path.read_text())
             records[0]['result']['demand']['electrical']['loss_model']['reference'] = 'wrong'
