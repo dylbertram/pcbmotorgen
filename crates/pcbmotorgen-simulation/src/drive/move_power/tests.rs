@@ -1,5 +1,7 @@
 use super::*;
 
+mod declared_losses;
+
 fn profile() -> MoveProfile {
     MoveProfile {
         start_m: 0.0,
@@ -45,6 +47,8 @@ fn electrical() -> MoveElectricalModel {
         additional_driver_loss_w: Some(0.01),
         source_accepts_regeneration: true,
         phase_model: None,
+        loss_model: None,
+        loss_operating_point: None,
     }
 }
 

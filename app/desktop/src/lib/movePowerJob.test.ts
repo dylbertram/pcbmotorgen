@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { MovePowerJob, moveInputKey } from "./movePowerJob";
 import type { MovePowerInputs, NativeMoveResult } from "./types/movePower";
+import { declaredLossFixture } from "./testFixtures/moveLosses";
 
 function deferred<T>() {
   let resolve!: (value: T) => void, reject!: (error: Error) => void;
@@ -85,5 +86,18 @@ describe("native move publication", () => {
   it("canonical identity ignores key order but includes nested geometry and move values", () => {
     expect(moveInputKey({ a: 1, b: { x: 3, y: 4 } })).toBe(moveInputKey({ b: { y: 4, x: 3 }, a: 1 }));
     expect(moveInputKey({ depth: -4.8 })).not.toBe(moveInputKey({ depth: 0 }));
+  });
+  it("invalidates a request when a loss coefficient changes, even with identical copper and motion", async () => {
+    const { job, requests, cancel } = setup();
+    const original = structuredClone(inputs);
+    original.move_request.loss_model = declaredLossFixture();
+    job.setInputs(original);
+    const run = job.run();
+    const edited = structuredClone(original);
+    edited.move_request.loss_model!.switching.constant_j = 9e-7;
+    job.setInputs(edited);
+    expect(cancel).toHaveBeenCalledWith("move-1");
+    requests[0].resolve(response("move-1", original)); await run;
+    expect(job.result).toBeNull(); expect(job.status).toBe("idle");
   });
 });

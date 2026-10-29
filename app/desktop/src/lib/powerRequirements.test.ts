@@ -3,6 +3,7 @@ import { ConfigStore } from "./stores/config.svelte";
 import { mockDriveAnalysis, mockForceSweep } from "./ipc/mocks";
 import type { CadGeometry } from "./types";
 import { powerRequirements, powerReportMarkdown, powerRequirementsCsv, powerModelSnapshot, forceSweepCsv, phaseElectricalCsv, currentMoveResult, moveTraceCsv, type PowerRequirementsInput } from "./powerRequirements";
+import { declaredLossFixture } from "./testFixtures/moveLosses";
 
 // Inputs transcribed from the user's Fader-traces-workspace.pmmotor. This
 // fixture deliberately does not claim to reproduce its imported trace solver.
@@ -153,6 +154,8 @@ function withMove(): PowerRequirementsInput {
       mechanical_work_j: 0.002, friction_damping_energy_j: 0.001, external_load_work_j: 0,
       kinetic_energy_change_j: 0, magnetic_energy_change_j: 0, capacitor_energy_change_j: 0,
       copper_energy_j: 0.1, mechanical_balance_residual_j: 1e-9, electrical_balance_residual_j: 2e-9,
+      source_balance_residual_j: null, loss_energy: null, accounted_loss_energy_j: 0.11,
+      phase_rms_including_declared_ripple_a: null, sampled_phase_peak_including_declared_ripple_a: null,
       limiting_factors: [], missing_inputs: [], notes: ["Synthetic report-mapping test, not engineering evidence."],
       samples: [{ time_s: 0, position_m: 0.0025, velocity_m_s: 0, acceleration_m_s2: 0, motor_force_n: 0,
         required_source_voltage_v: 12, required_source_current_a: 1/6, required_source_power_w: 2,
@@ -160,7 +163,7 @@ function withMove(): PowerRequirementsInput {
         required_line_voltage_v: 1.5, required_d_voltage_v: 0, required_q_voltage_v: 1,
         copper_loss_w: 0.1, driver_conduction_loss_w: 0.01, mechanical_power_w: 0,
         friction_damping_loss_w: 0, external_load_power_w: 0, kinetic_energy_j: 0, magnetic_energy_j: 1e-5,
-        magnetic_power_w: 0, partial_dc_link_power_w: 1.9 }] } } };
+        magnetic_power_w: 0, partial_dc_link_power_w: 1.9, losses: null }] } } };
   return input;
 }
 
@@ -203,5 +206,70 @@ describe("move power report consistency", () => {
     expect(item(input, "Peak supply power during a move").value).toBe("Unknown");
     expect(item(input, "Motion feasibility").value).toBe("Not achieved");
     expect(moveTraceCsv(input)).toContain('"simulated_not_measured","false"');
+  });
+});
+
+function withDeclaredLosses(): PowerRequirementsInput {
+  const input = withMove();
+  const model = declaredLossFixture(input.driveSettings.driver.name, input.driveSettings.driver.rds_on_ohm);
+  input.moveRequest!.additional_driver_loss_w = null;
+  input.moveRequest!.loss_model = model;
+  const m = input.moveResult!.result.demand;
+  m.source_model_scope = "declared_loss_model";
+  m.electrical.loss_model = model;
+  m.electrical.additional_driver_loss_w = null;
+  m.loss_energy = { winding_dc_ripple_energy_j: 0.00012, winding_ac_energy_j: 0.03756,
+    external_series_energy_j: 0.075015, external_core_energy_j: 0.006,
+    switching_energy_j: 0.013614, deadtime_energy_j: 0.003732, controller_energy_j: 0.02, other_dc_link_energy_j: 0.03 };
+  m.accounted_loss_energy_j = 0.9; m.source_balance_residual_j = 1e-10;
+  m.phase_rms_including_declared_ripple_a = [0.41, 0.51, 0.61];
+  m.sampled_phase_peak_including_declared_ripple_a = 0.82;
+  m.samples[0].losses = { mean_square_phase_current_a2: [0.6401, 0.1601, 0.1601],
+    phase_peak_envelope_a: [0.82, 0.42, 0.42], winding_dc_ripple_loss_w: 0.00012,
+    winding_ac_loss_w: 0.03756, external_series_loss_w: 0.075015, external_core_loss_w: 0.006,
+    switching_loss_w: 0.013614, deadtime_loss_w: 0.003732, controller_loss_w: 0.02, other_dc_link_loss_w: 0.03 };
+  return input;
+}
+
+describe("declared loss-model reports", () => {
+  it("maps conditional total W/A/J and loss terms identically to UI sections, report, CSV and snapshot", () => {
+    const input = withDeclaredLosses();
+    const sections = powerRequirements(input);
+    expect(item(input, "Peak supply power during a move").value).toBe("2 W");
+    expect(item(input, "Average supply power over a move").value).toBe("1 W");
+    expect(item(input, "Electrical energy per move").value).toBe("1 J");
+    expect(item(input, "Guaranteed maximum source power").value).toBe("Unknown");
+    expect(item(input, "Peak supply power during a move").detail).toContain("declared loss model");
+    expect(item(input, "Source model scope").value).toBe("Declared loss-model total");
+    expect(item(input, "Controller energy").value).toBe("0.02 J");
+    expect(powerReportMarkdown(sections)).toContain("Declared loss-model total");
+    expect(powerRequirementsCsv(sections)).toContain('"Electrical energy per move","1 J"');
+    const snapshot = JSON.parse(powerModelSnapshot(input));
+    expect(snapshot.sections).toEqual(sections);
+    expect(snapshot.moveResult.result.demand.loss_energy.controller_energy_j).toBe(0.02);
+    const trace = moveTraceCsv(input)!;
+    expect(trace).toContain('"driver_deadtime_loss_W"');
+    expect(trace).toContain('"phase_0_mean_square_current_A2"');
+    expect(trace).toContain('"declared_loss_model"');
+    expect(trace).toContain('"0.6401","0.1601","0.1601"');
+  });
+  it("never promotes idealized, incomplete, failed or browser results into total rows", () => {
+    for (const mutate of [(i: PowerRequirementsInput) => { i.moveResult!.result.demand.electrical.loss_model!.basis = "idealized"; },
+      (i: PowerRequirementsInput) => { i.moveResult!.result.demand.loss_energy = null; },
+      (i: PowerRequirementsInput) => { i.moveResult!.result.demand.missing_inputs = ["Unknown core law"]; },
+      (i: PowerRequirementsInput) => { i.moveResult!.result.demand.feasible = false; },
+      (i: PowerRequirementsInput) => { i.native = false; }]) {
+      const input = withDeclaredLosses(); mutate(input);
+      expect(item(input, "Peak supply power during a move").value).toBe("Unknown");
+      expect(item(input, "Electrical energy per move").value).toBe("Unknown");
+    }
+  });
+  it("invalidates totals and trace export after loss inputs change", () => {
+    const input = withDeclaredLosses();
+    input.moveRequest = structuredClone(input.moveRequest!);
+    input.moveRequest.loss_model!.switching.constant_j = 9e-7;
+    expect(currentMoveResult(input)).toBeNull();
+    expect(moveTraceCsv(input)).toBeNull();
+    expect(JSON.parse(powerModelSnapshot(input)).moveResult).toBeNull();
   });
 });

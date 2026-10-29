@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { readFile } from "node:fs/promises";
 import { gotoDesignApp } from "./helpers";
+import { declaredLossFixture } from "../src/lib/testFixtures/moveLosses";
 
 async function openPower(page: Page) {
   await page.getByRole("tab", { name: /^Simulate/i }).click();
@@ -52,6 +53,12 @@ test("move definition requires explicit inputs and demo mode cannot calculate or
   await panel.getByRole("button", { name: "Clear move definition", exact: true }).click();
   await expect(panel.getByRole("alert")).toHaveCount(0);
   expect(JSON.parse(await editor.inputValue()).profile.duration_s).toBeNull();
+  await panel.getByRole("button", { name: "Add loss-model fields", exact: true }).click();
+  const lossTemplate = JSON.parse(await editor.inputValue()).loss_model;
+  expect(lossTemplate.basis).toBeNull();
+  expect(lossTemplate.ripple.covariance_a2[0]).toEqual([null, null, null]);
+  expect(lossTemplate.controller_power_w).toBeNull();
+  await panel.getByRole("button", { name: "Clear move definition", exact: true }).click();
 });
 
 // These tests inject synthetic DTOs at the transport boundary. They verify
@@ -110,22 +117,31 @@ test("native move transport state updates UI and exports, and a cancelled late r
       export async function evaluateMovePower(id, inputs) {
         if (window.__holdMove) { window.__moveWaiting = true; await new Promise(resolve => window.addEventListener('release-move', resolve, {once:true})); }
         const p = inputs.move_request.profile;
+        const full = !!window.__declaredLossTransport;
         return { request_id:id, input_sha256:'a'.repeat(64), inputs, provenance:'simulated_not_measured',
-          result: { demand: { model_version:'synthetic-ui-transport-test', source_model_scope:'partial_declared_scenario', profile:p,
-            electrical:{additional_driver_loss_w:0, source_accepts_regeneration:true, phase_model:{phase_names:['A','B','C']}},
+          result: { demand: { model_version:'synthetic-ui-transport-test', source_model_scope:full?'declared_loss_model':'partial_declared_scenario', profile:p,
+            electrical:{additional_driver_loss_w:full?null:0, loss_model:full?inputs.move_request.loss_model:null, source_accepts_regeneration:true, phase_model:{phase_names:['A','B','C']}},
             feasible:true, limiting_factors:[], missing_inputs:[], notes:['Synthetic transport fixture, not numerical evidence.'],
             actual_time_step_s:0.001, requested_distance_m:0.001, sampled_requested_peak_speed_m_s:0.002,
             sampled_requested_positive_acceleration_m_s2:0.01, sampled_requested_negative_acceleration_m_s2:-0.01,
             sampled_phase_peak_a:0.2, phase_rms_a:[0.1,0.1,0.1], copper_energy_j:0.1,
             mechanical_balance_residual_j:0, electrical_balance_residual_j:0,
-            source:{sampled_positive_peak_power_w:2, sampled_positive_peak_current_a:0.1666667, average_power_w:1,
+            source_balance_residual_j:full?1e-10:null, accounted_loss_energy_j:0.9,
+            phase_rms_including_declared_ripple_a:full?[0.11,0.11,0.11]:null,
+            sampled_phase_peak_including_declared_ripple_a:full?0.22:null,
+            loss_energy:full?{winding_dc_ripple_energy_j:0.0001,winding_ac_energy_j:0.01,external_series_energy_j:0.02,
+              external_core_energy_j:0.003,switching_energy_j:0.04,deadtime_energy_j:0.005,controller_energy_j:0.02,other_dc_link_energy_j:0.03}:null,
+            source:{sampled_positive_peak_power_w:2, sampled_positive_peak_current_a:2/inputs.config.supply_voltage_v, average_power_w:1,
               drawn_energy_j:1.2, returned_energy_j:0.2, net_energy_j:1},
             samples:[{time_s:0,position_m:p.start_m,velocity_m_s:0,acceleration_m_s2:0,motor_force_n:0,
-              required_source_voltage_v:12, required_source_current_a:0.1666667, required_source_power_w:2,
+              required_source_voltage_v:inputs.config.supply_voltage_v, required_source_current_a:2/inputs.config.supply_voltage_v, required_source_power_w:2,
               q_current_phase_peak_a:0.2,phase_currents_a:[0.2,-0.1,-0.1], required_phase_voltages_v:[1,-0.5,-0.5],
               required_line_voltage_v:1.5,copper_loss_w:0.1,driver_conduction_loss_w:0.01,mechanical_power_w:0,
               friction_damping_loss_w:0,external_load_power_w:0,kinetic_energy_j:0,magnetic_energy_j:0,
-              magnetic_power_w:0,partial_dc_link_power_w:1.99}] } } };
+              magnetic_power_w:0,partial_dc_link_power_w:1.99,
+              losses:full?{mean_square_phase_current_a2:[0.0401,0.0101,0.0101],phase_peak_envelope_a:[0.22,0.12,0.12],
+                winding_dc_ripple_loss_w:0.0001,winding_ac_loss_w:0.01,external_series_loss_w:0.02,external_core_loss_w:0.003,
+                switching_loss_w:0.04,deadtime_loss_w:0.005,controller_loss_w:0.02,other_dc_link_loss_w:0.03}:null}] } } };
       }`,
   }));
   await gotoDesignApp(page);
@@ -158,6 +174,31 @@ test("native move transport state updates UI and exports, and a cancelled late r
   await page.locator('[data-dock-panel="power"]').evaluate(el => { el.scrollTop = 0; });
   await page.screenshot({ path: test.info().outputPath("move-power.png") });
   await panel.locator("summary").filter({ hasText: "Move definition and calculation" }).click();
+  request.additional_driver_loss_w = null;
+  request.loss_model = declaredLossFixture(snapshot.driveSettings.driver.name, snapshot.driveSettings.driver.rds_on_ohm);
+  Object.assign(request.loss_model.domain, { source_voltage_v: snapshot.config.supply_voltage_v,
+    pwm_hz: snapshot.driveSettings.pwm_hz, winding_temp_c: snapshot.driveSettings.winding_temp_c });
+  await editor.fill(JSON.stringify(request, null, 2));
+  await expect(trace).toBeDisabled();
+  await page.evaluate(() => { (window as any).__declaredLossTransport = true; });
+  await panel.getByRole("button", { name: "Apply move definition", exact: true }).click();
+  await calculate.click();
+  await expect(trace).toBeEnabled();
+  await expect(panel.locator("dl > div").filter({ has: page.getByText("Peak supply power during a move", { exact: true }) })).toContainText("2 W");
+  await expect(panel.locator("dl > div").filter({ has: page.getByText("Guaranteed maximum source power", { exact: true }) })).toContainText("Unknown");
+  await trace.click();
+  const lossTrace = await page.evaluate(() => (window as any).__savedPower.content);
+  expect(lossTrace).toContain('"declared_loss_model"');
+  expect(lossTrace).toContain('"driver_deadtime_loss_W"');
+  await panel.getByRole("button", { name: "Model snapshot JSON", exact: true }).click();
+  const complete = JSON.parse(await page.evaluate(() => (window as any).__savedPower.content));
+  expect(complete.moveResult.result.demand.loss_energy.controller_energy_j).toBe(0.02);
+  expect(complete.sections.flatMap((s: any) => s.rows).find((r: any) => r.label === "Electrical energy per move").value).toBe("1 J");
+  request.loss_model.switching.constant_j = 9e-7;
+  await editor.fill(JSON.stringify(request, null, 2));
+  await expect(trace).toBeDisabled();
+  await expect(panel.locator("dl > div").filter({ has: page.getByText("Peak supply power during a move", { exact: true }) })).toContainText("Unknown");
+  await panel.getByRole("button", { name: "Apply move definition", exact: true }).click();
   await page.evaluate(() => { (window as any).__holdMove = true; });
   await calculate.click();
   await expect(trace).toBeDisabled();

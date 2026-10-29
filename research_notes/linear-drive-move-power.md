@@ -302,3 +302,100 @@ validation of that complete model for supported saved designs. Hardware thermal,
 current-duration, controller-bandwidth and worst-case guarantees remain unknown.
 No physical design was modified, no external-solver campaign was launched, and
 no original housing was removed to force a passing request.
+
+## Declared loss-model extension
+
+Model `linear-move-sinusoidal-v3` accounts for declared cycle-average losses without inventing a
+PWM waveform or driver efficiency. It requires explicit phase ordering,
+references, a fixed voltage/PWM/temperature/driver operating point and current
+and speed applicability limits. It rejects extrapolation outside that domain.
+
+Winding fundamental AC resistance increments, winding ripple AC increments,
+external series resistance and external-inductor core watts are separate inputs.
+Hot winding DC resistance remains authoritative from the actual copper network.
+No winding resistance or motor constant may be replaced by these declarations.
+
+Declared zero-mean phase-ripple covariance and peak-deviation bounds describe
+cycle-average statistics, not synthetic switching samples. The covariance must
+be positive semidefinite, symmetric and balanced at a floating star neutral.
+Its diagonal adds to each phase's mean-current squared for RMS heating. A
+constant covariance adds constant magnetic stored energy, not a second energy
+flow or startup stage. Zero-ripple or explicitly idealized cases stay partial.
+
+Switching and dead-time each use a declared whole-inverter energy-per-PWM-cycle
+law: constant plus a coefficient times the sum of absolute mean phase currents
+plus a coefficient times the sum of mean-square phase currents. The latter
+includes declared ripple variance. These are calibrated/declared average laws,
+not derivations of switching-event currents from RMS data. Controller and other
+DC-link watts are explicit. Legacy lumped driver watts and this component model
+cannot both be applied.
+
+Only a non-idealized, in-domain declaration with all terms and no stated
+omissions may supply totals for that declared model. Such totals remain modeled
+scenario quantities, not measured hardware totals or guaranteed maxima. Missing
+declarations, idealized choices and stated omissions retain Unknown total rows.
+The source remains an explicitly stiff DC link; no upstream or capacitor
+transient capability is implied. Actual mass coverage, losses and source
+behavior still need confirmation before saved-design total-power acceptance.
+
+### v3 verification, 2026-10-29
+
+The native public command was exercised on unchanged Fader version 1 with a
+1 mm reverse move from 12.5 to 11.5 mm over 0.25 s. Configured mass/friction were
+retained; mass coverage is still explicitly unconfirmed. Travel, speed cap,
+12 V source, 100 kHz PWM and 47 µH external inductance per phase were unchanged.
+The test supplies explicitly numerical loss coefficients and ripple statistics,
+NOT measured or datasheet-qualified DRV8311, inductor or winding AC properties.
+It explicitly assumes the stiff DC link accepts regeneration. No physical
+design, configured motor constants or imported copper was substituted.
+
+At 129 force positions and 0.0005 s timestep the conditional fixture produced
+7.2681532938 W sampled peak, 0.6056794411 A sampled source peak,
+6.0289761543 W average and 1.5072440386 J drawn/net energy, with zero returned
+energy. Mean phase peak was 0.9318889867 A; the declared-ripple envelope was
+0.9518889867 A. Accounted loss energy was 1.5071857854 J and the independently
+recomputed source-energy residual was 2.0596e-10 J. Input SHA-256:
+`670521de6ddcb64dd7952b4e17925aeb8b536453746d731e9d98677fbbef952f`.
+
+Separate refinements passed the predeclared 2% energy/peak gates:
+
+- 193 force positions at fixed 0.0005 s: 1.4977757816 J and 7.2229036308 W;
+  relative changes 0.6321545% energy and 0.6264747% peak.
+- Fixed 193 positions at 0.00025 s: 1.4977757795 J and 7.2229036373 W;
+  relative changes approximately 1.41e-9 energy and 9.01e-10 peak.
+- Final source residual 5.1475e-11 J, below the gate of
+  `1e-6 * accounted_loss_energy_j`. No numerical residual correction was used.
+
+Reproduction (from repository root):
+
+```sh
+PCB_MOTOR_PROJECT_PATH="$PWD/Fader-traces-workspace.pmmotor" PCB_MOTOR_DECLARED_LOSS_REFINEMENT=1 cargo test -p pcbmotorgen commands::move_power::tests::supplied_saved_design_declared_loss_model -- --ignored --nocapture
+```
+
+Full Rust verification passed 132 desktop tests (15 explicit ignores), 237
+simulation unit tests (two pre-existing ignores) and seven integration tests.
+Frontend verification passed 545 tests (one pre-existing skip), zero
+svelte-check errors/warnings, and production build (existing chunk-size warning).
+Ten Chromium regressions passed across 1280/1600 px viewports; artifacts are in
+`app/desktop/e2e-results/loss-v3-final-20261029/`. Browser tests use synthetic
+transport DTOs only, not numerical solver evidence. They cover complete-model
+totals and exports, incomplete templates, coefficient-edit invalidation,
+Unknown demo/partial totals and cancelled late-response suppression. The
+generated desktop `move-power.png` was inspected. This is not observed native
+WKWebView acceptance. Svelte autofixer reported no issues; its effect suggestions
+refer to the existing imperative job-ownership lifecycle, not derived physics.
+
+Report/snapshot/time-series exports retain the loss laws, domain, references,
+phase ordering, RMS/peak distinctions and component ledger. Snapshot format is
+now v3. Legacy saved moves need no new declaration. The editor adds incomplete
+null fields rather than guessed zero-loss values. Native checks reject invalid
+covariance, domain mismatch, coefficient overflow and legacy/component driver
+double counting; analytic tests cover hold, braking, ripple and timestep refinement.
+
+All four supplied root file hashes still match the values recorded above.
+Ticket #7744 remains open: actual loss/ripple parameters, moving-mass coverage
+and source sink behavior must be confirmed for actual saved-design total-power
+acceptance. Placeholder coefficients do not satisfy that gate. The previously
+tested 63 mm requests remain electrically infeasible. Unsupported dynamic
+backplane/housing losses still reject; no external-solver campaign, hardware
+maximum, permitted peak-duration, controller or thermal qualification is claimed.

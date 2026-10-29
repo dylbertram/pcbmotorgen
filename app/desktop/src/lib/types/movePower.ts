@@ -2,6 +2,7 @@
 import type { DriveAnalysis, DriveSettings } from "./drive";
 import type { LinearMotorConfig } from "./config";
 import type { CadGeometry } from "./dxf";
+import type { DeclaredLossModel, LossOperatingPoint, LossSample, LossEnergy } from "./moveLosses";
 
 export interface MoveProfile {
   start_m: number;
@@ -30,6 +31,7 @@ export interface RoutedMoveRequest {
   source: { boundary: "stiff_dc_link"; accepts_regeneration: boolean };
   additional_driver_loss_w: number | null;
   force_positions: number;
+  loss_model?: DeclaredLossModel | null;
 }
 
 export interface MoveElectricalModel {
@@ -45,6 +47,8 @@ export interface MoveElectricalModel {
   driver_path_resistance_ohm: number;
   additional_driver_loss_w: number | null;
   source_accepts_regeneration: boolean;
+  loss_model?: DeclaredLossModel | null;
+  loss_operating_point?: LossOperatingPoint | null;
   phase_model?: {
     phase_names: [string, string, string];
     resistance_hot_ohm: [number, number, number];
@@ -77,11 +81,12 @@ export interface MovePowerSample {
   required_source_voltage_v: number;
   required_source_current_a: number | null;
   required_source_power_w: number | null;
+  losses: LossSample | null;
 }
 
 export interface MovePowerResult {
   model_version: string;
-  source_model_scope: "partial_declared_scenario";
+  source_model_scope: "partial_declared_scenario" | "declared_loss_model";
   profile: MoveProfile;
   electrical: MoveElectricalModel;
   actual_time_step_s: number;
@@ -105,6 +110,11 @@ export interface MovePowerResult {
   capacitor_energy_change_j: number;
   mechanical_balance_residual_j: number;
   electrical_balance_residual_j: number;
+  source_balance_residual_j: number | null;
+  loss_energy: LossEnergy | null;
+  accounted_loss_energy_j: number;
+  phase_rms_including_declared_ripple_a: [number, number, number] | null;
+  sampled_phase_peak_including_declared_ripple_a: number | null;
   source: {
     sampled_positive_peak_power_w: number;
     sampled_positive_peak_current_a: number;
