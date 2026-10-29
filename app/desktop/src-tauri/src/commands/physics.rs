@@ -1018,6 +1018,52 @@ mod cad_source_tests {
     }
 
     #[test]
+    fn imported_copper_with_conducting_housing_is_goal_independent() {
+        use pcbmotorgen_simulation::backplane::{BackplaneStack, HousingSpec, HousingMaterial};
+        let (mut ipc, mut cad) = exported_default();
+        ipc.n_positions = 9;
+        ipc.meshing = 3;
+        ipc.backplane = Some(BackplaneStack { layers: vec![], housing: Some(HousingSpec {
+            material: HousingMaterial::Aluminum6061, thickness_m: 0.001, gap_m: 0.001,
+        }) });
+        for p in ["A", "B", "C"] { cad.coil_phases.insert(format!("coil {p}"), p.into()); }
+        let original = serde_json::to_value(&cad).unwrap();
+        let baseline = pcbmotorgen_simulation::drive::DriveSettings::default();
+        let mut strict = baseline.clone();
+        strict.voltage_headroom = 0.0001;
+        strict.ripple_limit_fraction = 0.0001;
+        strict.allowed_rise_c = 0.1;
+        let run = |c: LinearMotorConfigIpc, settings: pcbmotorgen_simulation::drive::DriveSettings| {
+            let force = tauri::async_runtime::block_on(evaluate_force_sweep(
+                c.clone(), Some(cad.clone()), Some(settings.clone()))).unwrap();
+            let kf = force.mean_thrust_n / force.current_a;
+            let electrical = tauri::async_runtime::block_on(analyze_drive(
+                c, settings, Some(kf), Some(cad.clone()))).unwrap();
+            (force, electrical)
+        };
+        let a = run(ipc.clone(), baseline.clone());
+        let mut goals = ipc.clone();
+        goals.target_force_n = 100.0;
+        goals.peak_force_n = 0.001;
+        goals.max_accel_m_s2 = 0.0;
+        goals.max_temperature_rise_c = 0.0;
+        let b = run(goals, strict);
+        assert_eq!(serde_json::to_value(&a.0).unwrap(), serde_json::to_value(&b.0).unwrap());
+        super::goal_independence_tests::assert_electrical_equal(&a.1, &b.1);
+        let bp_a = serde_json::to_value(a.1.backplane.as_ref().unwrap()).unwrap();
+        let bp_b = serde_json::to_value(b.1.backplane.as_ref().unwrap()).unwrap();
+        for (key, value) in bp_a.as_object().unwrap() {
+            if key != "drag_curve" { assert_eq!(value, &bp_b[key], "Goal changed backplane {key}"); }
+        }
+        // Positive control: actual excitation changes force and copper heating.
+        ipc.max_current_a *= 2.0;
+        let physical = run(ipc, baseline);
+        assert!((physical.0.mean_thrust_n / a.0.mean_thrust_n - 2.0).abs() < 1e-10);
+        assert!((physical.1.copper_loss_w / a.1.copper_loss_w - 4.0).abs() < 1e-10);
+        assert_eq!(serde_json::to_value(&cad).unwrap(), original);
+    }
+
+    #[test]
     fn unmapped_coils_are_reported() {
         let (ipc, cad) = exported_default();
         let err = tauri::async_runtime::block_on(evaluate_force_sweep(ipc, Some(cad), Some(Default::default())))

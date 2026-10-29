@@ -1000,28 +1000,40 @@ pub fn analyze_drive_with(
                 }
             })
             .collect();
-        // First crossing of drag over thrust on the curve, refined by bisection.
+        // Search independently of the goal-dependent voltage plot. This finite
+        // logarithmic scan brackets the first sampled crossing, not a proof
+        // that no crossing exists outside the scan or between sample points.
+        const DRAG_SEARCH_TOP_M_S: f64 = 1e3;
         bp.drag_limited_speed_m_s = thrust.and_then(|f| {
-            let hit = bp.drag_curve.iter().position(|p| p.drag_n >= f)?;
-            let (mut lo, mut hi) = (
-                bp.drag_curve[hit.saturating_sub(1)].speed_m_s,
-                bp.drag_curve[hit].speed_m_s,
-            );
-            for _ in 0..40 {
-                let mid = 0.5 * (lo + hi);
-                if drag(mid).drag_n >= f {
-                    hi = mid;
-                } else {
-                    lo = mid;
-                }
+            if !f.is_finite() || f < 0.0 {
+                return None;
             }
-            Some(hi)
+            let mut lo = 0.0;
+            if drag(lo).drag_n >= f {
+                return Some(lo);
+            }
+            for k in 0..=512 {
+                let mut hi = 1e-6 * (DRAG_SEARCH_TOP_M_S / 1e-6).powf(k as f64 / 512.0);
+                if drag(hi).drag_n >= f {
+                    for _ in 0..40 {
+                        let mid = 0.5 * (lo + hi);
+                        if drag(mid).drag_n >= f {
+                            hi = mid;
+                        } else {
+                            lo = mid;
+                        }
+                    }
+                    return Some(hi);
+                }
+                lo = hi;
+            }
+            None
         });
         if s.conducts() {
             let v = settings.target_speed_m_s;
             let limit = match bp.drag_limited_speed_m_s {
                 Some(v_lim) => format!("The screening model reaches full-current thrust at {v_lim:.2} m/s."),
-                None => format!("The screening model stays below full-current thrust up to {top:.1} m/s."),
+                None => format!("No drag/thrust crossing was bracketed by the screening scan from 0 to {DRAG_SEARCH_TOP_M_S:.0} m/s; this is not proof that no crossing exists."),
             };
             checks.push(DriveCheck {
                 id: "eddy_drag".into(),
