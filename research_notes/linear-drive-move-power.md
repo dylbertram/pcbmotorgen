@@ -7,6 +7,26 @@ remain as a record of what was implemented and tested, not current requirements.
 
 ## Supported model
 
+### Simulation height audit after the PCB correction
+
+Audited the active desktop simulation entry points, not just move power:
+
+| Path | Height source and audit result |
+| --- | --- |
+| Static force sweep | CadBoard physical layer hints, then routed current-weighted Lorentz samples. Scaled source Z and already-placed Z give equal force. |
+| Driver resistance/inductance | Same hints for trace heights, via lengths and Neumann integrals. Scaled and already-placed source results agree for R and effective L. |
+| Copper heat preview | Same CadBoard hints. Added a public-command regression checking every trace/via sample against the DC snapshot layer heights, plus software-thickness edits. |
+| DC geometry, live coupled DC and coil B field | Host rebuilds via prepare_dc_winding_geometry before worker requests; workers consume physical geometry_hints, not raw CAD Z. No external solver launched. In-app imported source preparation remains explicitly unsupported. |
+| PM-only B-field grids and 3D PM field | Sample requested physical XYZ with PCB top at zero and magnet height from air gap. No CAD-layer-height dependency. |
+| Housing motion and stack calculations | Housing separation uses configured PCB thickness and air gap. Imported placement validation uses CadBoard hints. |
+| 3D copper and heat mapping | Proportional physical layer placement from configured thickness, added in 1b30eb8. |
+| Travel envelope/equilibrium | **Outstanding limitation.** physics::travel_envelope generates coils without CAD input; equilibrium/charge.rs builds legacy conductor samples in one Z=0 plane. It is not an actual layered/imported Fader equilibrium calculation. Do not treat its rest positions as qualified by the corrected force/move results. |
+
+The heat visualization implementation fingerprint now includes cad_source.rs,
+so layer-placement implementation changes alter provenance. The coordinate text
+now discloses imported-Z scaling. This audit does not fix the separate legacy
+travel-envelope geometry model or qualify old external solver caches.
+
 ### PCB layer placement correction, user clarification 2026-10-29
 
 The configured PCB thickness is authoritative. Raw imported DXF Z values encode

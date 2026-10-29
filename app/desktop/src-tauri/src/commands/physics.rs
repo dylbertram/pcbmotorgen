@@ -1096,7 +1096,7 @@ mod cad_source_tests {
     }
 
     #[test]
-    fn imported_z_scaling_is_shared_by_force_driver_housing_and_dc_geometry() {
+    fn imported_z_scaling_is_shared_by_force_driver_heat_housing_and_dc_geometry() {
         use pcbmotorgen_simulation::backplane::{BackplaneLayer, BackplaneStack, LayerMaterial};
         let (mut ipc, mut cad) = exported_default();
         for p in ["A", "B", "C"] { cad.coil_phases.insert(format!("coil {p}"), p.to_string()); }
@@ -1114,7 +1114,24 @@ mod cad_source_tests {
         let a = force(cad.clone());
         let b = force(placed.clone());
         for (a, b) in a.force_x_n.iter().zip(&b.force_x_n) { assert!((a - b).abs() < 1e-12); }
-        assert!((driver(cad.clone()).phase_resistance_ohm - driver(placed.clone()).phase_resistance_ohm).abs() < 1e-12);
+        let da = driver(cad.clone());
+        let db = driver(placed.clone());
+        assert!((da.phase_resistance_ohm - db.phase_resistance_ohm).abs() < 1e-12);
+        assert!((da.effective_inductance_h - db.effective_inductance_h).abs() < 1e-15);
+        let heat = |g, config| {
+            let request = pcbmotorgen_simulation::visualization::VisualizationRequest {
+                request_id: "z-audit".into(), mover_position_m: 0.01,
+                bounds_m: [[0., 0.02], [0., 0.008], [-0.004, 0.005]], counts: [2, 2, 2],
+                phase_peak_a: 1.0, fields: false, heat: true,
+            };
+            serde_json::to_value(tauri::async_runtime::block_on(
+                crate::commands::visualization::sample_simulation_visualization(config, Default::default(), Some(g), request)
+            ).unwrap()).unwrap()
+        };
+        let ha = heat(cad.clone(), ipc.clone());
+        let hb = heat(placed.clone(), ipc.clone());
+        assert!(ha["heat_unavailable_reason"].is_null(), "{ha}");
+        assert_eq!(ha["heat"], hb["heat"]);
         tauri::async_runtime::block_on(analyze_housing_motion(ipc.clone(), pcbmotorgen_simulation::backplane::HousingMotionProfile { duration_s: 0.1 }, 3., Some(cad.clone()))).unwrap();
         let snapshot = tauri::async_runtime::block_on(prepare_dc_winding_geometry(ipc.clone(), Default::default(), Some(cad.clone()))).unwrap();
         let z = snapshot["geometry_hints"]["layer_z_m"].as_array().unwrap();
@@ -1122,6 +1139,29 @@ mod cad_source_tests {
         let high = z.iter().map(|v| v.as_f64().unwrap()).fold(f64::NEG_INFINITY, f64::max);
         assert!((low + ipc.pcb_thickness_m).abs() < 1e-15);
         assert_eq!(high, 0.0);
+        for edge in ha["heat"]["edges"].as_array().unwrap() {
+            for (point, layer) in edge["points_m"].as_array().unwrap().iter().zip(edge["layers"].as_array().unwrap().iter().cycle()) {
+                let expected = z[layer.as_u64().unwrap() as usize].as_f64().unwrap();
+                assert!((point[2].as_f64().unwrap() - expected).abs() < 1e-15);
+            }
+        }
+        let mut thicker = ipc.clone();
+        thicker.pcb_thickness_m *= 2.0;
+        // Check an actual native response after changing only software thickness.
+        // Omit the backplane here: its placement is a separate model input.
+        thicker.backplane = None;
+        let thick_heat = heat(cad.clone(), thicker.clone());
+        assert!(thick_heat["heat_unavailable_reason"].is_null());
+        let deep = tauri::async_runtime::block_on(prepare_dc_winding_geometry(thicker.clone(), Default::default(), Some(cad.clone()))).unwrap();
+        for (a, b) in z.iter().zip(deep["geometry_hints"]["layer_z_m"].as_array().unwrap()) {
+            assert!((2.0 * a.as_f64().unwrap() - b.as_f64().unwrap()).abs() < 1e-15);
+        }
+        for edge in thick_heat["heat"]["edges"].as_array().unwrap() {
+            for point in edge["points_m"].as_array().unwrap() {
+                let z = point[2].as_f64().unwrap();
+                assert!(z >= -thicker.pcb_thickness_m - 1e-15 && z <= 1e-15);
+            }
+        }
         assert_eq!(serde_json::to_value(&cad).unwrap(), before);
     }
 
