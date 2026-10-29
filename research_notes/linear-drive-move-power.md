@@ -7,6 +7,66 @@ remain as a record of what was implemented and tested, not current requirements.
 
 ## Supported model
 
+### Commutation alignment and copper-width check, 2026-10-30
+
+User clarified the requested copper is **0.2 mm trace width with 1 oz copper**.
+The imported Fader already has 0.2 mm source width, and both inner/outer copper
+are 1 oz, approximately 35 µm. CadBoard uses that imported width, not the
+configuration's unrelated 0.127 mm minimum. No width or copper-weight change
+was needed or simulated. The comparison retains the explicit 0.8 mm PCB scenario.
+
+`scripts/solvers/audit_move_commutation.py` audits signed unit-terminal force
+maps, without changing wiring or tuning geometry/force constants. On the
+geometry-selected interior interval 14.5–50.5 mm, three electrical periods,
+a DC+sine+cosine regression finds phase sine offsets A=69.9248°, B=9.9269°,
+C=-50.0707°, amplitudes approximately 0.09704 N/A, and R² above 0.99997.
+The directed axes are 60°, not 120°, apart under the saved terminal convention.
+Thus the actual winding/mapping polarity and conventional balanced-star current
+law are not a canonical match. A single reference angle cannot remove that.
+Mathematically reversing B would produce 120° spacing with the opposite phase
+sequence, but this is not a
+verified hardware wiring correction and was **not** applied. Phase polarity,
+mapping and physical star connections need review before changing any winding.
+
+The positive-sequence fundamental of the existing signed map gives electrical
+zero 2.2676493455876967 rad, or 129.9267°, versus the test scenario's 90°.
+This is a geometry-derived fixed-reference diagnostic, not an actual controller
+calibration or an optimal-current controller. The interval is selected from
+full-overlap bounds and electrical period, not from desired power or force.
+Using that reference, with every other Fader baseline input verified unchanged,
+gives the following explicit imposed-motion scenarios:
+
+| Move, 0.8 mm PCB | Peak W at 90° | Peak W at 129.93° | Net J at 90° | Net J at 129.93° |
+| --- | ---: | ---: | ---: | ---: |
+| Full forward | 37.6338 | 12.4062 | 10.3766 | 4.35611 |
+| Short forward | 2.68357 | 3.32011 | 0.504599 | 0.557689 |
+| Short return | 2.76087 | 3.41449 | 0.511402 | 0.569642 |
+
+The full move source peak is 1.03385 A; move-average power 4.35611 W; drawn
+equals net and returned energy is zero. Required line voltage peaks at 9.76837 V,
+so this scenario has no modeled 12 V tracking conflict. This is not proof of
+achieved motion, thermal suitability, controller implementation or winding
+qualification. Short moves worsen at the new reference because the residual
+noncanonical phase geometry makes coupling position-dependent. Do not present
+the reference as a universal efficiency improvement.
+
+All six diagnostic/control scenarios passed independent balances and unchanged
+2% energy/peak refinement gates. Real-native export mapping now checks the
+actual feasibility result rather than incorrectly assuming every full move
+must have a voltage conflict. Python regressions recover known 120° axes,
+detect 60° axes and distinguish a hypothetical polarity reversal from an
+electrical-zero change. No supplied design/default settings were modified.
+
+Evidence: `scripts/solvers/results/fader-commutation-audit-2026-10-30.json` and
+`scripts/solvers/results/practical-move-alignment-2026-10-30.json`. Full receipts
+are in approved temp `move-alignment-{baselines,models,results}-20261030`.
+Reproduce the harmonic audit from the prior 0.8 mm full-forward receipt, then
+run the existing baseline-export command with explicit
+`PCB_MOTOR_FADER_PCB_THICKNESS_M=0.0008` and
+`PCB_MOTOR_FADER_ELECTRICAL_ZERO_RAD=2.2676493455876967`, followed by the same
+fresh-directory builder/native/refinement/export commands. The star2 controls
+remain unchanged. Named loss-model exclusions and friction assumptions remain.
+
 ### User-requested 0.8 mm Fader PCB scenario, 2026-10-30
 
 An explicit test-only `PCB_MOTOR_FADER_PCB_THICKNESS_M=0.0008` override changes

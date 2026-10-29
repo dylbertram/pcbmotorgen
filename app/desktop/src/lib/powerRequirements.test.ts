@@ -196,7 +196,7 @@ describe("move power report consistency", () => {
       const trace = moveTraceCsv(input)!;
       expect(trace).toContain('"required_source_power_W"');
       expect(trace).toContain('"simulated_not_measured"');
-      if (scenario === "full-forward") expect(item(input, "Physical tracking findings").value).toBe("Imposed demand only");
+      expect(item(input, "Physical tracking findings").value).toBe(native.result.demand.feasible ? "No modeled conflict" : "Imposed demand only");
       expect(item(input, "Source model scope").detail).toContain(estimate ? "excluded contributions" : "omissions keep totals Unknown");
       if (estimate) {
         expect(item(input, "Estimated peak supply power").value).toBe(peak);

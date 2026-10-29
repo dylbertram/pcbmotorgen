@@ -14,6 +14,9 @@ fn export_saved_design_screening_inputs() {
     let fader_thickness = std::env::var("PCB_MOTOR_FADER_PCB_THICKNESS_M").ok()
         .map(|v| v.parse::<f64>().expect("Fader thickness must be SI metres"));
     if let Some(t) = fader_thickness { assert!(t.is_finite() && t > 0.0); }
+    let fader_reference = std::env::var("PCB_MOTOR_FADER_ELECTRICAL_ZERO_RAD").ok()
+        .map(|v| v.parse::<f64>().expect("Fader electrical reference must be radians"));
+    if let Some(angle) = fader_reference { assert!(angle.is_finite()); }
     std::fs::create_dir(&output).expect("output must be a new, exclusive directory");
     for (file, hash) in [
         ("Fader-traces-workspace.pmmotor", "567d97900475c92598f9ad6f7df9e7aeaf374dfc542fa25fa7e04b90dbfb287b"),
@@ -29,6 +32,10 @@ fn export_saved_design_screening_inputs() {
         let thickness_override = if file.starts_with("Fader") { fader_thickness } else { None };
         if let Some(t) = thickness_override {
             baseline["config"]["pcb_thickness_m"] = serde_json::json!(t);
+        }
+        let reference_override = if file.starts_with("Fader") { fader_reference } else { None };
+        if let Some(angle) = reference_override {
+            baseline["move_request"]["electrical_angle_at_zero_rad"] = serde_json::json!(angle);
         }
         baseline["move_request"]["loss_model"] = serde_json::Value::Null;
         let c: crate::ipc::ProjectConfigStateIpc = serde_json::from_value(state["config"].clone()).unwrap();
@@ -53,7 +60,8 @@ fn export_saved_design_screening_inputs() {
             assert_eq!(result.inputs, input);
             assert!(result.result.demand.source.is_none());
             let receipt = serde_json::json!({"archive":file,"archive_sha256":hash,"version":1,
-                "scenario":name,"scenario_overrides":{"pcb_thickness_m":thickness_override},"native":result});
+                "scenario":name,"scenario_overrides":{"pcb_thickness_m":thickness_override,
+                    "electrical_angle_at_zero_rad":reference_override},"native":result});
             let filename = format!("{}-{name}.json", if file.starts_with("Fader") {"fader"} else {"star2"});
             let mut out = std::fs::OpenOptions::new().write(true).create_new(true).open(output.join(filename)).unwrap();
             serde_json::to_writer(&mut out, &receipt).unwrap();
