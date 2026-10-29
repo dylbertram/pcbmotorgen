@@ -9,6 +9,59 @@ remain as a record of what was implemented and tested, not current requirements.
 
 ### Geometry-bound engineering estimate, 2026-10-29
 
+**Acceptance audit update:** the superseding receipt is
+`scripts/solvers/results/practical-move-audit-v2-2026-10-29.json`. The earlier
+geometry-bound receipt incorrectly described the two-layer design's saved 15 g
+carriage mass as a user-approved Fader assembly. Its numeric value was not
+changed. The corrected two-layer case explicitly treats that saved mass as a
+scenario assumption with unverified assembly coverage. The 15 g full-assembly
+approval applies to the Fader only. The corrected runs preserve all design data.
+
+The full-forward trajectories cover 63 mm in 1 s and the shorter trajectories
+cover 1 mm in 0.25 s. Their zero-end-velocity quintic profiles reach 0.118125 and
+0.0075 m/s respectively: the Fader's configured 0.5 m/s is a design target,
+not the peak speed of these particular moves. At 193 positions and 0.25 ms the
+estimated peak W / peak A / average W / drawn J / returned J / net J are:
+
+| Design and move | Peak W | Peak A | Average W | Drawn J | Returned J | Net J |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Fader full forward | 158.238 | 13.186 | 41.609 | 41.609 | 0 | 41.609 |
+| Fader short forward | 10.110 | 0.843 | 7.433 | 1.858 | 0 | 1.858 |
+| Fader short return | 10.427 | 0.869 | 7.544 | 1.886 | 0 | 1.886 |
+| Two-layer full forward | 115.102 | 9.592 | 31.812 | 31.812 | 0 | 31.812 |
+| Two-layer short forward | 9.279 | 0.773 | 7.395 | 1.849 | 0 | 1.849 |
+| Two-layer short return | 9.496 | 0.791 | 7.473 | 1.868 | 0 | 1.868 |
+
+Zero returned energy is a result for these dissipative cases, not an assumption
+that regeneration is impossible. The separate braking balance tests exercise
+positive returned energy and explicit sink handling. The summary includes
+scenario profiles, geometry bindings and hashes for the native inputs, models,
+results and winding sensitivity receipts; it checks snapshot/model equality,
+energy balance and the unchanged convergence gates before writing. Full trace
+receipts were kept externally. The 10%/100% winding AC probes are hypothetical
+stress cases, not bounds: peak Fader power rises to 173.327/309.132 W and
+two-layer to 125.984/223.924 W, showing the impact of excluded winding physics.
+
+To reproduce, from the repository root choose a new empty parent directory in
+`OUT` (each child must not exist), and put the two hash-matched supplied archives
+in `DESIGNS`. The commands use the checked-in test fixtures and do not write the
+supplied archives:
+
+```sh
+PCB_MOTOR_SUPPLIED_DESIGN_DIR="$DESIGNS" PCB_MOTOR_SCREENING_OUTPUT="$OUT/baselines" cargo test -p pcbmotorgen export_saved_design_screening_inputs -- --ignored --nocapture
+(cd app/desktop && PCB_MOTOR_SCREENING_BASELINES="$OUT/baselines" PCB_MOTOR_ESTIMATE_OUTPUT="$OUT/models" pnpm exec vitest run src/lib/practicalMoveEstimate.test.ts)
+PCB_MOTOR_ENGINEERING_ESTIMATE=1 PCB_MOTOR_SCREENING_BASELINES="$OUT/baselines" PCB_MOTOR_SCREENING_MODELS="$OUT/models" PCB_MOTOR_SCREENING_OUTPUT="$OUT/results" cargo test -p pcbmotorgen evaluate_saved_design_screening_assumptions -- --ignored --nocapture
+PCB_MOTOR_SCREENING_RESULTS="$OUT/results" PCB_MOTOR_SCREENING_OUTPUT="$OUT/winding" cargo test -p pcbmotorgen winding_ac_uncertainty_sensitivity -- --ignored --nocapture
+(cd app/desktop && PCB_MOTOR_SCREENING_RESULTS="$OUT/results" pnpm exec vitest run src/lib/powerRequirements.test.ts)
+python3 scripts/solvers/summarize_move_screening.py "$OUT/baselines" "$OUT/models" "$OUT/results" "$OUT/summary.json" --engineering-estimate --builder app/desktop/src/lib/practicalMoveEstimate.ts --winding-sensitivity "$OUT/winding"
+```
+
+Use absolute paths for `OUT` and `DESIGNS`. Archive hashes are enforced by the
+export fixture. The timing and force-grid gates validate numerical convergence,
+not model accuracy. The generated 20 A / 1 m/s loss applicability domain is a
+scenario validity interval, not a motor or driver rating or a design-goal gate;
+outside it the declared loss model does not extrapolate.
+
 The move editor can explicitly construct an approximate DRV8311 12 V / 100 kHz
 scenario from the current native three-phase analysis. It uses the referenced
 driver and Bourns 47 µH data and the RL, phase-pair and isolated-slab estimates

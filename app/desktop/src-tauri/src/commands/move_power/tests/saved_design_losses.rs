@@ -35,7 +35,11 @@ fn export_saved_design_screening_inputs() {
             p["start_m"] = serde_json::json!(a);
             p["end_m"] = serde_json::json!(b);
             p["duration_s"] = serde_json::json!(duration);
-            p["mass_includes"] = serde_json::json!("15 g full moving assembly including magnets, bushings and moving enclosure, user-approved engineering estimate");
+            p["mass_includes"] = serde_json::json!(if file.starts_with("Fader") {
+                "15 g full moving assembly including magnets, bushings and moving enclosure, user-approved engineering estimate"
+            } else {
+                "Saved 15 g carriage mass used as a scenario assumption; assembly coverage is not independently established"
+            });
             let result = tauri::async_runtime::block_on(evaluate_move_power(
                 format!("screening-{file}-{name}"), input.clone())).unwrap();
             assert_eq!(result.inputs, input);

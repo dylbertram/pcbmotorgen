@@ -10,7 +10,7 @@ import json
 import math
 from pathlib import Path
 
-TI = "https://www.ti.com/document-viewer/DRV8311/datasheet/GUID-XXXXXXXX-SF0T-XXXX-XXXX-000000179401"
+TI = "https://www.ti.com/lit/ds/symlink/drv8311.pdf"
 TI_LOSS = "https://www.ti.com/document-viewer/DRV8311/datasheet/GUID-C826F7E8-19E5-47C8-9C09-E13912428538"
 BOURNS = "https://www.bourns.com/docs/product-datasheets/srp1265wa.pdf"
 COILCRAFT_Q = "https://www.coilcraft.com/en-us/resources/application-notes/key-parameters-for-selecting-rf-inductors/"
