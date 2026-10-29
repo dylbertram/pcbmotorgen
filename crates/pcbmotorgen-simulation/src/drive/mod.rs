@@ -27,6 +27,7 @@
 
 mod geometry;
 mod inductance;
+pub mod move_power;
 
 pub use geometry::{
     extract_phase_networks, extract_phase_networks_with_terminals, solve_network, EdgeKind,
