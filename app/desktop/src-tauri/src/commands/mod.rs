@@ -16,6 +16,8 @@
 //! | `generate_coils`              | REAL          | Resolves the selected routing pattern and returns geometry plus dimensions. |
 //! | `evaluate_force_sweep`        | REAL          | Uses core `ForceEvaluator` (Lorentz).    |
 //! | `compute_friction`            | REAL          | Uses core `FrictionEstimator`.           |
+//! | `evaluate_move_power`         | NATIVE partial | Bounded actual-copper prescribed motion; explicit loss omissions, no browser substitute. |
+//! | `cancel_move_power`           | REAL (sync)   | Identity-bound cooperative cancellation; retains ownership until the worker exits. |
 //! | `connect_kicad`               | REAL          | KiCad IPC: connect + query open board.   |
 //! | `write_coils_to_board`        | REAL          | KiCad IPC: generate + atomic commit.     |
 //! | `get_board_diagnostics`       | REAL          | KiCad IPC: live board snapshot.          |
@@ -73,6 +75,7 @@ pub mod visualization;
 pub mod dxf;
 pub mod kicad;
 pub mod physics;
+pub mod move_power;
 pub mod project;
 pub mod workspace;
 pub mod routing_plugins;

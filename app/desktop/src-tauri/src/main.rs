@@ -73,6 +73,8 @@ fn main() {
             commands::physics::travel_envelope,
             commands::physics::compute_friction,
             commands::physics::analyze_drive,
+            commands::move_power::evaluate_move_power,
+            commands::move_power::cancel_move_power,
             commands::physics::analyze_housing_motion,
             commands::physics::prepare_dc_winding_geometry,
             commands::dc_jobs::dc_coupling_capability,

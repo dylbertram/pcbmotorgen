@@ -114,6 +114,35 @@ impl ForceEvaluator {
         self.routed_samples.as_deref()
     }
 
+    /// Axial mover force per terminal ampere for each solved phase network.
+    /// This evaluates the actual routed copper at its physical depth. It does
+    /// not apply or calibrate any commutation law, or divide by a commanded
+    /// current which might be zero. Reciprocity gives the same signed phase
+    /// back-EMF coefficient in V/(m/s).
+    pub fn unit_phase_force_constants_at(
+        &self,
+        config: &SimulationInput,
+        position_m: f64,
+    ) -> Result<Vec<f64>, SimulationError> {
+        let phases = self.routed_samples.as_ref().ok_or_else(||
+            SimulationError("Unit phase forces require solved routed conductor samples".into()))?;
+        if !position_m.is_finite() {
+            return Err(SimulationError("Unit phase forces require a finite position".into()));
+        }
+        let assembly = MagnetArray::new(config).build_assembly(position_m);
+        let result: Vec<f64> = phases.iter().map(|samples| {
+            let points: Vec<_> = samples.iter().map(|s|
+                nalgebra::Point3::from(s.midpoint_3d)).collect();
+            let fields = physics::compute_b_batch_parallel(&assembly, &points);
+            -samples.iter().zip(fields).map(|(s, b)|
+                s.dl_3d[1]*b.z - s.dl_3d[2]*b.y).sum::<f64>()
+        }).collect();
+        if result.iter().any(|v| !v.is_finite()) {
+            return Err(SimulationError("Unit phase forces produced a nonfinite coefficient".into()));
+        }
+        Ok(result)
+    }
+
     /// Reproduce the excitation used by a completed, calibrated force run.
     /// This records the model's command, not a validated controller waveform.
     pub fn excitation_currents_at(&self, config: &SimulationInput, coils: &[PhaseCoil], position_m: f64) -> Result<Vec<f64>, SimulationError> {

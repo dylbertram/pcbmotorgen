@@ -25,6 +25,7 @@ import {
 import { mm, listRoutingPatterns, routingPatternParameters, loadInstalledPlugins, fetchMagnetGrades } from "../ipc";
 import { readPreferences } from "../preferences";
 import { MAX_PCB_LAYERS } from "../types/simulationLimits";
+import type { RoutedMoveRequest } from "../types/movePower";
 
 export class ConfigStore {
   constructor() {
@@ -126,6 +127,8 @@ export class ConfigStore {
   /** Driver limits and operating assumptions for `analyze_drive`. Replace
    *  the whole object to edit it, so dependents see one change. */
   drive = $state<DriveSettings>(structuredClone(DEFAULT_DRIVE_SETTINGS));
+  /** No move exists until explicitly specified by the user. */
+  power_move = $state<RoutedMoveRequest | null>(null);
 
   // --- Backplane and housing (t707) ------------------------------------
   /** Layers below the PCB and an optional housing. `null` = none, which

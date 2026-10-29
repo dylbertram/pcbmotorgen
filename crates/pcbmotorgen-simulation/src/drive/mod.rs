@@ -262,6 +262,9 @@ pub struct DriveAnalysis {
     /// Mean mutual inductance between phases [H] (sign follows the strand
     /// orientation, terminal at the low-x end).
     pub mutual_inductance_h: f64,
+    /// Trace-only copper partial-inductance matrix, in `phases` order.
+    /// Excludes stack screening, external series inductors and terminal returns.
+    pub phase_inductance_matrix_h: Vec<Vec<f64>>,
     /// Line-to-line inductance an LCR meter reads between two terminals [H].
     pub line_inductance_h: f64,
     /// Effective per-phase (synchronous) inductance `L_LL / 2` [H].
@@ -615,14 +618,19 @@ pub fn analyze_drive_with(
         ph.self_inductance_h = *l;
     }
     let mut mutuals = Vec::new();
+    let mut phase_inductance_matrix_h = vec![vec![0.0; filaments.len()]; filaments.len()];
     for i in 0..filaments.len() {
+        phase_inductance_matrix_h[i][i] = self_l[i];
         for j in (i + 1)..filaments.len() {
-            mutuals.push(inductance::phase_mutual_inductance(
+            let mutual = inductance::phase_mutual_inductance(
                 &filaments[i],
                 &filaments[j],
                 width,
                 thickness_for_gmd,
-            ));
+            );
+            mutuals.push(mutual);
+            phase_inductance_matrix_h[i][j] = mutual;
+            phase_inductance_matrix_h[j][i] = mutual;
         }
     }
     let mean = |v: &[f64]| if v.is_empty() { 0.0 } else { v.iter().sum::<f64>() / v.len() as f64 };
@@ -1070,6 +1078,7 @@ pub fn analyze_drive_with(
         phase_resistance_ohm: r_phase,
         phase_inductance_h: l_self,
         mutual_inductance_h: m_mut,
+        phase_inductance_matrix_h,
         line_inductance_h: l_ll,
         synchronous_inductance_h: l_s,
         series_inductance_h: settings.series_inductance_h.max(0.0),

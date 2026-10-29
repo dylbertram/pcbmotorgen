@@ -188,6 +188,11 @@ pub struct ProjectConfigStateIpc {
     /// Driver IC limits and operating assumptions; absent in older files.
     pub drive: pcbmotorgen_simulation::drive::DriveSettings,
 
+    /// Explicit optional operating requirements. Legacy files have no move,
+    /// never an invented duration, mass breakdown, controller or loss law.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub power_move: Option<pcbmotorgen_simulation::drive::move_power::routed::RoutedMoveRequest>,
+
     // --- Backplane and housing stackup (t707) ---
     /// Layers below the PCB and the optional housing; absent in older files,
     /// which load with no backplane.
@@ -237,6 +242,7 @@ impl Default for ProjectConfigStateIpc {
             drive_frequency_hz: 500.0,
             max_temperature_rise_c: 20.0,
             drive: pcbmotorgen_simulation::drive::DriveSettings::default(),
+            power_move: None,
             backplane: None,
         }
     }
@@ -739,5 +745,34 @@ mod tests {
         assert!(leftovers.is_empty(), "orphaned tmp files: {leftovers:?}");
 
         std::fs::remove_dir_all(&dir).expect("cleanup");
+    }
+
+    #[test]
+    fn legacy_projects_do_not_acquire_operating_requirements() {
+        let config: ProjectConfigStateIpc = serde_json::from_value(serde_json::json!({})).unwrap();
+        assert!(config.power_move.is_none());
+        assert!(serde_json::to_value(config).unwrap().get("power_move").is_none());
+        let (state, _) = parse_project_file(&serialize(&sample_state())).unwrap();
+        assert!(state.config.power_move.is_none());
+    }
+
+    #[test]
+    fn explicit_move_and_unknown_driver_losses_survive_saved_archive_roundtrip() {
+        let mut state = sample_state();
+        let input = serde_json::json!({
+            "profile": { "start_m":0.0025, "end_m":0.0655,
+                "initial_velocity_m_s":0.0, "final_velocity_m_s":0.0,
+                "duration_s":1.0, "travel_min_m":0.0025, "travel_max_m":0.0655,
+                "max_speed_m_s":0.5, "max_acceleration_m_s2":2.0, "max_deceleration_m_s2":1.0,
+                "moving_mass_kg":0.015, "mass_includes":"Explicit test scenario, cap included",
+                "coulomb_friction_n":0.05, "damping_n_s_per_m":0.0, "external_load_n":0.0,
+                "time_step_s":0.001 },
+            "control":"balanced_star_sinusoidal", "electrical_angle_at_zero_rad":0.0,
+            "phase_peak_limit_a":1.0, "source":{"boundary":"stiff_dc_link", "accepts_regeneration":false},
+            "additional_driver_loss_w":null, "force_positions":65
+        });
+        state.config.power_move = Some(serde_json::from_value(input.clone()).unwrap());
+        let (restored, _) = parse_project_file(&serialize(&state)).unwrap();
+        assert_eq!(serde_json::to_value(restored.config.power_move.unwrap()).unwrap(), input);
     }
 }

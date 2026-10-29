@@ -177,7 +177,7 @@
     </Tabs.Content>
     <Tabs.Content value="power" data-dock-panel="power" class="min-h-0 flex-1 overflow-auto p-3">
       {@render warnings()}
-      <PowerRequirements input={powerInput} />
+      <PowerRequirements input={powerInput} {config} />
     </Tabs.Content>
     </div>
   </Tabs.Root>
