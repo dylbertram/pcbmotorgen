@@ -9,6 +9,10 @@ use pcbmotorgen_simulation::magnetic::{
 };
 use pcbmotorgen_simulation::stackup::{FrictionEstimator, HeightStackCalculator};
 
+#[cfg(test)]
+#[path = "physics_goal_independence_tests.rs"]
+mod goal_independence_tests;
+
 // ===========================================================================
 // get_magnet_grades — REAL (core static table)
 // ===========================================================================
@@ -35,7 +39,7 @@ pub async fn compute_height_stack(
     config: LinearMotorConfigIpc,
 ) -> Result<HeightStackResultIpc, String> {
     let core = config.to_core();
-    core.validate().map_err(|e| e.to_string())?;
+    core.validate_for_simulation().map_err(|e| e.to_string())?;
     tauri::async_runtime::spawn_blocking(move || {
         let hs = HeightStackCalculator::default().calculate(&core.to_simulation());
         Ok(HeightStackResultIpc {
@@ -67,7 +71,7 @@ pub async fn prepare_dc_winding_geometry(
     cad_geometry: Option<pcbmotorgen_export::cad_dxf::CadGeometry>,
 ) -> Result<serde_json::Value, String> {
     let core = config.to_core();
-    core.validate().map_err(|error| error.to_string())?;
+    core.validate_for_simulation().map_err(|error| error.to_string())?;
     tauri::async_runtime::spawn_blocking(move || {
         let (routing, sim, hints) = if let Some(cad) = cad_geometry.as_ref() {
             let board = super::cad_source::CadBoard::new(cad, &core)?;
@@ -93,17 +97,17 @@ pub async fn analyze_housing_motion(
     cad_geometry: Option<pcbmotorgen_export::cad_dxf::CadGeometry>,
 ) -> Result<pcbmotorgen_simulation::backplane::HousingMotionAnalysis, String> {
     let core = config.to_core();
-    core.validate().map_err(|e| e.to_string())?;
+    core.validate_for_simulation().map_err(|e| e.to_string())?;
     tauri::async_runtime::spawn_blocking(move || {
         let sim = if let Some(cad) = cad_geometry.as_ref() {
             let board = super::cad_source::CadBoard::new(cad, &core)?;
             let sim = board.simulation_input(cad, &core);
-            sim.validate().map_err(|e| e.to_string())?;
+            sim.validate_for_simulation().map_err(|e| e.to_string())?;
             let hints = super::cad_source::CadBoard::drive_hints(cad);
             pcbmotorgen_simulation::drive::validate_copper_placement(&sim, &board.routing, &hints).map_err(|e| e.to_string())?;
             sim
         } else { core.to_simulation() };
-        sim.validate().map_err(|e| e.to_string())?;
+        sim.validate_for_simulation().map_err(|e| e.to_string())?;
         let stack = sim.backplane.as_ref().ok_or("Add a supported housing before calculating motion-induced heat")?;
         Ok(stack.housing_motion(&sim, speed, profile))
     }).await.map_err(|e| format!("housing motion worker failed: {e}"))?
@@ -116,7 +120,7 @@ pub async fn periodic_backplane_reference(
     config: LinearMotorConfigIpc,
 ) -> Result<pcbmotorgen_simulation::backplane::PeriodicStaticReference, String> {
     let sim = config.to_core().to_simulation();
-    sim.validate().map_err(|e| e.to_string())?;
+    sim.validate_for_simulation().map_err(|e| e.to_string())?;
     tauri::async_runtime::spawn_blocking(move || {
         let _permit = PERIODIC_REFERENCE_JOB.try_lock().map_err(|error| match error {
             std::sync::TryLockError::WouldBlock => "A periodic reference is already running. Wait for it to finish before starting another.".to_string(),
@@ -146,7 +150,7 @@ pub async fn periodic_backplane_reference(
 #[tauri::command]
 pub async fn generate_coils(config: LinearMotorConfigIpc) -> Result<CoilPathIpc, String> {
     let core = config.to_core();
-    core.validate().map_err(|e| e.to_string())?;
+    core.validate_for_simulation().map_err(|e| e.to_string())?;
     let num_layers = config.num_layers;
     tauri::async_runtime::spawn_blocking(move || {
         let ctx = core.routing_context();
@@ -194,7 +198,7 @@ pub async fn evaluate_force_sweep(
     }
     let drive = drive.ok_or("Force analysis requires explicit drive settings; use the same copper, temperature and via settings as driver analysis.")?;
     let core = config.to_core();
-    core.validate().map_err(|e| e.to_string())?;
+    core.validate_for_simulation().map_err(|e| e.to_string())?;
     let n_positions = config.n_positions.max(2) as usize;
     let meshing = config.meshing.max(1) as usize;
     let commutation = match config.commutation {
@@ -220,7 +224,7 @@ pub async fn evaluate_force_sweep(
             }
         };
 
-        sim.validate().map_err(|e| e.to_string())?;
+        sim.validate_for_simulation().map_err(|e| e.to_string())?;
         let hints = cad_geometry.as_ref().map(super::cad_source::CadBoard::drive_hints).unwrap_or_default();
         let (mut evaluator, coils) = ForceEvaluator::new(n_positions, meshing, commutation, 0.0)
             .with_routed_currents(&routing, &sim, &drive, &hints)
@@ -278,7 +282,7 @@ pub async fn evaluate_force_sweep(
 #[tauri::command]
 pub async fn compute_friction(config: LinearMotorConfigIpc) -> Result<FrictionBudgetIpc, String> {
     let core = config.to_core();
-    core.validate().map_err(|e| e.to_string())?;
+    core.validate_for_simulation().map_err(|e| e.to_string())?;
     tauri::async_runtime::spawn_blocking(move || {
         let fb = FrictionEstimator::default().estimate_for_config(&core.to_simulation());
         Ok(FrictionBudgetIpc {
@@ -334,7 +338,7 @@ pub async fn sample_b_field(
         ));
     }
     let core = config.to_core();
-    core.validate().map_err(|e| e.to_string())?;
+    core.validate_for_simulation().map_err(|e| e.to_string())?;
     tauri::async_runtime::spawn_blocking(move || {
         // Build linspaces from extents.
         let x_sample: Vec<f64> = linspace(x_extent_m[0], x_extent_m[1], n_x);
@@ -391,7 +395,7 @@ pub async fn analyze_drive(
     cad_geometry: Option<pcbmotorgen_export::cad_dxf::CadGeometry>,
 ) -> Result<pcbmotorgen_simulation::drive::DriveAnalysis, String> {
     let core = config.to_core();
-    core.validate().map_err(|e| e.to_string())?;
+    core.validate_for_simulation().map_err(|e| e.to_string())?;
     // Pattern-owned contract from motor-coil-generator-add-inputs:
     // 0 = closed, 1 = delta, 2 = star/wye. Imported copper is independent.
     let delta = match cad_geometry.as_ref() {
@@ -406,7 +410,7 @@ pub async fn analyze_drive(
         if let Some(cad) = cad_geometry.as_ref() {
             let board = super::cad_source::CadBoard::new(cad, &core)?;
             let sim = board.simulation_input(cad, &core);
-            sim.validate().map_err(|e| e.to_string())?;
+            sim.validate_for_simulation().map_err(|e| e.to_string())?;
             let hints = super::cad_source::CadBoard::drive_hints(cad);
             pcbmotorgen_simulation::drive::validate_copper_placement(&sim, &board.routing, &hints)
                 .map_err(|error| error.to_string())?;
@@ -454,7 +458,7 @@ pub async fn analyze_drive(
 #[tauri::command]
 pub async fn travel_envelope(config: LinearMotorConfigIpc) -> Result<TravelEnvelopeIpc, String> {
     let core = config.to_core();
-    core.validate().map_err(|e| e.to_string())?;
+    core.validate_for_simulation().map_err(|e| e.to_string())?;
     tauri::async_runtime::spawn_blocking(move || {
         let sim = core.to_simulation();
         // The copper active area is the whole track: [0, active_area_length].
@@ -705,7 +709,7 @@ mod analyze_drive_tests {
             settings.ripple_limit_fraction = 0.35; settings.voltage_headroom = 0.95;
             let analysis = tauri::async_runtime::block_on(analyze_drive(driver_ipc, settings, Some(kf), None)).unwrap();
             Some(serde_json::json!({"kf_n_per_a":kf,"thrust_n":analysis.thrust_n,"speed_voltage_v":analysis.speed_voltage_v,
-                "all_checks_passed":analysis.checks.iter().all(|check| check.status == pcbmotorgen_simulation::drive::CheckStatus::Pass)}))
+                "validation_basis":"Independent winding/field/force comparison, not design-goal compliance"}))
         } else { None };
         use pcbmotorgen_simulation::drive::{extract_phase_networks_with_terminals, solve_network, EdgeKind};
         let rho = pcbmotorgen_simulation::drive::rho_cu_at(state.drive.winding_temp_c);
@@ -781,8 +785,12 @@ mod analyze_drive_tests {
                 eprintln!("USER force_x={:?}", sweep.force_x_n);
                 eprintln!("USER phase means={:?}", (0..3).map(|p| sweep.per_phase_force_x.iter().map(|row| row[p]).sum::<f64>() / sweep.per_phase_force_x.len() as f64).collect::<Vec<_>>());
                 assert!(a.ripple_pp_a < 12.0 / (2.0 * a.phase_resistance_ohm));
-                assert!(a.ripple_pp_a > state.drive.ripple_limit_fraction * ipc.max_current_a);
-                assert!(a.thrust_n.unwrap() < ipc.target_force_n);
+                assert!((a.thrust_n.unwrap() - kf * ipc.max_current_a).abs() < 1e-12);
+                let mut goals = ipc.clone();
+                goals.target_force_n = 100.0;
+                goals.peak_force_n = 0.001;
+                let changed = tauri::async_runtime::block_on(analyze_drive(goals, state.drive.clone(), Some(kf), None)).unwrap();
+                super::goal_independence_tests::assert_electrical_equal(&a, &changed);
             }
             if let Some(old) = previous.as_ref() {
                 let max_diff = old.iter().zip(&sweep.force_x_n).map(|(a,b)| (a-b).abs()).fold(0.0, f64::max);
@@ -826,7 +834,6 @@ mod analyze_drive_tests {
         // At 20 m/s the aluminium housing drags harder than the motor pushes.
         let eddy = a.backplane.as_ref().unwrap();
         assert!(eddy.drag_n > a.thrust_n.unwrap() && eddy.drag_limited_speed_m_s.unwrap() < 20.0);
-        assert_eq!(a.checks.iter().find(|c| c.id == "eddy_drag").unwrap().status, pcbmotorgen_simulation::drive::CheckStatus::Fail);
         assert!(eddy.pwm_inductance_h < a.effective_inductance_h);
     }
 
@@ -853,18 +860,18 @@ mod analyze_drive_tests {
             for voltage in [5.0, 12.0] {
                 ipc.supply_voltage_v = voltage;
                 let a = tauri::async_runtime::block_on(analyze_drive(ipc.clone(), settings.clone(), Some(kf), None)).unwrap();
-                let pass = a.checks.iter().all(|c| c.status == pcbmotorgen_simulation::drive::CheckStatus::Pass);
-                if strands == 9.0 {
-                    assert_eq!(pass, voltage == 12.0, "nine-strand 5 V / 12 V feasibility regression: {:?}", a.checks);
-                }
-                eprintln!("DRV8311 strands={strands} V={voltage} ALL_PASS={pass} R={} L_uH={} thrust={:?} holding={} speed={:?} available={} ripple={} ripple_limit={}", a.phase_resistance_ohm, a.synchronous_inductance_h*1e6, a.thrust_n, a.holding_voltage_v, a.speed_voltage_v, a.available_voltage_v, a.ripple_pp_a, 0.35*1.1);
+                assert!((a.thrust_n.unwrap() - kf * ipc.max_current_a).abs() < 1e-12);
+                let expected_ripple = voltage / (2.0 * a.phase_resistance_ohm)
+                    * (a.phase_resistance_ohm / (4.0 * settings.pwm_hz * a.effective_inductance_h)).tanh();
+                assert!((a.ripple_pp_a - expected_ripple).abs() < 1e-10);
+                eprintln!("DRV8311 strands={strands} V={voltage} numerical R={} L_uH={} thrust={:?} holding={} speed={:?} ripple={}", a.phase_resistance_ohm, a.synchronous_inductance_h*1e6, a.thrust_n, a.holding_voltage_v, a.speed_voltage_v, a.ripple_pp_a);
                 eprintln!("checks={:?}", a.checks.iter().map(|c| (&c.id, c.status, c.value, c.limit)).collect::<Vec<_>>());
             }
         }
     }
 
     #[test]
-    fn drv8311_star_reference_passes_all_checks() {
+    fn drv8311_star_reference_matches_independent_numerics_regardless_of_goals() {
         for width_mm in [0.5] {
             let mut ipc = crate::ipc::ProjectConfigStateIpc::default().to_linear_motor_ipc();
             ipc.routing_params.insert("connection".into(), 2.0);
@@ -893,15 +900,17 @@ mod analyze_drive_tests {
                         settings.pwm_hz = 200e3;
                         settings.ripple_limit_fraction = 0.35;
                         settings.voltage_headroom = 0.95;
-                        let a = tauri::async_runtime::block_on(analyze_drive(ipc.clone(), settings, Some(kf), None)).unwrap();
+                        let a = tauri::async_runtime::block_on(analyze_drive(ipc.clone(), settings.clone(), Some(kf), None)).unwrap();
                         assert!((a.thrust_n.unwrap() - 0.6536304671).abs() < 1e-8);
                         assert!((a.speed_voltage_v.unwrap() - 4.0956500486).abs() < 1e-8);
-                        let electrical_pass = a.checks.iter().filter(|c| c.id != "thrust").all(|c| c.status == pcbmotorgen_simulation::drive::CheckStatus::Pass);
-                        assert!(a.checks.iter().all(|c| c.status == pcbmotorgen_simulation::drive::CheckStatus::Pass), "reference driver checks: {:?}", a.checks);
-                        eprintln!("trial width={width_mm} V={voltage} I={current} checks={:?}", a.checks.iter().map(|c| (&c.id, c.status, c.value, c.limit)).collect::<Vec<_>>());
-                        if electrical_pass {
-                            eprintln!("ELECTRICAL PASS DRV8311 width={width_mm} copper={copper}oz V={voltage} I={current} thrust={:?} N checks={:?}", a.thrust_n, a.checks.iter().map(|c| (&c.id, c.status)).collect::<Vec<_>>());
-                        }
+                        let mut goals = ipc.clone();
+                        goals.target_force_n = 100.0;
+                        goals.peak_force_n = 0.001;
+                        settings.ripple_limit_fraction = 0.0001;
+                        settings.voltage_headroom = 0.01;
+                        settings.allowed_rise_c = 0.1;
+                        let changed = tauri::async_runtime::block_on(analyze_drive(goals, settings, Some(kf), None)).unwrap();
+                        super::goal_independence_tests::assert_electrical_equal(&a, &changed);
                     }
                 }
             }

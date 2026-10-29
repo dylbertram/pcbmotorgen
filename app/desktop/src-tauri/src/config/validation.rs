@@ -27,6 +27,12 @@ impl LinearMotorConfig {
         self.validate_with_design_goals(false)
     }
 
+    /// Physics commands must not reject a design for missing its performance goals.
+    /// Static force/heat still consume the configured current as excitation.
+    pub fn validate_for_simulation(&self) -> Result<(), ConfigError> {
+        self.validate_with_design_goals(false)
+    }
+
     fn validate_with_design_goals(&self, check_goals: bool) -> Result<(), ConfigError> {
         if let Some(stack) = &self.backplane {
             stack.validate().map_err(ConfigError)?;

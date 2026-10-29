@@ -22,7 +22,7 @@ pub fn circular_qualification_snapshot(sim: &SimulationInput, routing: &RoutingR
 
 fn snapshot_with_scope(sim: &SimulationInput, routing: &RoutingResult, drive: &DriveSettings,
                 hints: &DriveGeometryHints, circular_qualification: bool) -> Result<Value, String> {
-    sim.validate().map_err(|error| error.to_string())?;
+    sim.validate_for_simulation().map_err(|error| error.to_string())?;
     if routing.segments.len().saturating_add(routing.vias.len()).saturating_add(routing.curves.len()) > 10_000 {
         return Err("Finite DC geometry preparation exceeds the declared 10000-edge resource cap; geometry was not truncated".into());
     }
