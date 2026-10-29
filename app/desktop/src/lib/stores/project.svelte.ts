@@ -158,6 +158,7 @@ export class ProjectStore {
         peak_force_n: this.config.peak_force_n,
         friction_n: this.config.friction_n,
         carriage_mass_kg: this.config.carriage_mass_kg,
+        carriage_mass_source: this.config.carriage_mass_source,
         max_accel_m_s2: this.config.max_accel_m_s2,
         capacitor_bank_uf: this.config.capacitor_bank_uf,
         commutation: this.config.commutation,
@@ -216,6 +217,7 @@ export class ProjectStore {
     this.config.peak_force_n = c.peak_force_n;
     this.config.friction_n = c.friction_n;
     this.config.carriage_mass_kg = c.carriage_mass_kg;
+    this.config.carriage_mass_source = c.carriage_mass_source === "magnets" ? "magnets" : "assembly";
     this.config.max_accel_m_s2 = c.max_accel_m_s2;
     this.config.capacitor_bank_uf = c.capacitor_bank_uf;
     this.config.commutation = c.commutation;

@@ -1,5 +1,20 @@
 import { expect, it } from "vitest";
-import { emptyMoveTemplate, parseMoveRequest } from "./movePowerInputs";
+import { emptyMoveTemplate, parseMoveRequest, useDesignMechanicalInputs } from "./movePowerInputs";
+
+it("copies design estimates only on explicit request, leaving motion and source unknown", () => {
+  const text = emptyMoveTemplate();
+  const design = { carriage_mass_kg: 0.015, carriage_mass_source: "assembly" as const, friction_n: 0.05 };
+  const draft = JSON.parse(useDesignMechanicalInputs(text, design));
+  expect(draft.profile.moving_mass_kg).toBe(0.015);
+  expect(draft.profile.coulomb_friction_n).toBe(0.05);
+  expect(draft.profile.mass_includes).toContain("Full moving assembly estimate");
+  expect(draft.profile.duration_s).toBeNull();
+  expect(draft.source.accepts_regeneration).toBeNull();
+  expect(JSON.parse(text).profile.moving_mass_kg).toBeNull();
+  const magnets = JSON.parse(useDesignMechanicalInputs(text, { ...design, carriage_mass_source: "magnets" }));
+  expect(magnets.profile.mass_includes).toContain("Magnet-only estimate");
+  expect(() => useDesignMechanicalInputs("{}", design)).toThrow("profile object");
+});
 
 it("requires explicit quantities, mass coverage and regeneration choice, not null-to-zero defaults", () => {
   const draft = JSON.parse(emptyMoveTemplate());

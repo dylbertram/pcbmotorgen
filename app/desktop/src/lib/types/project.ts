@@ -66,6 +66,8 @@ export interface ProjectConfigState {
   peak_force_n: number;
   friction_n: number;
   carriage_mass_kg: number;
+  /** Missing in legacy designs: preserve their saved mass as an assembly override. */
+  carriage_mass_source?: "magnets" | "assembly" | null;
   max_accel_m_s2: number;
   capacitor_bank_uf: number;
 

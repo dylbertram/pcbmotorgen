@@ -11,7 +11,7 @@ function fixture(): PowerRequirementsInput {
   const config = new ConfigStore();
   Object.assign(config, { desired_travel_mm: 63, active_area_width_mm: 8,
     magnet_count: 5, magnet_width_mm: 5, magnet_cross_width_mm: 5,
-    magnet_height_mm: 3, electrical_pitch_mm: 12, supply_voltage_v: 12,
+    magnet_height_mm: 3, electrical_pitch_mm: 12, supply_voltage_v: 12, carriage_mass_kg: 0.015,
     routing_params: { num_strands: 3, connection: 0 } });
   const driveSettings = { ...config.drive, series_inductance_h: 47e-6 };
   return { config: config.toIpc(), driveSettings, desiredTravelMm: 63,
@@ -32,7 +32,7 @@ describe("power requirements", () => {
     expect(item(input, "Electrical travel period").value).toBe("12 mm");
     expect(item(input, "Electrical travel period").detail).toContain("pole pitch 6 mm");
     expect(item(input, "Configured carriage mass").value).toBe("0.015 kg");
-    expect(item(input, "Configured carriage mass").detail).toContain("fader cap is unknown");
+    expect(item(input, "Configured carriage mass").detail).toContain("full-assembly override");
   });
 
   it("separates target speed and ripple-inclusive analytical phase peak from supply demand", () => {
