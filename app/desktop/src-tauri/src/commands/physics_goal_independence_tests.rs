@@ -47,8 +47,33 @@ pub(super) fn assert_electrical_equal(a: &DriveAnalysis, b: &DriveAnalysis) {
         "thrust_constant_n_per_a",
         "back_emf_constant_v_s_per_m",
     ] {
-        assert_eq!(a[key], b[key], "Design goals changed calculated {key}");
+        assert_numerically_equal(&a[key], &b[key], key);
     }
+}
+
+fn assert_numerically_equal(a: &serde_json::Value, b: &serde_json::Value, label: &str) {
+    if let (Some(x), Some(y)) = (a.as_f64(), b.as_f64()) {
+        // Rayon sums filament contributions in an unspecified order. Repeated
+        // runs can differ by a few ulps without any goal-dependent physics.
+        let tolerance = 1e-13 * x.abs().max(y.abs()).max(1e-12);
+        assert!((x - y).abs() <= tolerance, "Design goals changed calculated {label}: {x} vs {y}, tolerance {tolerance}");
+    } else if let (Some(x), Some(y)) = (a.as_array(), b.as_array()) {
+        assert_eq!(x.len(), y.len(), "Design goals changed length of {label}");
+        for (i, (x, y)) in x.iter().zip(y).enumerate() {
+            assert_numerically_equal(x, y, &format!("{label}[{i}]"));
+        }
+    } else {
+        assert_eq!(a, b, "Design goals changed calculated {label}");
+    }
+}
+
+#[test]
+fn inductance_invariance_tolerance_accepts_roundoff_not_physical_changes() {
+    let baseline = serde_json::json!([1e-6, [2.0, 0.0]]);
+    let roundoff = serde_json::json!([1e-6 * (1.0 + 1e-14), [2.0, 0.0]]);
+    assert_numerically_equal(&baseline, &roundoff, "roundoff");
+    let changed = serde_json::json!([1e-6 * (1.0 + 1e-10), [2.0, 0.0]]);
+    assert!(std::panic::catch_unwind(|| assert_numerically_equal(&baseline, &changed, "change")).is_err());
 }
 
 #[test]

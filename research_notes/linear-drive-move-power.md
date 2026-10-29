@@ -347,6 +347,119 @@ no original housing was removed to force a passing request.
 
 ### Practical-estimate investigation, 2026-10-29
 
+#### Referenced partial screening case
+
+`scripts/solvers/practical_move_assumptions.py` now constructs an explicit,
+limited 12 V/100 kHz DRV8311 scenario from a native baseline's actual phase
+resistances, phase names and effective inductance. It is a screening model,
+not a new saved-design setting. It preserves supplied geometry and drive inputs.
+
+- TI SLVSFN2B section 7.5 gives typical 0.21 Ω high-side plus low-side path at
+  25 °C; SLEW=01 gives 75 V/µs (20–80%); DEADTIME=001 gives 200 ns. The saved
+  driver path value is used unchanged. The SLEW and DEADTIME choices are
+  assumptions, not recovered board settings. The assumed diode drop is 0.7 V,
+  not a TI-specified value. Typical 12 V operating current is interpolated
+  between 10 mA at 25 kHz and 12 mA at 200 kHz. External control/regulator
+  consumption remains unspecified. TI section 12.3.1 FOC switching/dead-time
+  equations use electrical-cycle RMS. Their coefficients are mapped to
+  `sum(abs(phase current))` by equating their averages for ideal balanced
+  sinusoidal currents, not by claiming an instantaneous switching simulation.
+- Ripple uses the exact 50%-duty two-phase RL peak-to-peak formula at the
+  native effective inductance and worst hot phase R, plus assumed external
+  inductor DCR and half the driver conduction-path resistance. The covariance
+  approximates a symmetric triangular ripple shared by a uniformly selected
+  phase pair. It is not an SVPWM solution, measured ripple, or universal bound.
+  An independent exponential half-cycle march verifies the RL formula, and
+  numerical triangle integration verifies the balanced covariance.
+- Bourns SRP1265WA-470M is a **representative scenario part**, not a board
+  modification: 47 µH, 74.1 mΩ typical DCR, 89 mΩ maximum DCR, Q typical 20
+  at 100 kHz / 1 V, all at 25 °C. Its typical 5.2 A Irms and 6 A Isat are not
+  hardware guarantees. Estimate DCR at the assumed winding temperature using
+  copper's 0.00393/°C coefficient. Q gives total small-signal AC resistance
+  `2πfL/Q`, not core resistance alone. Subtract 25 °C DCR once and apply the
+  remainder to the triangle's fundamental mean-square current. The result is
+  entered in the existing constant-inductor-loss field, but is explicitly a
+  combined AC-excess proxy, not separately measured core loss. Bias, temperature,
+  nonlinearity and harmonics are not characterized. The generated two-layer
+  design has no external inductor and remains unchanged.
+- An isolated-slab skin-effect formula uses 35 µm copper and the actual hot DC
+  phase resistance as a proxy. It applies the maximum-domain electrical
+  frequency for fundamental and 100 kHz for ripple. A complex-impedance
+  calculation independently checks the formula. This approximation does not
+  model conductor proximity, via-specific current distribution or harmonics.
+  Those limitations, external board electronics, and inductor bias/harmonic
+  limitations remain **named omissions**, so `source_model_scope` stays
+  `partial_declared_scenario` and complete supply totals remain Unknown.
+
+References: TI sections [7.5](https://www.ti.com/document-viewer/DRV8311/datasheet/GUID-XXXXXXXX-SF0T-XXXX-XXXX-000000179401)
+and [12.3.1](https://www.ti.com/document-viewer/DRV8311/datasheet/GUID-C826F7E8-19E5-47C8-9C09-E13912428538),
+[Bourns SRP1265WA](https://www.bourns.com/docs/product-datasheets/srp1265wa.pdf),
+and [Coilcraft on Q](https://www.coilcraft.com/en-us/resources/application-notes/key-parameters-for-selecting-rf-inductors/).
+
+Read-only Fader version 1 and generated two-layer star version 1 were evaluated
+at 129/193 force positions at 0.0005 s, then 193 positions at 0.00025 s.
+Full forward is 63 mm in 1 s; short moves are ±1 mm in 0.25 s. Both use a
+stiff 12 V DC link explicitly accepting regeneration, zero endpoint velocity,
+15 g mass and 0.05 N bushing/rail friction, with zero external load/damping
+as explicit test assumptions. This does not assert the actual supply can sink
+energy. The Fader's saved 0.5 m/s setting remains unchanged and is not used as
+a cap. Both full moves have physical voltage-tracking findings; calculated
+demand is retained, not claimed as achievable.
+
+| Case | Partial sampled peak W | Partial peak A | Partial average W | Drawn / returned / net J |
+| --- | ---: | ---: | ---: | ---: |
+| Fader full forward | 158.238 | 13.1865 | 41.6086 | 41.6086 / 0 / 41.6086 |
+| Fader short forward | 10.1104 | 0.8425 | 7.4334 | 1.85835 / 0 / 1.85835 |
+| Fader short return | 10.4274 | 0.8690 | 7.5442 | 1.88605 / 0 / 1.88605 |
+| Two-layer full forward | 115.102 | 9.5919 | 31.8123 | 31.8123 / 0 / 31.8123 |
+| Two-layer short forward | 9.2792 | 0.7733 | 7.3955 | 1.84887 / 0 / 1.84887 |
+| Two-layer short return | 9.4955 | 0.7913 | 7.4731 | 1.86828 / 0 / 1.86828 |
+
+The two full cases are imposed demand above the DC-link voltage, not delivered
+power or achieved motion. The short-move absence of a voltage finding does not
+prove tracking or current/thermal safety. Zero returned energy here is a result
+of these lossy trajectories, not a general braking claim.
+
+All six cases pass the unchanged 2% energy/peak gates for each spatial and
+time refinement, independent electrical/source balance below 1e-6 of accounted
+losses, and mechanical balance below 1e-8 J. The largest spatial changes are
+0.6002% net energy and 0.8314% peak; the largest time changes are 0.0003% net
+energy and 0.0044% peak. These are convergence checks for the stated model,
+not error bounds on its approximations.
+
+An intentionally broad assumption sensitivity scales ripple amplitude and
+switching/dead-time coefficients by 0.5 and 2; the Q proxy scales with ripple
+amplitude squared. Full-move partial net energy spans 41.2315–42.5086 J for
+Fader and 29.7412–39.3822 J for two-layer. These are sensitivity probes, not
+calibrated confidence intervals or guaranteed extrema; in particular the
+uninducted two-layer estimate is sensitive to ripple assumptions.
+
+Hash-bound compact receipts, including sensitivity hashes, are in
+`scripts/solvers/results/practical-move-screening-v3-2026-10-29.json`.
+Full baseline, model and native receipts are in the approved temporary folder's
+`move-screening-baselines-20261029`, `move-screening-models-v2-20261029`,
+`move-screening-results-v2-20261029`, and `move-screening-sensitivity-v2-20261029`
+directories. The earlier `practical-move-screening-2026-10-29.json` and v1
+temporary receipts preserve the first approximation before the slab addition.
+The optional native receipt report test checks all six cases against UI report,
+CSV, snapshot and time-series mapping, while confirming complete totals remain
+Unknown. No browser physics or hardware results are implied.
+
+During the full Rust verification the imported-copper goal-invariance test
+failed once on a one-ULP mutual-inductance difference. Its filament accumulation
+uses a Rayon parallel sum with nondeterministic reduction order. The invariance
+helper now compares numerical arrays at 1e-13 relative with a 1e-12 scale
+floor, while still requiring matching structure and nonnumeric fields. A new
+control accepts 1e-14 relative roundoff and rejects a 1e-10 relative change.
+This is a numerical-repeatability tolerance, not a motor-performance target;
+the source/energy and 2% refinement gates above were not changed. The full
+Rust suite passed on rerun.
+
+The practical-goal completion criterion is **not yet met**: the included loss
+approximations are useful partial screening, but omitted winding proximity,
+inductor nonlinearity/harmonics and external electronics remain unquantified.
+Do not relabel the above partial numbers as complete W/A/J estimates.
+
 The existing declared-loss interface has a constant, balanced three-phase ripple
 covariance and constant per-inductor core watts over the move. These are model
 assumptions, not quantities furnished by a 47 µH inductance rating. A practical
