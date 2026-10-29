@@ -399,3 +399,95 @@ acceptance. Placeholder coefficients do not satisfy that gate. The previously
 tested 63 mm requests remain electrically infeasible. Unsupported dynamic
 backplane/housing losses still reject; no external-solver campaign, hardware
 maximum, permitted peak-duration, controller or thermal qualification is claimed.
+
+### Additional saved-design rejection evidence
+
+The same 1 mm/0.25 s declared-loss request was next tried against the two other
+supplied version-1 designs. Both calls to the existing success-only
+`supplied_saved_design_declared_loss_model` test failed its feasibility assertion:
+
+- `star_2-layer.pmmotor`: current-limit failure, mean phase peak
+  1.0622824503 A and declared-ripple envelope 1.0822824503 A against 1 A.
+  Input SHA-256 before the mass-label clarification was
+  `bab26c905bc954a73669a94976c39057df2953d44cf5b13249c03fb74f366756`.
+- `star_4-layer.pmmotor`: voltage-limit failure, required line peak
+  12.7698317899 V. Input SHA-256 before the label clarification was
+  `48f0040cca2da708d2dad71fd6fd17dc2bbe3b8446fd277666736954a26bbfec`.
+
+These failed success probes are not successful total-power scenarios. No design,
+current limit, move duration or load was changed to make them pass. The existing
+success-only assertion remains unchanged. A separate rejection regression now
+pins the archive hashes and explicitly selects version 1, checks these expected
+limits and requires `source = null` at each resolution. It checks energy balance
+for required excitation, not achieved source demand, and compares accounted
+losses, phase envelope and required line-voltage peak under separate 129→193
+spatial and 0.0005→0.00025 s time refinements. All comparisons pass 2% gates.
+
+Final required-excitation diagnostics at 193 positions/0.00025 s:
+
+- Two-layer: 1.0788584841 A declared envelope, 4.8899911371 V required line
+  peak, 1.0214920739 J accounted losses, source residual 1.5457e-12 J.
+  Input SHA-256 `461f708773dd539f78e59b52c18d5aa6b19a0c2a9b850d461749cc67490cdc1a`.
+- Four-layer: 0.9489543302 A declared envelope, 12.7296176980 V required line
+  peak, 2.2902780384 J accounted losses, source residual 2.7620e-12 J.
+  Input SHA-256 `0757561657eacea742e8688b9ec4b82fe163726400a209a2b1ebdb744b529be8`.
+
+The regression separately selects two-layer version 2 and confirms that its
+actual saved backplane/housing survives request construction and causes explicit
+unsupported-dynamic-loss rejection. It never falls back to version 1.
+
+```sh
+PCB_MOTOR_SUPPLIED_DESIGN_DIR="$PWD" cargo test -p pcbmotorgen supplied_loss_model_rejects_current_voltage_and_unsupported_stack_without_repair -- --ignored --nocapture
+```
+
+The shared request helper now describes mass as the configured carriage mass
+with unconfirmed complete-assembly/cap coverage, rather than hard-coding 15 g
+in the text. The numeric value still comes from the saved design. Re-running
+Fader and both refinements produces identical numerical results to the previous
+section; its clarified-label base input SHA-256 is now
+`0049a7a0fb3b31fa6e05221656bbaf68fdf9695828b69e9cc94f8e12d6848979`.
+
+### Driver source audit and inputs still required
+
+Checked TI's DRV8311 production datasheet SLVSFN2B, revision B, February 2022,
+using its HTML sections on 2026-10-29:
+
+- [7.5 Electrical characteristics](https://www.ti.com/document-viewer/DRV8311/datasheet/GUID-XXXXXXXX-SF0T-XXXX-XXXX-000000179401)
+  specifies 210 mΩ typical HS+LS resistance at VM ≥ 6 V, 1 A and junction
+  temperature 25°C; 330 mΩ typical at 150°C. The saved 0.21 Ω is therefore a
+  configured typical cold value, not a hot-driver or worst-case resistance.
+  Saved winding temperature 75°C does not establish driver junction temperature.
+  No resistance value was changed or interpolated from these endpoints.
+- The same section specifies VM operating current at 12 V and 25/200 kHz,
+  for example 10/12 mA typical at 25°C. These are not a qualified 100 kHz
+  controller-only coefficient. Standby/operating current, charge-pump/gate
+  consumption and externally supplied logic/regulator loads need a clear
+  boundary before combining them with switching and controller terms. Do not
+  add the entire operating-current draw to overlapping calibrated loss laws.
+- [12.3.1 Power dissipation](https://www.ti.com/document-viewer/DRV8311/datasheet/GUID-C826F7E8-19E5-47C8-9C09-E13912428538)
+  provides FOC estimates for conduction, switching and diode dead-time losses.
+  It requires rise/fall time, diode forward voltage, dead time and current
+  conventions. Section 7.5 specifies slew/dead time under selected settings;
+  the saved file identifies only DRV8311, not the H/S/P variant, PWM mode,
+  SLEW/DEADTIME settings or driver temperature. Do not choose a setting or map
+  a whole-electrical-cycle RMS estimate to an instantaneous current law silently.
+- [11.1 Bulk capacitance](https://www.ti.com/document-viewer/DRV8311/datasheet/GUID-73020C97-0258-497F-8442-8933E816B34B)
+  explicitly depends on supply capability, wiring inductance, allowable voltage
+  ripple and braking method. A chip capable of synchronous conduction does not
+  prove that the upstream 12 V supply can sink regenerative energy.
+
+The supplied Fader has 15 g configured carriage mass, 0.05 N friction and
+47 µH external inductance per phase, but no moving-part coverage statement,
+inductor manufacturer/part number, DCR/core-loss data, qualified ripple moments,
+winding AC-loss increments or source sink declaration. Inductance alone cannot
+identify an inductor's losses. Magnet dimensions alone cannot establish total
+moving mass. These missing inputs require design-owner data or an explicitly
+approved, referenced modeling assumption; they cannot be recovered from this
+datasheet. No production loss preset or saved-design total was fabricated.
+
+Follow-up changes touch tests and this evidence note only. Verification reruns
+the six automatic native move-command tests and explicitly executes the new
+saved-design rejection regression and the unchanged Fader success/refinement
+gates. Previous frontend/build/Chromium evidence applies to unchanged production
+code; those suites were not rerun for this test-only follow-up. Original root
+hashes were checked again and match. The blocking inputs above remain open.

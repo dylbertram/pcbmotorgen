@@ -4,6 +4,8 @@ use pcbmotorgen_simulation::drive::move_power::losses::{
 };
 use pcbmotorgen_simulation::drive::move_power::{MoveProfile, WindingModel};
 
+mod saved_design_losses;
+
 /// Explicit numerical integration-test parameters, NOT driver/material data.
 fn declared_test_losses(c: &crate::ipc::ProjectConfigStateIpc) -> DeclaredLossModel {
     DeclaredLossModel {
@@ -54,35 +56,16 @@ fn supplied_saved_design_declared_loss_model() {
     let path = std::env::var("PCB_MOTOR_PROJECT_PATH").expect("set PCB_MOTOR_PROJECT_PATH");
     let original = std::fs::read(&path).unwrap();
     let file: serde_json::Value = serde_json::from_slice(&original).unwrap();
-    let state = &file["versions"][0]["state"];
+    let selected = file["versions"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|version| version["id"] == 1)
+        .expect("Select saved version 1 explicitly");
+    let state = &selected["state"];
     let c: crate::ipc::ProjectConfigStateIpc =
         serde_json::from_value(state["config"].clone()).unwrap();
-    let mut p = profile();
-    p.start_m = c.magnet_width_mm * 0.0005 + 0.01;
-    p.end_m = p.start_m - 0.001;
-    p.duration_s = 0.25;
-    p.time_step_s = 0.0005;
-    p.travel_min_m = c.magnet_width_mm * 0.0005;
-    p.travel_max_m = p.travel_min_m + c.desired_travel_mm * 1e-3;
-    p.max_speed_m_s = c.drive.target_speed_m_s;
-    p.max_acceleration_m_s2 = c.max_accel_m_s2;
-    p.max_deceleration_m_s2 = c.max_accel_m_s2;
-    p.moving_mass_kg = c.carriage_mass_kg;
-    p.coulomb_friction_n = c.friction_n;
-    let request = RoutedMoveRequest {
-        profile: p,
-        control: WindingModel::BalancedStarSinusoidal,
-        electrical_angle_at_zero_rad: std::f64::consts::FRAC_PI_2,
-        phase_peak_limit_a: c.max_current_a,
-        source: MoveSource::StiffDcLink {
-            accepts_regeneration: true,
-        },
-        additional_driver_loss_w: None,
-        loss_model: Some(declared_test_losses(&c)),
-        force_positions: 129,
-    };
-    let inputs = serde_json::json!({ "topology":"linear", "config":c.to_linear_motor_ipc(), "drive":c.drive,
-        "cad_geometry":state["cad_geometry"], "move_request":request });
+    let inputs = saved_design_losses::inputs(state);
     let result = tauri::async_runtime::block_on(evaluate_move_power(
         "saved-declared-loss-model".into(),
         inputs.clone(),
@@ -91,7 +74,7 @@ fn supplied_saved_design_declared_loss_model() {
     assert_eq!(result.inputs, inputs);
     let m = &result.result.demand;
     eprintln!("Conditional numerical loss-law fixture: file={path}, file_sha256={:x}, selected version={}, input_sha256={}",
-        Sha256::digest(&original), file["versions"][0]["id"], result.input_sha256);
+        Sha256::digest(&original), selected["id"], result.input_sha256);
     eprintln!("scope={}, feasible={}, current/voltage findings={:?}, phase mean peak={} A, ripple envelope={:?} A, ledger={}, source={}",
         m.source_model_scope, m.feasible, m.limiting_factors, m.sampled_phase_peak_a,
         m.sampled_phase_peak_including_declared_ripple_a, serde_json::to_string(&m.loss_energy).unwrap(), serde_json::to_string(&m.source).unwrap());
