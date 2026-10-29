@@ -1,0 +1,626 @@
+{
+  "schema": "engineering-saved-design-estimate-v1",
+  "scope": "Engineering estimate with named exclusions, NOT a complete supply total, measured hardware demand, a guaranteed maximum, or achieved tracking",
+  "source_boundary": "12 V stiff DC link, explicit regeneration sink accepted; no upstream or capacitor transient model",
+  "generator_sha256": "f648bbb944b9ff2cb2dd9dd5f072db3e63c4a9578ef230981c67101a4336bed9",
+  "cases": {
+    "fader-full-forward": {
+      "archive": "Fader-traces-workspace.pmmotor",
+      "archive_sha256": "567d97900475c92598f9ad6f7df9e7aeaf374dfc542fa25fa7e04b90dbfb287b",
+      "version": 1,
+      "baseline_sha256": "2b5750c5a107864045a2aa52940aafeca84bc0bb746e3323fe1150b641d92e9a",
+      "model_sha256": "84e9cd885ae64ccb48cdfed88bbe0bcbe818151880635bbf35995819198a3886",
+      "native_receipt_sha256": "d947da30f078af3c809b6eeadde3fbcfd2d1a1109b4a558a4679c992adc1bfdb",
+      "baseline_input_sha256": "a552de0d800eecfab4cb242544c801da793f82b146093cc56853b735bd739085",
+      "omitted_losses": [
+        "Winding proximity and via-specific AC loss not represented by isolated slab approximation",
+        "Inductor AC loss outside 100 kHz fundamental and bias/temperature effects not characterized",
+        "Board-level controller/regulator and source wiring consumption not specified"
+      ],
+      "model_reference": "Explicit engineering estimate, not a measured or complete hardware total: TI DRV8311 SLVSFN2B sections 7.5/12.3.1, 25 \u00b0C driver, assumed SLEW=01, DEADTIME=001, 0.7 V diode drop and sinusoidal cycle-average mapping; Bourns SRP1265WA-470M 47 \u00b5H Q=20 at 100 kHz/1 V and 74.1 m\u03a9 typical DCR at 25 \u00b0C; inductor temperature assumed equal to winding. Q excess is combined AC-loss proxy, not isolated core loss. Isolated copper slab uses full-network DC resistance as proxy; proximity and via AC distribution omitted. 12 V stiff DC-link boundary excludes upstream wiring and board-level loads. Not a guaranteed bound or hardware qualification. Sources: https://www.ti.com/document-viewer/DRV8311/datasheet/GUID-C826F7E8-19E5-47C8-9C09-E13912428538 and https://www.bourns.com/docs/product-datasheets/srp1265wa.pdf",
+      "ripple_reference": "50%-duty two-phase RL p-p used as triangular phase-pair mixture; Lphase=0.00005024035698872327 H, Rphase=5.041877806650973 \u03a9, pp=0.2924542052048229 A. Approximate, not actual PWM or universal bound.",
+      "profile": {
+        "coulomb_friction_n": 0.05,
+        "damping_n_s_per_m": 0.0,
+        "duration_s": 1.0,
+        "end_m": 0.0655,
+        "external_load_n": 0.0,
+        "final_velocity_m_s": 0.0,
+        "initial_velocity_m_s": 0.0,
+        "mass_includes": "15 g full moving assembly including magnets, bushings and moving enclosure, user-approved engineering estimate",
+        "max_acceleration_m_s2": 2.0,
+        "max_deceleration_m_s2": 2.0,
+        "max_speed_m_s": 0.5,
+        "moving_mass_kg": 0.015,
+        "start_m": 0.0025,
+        "time_step_s": 0.0005,
+        "travel_max_m": 0.0655,
+        "travel_min_m": 0.0025
+      },
+      "pcb_thickness_m": 0.0008,
+      "scenario_overrides": {
+        "electrical_angle_at_zero_rad": 2.2676493455876967,
+        "pcb_thickness_m": 0.0008
+      },
+      "geometry": {
+        "phase_resistance_hot_ohm": [
+          4.830911540531349,
+          4.833573941203345,
+          4.848217156650973
+        ],
+        "effective_phase_inductance_h": 5.024035698872327e-05,
+        "copper_thickness_m": 3.5e-05,
+        "electrical_period_m": 0.012
+      },
+      "refinements": [
+        {
+          "input_sha256": "87a619485788a86e91f343704f2f13a34ea5614cb926ea6f30a12d6fc37e8347",
+          "positions": 129,
+          "time_step_s": 0.0005,
+          "source": {
+            "sampled_positive_peak_power_w": 12.504228430452589,
+            "sampled_positive_peak_current_a": 1.042019035871049,
+            "average_power_w": 4.376815028724385,
+            "drawn_energy_j": 4.376815028724385,
+            "returned_energy_j": 0.0,
+            "net_energy_j": 4.376815028724385
+          },
+          "physical_tracking_findings": [],
+          "source_balance_residual_j": 4.5401807327268874e-11,
+          "mechanical_balance_residual_j": -8.673617379884035e-19,
+          "accounted_loss_energy_j": 4.373707032798004
+        },
+        {
+          "input_sha256": "71f158c00f5434d52bfcf42ba1cc06040aaf33415b231820833cbff443a84720",
+          "positions": 193,
+          "time_step_s": 0.0005,
+          "source": {
+            "sampled_positive_peak_power_w": 12.406156425692446,
+            "sampled_positive_peak_current_a": 1.0338463688077038,
+            "average_power_w": 4.356116375399213,
+            "drawn_energy_j": 4.356116375399213,
+            "returned_energy_j": 0.0,
+            "net_energy_j": 4.356116375399213
+          },
+          "physical_tracking_findings": [],
+          "source_balance_residual_j": 4.5605200226037784e-11,
+          "mechanical_balance_residual_j": -8.673617379884035e-19,
+          "accounted_loss_energy_j": 4.353008379472628
+        },
+        {
+          "input_sha256": "ff354d70a86195b2bf3ae729e14dcfd4c49c154824c9b305d7bbac11c1592189",
+          "positions": 193,
+          "time_step_s": 0.00025,
+          "source": {
+            "sampled_positive_peak_power_w": 12.406222003665151,
+            "sampled_positive_peak_current_a": 1.0338518336387625,
+            "average_power_w": 4.356108283860647,
+            "drawn_energy_j": 4.356108283860647,
+            "returned_energy_j": 0.0,
+            "net_energy_j": 4.356108283860647
+          },
+          "physical_tracking_findings": [],
+          "source_balance_residual_j": 1.1701653589244604e-11,
+          "mechanical_balance_residual_j": -5.204170427930421e-18,
+          "accounted_loss_energy_j": 4.353000287967966
+        }
+      ]
+    },
+    "fader-short-forward": {
+      "archive": "Fader-traces-workspace.pmmotor",
+      "archive_sha256": "567d97900475c92598f9ad6f7df9e7aeaf374dfc542fa25fa7e04b90dbfb287b",
+      "version": 1,
+      "baseline_sha256": "6ab07b5de4e8222ee6bddd5f68714126d5ae3f44563529aca0f4c3f7e64ddf48",
+      "model_sha256": "84e9cd885ae64ccb48cdfed88bbe0bcbe818151880635bbf35995819198a3886",
+      "native_receipt_sha256": "bd349c6268f497e807d82c9043ce50f828a3dd5150fa3deb50bce54d055309d8",
+      "baseline_input_sha256": "984a41b7a182b638ba1b0a0cb894ef1e57c20ebb91ecd222ee2a6ed6d290a8a4",
+      "omitted_losses": [
+        "Winding proximity and via-specific AC loss not represented by isolated slab approximation",
+        "Inductor AC loss outside 100 kHz fundamental and bias/temperature effects not characterized",
+        "Board-level controller/regulator and source wiring consumption not specified"
+      ],
+      "model_reference": "Explicit engineering estimate, not a measured or complete hardware total: TI DRV8311 SLVSFN2B sections 7.5/12.3.1, 25 \u00b0C driver, assumed SLEW=01, DEADTIME=001, 0.7 V diode drop and sinusoidal cycle-average mapping; Bourns SRP1265WA-470M 47 \u00b5H Q=20 at 100 kHz/1 V and 74.1 m\u03a9 typical DCR at 25 \u00b0C; inductor temperature assumed equal to winding. Q excess is combined AC-loss proxy, not isolated core loss. Isolated copper slab uses full-network DC resistance as proxy; proximity and via AC distribution omitted. 12 V stiff DC-link boundary excludes upstream wiring and board-level loads. Not a guaranteed bound or hardware qualification. Sources: https://www.ti.com/document-viewer/DRV8311/datasheet/GUID-C826F7E8-19E5-47C8-9C09-E13912428538 and https://www.bourns.com/docs/product-datasheets/srp1265wa.pdf",
+      "ripple_reference": "50%-duty two-phase RL p-p used as triangular phase-pair mixture; Lphase=0.00005024035698872327 H, Rphase=5.041877806650973 \u03a9, pp=0.2924542052048229 A. Approximate, not actual PWM or universal bound.",
+      "profile": {
+        "coulomb_friction_n": 0.05,
+        "damping_n_s_per_m": 0.0,
+        "duration_s": 0.25,
+        "end_m": 0.0135,
+        "external_load_n": 0.0,
+        "final_velocity_m_s": 0.0,
+        "initial_velocity_m_s": 0.0,
+        "mass_includes": "15 g full moving assembly including magnets, bushings and moving enclosure, user-approved engineering estimate",
+        "max_acceleration_m_s2": 2.0,
+        "max_deceleration_m_s2": 2.0,
+        "max_speed_m_s": 0.5,
+        "moving_mass_kg": 0.015,
+        "start_m": 0.0125,
+        "time_step_s": 0.0005,
+        "travel_max_m": 0.0655,
+        "travel_min_m": 0.0025
+      },
+      "pcb_thickness_m": 0.0008,
+      "scenario_overrides": {
+        "electrical_angle_at_zero_rad": 2.2676493455876967,
+        "pcb_thickness_m": 0.0008
+      },
+      "geometry": {
+        "phase_resistance_hot_ohm": [
+          4.830911540531349,
+          4.833573941203345,
+          4.848217156650973
+        ],
+        "effective_phase_inductance_h": 5.024035698872327e-05,
+        "copper_thickness_m": 3.5e-05,
+        "electrical_period_m": 0.012
+      },
+      "refinements": [
+        {
+          "input_sha256": "0a261b83d0ff0874b308057174a2711e591c3b136c904a79965f86a07c6f1cd6",
+          "positions": 129,
+          "time_step_s": 0.0005,
+          "source": {
+            "sampled_positive_peak_power_w": 3.343256388275729,
+            "sampled_positive_peak_current_a": 0.2786046990229774,
+            "average_power_w": 2.243226617442657,
+            "drawn_energy_j": 0.5608066543606642,
+            "returned_energy_j": 0.0,
+            "net_energy_j": 0.5608066543606642
+          },
+          "physical_tracking_findings": [],
+          "source_balance_residual_j": 6.772084094702985e-11,
+          "mechanical_balance_residual_j": -8.809142651444724e-20,
+          "accounted_loss_energy_j": 0.5607480061758222
+        },
+        {
+          "input_sha256": "121b9f49c3390b3ceb867e02023e5d970e79041feb944c5f55238ed6fc3326be",
+          "positions": 193,
+          "time_step_s": 0.0005,
+          "source": {
+            "sampled_positive_peak_power_w": 3.320108766065261,
+            "sampled_positive_peak_current_a": 0.2766757305054384,
+            "average_power_w": 2.2307558816250794,
+            "drawn_energy_j": 0.5576889704062699,
+            "returned_energy_j": 0.0,
+            "net_energy_j": 0.5576889704062699
+          },
+          "physical_tracking_findings": [],
+          "source_balance_residual_j": 6.733041843181675e-11,
+          "mechanical_balance_residual_j": -8.809142651444724e-20,
+          "accounted_loss_energy_j": 0.5576303920894027
+        },
+        {
+          "input_sha256": "ab46462ea85aea68776d27d584bebbd70a7dd970653d19b9ba7249f51cc5e2a3",
+          "positions": 193,
+          "time_step_s": 0.00025,
+          "source": {
+            "sampled_positive_peak_power_w": 3.320108770494979,
+            "sampled_positive_peak_current_a": 0.2766757308745816,
+            "average_power_w": 2.2307557438238215,
+            "drawn_energy_j": 0.5576889359559554,
+            "returned_energy_j": 0.0,
+            "net_energy_j": 0.5576889359559554
+          },
+          "physical_tracking_findings": [],
+          "source_balance_residual_j": 1.717065320155464e-11,
+          "mechanical_balance_residual_j": 4.743384504624082e-20,
+          "accounted_loss_energy_j": 0.5576303576892472
+        }
+      ]
+    },
+    "fader-short-return": {
+      "archive": "Fader-traces-workspace.pmmotor",
+      "archive_sha256": "567d97900475c92598f9ad6f7df9e7aeaf374dfc542fa25fa7e04b90dbfb287b",
+      "version": 1,
+      "baseline_sha256": "3a0c2f27fda377e84caf65383628e6e0b03ddb6b2e9aaadb9b115f28fe05d69c",
+      "model_sha256": "84e9cd885ae64ccb48cdfed88bbe0bcbe818151880635bbf35995819198a3886",
+      "native_receipt_sha256": "2405742377140a101cb8ad0756fa0e1a35b8a10befc95a47325aaeabd50e0ea5",
+      "baseline_input_sha256": "52ca0920fb82fe6e8753d25b400468ea477d15e7765fba24b75ef83c819508b9",
+      "omitted_losses": [
+        "Winding proximity and via-specific AC loss not represented by isolated slab approximation",
+        "Inductor AC loss outside 100 kHz fundamental and bias/temperature effects not characterized",
+        "Board-level controller/regulator and source wiring consumption not specified"
+      ],
+      "model_reference": "Explicit engineering estimate, not a measured or complete hardware total: TI DRV8311 SLVSFN2B sections 7.5/12.3.1, 25 \u00b0C driver, assumed SLEW=01, DEADTIME=001, 0.7 V diode drop and sinusoidal cycle-average mapping; Bourns SRP1265WA-470M 47 \u00b5H Q=20 at 100 kHz/1 V and 74.1 m\u03a9 typical DCR at 25 \u00b0C; inductor temperature assumed equal to winding. Q excess is combined AC-loss proxy, not isolated core loss. Isolated copper slab uses full-network DC resistance as proxy; proximity and via AC distribution omitted. 12 V stiff DC-link boundary excludes upstream wiring and board-level loads. Not a guaranteed bound or hardware qualification. Sources: https://www.ti.com/document-viewer/DRV8311/datasheet/GUID-C826F7E8-19E5-47C8-9C09-E13912428538 and https://www.bourns.com/docs/product-datasheets/srp1265wa.pdf",
+      "ripple_reference": "50%-duty two-phase RL p-p used as triangular phase-pair mixture; Lphase=0.00005024035698872327 H, Rphase=5.041877806650973 \u03a9, pp=0.2924542052048229 A. Approximate, not actual PWM or universal bound.",
+      "profile": {
+        "coulomb_friction_n": 0.05,
+        "damping_n_s_per_m": 0.0,
+        "duration_s": 0.25,
+        "end_m": 0.0125,
+        "external_load_n": 0.0,
+        "final_velocity_m_s": 0.0,
+        "initial_velocity_m_s": 0.0,
+        "mass_includes": "15 g full moving assembly including magnets, bushings and moving enclosure, user-approved engineering estimate",
+        "max_acceleration_m_s2": 2.0,
+        "max_deceleration_m_s2": 2.0,
+        "max_speed_m_s": 0.5,
+        "moving_mass_kg": 0.015,
+        "start_m": 0.0135,
+        "time_step_s": 0.0005,
+        "travel_max_m": 0.0655,
+        "travel_min_m": 0.0025
+      },
+      "pcb_thickness_m": 0.0008,
+      "scenario_overrides": {
+        "electrical_angle_at_zero_rad": 2.2676493455876967,
+        "pcb_thickness_m": 0.0008
+      },
+      "geometry": {
+        "phase_resistance_hot_ohm": [
+          4.830911540531349,
+          4.833573941203345,
+          4.848217156650973
+        ],
+        "effective_phase_inductance_h": 5.024035698872327e-05,
+        "copper_thickness_m": 3.5e-05,
+        "electrical_period_m": 0.012
+      },
+      "refinements": [
+        {
+          "input_sha256": "d5eed10ddaa32d6fe6de7d7c36c573fae087d75834ed35cd77884481d355ab70",
+          "positions": 129,
+          "time_step_s": 0.0005,
+          "source": {
+            "sampled_positive_peak_power_w": 3.4372366305913578,
+            "sampled_positive_peak_current_a": 0.28643638588261316,
+            "average_power_w": 2.29113437250156,
+            "drawn_energy_j": 0.57278359312539,
+            "returned_energy_j": 0.0,
+            "net_energy_j": 0.57278359312539
+          },
+          "physical_tracking_findings": [],
+          "source_balance_residual_j": 7.284671664681047e-11,
+          "mechanical_balance_residual_j": -8.809142651444724e-20,
+          "accounted_loss_energy_j": 0.572742241169666
+        },
+        {
+          "input_sha256": "097b32fd50a7954bf407fc8a9210d4c7f0c56a2bf65fb43250cb042d108dbca9",
+          "positions": 193,
+          "time_step_s": 0.0005,
+          "source": {
+            "sampled_positive_peak_power_w": 3.4144887959507377,
+            "sampled_positive_peak_current_a": 0.28454073299589483,
+            "average_power_w": 2.27856701628382,
+            "drawn_energy_j": 0.569641754070955,
+            "returned_energy_j": 0.0,
+            "net_energy_j": 0.569641754070955
+          },
+          "physical_tracking_findings": [],
+          "source_balance_residual_j": 7.218986578289466e-11,
+          "mechanical_balance_residual_j": -8.809142651444724e-20,
+          "accounted_loss_energy_j": 0.5696003322483034
+        },
+        {
+          "input_sha256": "18d471ff057a3be98367c2b05e3baed157a2e701385fa04171715d1ee37deac7",
+          "positions": 193,
+          "time_step_s": 0.00025,
+          "source": {
+            "sampled_positive_peak_power_w": 3.4144887967928375,
+            "sampled_positive_peak_current_a": 0.2845407330660698,
+            "average_power_w": 2.2785673949631913,
+            "drawn_energy_j": 0.5696418487407978,
+            "returned_energy_j": 0.0,
+            "net_energy_j": 0.5696418487407978
+          },
+          "physical_tracking_findings": [],
+          "source_balance_residual_j": 1.7780388858972375e-11,
+          "mechanical_balance_residual_j": 4.743384504624082e-20,
+          "accounted_loss_energy_j": 0.569600426972555
+        }
+      ]
+    },
+    "star2-full-forward": {
+      "archive": "star_2-layer.pmmotor",
+      "archive_sha256": "0ed215f6ff403b927dbeac1ea3d4d9587489a1f1c0680e4ce3a2a48658475d82",
+      "version": 1,
+      "baseline_sha256": "f6c121644368a9b791a1300d9fb1a9fb182237ac36df8c121f85c4d11a62ec85",
+      "model_sha256": "e7f0d4f4b9e8d7ea87b31a04b53f06b9accd75664a55775eaf088c5b2b421a11",
+      "native_receipt_sha256": "22ae550bc7970270b2409122ade95899580c7702bbfaedd3ff73f6925cb674a4",
+      "baseline_input_sha256": "a296e7109744b88031f66a9f01250df6c499180bb369b46d94c6e6b55d291d9e",
+      "omitted_losses": [
+        "Winding proximity and via-specific AC loss not represented by isolated slab approximation",
+        "Inductor AC loss outside 100 kHz fundamental and bias/temperature effects not characterized",
+        "Board-level controller/regulator and source wiring consumption not specified"
+      ],
+      "model_reference": "Explicit engineering estimate, not a measured or complete hardware total: TI DRV8311 SLVSFN2B sections 7.5/12.3.1, 25 \u00b0C driver, assumed SLEW=01, DEADTIME=001, 0.7 V diode drop and sinusoidal cycle-average mapping; Bourns SRP1265WA-470M 47 \u00b5H Q=20 at 100 kHz/1 V and 74.1 m\u03a9 typical DCR at 25 \u00b0C; inductor temperature assumed equal to winding. Q excess is combined AC-loss proxy, not isolated core loss. Isolated copper slab uses full-network DC resistance as proxy; proximity and via AC distribution omitted. 12 V stiff DC-link boundary excludes upstream wiring and board-level loads. Not a guaranteed bound or hardware qualification. Sources: https://www.ti.com/document-viewer/DRV8311/datasheet/GUID-C826F7E8-19E5-47C8-9C09-E13912428538 and https://www.bourns.com/docs/product-datasheets/srp1265wa.pdf",
+      "ripple_reference": "50%-duty two-phase RL p-p used as triangular phase-pair mixture; Lphase=9.939151498645633e-7 H, Rphase=2.616156195730962 \u03a9, pp=2.293432217947176 A. Approximate, not actual PWM or universal bound.",
+      "profile": {
+        "coulomb_friction_n": 0.05,
+        "damping_n_s_per_m": 0.0,
+        "duration_s": 1.0,
+        "end_m": 0.0655,
+        "external_load_n": 0.0,
+        "final_velocity_m_s": 0.0,
+        "initial_velocity_m_s": 0.0,
+        "mass_includes": "Saved 15 g carriage mass used as a scenario assumption; assembly coverage is not independently established",
+        "max_acceleration_m_s2": 2.0,
+        "max_deceleration_m_s2": 2.0,
+        "max_speed_m_s": 20.0,
+        "moving_mass_kg": 0.015,
+        "start_m": 0.0025,
+        "time_step_s": 0.0005,
+        "travel_max_m": 0.0655,
+        "travel_min_m": 0.0025
+      },
+      "pcb_thickness_m": 0.0016,
+      "scenario_overrides": {
+        "electrical_angle_at_zero_rad": null,
+        "pcb_thickness_m": null
+      },
+      "geometry": {
+        "phase_resistance_hot_ohm": [
+          2.4965129775702932,
+          2.497844179222423,
+          2.511156195730962
+        ],
+        "effective_phase_inductance_h": 9.939151498645633e-07,
+        "copper_thickness_m": 3.5e-05,
+        "electrical_period_m": 0.012
+      },
+      "refinements": [
+        {
+          "input_sha256": "5b5919aa27940084e60ba296ba75667c0242c0a0732c5ea3bdb1949ff057e36e",
+          "positions": 129,
+          "time_step_s": 0.0005,
+          "source": {
+            "sampled_positive_peak_power_w": 115.93019504280059,
+            "sampled_positive_peak_current_a": 9.66084958690005,
+            "average_power_w": 31.968856307798657,
+            "drawn_energy_j": 31.968856307798657,
+            "returned_energy_j": 0.0,
+            "net_energy_j": 31.968856307798657
+          },
+          "physical_tracking_findings": [
+            "Required line voltage exceeds the physical DC-link voltage; demand is calculated for imposed motion, not achieved tracking"
+          ],
+          "source_balance_residual_j": 5.796517007160794e-12,
+          "mechanical_balance_residual_j": -8.673617379884035e-19,
+          "accounted_loss_energy_j": 31.965711525601353
+        },
+        {
+          "input_sha256": "89b2f749850cf144271d7e35ae25481a6c8a76fdaae29df95c33ef829dd523f1",
+          "positions": 193,
+          "time_step_s": 0.0005,
+          "source": {
+            "sampled_positive_peak_power_w": 115.10119147711613,
+            "sampled_positive_peak_current_a": 9.591765956426345,
+            "average_power_w": 31.812322618307373,
+            "drawn_energy_j": 31.812322618307373,
+            "returned_energy_j": 0.0,
+            "net_energy_j": 31.812322618307373
+          },
+          "physical_tracking_findings": [
+            "Required line voltage exceeds the physical DC-link voltage; demand is calculated for imposed motion, not achieved tracking"
+          ],
+          "source_balance_residual_j": 5.977705412402916e-12,
+          "mechanical_balance_residual_j": -8.673617379884035e-19,
+          "accounted_loss_energy_j": 31.80917783610989
+        },
+        {
+          "input_sha256": "62fa25f3f2d33aea1f30a50cb60e5360f738678860f781a2100b791b850b4326",
+          "positions": 193,
+          "time_step_s": 0.00025,
+          "source": {
+            "sampled_positive_peak_power_w": 115.10219617682664,
+            "sampled_positive_peak_current_a": 9.59184968140222,
+            "average_power_w": 31.812255491319295,
+            "drawn_energy_j": 31.812255491319295,
+            "returned_energy_j": 0.0,
+            "net_energy_j": 31.812255491319295
+          },
+          "physical_tracking_findings": [
+            "Required line voltage exceeds the physical DC-link voltage; demand is calculated for imposed motion, not achieved tracking"
+          ],
+          "source_balance_residual_j": 1.6149730148359008e-12,
+          "mechanical_balance_residual_j": -5.204170427930421e-18,
+          "accounted_loss_energy_j": 31.809110709126173
+        }
+      ]
+    },
+    "star2-short-forward": {
+      "archive": "star_2-layer.pmmotor",
+      "archive_sha256": "0ed215f6ff403b927dbeac1ea3d4d9587489a1f1c0680e4ce3a2a48658475d82",
+      "version": 1,
+      "baseline_sha256": "8baf1d67d66b3cfe2a1f19331ba7382e92f9b6809c24d8464530b09efae9df9d",
+      "model_sha256": "e7f0d4f4b9e8d7ea87b31a04b53f06b9accd75664a55775eaf088c5b2b421a11",
+      "native_receipt_sha256": "2940b22dec8f7dd5606acd3d8dcea62f4bfd44674d9b12e99be5f81d2eb43c1e",
+      "baseline_input_sha256": "3ca7e2bbe253e398223a320e3aa8a918484e8beff190cb9c64a6b8692b5281f6",
+      "omitted_losses": [
+        "Winding proximity and via-specific AC loss not represented by isolated slab approximation",
+        "Inductor AC loss outside 100 kHz fundamental and bias/temperature effects not characterized",
+        "Board-level controller/regulator and source wiring consumption not specified"
+      ],
+      "model_reference": "Explicit engineering estimate, not a measured or complete hardware total: TI DRV8311 SLVSFN2B sections 7.5/12.3.1, 25 \u00b0C driver, assumed SLEW=01, DEADTIME=001, 0.7 V diode drop and sinusoidal cycle-average mapping; Bourns SRP1265WA-470M 47 \u00b5H Q=20 at 100 kHz/1 V and 74.1 m\u03a9 typical DCR at 25 \u00b0C; inductor temperature assumed equal to winding. Q excess is combined AC-loss proxy, not isolated core loss. Isolated copper slab uses full-network DC resistance as proxy; proximity and via AC distribution omitted. 12 V stiff DC-link boundary excludes upstream wiring and board-level loads. Not a guaranteed bound or hardware qualification. Sources: https://www.ti.com/document-viewer/DRV8311/datasheet/GUID-C826F7E8-19E5-47C8-9C09-E13912428538 and https://www.bourns.com/docs/product-datasheets/srp1265wa.pdf",
+      "ripple_reference": "50%-duty two-phase RL p-p used as triangular phase-pair mixture; Lphase=9.939151498645633e-7 H, Rphase=2.616156195730962 \u03a9, pp=2.293432217947176 A. Approximate, not actual PWM or universal bound.",
+      "profile": {
+        "coulomb_friction_n": 0.05,
+        "damping_n_s_per_m": 0.0,
+        "duration_s": 0.25,
+        "end_m": 0.0135,
+        "external_load_n": 0.0,
+        "final_velocity_m_s": 0.0,
+        "initial_velocity_m_s": 0.0,
+        "mass_includes": "Saved 15 g carriage mass used as a scenario assumption; assembly coverage is not independently established",
+        "max_acceleration_m_s2": 2.0,
+        "max_deceleration_m_s2": 2.0,
+        "max_speed_m_s": 20.0,
+        "moving_mass_kg": 0.015,
+        "start_m": 0.0125,
+        "time_step_s": 0.0005,
+        "travel_max_m": 0.0655,
+        "travel_min_m": 0.0025
+      },
+      "pcb_thickness_m": 0.0016,
+      "scenario_overrides": {
+        "electrical_angle_at_zero_rad": null,
+        "pcb_thickness_m": null
+      },
+      "geometry": {
+        "phase_resistance_hot_ohm": [
+          2.4965129775702932,
+          2.497844179222423,
+          2.511156195730962
+        ],
+        "effective_phase_inductance_h": 9.939151498645633e-07,
+        "copper_thickness_m": 3.5e-05,
+        "electrical_period_m": 0.012
+      },
+      "refinements": [
+        {
+          "input_sha256": "7506bfc251ac8970df0cc54cbf742cab49d2539d0be6db11433de85abe3d7f09",
+          "positions": 129,
+          "time_step_s": 0.0005,
+          "source": {
+            "sampled_positive_peak_power_w": 9.328823549070444,
+            "sampled_positive_peak_current_a": 0.777401962422537,
+            "average_power_w": 7.425860551261926,
+            "drawn_energy_j": 1.8564651378154815,
+            "returned_energy_j": 0.0,
+            "net_energy_j": 1.8564651378154815
+          },
+          "physical_tracking_findings": [],
+          "source_balance_residual_j": 8.510767957927974e-12,
+          "mechanical_balance_residual_j": -8.809142651444724e-20,
+          "accounted_loss_energy_j": 1.8564144061978236
+        },
+        {
+          "input_sha256": "aa3c2c18a7397f3a5f89e87f5b991870e600f227a4de8c1547735659bee57729",
+          "positions": 193,
+          "time_step_s": 0.0005,
+          "source": {
+            "sampled_positive_peak_power_w": 9.27924927021334,
+            "sampled_positive_peak_current_a": 0.7732707725177783,
+            "average_power_w": 7.395482510091711,
+            "drawn_energy_j": 1.8488706275229279,
+            "returned_energy_j": 0.0,
+            "net_energy_j": 1.8488706275229279
+          },
+          "physical_tracking_findings": [],
+          "source_balance_residual_j": 8.469282022706583e-12,
+          "mechanical_balance_residual_j": -8.809142651444724e-20,
+          "accounted_loss_energy_j": 1.848819902021365
+        },
+        {
+          "input_sha256": "21ecf871dea941ee7fcfcb1da9e94ce314c2b1e0b209d4f40b8ce2419d78fb65",
+          "positions": 193,
+          "time_step_s": 0.00025,
+          "source": {
+            "sampled_positive_peak_power_w": 9.279249270609434,
+            "sampled_positive_peak_current_a": 0.7732707725507861,
+            "average_power_w": 7.39548245719312,
+            "drawn_energy_j": 1.84887061429828,
+            "returned_energy_j": 0.0,
+            "net_energy_j": 1.84887061429828
+          },
+          "physical_tracking_findings": [],
+          "source_balance_residual_j": 2.143675317602291e-12,
+          "mechanical_balance_residual_j": 4.743384504624082e-20,
+          "accounted_loss_energy_j": 1.848819888803042
+        }
+      ]
+    },
+    "star2-short-return": {
+      "archive": "star_2-layer.pmmotor",
+      "archive_sha256": "0ed215f6ff403b927dbeac1ea3d4d9587489a1f1c0680e4ce3a2a48658475d82",
+      "version": 1,
+      "baseline_sha256": "706ba5562cdfe03cb496940ce62fd220a6efe02061f2676e2e6913b00d9d6306",
+      "model_sha256": "e7f0d4f4b9e8d7ea87b31a04b53f06b9accd75664a55775eaf088c5b2b421a11",
+      "native_receipt_sha256": "a290d3818c2f58a8c91996e07f333ab885770f218056f47048e38898c13d74e8",
+      "baseline_input_sha256": "7ccee1b343613f5e69cd7b52af57f81a8ae7f32fa869c5521204bac481d89dfb",
+      "omitted_losses": [
+        "Winding proximity and via-specific AC loss not represented by isolated slab approximation",
+        "Inductor AC loss outside 100 kHz fundamental and bias/temperature effects not characterized",
+        "Board-level controller/regulator and source wiring consumption not specified"
+      ],
+      "model_reference": "Explicit engineering estimate, not a measured or complete hardware total: TI DRV8311 SLVSFN2B sections 7.5/12.3.1, 25 \u00b0C driver, assumed SLEW=01, DEADTIME=001, 0.7 V diode drop and sinusoidal cycle-average mapping; Bourns SRP1265WA-470M 47 \u00b5H Q=20 at 100 kHz/1 V and 74.1 m\u03a9 typical DCR at 25 \u00b0C; inductor temperature assumed equal to winding. Q excess is combined AC-loss proxy, not isolated core loss. Isolated copper slab uses full-network DC resistance as proxy; proximity and via AC distribution omitted. 12 V stiff DC-link boundary excludes upstream wiring and board-level loads. Not a guaranteed bound or hardware qualification. Sources: https://www.ti.com/document-viewer/DRV8311/datasheet/GUID-C826F7E8-19E5-47C8-9C09-E13912428538 and https://www.bourns.com/docs/product-datasheets/srp1265wa.pdf",
+      "ripple_reference": "50%-duty two-phase RL p-p used as triangular phase-pair mixture; Lphase=9.939151498645633e-7 H, Rphase=2.616156195730962 \u03a9, pp=2.293432217947176 A. Approximate, not actual PWM or universal bound.",
+      "profile": {
+        "coulomb_friction_n": 0.05,
+        "damping_n_s_per_m": 0.0,
+        "duration_s": 0.25,
+        "end_m": 0.0125,
+        "external_load_n": 0.0,
+        "final_velocity_m_s": 0.0,
+        "initial_velocity_m_s": 0.0,
+        "mass_includes": "Saved 15 g carriage mass used as a scenario assumption; assembly coverage is not independently established",
+        "max_acceleration_m_s2": 2.0,
+        "max_deceleration_m_s2": 2.0,
+        "max_speed_m_s": 20.0,
+        "moving_mass_kg": 0.015,
+        "start_m": 0.0135,
+        "time_step_s": 0.0005,
+        "travel_max_m": 0.0655,
+        "travel_min_m": 0.0025
+      },
+      "pcb_thickness_m": 0.0016,
+      "scenario_overrides": {
+        "electrical_angle_at_zero_rad": null,
+        "pcb_thickness_m": null
+      },
+      "geometry": {
+        "phase_resistance_hot_ohm": [
+          2.4965129775702932,
+          2.497844179222423,
+          2.511156195730962
+        ],
+        "effective_phase_inductance_h": 9.939151498645633e-07,
+        "copper_thickness_m": 3.5e-05,
+        "electrical_period_m": 0.012
+      },
+      "refinements": [
+        {
+          "input_sha256": "a492f11c41256e78adb78570942d38e96011ae411f29387040e45c88a7af165f",
+          "positions": 129,
+          "time_step_s": 0.0005,
+          "source": {
+            "sampled_positive_peak_power_w": 9.543856020514816,
+            "sampled_positive_peak_current_a": 0.7953213350429014,
+            "average_power_w": 7.503441324229034,
+            "drawn_energy_j": 1.8758603310572586,
+            "returned_energy_j": 0.0,
+            "net_energy_j": 1.8758603310572586
+          },
+          "physical_tracking_findings": [],
+          "source_balance_residual_j": 8.961699959017814e-12,
+          "mechanical_balance_residual_j": -8.809142651444724e-20,
+          "accounted_loss_energy_j": 1.8758110626574456
+        },
+        {
+          "input_sha256": "6b4f18f841cac9c1ddb5306e65263971055dbf09a1f6cd2550a87db64e9ff7d0",
+          "positions": 193,
+          "time_step_s": 0.0005,
+          "source": {
+            "sampled_positive_peak_power_w": 9.495500148911724,
+            "sampled_positive_peak_current_a": 0.791291679075977,
+            "average_power_w": 7.473102579337885,
+            "drawn_energy_j": 1.8682756448344713,
+            "returned_energy_j": 0.0,
+            "net_energy_j": 1.8682756448344713
+          },
+          "physical_tracking_findings": [],
+          "source_balance_residual_j": 8.885724298233864e-12,
+          "mechanical_balance_residual_j": -8.809142651444724e-20,
+          "accounted_loss_energy_j": 1.8682263703186808
+        },
+        {
+          "input_sha256": "108d17a2ed15b0f7caf9c840d5835a13a16e0064968701e9432612fdae5263ae",
+          "positions": 193,
+          "time_step_s": 0.00025,
+          "source": {
+            "sampled_positive_peak_power_w": 9.4955001489723,
+            "sampled_positive_peak_current_a": 0.7912916790810249,
+            "average_power_w": 7.473103373590907,
+            "drawn_energy_j": 1.8682758433977267,
+            "returned_energy_j": 0.0,
+            "net_energy_j": 1.8682758433977267
+          },
+          "physical_tracking_findings": [],
+          "source_balance_residual_j": 2.1930778611884956e-12,
+          "mechanical_balance_residual_j": 4.743384504624082e-20,
+          "accounted_loss_energy_j": 1.8682265688886281
+        }
+      ]
+    }
+  }
+}
