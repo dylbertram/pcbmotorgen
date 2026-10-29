@@ -4,6 +4,8 @@ import { mockDriveAnalysis, mockForceSweep } from "./ipc/mocks";
 import type { CadGeometry } from "./types";
 import { powerRequirements, powerReportMarkdown, powerRequirementsCsv, powerModelSnapshot, forceSweepCsv, phaseElectricalCsv, currentMoveResult, moveTraceCsv, type PowerRequirementsInput } from "./powerRequirements";
 import { declaredLossFixture } from "./testFixtures/moveLosses";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 
 // Inputs transcribed from the user's Fader-traces-workspace.pmmotor. This
 // fixture deliberately does not claim to reproduce its imported trace solver.
@@ -168,6 +170,35 @@ function withMove(): PowerRequirementsInput {
 }
 
 describe("move power report consistency", () => {
+  it.skipIf(!process.env.PCB_MOTOR_SCREENING_RESULTS)("maps real native partial screening receipts without promoting omitted losses", () => {
+    const root = process.env.PCB_MOTOR_SCREENING_RESULTS!;
+    for (const design of ["fader", "star2"]) for (const scenario of ["full-forward", "short-forward", "short-return"]) {
+      const records = JSON.parse(readFileSync(join(root, `${design}-${scenario}.json`), "utf8"));
+      const native = records.at(-1);
+      const source = native.result.demand.source;
+      const input: PowerRequirementsInput = {
+        config: native.inputs.config, driveSettings: native.inputs.drive,
+        desiredTravelMm: 63, topology: native.inputs.topology,
+        cadGeometry: native.inputs.cad_geometry, sweep: null, drive: native.result.drive,
+        native: true, moveRequest: native.inputs.move_request, moveResult: native,
+      };
+      expect(currentMoveResult(input)).not.toBeNull();
+      expect(item(input, "Peak supply power during a move").value).toBe("Unknown");
+      const peak = `${Number(source.sampled_positive_peak_power_w.toPrecision(7))} W`;
+      const net = `${Number(source.net_energy_j.toPrecision(7))} J`;
+      expect(item(input, "Partial scenario peak source power").value).toBe(peak);
+      expect(item(input, "Partial scenario net source energy").value).toBe(net);
+      expect(powerReportMarkdown(powerRequirements(input))).toContain(peak);
+      expect(powerRequirementsCsv(powerRequirements(input))).toContain(`"Partial scenario net source energy","${net}"`);
+      expect(JSON.parse(powerModelSnapshot(input)).moveResult.result.demand.source).toEqual(source);
+      const trace = moveTraceCsv(input)!;
+      expect(trace).toContain('"required_source_power_W"');
+      expect(trace).toContain('"simulated_not_measured"');
+      if (scenario === "full-forward") expect(item(input, "Physical tracking findings").value).toBe("Imposed demand only");
+      expect(item(input, "Source model scope").detail).toContain("omissions keep totals Unknown");
+    }
+  });
+
   it("maps native scenario values consistently to report, requirements CSV, snapshot and time-series CSV", () => {
     const input = withMove();
     const sections = powerRequirements(input);

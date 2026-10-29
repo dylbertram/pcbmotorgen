@@ -2,6 +2,141 @@
 //! Loss coefficients are numerical fixtures, never production presets.
 use super::*;
 
+/// Read-only, explicit saved-design screening export. Output must be a new
+/// directory selected by the caller; never overwrite an earlier receipt.
+#[test]
+#[ignore = "Requires supplied designs and a new PCB_MOTOR_SCREENING_OUTPUT directory; screening only"]
+fn export_saved_design_screening_inputs() {
+    use std::io::Write;
+    let root = std::env::var("PCB_MOTOR_SUPPLIED_DESIGN_DIR").unwrap();
+    let output = std::path::PathBuf::from(std::env::var("PCB_MOTOR_SCREENING_OUTPUT").unwrap());
+    std::fs::create_dir(&output).expect("output must be a new, exclusive directory");
+    for (file, hash) in [
+        ("Fader-traces-workspace.pmmotor", "567d97900475c92598f9ad6f7df9e7aeaf374dfc542fa25fa7e04b90dbfb287b"),
+        ("star_2-layer.pmmotor", "0ed215f6ff403b927dbeac1ea3d4d9587489a1f1c0680e4ce3a2a48658475d82"),
+    ] {
+        let original = std::fs::read(std::path::Path::new(&root).join(file)).unwrap();
+        assert_eq!(format!("{:x}", Sha256::digest(&original)), hash);
+        let archive: serde_json::Value = serde_json::from_slice(&original).unwrap();
+        let version = archive["versions"].as_array().unwrap().iter()
+            .find(|v| v["id"] == 1).unwrap();
+        let state = &version["state"];
+        let mut baseline = inputs(state);
+        baseline["move_request"]["loss_model"] = serde_json::Value::Null;
+        let c: crate::ipc::ProjectConfigStateIpc = serde_json::from_value(state["config"].clone()).unwrap();
+        let start = c.magnet_width_mm * 0.0005;
+        for (name, a, b, duration) in [
+            ("full-forward", start, start + c.desired_travel_mm * 1e-3, 1.0),
+            ("short-forward", start + 0.010, start + 0.011, 0.25),
+            ("short-return", start + 0.011, start + 0.010, 0.25),
+        ] {
+            let mut input = baseline.clone();
+            let p = &mut input["move_request"]["profile"];
+            p["start_m"] = serde_json::json!(a);
+            p["end_m"] = serde_json::json!(b);
+            p["duration_s"] = serde_json::json!(duration);
+            p["mass_includes"] = serde_json::json!("15 g full moving assembly including magnets, bushings and moving enclosure, user-approved engineering estimate");
+            let result = tauri::async_runtime::block_on(evaluate_move_power(
+                format!("screening-{file}-{name}"), input.clone())).unwrap();
+            assert_eq!(result.inputs, input);
+            assert!(result.result.demand.source.is_none());
+            let receipt = serde_json::json!({"archive":file,"archive_sha256":hash,"version":1,
+                "scenario":name,"native":result});
+            let filename = format!("{}-{name}.json", if file.starts_with("Fader") {"fader"} else {"star2"});
+            let mut out = std::fs::OpenOptions::new().write(true).create_new(true).open(output.join(filename)).unwrap();
+            serde_json::to_writer(&mut out, &receipt).unwrap();
+            out.write_all(b"\n").unwrap();
+        }
+        assert_eq!(std::fs::read(std::path::Path::new(&root).join(file)).unwrap(), original);
+    }
+}
+
+#[test]
+#[ignore = "Requires screening baseline/model directories and a new output directory; bounded local scenario only"]
+fn evaluate_saved_design_screening_assumptions() {
+    use std::io::Write;
+    let baselines = std::path::PathBuf::from(std::env::var("PCB_MOTOR_SCREENING_BASELINES").unwrap());
+    let models = std::path::PathBuf::from(std::env::var("PCB_MOTOR_SCREENING_MODELS").unwrap());
+    let output = std::path::PathBuf::from(std::env::var("PCB_MOTOR_SCREENING_OUTPUT").unwrap());
+    std::fs::create_dir(&output).expect("output must be a new, exclusive directory");
+    for design in ["fader", "star2"] {
+        for scenario in ["full-forward", "short-forward", "short-return"] {
+            let filename = format!("{design}-{scenario}.json");
+            let receipt: serde_json::Value = serde_json::from_slice(&std::fs::read(baselines.join(&filename)).unwrap()).unwrap();
+            let model: serde_json::Value = serde_json::from_slice(&std::fs::read(models.join(&filename)).unwrap()).unwrap();
+            assert!(!model["omitted_losses"].as_array().unwrap().is_empty());
+            let mut input = receipt["native"]["inputs"].clone();
+            input["move_request"]["loss_model"] = model;
+            let mut records = Vec::new();
+            let mut previous: Option<(f64, f64)> = None;
+            for (positions, dt) in [(129, 0.0005), (193, 0.0005), (193, 0.00025)] {
+                input["move_request"]["force_positions"] = serde_json::json!(positions);
+                input["move_request"]["profile"]["time_step_s"] = serde_json::json!(dt);
+                let r = tauri::async_runtime::block_on(evaluate_move_power(
+                    format!("screen-{design}-{scenario}-{positions}-{dt}"), input.clone())).unwrap();
+                assert_eq!(r.inputs, input);
+                let m = &r.result.demand;
+                assert_eq!(m.source_model_scope, "partial_declared_scenario");
+                let source = m.source.as_ref().unwrap();
+                let scale = m.accounted_loss_energy_j.max(1e-6);
+                assert!(m.source_balance_residual_j.unwrap().abs() < 1e-6 * scale);
+                assert!(m.mechanical_balance_residual_j.abs() < 1e-8);
+                assert!((source.net_energy_j - m.mechanical_work_j - m.accounted_loss_energy_j - m.magnetic_energy_change_j).abs() < 1e-6 * scale);
+                assert!((source.sampled_positive_peak_current_a * 12.0 - source.sampled_positive_peak_power_w).abs() < 1e-9);
+                if let Some((old_energy, old_peak)) = previous {
+                    let energy_delta = (source.net_energy_j - old_energy).abs() / source.net_energy_j.abs().max(1e-9);
+                    let peak_delta = (source.sampled_positive_peak_power_w - old_peak).abs() / source.sampled_positive_peak_power_w.abs().max(1e-9);
+                    eprintln!("{design} {scenario} {positions} {dt}: energy change {energy_delta:.6}, peak change {peak_delta:.6}");
+                    assert!(energy_delta < 0.02 && peak_delta < 0.02, "unchanged 2% spatial/time convergence gates");
+                }
+                previous = Some((source.net_energy_j, source.sampled_positive_peak_power_w));
+                records.push(r);
+            }
+            let mut out = std::fs::OpenOptions::new().write(true).create_new(true).open(output.join(&filename)).unwrap();
+            serde_json::to_writer(&mut out, &records).unwrap();
+            out.write_all(b"\n").unwrap();
+        }
+    }
+}
+
+#[test]
+#[ignore = "Requires screening result receipts and a new output directory; assumption sensitivity only"]
+fn screening_assumption_sensitivity() {
+    use std::io::Write;
+    let base = std::path::PathBuf::from(std::env::var("PCB_MOTOR_SCREENING_RESULTS").unwrap());
+    let output = std::path::PathBuf::from(std::env::var("PCB_MOTOR_SCREENING_OUTPUT").unwrap());
+    std::fs::create_dir(&output).expect("output must be new");
+    for design in ["fader", "star2"] {
+        let filename = format!("{design}-full-forward.json");
+        let baseline: Vec<serde_json::Value> = serde_json::from_slice(&std::fs::read(base.join(&filename)).unwrap()).unwrap();
+        let reference = baseline.last().unwrap();
+        let mut records = Vec::new();
+        for (label, ripple_scale, driver_scale) in [("lower", 0.5, 0.5), ("higher", 2.0, 2.0)] {
+            let mut input = reference["inputs"].clone();
+            let model = &mut input["move_request"]["loss_model"];
+            for row in model["ripple"]["covariance_a2"].as_array_mut().unwrap() {
+                for entry in row.as_array_mut().unwrap() { *entry = serde_json::json!(entry.as_f64().unwrap() * ripple_scale * ripple_scale); }
+            }
+            for entry in model["ripple"]["peak_deviation_a"].as_array_mut().unwrap() { *entry = serde_json::json!(entry.as_f64().unwrap() * ripple_scale); }
+            for entry in model["external_core_loss_w"].as_array_mut().unwrap() { *entry = serde_json::json!(entry.as_f64().unwrap() * ripple_scale * ripple_scale); }
+            for key in ["switching", "deadtime"] {
+                model[key]["abs_mean_current_j_per_a"] = serde_json::json!(model[key]["abs_mean_current_j_per_a"].as_f64().unwrap() * driver_scale);
+            }
+            model["reference"] = serde_json::json!(format!("{}; {label} sensitivity: ripple ×{ripple_scale}, Q proxy ×{}, driver switching/dead-time ×{driver_scale}; not component data", model["reference"].as_str().unwrap(), ripple_scale * ripple_scale));
+            model["ripple"]["reference"] = serde_json::json!(format!("{}; ripple ×{ripple_scale} sensitivity", model["ripple"]["reference"].as_str().unwrap()));
+            let result = tauri::async_runtime::block_on(evaluate_move_power(format!("{design}-{label}"), input)).unwrap();
+            let demand = &result.result.demand;
+            assert_eq!(demand.source_model_scope, "partial_declared_scenario");
+            assert!(demand.source_balance_residual_j.unwrap().abs() < 1e-6 * demand.accounted_loss_energy_j.max(1e-6));
+            eprintln!("{design} {label}: {}", serde_json::to_string(&demand.source).unwrap());
+            records.push(result);
+        }
+        let mut file = std::fs::OpenOptions::new().write(true).create_new(true).open(output.join(filename)).unwrap();
+        serde_json::to_writer(&mut file, &records).unwrap();
+        file.write_all(b"\n").unwrap();
+    }
+}
+
 pub(super) fn inputs(state: &serde_json::Value) -> serde_json::Value {
     let c: crate::ipc::ProjectConfigStateIpc =
         serde_json::from_value(state["config"].clone()).unwrap();
