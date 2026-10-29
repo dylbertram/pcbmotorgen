@@ -114,6 +114,13 @@ impl Default for ProjectStateIpc {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum CarriageMassSource {
+    Magnets,
+    Assembly,
+}
+
 /// Every user-facing design input, in UI units (mm and SI engineering
 /// units) — mirrors the fields of the frontend `ConfigStore` one-for-one.
 ///
@@ -161,6 +168,9 @@ pub struct ProjectConfigStateIpc {
     pub peak_force_n: f64,
     pub friction_n: f64,
     pub carriage_mass_kg: f64,
+    /// None preserves legacy saved masses; new UI designs explicitly select magnets or assembly.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub carriage_mass_source: Option<CarriageMassSource>,
     pub max_accel_m_s2: f64,
     pub capacitor_bank_uf: f64,
 
@@ -200,8 +210,10 @@ pub struct ProjectConfigStateIpc {
     pub backplane: Option<pcbmotorgen_simulation::backplane::BackplaneStack>,
 }
 
-/// Defaults mirror the frontend `ConfigStore` initial values (the app's
-/// out-of-the-box design) — keep the two in sync.
+/// Deserialization defaults preserve legacy inputs. New frontend designs use
+/// automatic magnet mass; legacy artifacts without a mass basis keep their
+/// saved carriage mass, with 15 g retained only as the missing-field fallback.
+/// Other values mirror the frontend initial design.
 impl Default for ProjectConfigStateIpc {
     fn default() -> Self {
         Self {
@@ -227,6 +239,7 @@ impl Default for ProjectConfigStateIpc {
             peak_force_n: 1.0,
             friction_n: 0.05,
             carriage_mass_kg: 0.015,
+            carriage_mass_source: None,
             max_accel_m_s2: 2.0,
             capacitor_bank_uf: 1000.0,
             commutation: CommutationModeIpc::MaxThrust,
@@ -430,6 +443,24 @@ pub fn write_project_atomic(path: &Path, json: &str) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn carriage_mass_basis_round_trips_without_reinterpreting_legacy_mass() {
+        let legacy: super::ProjectConfigStateIpc = serde_json::from_value(serde_json::json!({
+            "carriage_mass_kg": 0.015
+        })).unwrap();
+        assert_eq!(legacy.carriage_mass_kg, 0.015);
+        assert_eq!(legacy.carriage_mass_source, None);
+        for source in [super::CarriageMassSource::Magnets, super::CarriageMassSource::Assembly] {
+            let config = super::ProjectConfigStateIpc {
+                carriage_mass_source: Some(source.clone()), ..legacy.clone()
+            };
+            let restored: super::ProjectConfigStateIpc = serde_json::from_str(
+                &serde_json::to_string(&config).unwrap()).unwrap();
+            assert_eq!(restored.carriage_mass_source, Some(source));
+            assert_eq!(restored.to_linear_motor_ipc().carriage_mass_kg, 0.015);
+        }
+    }
 
     /// A fully-populated state (every field non-default where meaningful).
     fn sample_state() -> ProjectStateIpc {

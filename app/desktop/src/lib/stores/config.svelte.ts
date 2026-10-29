@@ -26,6 +26,7 @@ import { mm, listRoutingPatterns, routingPatternParameters, loadInstalledPlugins
 import { readPreferences } from "../preferences";
 import { MAX_PCB_LAYERS } from "../types/simulationLimits";
 import type { RoutedMoveRequest } from "../types/movePower";
+import { magnetMass } from "../carriageMass";
 
 export class ConfigStore {
   constructor() {
@@ -103,7 +104,19 @@ export class ConfigStore {
   target_force_n = $state(0.5);
   peak_force_n = $state(1.0);
   friction_n = $state(0.05);
-  carriage_mass_kg = $state(0.015);
+  carriage_mass_source = $state<"magnets" | "assembly">("magnets");
+  private assembly_mass_kg = $state(0.015);
+  magnet_mass = $derived(magnetMass(
+    [this.magnet_width_mm, this.magnet_cross_width_mm, this.magnet_height_mm], this.magnet_grade,
+  ));
+  magnet_total_mass_kg = $derived(this.magnet_mass.massG * this.magnet_count / 1000);
+  get carriage_mass_kg(): number {
+    return this.carriage_mass_source === "magnets" ? this.magnet_total_mass_kg : this.assembly_mass_kg;
+  }
+  set carriage_mass_kg(value: number) {
+    this.assembly_mass_kg = value;
+    this.carriage_mass_source = "assembly";
+  }
   max_accel_m_s2 = $state(2.0);
   capacitor_bank_uf = $state(1000);
 

@@ -14,6 +14,21 @@ export function emptyMoveTemplate(): string {
     additional_driver_loss_w: null, loss_model: null, force_positions: null }, null, 2);
 }
 
+/** Explicit copy into the draft; never silently change an existing move. */
+export function useDesignMechanicalInputs(text: string, design: {
+  carriage_mass_kg: number; carriage_mass_source: "magnets" | "assembly"; friction_n: number;
+}): string {
+  const value = JSON.parse(text);
+  if (!value || typeof value !== "object" || !value.profile || typeof value.profile !== "object" || Array.isArray(value.profile))
+    throw new Error("Keep a profile object in the move definition before copying design inputs.");
+  value.profile.moving_mass_kg = design.carriage_mass_kg;
+  value.profile.coulomb_friction_n = design.friction_n;
+  value.profile.mass_includes = design.carriage_mass_source === "magnets"
+    ? "Magnet-only estimate; excludes carrier, bushings, enclosure, knob and other moving parts"
+    : "Full moving assembly estimate including magnets, carrier, bushings, moving enclosure, knob and attached load";
+  return JSON.stringify(value, null, 2);
+}
+
 /** Shape checking only. Physical validation and all arithmetic remain native. */
 export function parseMoveRequest(text: string): RoutedMoveRequest {
   const v = JSON.parse(text);

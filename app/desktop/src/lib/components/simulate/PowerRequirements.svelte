@@ -5,7 +5,7 @@
   import { onDestroy, untrack } from "svelte";
   import type { ConfigStore } from "../../stores/config.svelte";
   import { MovePowerJob } from "../../movePowerJob";
-  import { emptyMoveTemplate, parseMoveRequest } from "../../movePowerInputs";
+  import { emptyMoveTemplate, parseMoveRequest, useDesignMechanicalInputs } from "../../movePowerInputs";
   import { emptyLossTemplate } from "../../moveLossInputs";
 
   let { input, config }: { input: PowerRequirementsInput; config: ConfigStore } = $props();
@@ -46,6 +46,12 @@
       value.loss_model = emptyLossTemplate();
       draft = JSON.stringify(value, null, 2);
     } catch (error) { moveError = error instanceof Error ? error.message : String(error); }
+  }
+  function copyMechanicalInputs(): void {
+    job.setInputs(null);
+    moveError = "";
+    try { draft = useDesignMechanicalInputs(draft, config); }
+    catch (error) { moveError = error instanceof Error ? error.message : String(error); }
   }
   let saving = $state(false);
   let message = $state("");
@@ -111,6 +117,7 @@
     <summary class="cursor-pointer text-sm text-slate-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-400">Move definition and calculation</summary>
     <div class="mt-3 space-y-3 text-xs text-slate-400">
       <p>Specify the move in SI units using the JSON editor. Replace every required null, state the mass breakdown and choose the source's return capability. Existing designs have no inferred move. Applying this definition adds it to the saved design.</p>
+      <p>Carriage mass and bushing / rail friction are set in Design setup under Drive. Copy those estimates into this draft with “Use design mass and friction”, then apply the move. Existing move inputs are not changed automatically when the design estimates change.</p>
       <p>Positions are absolute first-magnet-center coordinates in metres. The profile is imposed quintic motion with zero endpoint acceleration. Control explicitly uses balanced-star sinusoidal currents, independent of the static preview. The source is directly at a constant-voltage DC link. Keep additional_driver_loss_w null when switching, dead-time and control losses are unknown. Zero declares an idealized scenario, not hardware total power.</p>
       <p>Simulation results are independent of design goals. Legacy speed, acceleration and current-limit fields do not clamp the motion or hide its calculated demand. Required voltage above the physical bus is reported separately; this model calculates imposed-motion demand, not actual controller tracking.</p>
       <p>Optional loss_model fields require referenced coefficients, phase order from the native snapshot, balanced ripple statistics and an operating domain matching the active driver, supply, PWM and temperature. Switching and dead-time laws are whole-inverter joules per PWM cycle, not per FET or edge. Set the legacy additional_driver_loss_w to null before using component laws. Idealized declarations, zero-ripple assumptions or listed omissions keep totals Unknown. Declared-model totals are conditional scenario results, not measurements or guaranteed maxima.</p>
@@ -120,6 +127,7 @@
       <div class="flex flex-wrap gap-2">
         <button type="button" onclick={applyMove} class="rounded border border-slate-600 px-3 py-1.5 text-slate-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-400">Apply move definition</button>
         <button type="button" onclick={addLossModel} class="rounded border border-slate-600 px-3 py-1.5 text-slate-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-400">Add loss-model fields</button>
+        <button type="button" onclick={copyMechanicalInputs} class="rounded border border-slate-600 px-3 py-1.5 text-slate-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-400">Use design mass and friction</button>
         <button type="button" disabled={!input.native || input.topology !== "linear" || editing || !config.power_move || moveStatus === "pending"} onclick={() => { job.setInputs(activeInputs); void job.run(); }} class="rounded border border-sky-500/60 px-3 py-1.5 text-sky-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-400 disabled:opacity-40">Calculate move power</button>
         <button type="button" disabled={moveStatus !== "pending"} onclick={() => job.cancel()} class="rounded border border-slate-600 px-3 py-1.5 text-slate-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-400 disabled:opacity-40">Cancel calculation</button>
         <button type="button" onclick={() => { job.setInputs(null); config.power_move = null; draft = emptyMoveTemplate(); moveError = ""; }} class="rounded border border-slate-600 px-3 py-1.5 text-slate-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-400">Clear move definition</button>

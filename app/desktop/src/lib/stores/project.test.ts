@@ -29,6 +29,26 @@ function makeStores(recents?: RecentFilesStore, kind: "motor" | "sensor" = "moto
 }
 
 describe("explicit move persistence", () => {
+  it("preserves legacy 15 g assemblies and persists automatic magnet mass selection", () => {
+    const { config, projects } = makeStores();
+    const legacy = projects.snapshotIpc();
+    delete legacy.config.carriage_mass_source;
+    legacy.config.carriage_mass_kg = 0.015;
+    projects.applyToState(legacy);
+    expect(config.carriage_mass_source).toBe("assembly");
+    config.magnet_count = 8;
+    expect(config.carriage_mass_kg).toBe(0.015);
+    expect(projects.snapshotIpc().config.carriage_mass_source).toBe("assembly");
+    config.carriage_mass_source = "magnets";
+    const automatic = projects.snapshotIpc();
+    config.carriage_mass_kg = 0.02;
+    projects.applyToState(automatic);
+    expect(config.carriage_mass_source).toBe("magnets");
+    expect(config.carriage_mass_kg).toBe(automatic.config.carriage_mass_kg);
+    config.magnet_count *= 2;
+    expect(config.carriage_mass_kg).toBeCloseTo(2 * automatic.config.carriage_mass_kg, 12);
+  });
+
   it("loads legacy designs without inferred move requirements", () => {
     const { config, projects } = makeStores();
     expect(config.power_move).toBeNull();

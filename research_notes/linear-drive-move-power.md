@@ -7,6 +7,44 @@ remain as a record of what was implemented and tested, not current requirements.
 
 ## Supported model
 
+### Carriage setup clarification, 2026-10-29
+
+The user accepts 15 g as a reasonable full moving-assembly estimate for the
+Fader, including its moving bushings and enclosure. It is an engineering input,
+not a measured mass, and no longer needs to be treated as an unresolved coverage
+blocker for this scenario. Friction means bushing-to-rail sliding resistance.
+Reasonable estimates are acceptable before planned board/prototype tests;
+perfect material/friction measurements are not prerequisites for useful design
+simulation. This supersedes the earlier Fader mass-coverage caveats below,
+without qualifying unrelated designs or filling in driver/inductor losses.
+
+Design setup now exposes carriage mass and friction under Drive. New designs
+default to the combined magnet mass, using a list of known weights seeded with
+the user's 5×5×3 mm N52 = 0.57 g reference. Other NdFeB sizes use an explicitly
+approximate volume × 7.6 g/cm³ estimate consistent with that reference. The
+display lists current dimensions/count, each magnet's mass and combined mass.
+The full-assembly override includes magnets once plus all other moving parts,
+not stationary rails. Existing saved masses remain overrides, including 15 g;
+they are never replaced on load by the new magnet-only default. Automatic mode
+updates with magnet dimensions/count and survives save/load.
+
+The optional move remains separately explicit. “Use design mass and friction”
+copies these estimates and their inclusion statement into the move draft, which
+must then be applied. It does not invent a trajectory, source sink capability or
+loss coefficients, and does not silently overwrite an existing applied move.
+Reports separately show design estimates and the mass/friction actually used by
+an explicit move.
+
+Verification: 550 frontend unit tests pass with one existing skip, Svelte check
+has zero errors/warnings, production build passes with its existing large-chunk
+warning, and thirteen affected Chromium tests pass, including mobile layout.
+The Rust suite passes 137 desktop, 239 simulation unit and seven integration
+tests, with 18 explicit ignores. Native persistence tests cover legacy-mass
+preservation and both saved mass modes. Browser screenshots are UI
+evidence, not native WKWebView or physics validation.
+
+### Simulation assumptions
+
 - One three-phase star winding, sinusoidal FOC with id = 0. Phase current means
   peak sinusoidal amplitude, not RMS, line-to-line current or source current.
 - A prescribed quintic position trajectory over an explicit duration. Start and
