@@ -66,7 +66,7 @@ pub async fn sample_simulation_visualization(
                         &board.simulation_input(cad, &core),
                         &board.routing,
                         &drive_settings,
-                        &super::cad_source::CadBoard::drive_hints(cad),
+                        &board.drive_hints(cad),
                         request.phase_peak_a,
                     );
                 }

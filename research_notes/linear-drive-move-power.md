@@ -7,6 +7,45 @@ remain as a record of what was implemented and tested, not current requirements.
 
 ## Supported model
 
+### PCB layer placement correction, user clarification 2026-10-29
+
+The configured PCB thickness is authoritative. Raw imported DXF Z values encode
+relative layer spacing, not the physical board thickness. This supersedes the
+earlier interpretation in this document that the Fader's -4.8/-3.2/-1.6/0 mm
+source heights must be used directly by physics. For every motor CAD board the
+placement is now `(source_z - max_z) / (max_z - min_z) * pcb_thickness`.
+A single layer is at zero. Layer indices, relative spacing, XY copper and
+terminal connectivity are unchanged. The supplied archive/DXF bytes are not
+edited. The Fader's 1.6 mm PCB therefore uses -1.600, -1.0666667, -0.5333333,
+0 mm copper heights. Changing the software PCB thickness changes this placement.
+
+The same CadBoard placement feeds force, winding resistance/inductance, via
+lengths, heat visualization, DC geometry snapshots and move power. The 3D viewer
+and power report use the same proportional placement. Raw input geometry remains
+in exported inputs; native move notes record the physical heights. Move model
+version is now `linear-move-demand-v5`. Older raw-Z results are historical and
+must not be reused as current Fader evidence. Changed DC geometry requires fresh
+hash-bound qualification; no external qualification campaign was run here.
+
+Regenerated all six cases using the same trajectories, pi/2 phase reference,
+50 mN friction, 15 g mass, copper/PWM/driver/inductor assumptions and convergence
+gates. Receipt: `scripts/solvers/results/practical-move-zfix-2026-10-29.json`.
+The Fader full move now estimates 56.5753 W peak, 4.71461 A source peak,
+15.2938 W average and 15.2938 J drawn/net, with zero returned energy. Previous
+raw-Z values were 158.2377 W and 41.6086 J. Full-move winding heating at the new
+peak is 53.4919 W. A physical 12 V voltage tracking conflict remains, so these
+are imposed-motion estimates, not achieved hardware demand. Phase alignment and
+friction assumptions still need review; this correction alone does not close
+the reopened practical-accuracy issue.
+
+All six cases passed independent balances and the unchanged 2% spatial/time
+energy and peak gates. The native-receipt UI/report/CSV/snapshot mappings pass.
+Full Rust: 139 desktop + 241 simulation + 7 integration passed, 22 ignored.
+Frontend: 555 passed, 3 skipped; Svelte check and build pass. Seven Chromium
+power/3D-display tests pass. Regression cases cover unequal spacing, shifted or
+reversed source Z, one layer, source immutability, thickness edits and shared
+physics/DC placement. Full receipts: approved temp `move-zfix-{baselines,models,results}-20261029`.
+
 ### Geometry-bound engineering estimate, 2026-10-29
 
 **Acceptance audit update:** the superseding receipt is

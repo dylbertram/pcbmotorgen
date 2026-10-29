@@ -22,6 +22,8 @@ pub struct CadBoard {
     pub placement_length_mm: f64,
     /// Copper extent across the travel axis [mm].
     pub width_mm: f64,
+    /// Source Z ratios placed within the configured PCB, top copper at zero.
+    pub layer_z_m: Vec<f64>,
 }
 
 #[cfg(test)]
@@ -30,7 +32,7 @@ mod tests {
 
     fn assert_current_and_power_balance(board: &CadBoard, cad: &CadGeometry) {
         use pcbmotorgen_simulation::drive::{extract_phase_networks_with_terminals, solve_network};
-        for net in extract_phase_networks_with_terminals(&board.routing, &CadBoard::drive_hints(cad).terminals) {
+        for net in extract_phase_networks_with_terminals(&board.routing, &board.drive_hints(cad).terminals) {
             // Unequal values exercise signed branching, not only a symmetric path.
             let resistance: Vec<_> = (0..net.edges.len()).map(|i| 0.5 + 0.1 * (i % 7) as f64).collect();
             let solved = solve_network(&net, &resistance);
@@ -70,6 +72,33 @@ mod tests {
     }
 
     #[test]
+    fn imported_z_ratios_use_configured_pcb_thickness_without_editing_source() {
+        let core = LinearMotorConfig { phases: 1, pcb_thickness_m: 0.0016, ..Default::default() };
+        let mut cad = mapped();
+        for (raw, expected) in [
+            (vec![-4.8, -3.2, -1.6, 0.0], vec![-0.0016, -0.0010666666666666667, -0.0005333333333333334, 0.0]),
+            (vec![8.0, 7.0, 4.0], vec![0.0, -0.0004, -0.0016]),
+            (vec![2.0], vec![0.0]),
+        ] {
+            cad.layer_z_mm = raw;
+            if cad.layer_z_mm.len() == 1 {
+                cad.routing.segments[1].layer = 0;
+                cad.routing.vias.clear();
+                cad.coil_terminals.get_mut("coil").unwrap().output.layer = 0;
+            }
+            let original = serde_json::to_value(&cad).unwrap();
+            let board = CadBoard::new(&cad, &core).unwrap();
+            for (a, b) in board.drive_hints(&cad).layer_z_m.iter().zip(expected) {
+                assert!((a - b).abs() < 1e-15);
+            }
+            assert_eq!(serde_json::to_value(&cad).unwrap(), original);
+            let thick = LinearMotorConfig { pcb_thickness_m: 0.0032, ..core.clone() };
+            let other = CadBoard::new(&cad, &thick).unwrap();
+            for (a, b) in board.layer_z_m.iter().zip(other.layer_z_m) { assert!((2.0 * a - b).abs() < 1e-15); }
+        }
+    }
+
+    #[test]
     fn mapped_import_drives_board_and_electrical_inputs_without_regeneration() {
         let core = LinearMotorConfig { phases:1, routing_pattern:"missing-plugin".into(), ..Default::default() };
         let cad = mapped();
@@ -84,7 +113,7 @@ mod tests {
         assert_eq!(sim.min_trace_m, 0.0002);
         assert_eq!(sim.num_layers, 2);
         let analysis = pcbmotorgen_simulation::drive::analyze_drive_with(
-            &sim, &board.routing, &Default::default(), None, &CadBoard::drive_hints(&cad));
+            &sim, &board.routing, &Default::default(), None, &board.drive_hints(&cad));
         assert!(analysis.phases[0].connected);
         assert!(analysis.phase_resistance_ohm > 0.0);
     }
@@ -104,7 +133,7 @@ mod tests {
         assert_current_and_power_balance(&board, &cad);
         let sim = board.simulation_input(&cad, &core);
         let analysis = pcbmotorgen_simulation::drive::analyze_drive_with(
-            &sim, &board.routing, &Default::default(), None, &CadBoard::drive_hints(&cad));
+            &sim, &board.routing, &Default::default(), None, &board.drive_hints(&cad));
         assert!(analysis.phases[0].connected);
         assert_eq!(analysis.phases[0].layers, vec![1, 2]);
         assert!(analysis.phase_resistance_ohm.is_finite() && analysis.phase_resistance_ohm > 0.0);
@@ -129,7 +158,7 @@ mod tests {
             assert_current_and_power_balance(&board, &cad);
             let sim = board.simulation_input(&cad, &core);
             let analysis = pcbmotorgen_simulation::drive::analyze_drive_with(
-                &sim, &board.routing, &config.drive, None, &CadBoard::drive_hints(&cad));
+                &sim, &board.routing, &config.drive, None, &board.drive_hints(&cad));
             assert_eq!(analysis.phases.len(), core.phases as usize);
             assert!(analysis.phases.iter().all(|phase| phase.connected));
             assert!(analysis.phase_resistance_ohm.is_finite() && analysis.phase_resistance_ohm > 0.0);
@@ -160,6 +189,16 @@ mod tests {
 impl CadBoard {
     pub fn validate(cad: &CadGeometry, core: &LinearMotorConfig) -> Result<(), String> {
         cad.validate_motor_mapping(core.phases, core.design_rules().min_trace_mm)?;
+        if !core.pcb_thickness_m.is_finite() || core.pcb_thickness_m <= 0.0 {
+            return Err("Configured PCB thickness must be finite and positive".into());
+        }
+        if cad.layer_z_mm.len() > 1 {
+            let low = cad.layer_z_mm.iter().copied().fold(f64::INFINITY, f64::min);
+            let high = cad.layer_z_mm.iter().copied().fold(f64::NEG_INFINITY, f64::max);
+            if !((high - low).is_finite() && high > low) {
+                return Err("Imported copper needs distinct finite layer heights for proportional PCB placement".into());
+            }
+        }
         // Validate each coil before phase mapping can join separate coils to
         // virtual buses. This is a topology check, not a resistance estimate.
         for network in pcbmotorgen_simulation::drive::extract_phase_networks(&cad.routing) {
@@ -207,6 +246,13 @@ impl CadBoard {
             rules,
             placement_length_mm,
             width_mm: y[1] - y[0],
+            layer_z_m: {
+                let low = cad.layer_z_mm.iter().copied().fold(f64::INFINITY, f64::min);
+                let high = cad.layer_z_mm.iter().copied().fold(f64::NEG_INFINITY, f64::max);
+                cad.layer_z_mm.iter().map(|z| if high == low { 0.0 } else {
+                    ((z - high) / (high - low)) * core.pcb_thickness_m
+                }).collect()
+            },
         })
     }
 
@@ -224,15 +270,15 @@ impl CadBoard {
         sim
     }
 
-    /// Imported layer heights and picked terminals for the drive analysis.
-    pub fn drive_hints(cad: &CadGeometry) -> pcbmotorgen_simulation::drive::DriveGeometryHints {
+    /// Configured physical layer heights and original picked terminals.
+    pub fn drive_hints(&self, cad: &CadGeometry) -> pcbmotorgen_simulation::drive::DriveGeometryHints {
         use pcbmotorgen_simulation::drive::{TerminalPair, TerminalPoint};
         let point = |t: &pcbmotorgen_export::cad_dxf::CadTerminal| TerminalPoint {
             layer: t.layer,
             position: t.position,
         };
         pcbmotorgen_simulation::drive::DriveGeometryHints {
-            layer_z_m: cad.layer_z_mm.iter().map(|z| z * 1e-3).collect(),
+            layer_z_m: self.layer_z_m.clone(),
             terminals: cad
                 .terminals_by_phase()
                 .into_iter()

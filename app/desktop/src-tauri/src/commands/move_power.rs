@@ -114,10 +114,11 @@ fn calculate(
     let (routing, sim, hints) = if let Some(cad) = &cad_geometry {
         let board = super::cad_source::CadBoard::new(cad, &core)?;
         let sim = board.simulation_input(cad, &core);
+        let hints = board.drive_hints(cad);
         (
             board.routing,
             sim,
-            super::cad_source::CadBoard::drive_hints(cad),
+            hints,
         )
     } else {
         core.design_rules().validate_trace_width()?;
@@ -134,7 +135,7 @@ fn calculate(
         "{:x}",
         Sha256::digest(serde_json::to_vec(&inputs).map_err(|e| e.to_string())?)
     );
-    let result = evaluate_routed_move(
+    let mut result = evaluate_routed_move(
         &sim,
         &routing,
         &drive,
@@ -143,6 +144,9 @@ fn calculate(
         config.meshing as usize,
         &|| permit.cancelled(),
     )?;
+    if cad_geometry.is_some() {
+        result.demand.notes.push(format!("Imported CAD Z ratios are scaled to configured PCB thickness {:.9} m, with top copper at zero. Physical copper layer Z [m]: {:?}. Raw source Z remains unchanged in inputs.", core.pcb_thickness_m, hints.layer_z_m));
+    }
     if permit.cancelled() {
         return Err("Move power calculation cancelled; result withheld".into());
     }
