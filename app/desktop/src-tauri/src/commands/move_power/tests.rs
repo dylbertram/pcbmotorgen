@@ -48,6 +48,21 @@ fn component_loss_declarations_roundtrip_without_creating_legacy_requirements() 
     let legacy: crate::ipc::ProjectStateIpc =
         serde_json::from_value(serde_json::json!({})).unwrap();
     assert!(legacy.config.power_move.is_none());
+    let mut no_goals = serde_json::to_value(state.config.power_move.as_ref().unwrap()).unwrap();
+    no_goals
+        .as_object_mut()
+        .unwrap()
+        .remove("phase_peak_limit_a");
+    for key in [
+        "max_speed_m_s",
+        "max_acceleration_m_s2",
+        "max_deceleration_m_s2",
+    ] {
+        no_goals["profile"].as_object_mut().unwrap().remove(key);
+    }
+    let restored: RoutedMoveRequest = serde_json::from_value(no_goals).unwrap();
+    assert_eq!(restored.profile.duration_s, profile().duration_s);
+    assert_eq!(restored.phase_peak_limit_a, 0.0); // Legacy storage only, not a simulation constraint.
 }
 
 #[test]

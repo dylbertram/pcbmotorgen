@@ -27,6 +27,10 @@ it("rejects missing terms, unknown laws, absent references and wrong array shape
 
 it("legacy moves need no component declaration, and duplicate driver watts cannot be applied", () => {
   const move = JSON.parse(emptyMoveTemplate());
+  expect(move).not.toHaveProperty("phase_peak_limit_a");
+  expect(move.profile).not.toHaveProperty("max_speed_m_s");
+  expect(move.profile).not.toHaveProperty("max_acceleration_m_s2");
+  expect(move.profile).not.toHaveProperty("max_deceleration_m_s2");
   for (const key of Object.keys(move.profile)) if (key !== "mass_includes") move.profile[key] = 0;
   move.profile.mass_includes = "Numerical input-shape fixture only";
   Object.assign(move, { electrical_angle_at_zero_rad: 0, phase_peak_limit_a: 1, force_positions: 65 });

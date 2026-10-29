@@ -1,7 +1,9 @@
 # Linear-drive move power model
 
-Implementation scope for pcbmotorgen#7744. This document describes the first
-backend slice, not completion evidence for the ticket.
+Implementation and historical evidence for pcbmotorgen#7744. Current behavior
+is described in **Design-goal independence, v4** below. That section supersedes
+the earlier design-limit gating and rejection interpretation. Earlier sections
+remain as a record of what was implemented and tested, not current requirements.
 
 ## Supported model
 
@@ -491,3 +493,74 @@ saved-design rejection regression and the unchanged Fader success/refinement
 gates. Previous frontend/build/Chromium evidence applies to unchanged production
 code; those suites were not rerun for this test-only follow-up. Original root
 hashes were checked again and match. The blocking inputs above remain open.
+
+## Design-goal independence, v4
+
+User clarification on 2026-10-29: the goal is accurate simulation results,
+not checking the design goals. Exceeding goals is acceptable and irrelevant
+to the simulation. The previous treatment of current/speed/acceleration goals
+and voltage margins as publication gates was wrong.
+
+Model `linear-move-demand-v4` calculates the imposed trajectory's required
+force, current, voltage, power and energy without clamping to or rejecting
+against those goals. The configured static-preview current setpoint and driver
+peak rating no longer cap the move allocation. Legacy request current/speed/
+acceleration-limit fields remain readable but are ignored; new JSON templates
+omit them and native deserialization permits their absence. Move-specific
+physical validation no longer requires force-target relationships or positive
+acceleration/current/temperature-rise goals; ordinary design validation is
+unchanged. No physical geometry or material parameters are substituted.
+
+Design targets and model validity are distinct. Invalid covariance, unsupported
+housing/stack physics, loss-domain extrapolation, nonfinite inputs, unresolved
+internal reversal and source-return incompatibility still cannot produce
+unsupported results. A supplied loss law's applicability domain is a statement
+of where its equations are valid, not a desired performance goal.
+
+The physical DC-link voltage still enters power/current accounting. Required
+phase-command voltage above that actual bus is recorded as a physical tracking
+finding, without the configurable headroom factor. It does not suppress required
+W/A/J. Such demand describes the imposed motion, not actual hardware delivery or
+achieved tracking. The legacy `feasible` field now means only physical tracking
+compatibility and never design-goal compliance. UI/report show "Physical
+tracking findings" instead of treating goals as a pass/fail gate. Snapshot
+format is v4 and the trace column is `physical_tracking_compatible`.
+
+Native public-command regressions on both supplied star designs independently
+change the configured current setpoint to zero, contradictory force goals,
+zero acceleration goal, target speed, driver peak rating, request limits and
+voltage margin. The complete per-sample traces and source W/A/J are exactly
+identical before and after those goal edits. No geometry, loss law, physical
+source voltage or trajectory changes in these comparisons.
+
+At 193 force positions and 0.00025 s, the numerical-coefficient fixtures now
+publish required demand for both designs:
+
+- Two-layer v1: 4.8824137794 W sampled peak, 0.4068678150 A sampled source
+  peak, 4.0861682867 W average, 1.0215420717 J drawn/net, no returned energy.
+- Four-layer v1: 11.0535335716 W sampled peak, 0.9211277976 A sampled source
+  peak, 9.1613121707 W average, 2.2903280427 J drawn/net, no returned energy.
+  The 12.7296176980 V required line peak exceeds the actual 12 V bus; the
+  calculated demand remains available with that separate physical finding.
+
+These are still numerical loss-law fixtures, not accurate production-loss
+estimates or hardware measurements. Missing real loss data remains an accuracy
+limitation; exceeding a design goal does not. Fader outputs and its separate
+2% spatial/time refinement gates remain numerically unchanged. Two-layer v2
+still rejects missing dynamic housing/stack physics, not a design goal.
+
+Reproduction:
+
+```sh
+PCB_MOTOR_SUPPLIED_DESIGN_DIR="$PWD" cargo test -p pcbmotorgen supplied_loss_model_demand_is_independent_of_design_goals -- --ignored --nocapture
+```
+
+Verification: 132 desktop Rust tests, 237 simulation unit tests and seven
+integration tests pass, with 18 explicit ignored tests across those crates.
+The two saved-design goal-invariance/refinement runs and Fader refinement test
+were explicitly executed and pass. Frontend passes 546 tests with one existing
+skip, check reports zero errors/warnings, build passes with its existing chunk
+warning, and 10 Chromium regressions pass. New report/browser assertions retain
+totals despite physical tracking findings and preserve stale/cancel/demo guards.
+Artifacts: `app/desktop/e2e-results/demand-independent-goals-final-20261029/`.
+Svelte autofixer reports no issues. Original supplied files remain unchanged.

@@ -2,13 +2,14 @@ import type { MoveProfile, RoutedMoveRequest } from "./types/movePower";
 import { validateLossInputs } from "./moveLossInputs";
 
 const numericProfileFields: (keyof MoveProfile)[] = ["start_m", "end_m", "initial_velocity_m_s", "final_velocity_m_s",
-  "duration_s", "travel_min_m", "travel_max_m", "max_speed_m_s", "max_acceleration_m_s2", "max_deceleration_m_s2",
+  "duration_s", "travel_min_m", "travel_max_m",
   "moving_mass_kg", "coulomb_friction_n", "damping_n_s_per_m", "external_load_n", "time_step_s"];
+const legacyGoals = ["max_speed_m_s", "max_acceleration_m_s2", "max_deceleration_m_s2"];
 
 /** Deliberately incomplete. Opening an old file must not invent a move. */
 export function emptyMoveTemplate(): string {
   return JSON.stringify({ profile: { ...Object.fromEntries(numericProfileFields.map(k => [k, null])), mass_includes: "" },
-    control: "balanced_star_sinusoidal", electrical_angle_at_zero_rad: null, phase_peak_limit_a: null,
+    control: "balanced_star_sinusoidal", electrical_angle_at_zero_rad: null,
     source: { boundary: "stiff_dc_link", accepts_regeneration: null },
     additional_driver_loss_w: null, loss_model: null, force_positions: null }, null, 2);
 }
@@ -20,7 +21,7 @@ export function parseMoveRequest(text: string): RoutedMoveRequest {
     throw new Error("Add a profile object with explicit move and load inputs.");
   for (const [object, allowed, path] of [
     [v, ["profile", "control", "electrical_angle_at_zero_rad", "phase_peak_limit_a", "source", "additional_driver_loss_w", "loss_model", "force_positions"], "move"],
-    [v.profile, [...numericProfileFields, "mass_includes"], "profile"],
+    [v.profile, [...numericProfileFields, ...legacyGoals, "mass_includes"], "profile"],
     [v.source ?? {}, ["boundary", "accepts_regeneration"], "source"],
   ] as const) {
     for (const key of Object.keys(object)) if (!(allowed as readonly string[]).includes(key))
@@ -33,7 +34,7 @@ export function parseMoveRequest(text: string): RoutedMoveRequest {
   if (typeof v.profile.mass_includes !== "string" || !v.profile.mass_includes.trim())
     throw new Error("State which moving parts and cap are included in profile.mass_includes.");
   if (v.control !== "balanced_star_sinusoidal") throw new Error("Only balanced_star_sinusoidal move control is supported.");
-  for (const key of ["electrical_angle_at_zero_rad", "phase_peak_limit_a", "force_positions"]) {
+  for (const key of ["electrical_angle_at_zero_rad", "force_positions"]) {
     if (typeof v[key] !== "number" || !Number.isFinite(v[key])) throw new Error(`Set ${key} explicitly.`);
   }
   if (!Number.isInteger(v.force_positions)) throw new Error("force_positions must be an integer.");

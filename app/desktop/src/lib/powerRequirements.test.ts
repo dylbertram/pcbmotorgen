@@ -198,13 +198,14 @@ describe("move power report consistency", () => {
       expect(JSON.parse(powerModelSnapshot(input)).moveResult).toBeNull();
     }
   });
-  it("does not promote required demand for an infeasible move to achievable source power", () => {
+  it("reports required demand separately from physical tracking findings", () => {
     const input = withMove();
     const m = input.moveResult!.result.demand;
     m.feasible = false;
-    m.limiting_factors = ["Current limit exceeded"];
+    m.limiting_factors = ["Required voltage exceeds the physical DC link"];
     expect(item(input, "Peak supply power during a move").value).toBe("Unknown");
-    expect(item(input, "Motion feasibility").value).toBe("Not achieved");
+    expect(item(input, "Physical tracking findings").value).toBe("Imposed demand only");
+    expect(item(input, "Partial scenario peak source power").value).toBe("2 W");
     expect(moveTraceCsv(input)).toContain('"simulated_not_measured","false"');
   });
 });
@@ -257,12 +258,20 @@ describe("declared loss-model reports", () => {
     for (const mutate of [(i: PowerRequirementsInput) => { i.moveResult!.result.demand.electrical.loss_model!.basis = "idealized"; },
       (i: PowerRequirementsInput) => { i.moveResult!.result.demand.loss_energy = null; },
       (i: PowerRequirementsInput) => { i.moveResult!.result.demand.missing_inputs = ["Unknown core law"]; },
-      (i: PowerRequirementsInput) => { i.moveResult!.result.demand.feasible = false; },
       (i: PowerRequirementsInput) => { i.native = false; }]) {
       const input = withDeclaredLosses(); mutate(input);
       expect(item(input, "Peak supply power during a move").value).toBe("Unknown");
       expect(item(input, "Electrical energy per move").value).toBe("Unknown");
     }
+  });
+  it("keeps complete-model required totals available despite tracking findings", () => {
+    const input = withDeclaredLosses();
+    input.moveResult!.result.demand.feasible = false;
+    input.moveResult!.result.demand.limiting_factors = ["Physical voltage cannot track imposed motion"];
+    expect(item(input, "Peak supply power during a move").value).toBe("2 W");
+    expect(item(input, "Electrical energy per move").value).toBe("1 J");
+    expect(item(input, "Physical tracking findings").value).toBe("Imposed demand only");
+    expect(powerReportMarkdown(powerRequirements(input))).toContain("Physical voltage cannot track imposed motion");
   });
   it("invalidates totals and trace export after loss inputs change", () => {
     const input = withDeclaredLosses();

@@ -8,7 +8,7 @@ use losses::{DeclaredLossModel, LossEnergy, LossOperatingPoint, LossSample};
 use serde::{Deserialize, Serialize};
 use std::f64::consts::TAU;
 
-pub const MODEL_VERSION: &str = "linear-move-sinusoidal-v3";
+pub const MODEL_VERSION: &str = "linear-move-demand-v4";
 const MAX_INTERVALS: usize = 200_000;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -22,8 +22,12 @@ pub struct MoveProfile {
     pub duration_s: f64,
     pub travel_min_m: f64,
     pub travel_max_m: f64,
+    /// Legacy design goals, retained for saved-file compatibility only.
+    #[serde(default)]
     pub max_speed_m_s: f64,
+    #[serde(default)]
     pub max_acceleration_m_s2: f64,
+    #[serde(default)]
     pub max_deceleration_m_s2: f64,
     pub moving_mass_kg: f64,
     /// Must state which moving parts are included. No inferred cap mass.
@@ -75,8 +79,12 @@ pub struct MoveElectricalModel {
     pub electrical_period_m: f64,
     pub electrical_angle_at_zero_rad: f64,
     pub force_map: Vec<ForceConstantPoint>,
+    /// Legacy goal, never clamps or suppresses imposed-move demand.
+    #[serde(default)]
     pub phase_peak_limit_a: f64,
     pub source_voltage_v: f64,
+    /// Legacy design margin, not part of the physical demand calculation.
+    #[serde(default)]
     pub voltage_headroom: f64,
     /// HS + LS resistance; equal high/low FET resistance is assumed.
     pub driver_path_resistance_ohm: f64,
@@ -147,6 +155,8 @@ pub struct MovePowerResult {
     pub electrical: MoveElectricalModel,
     pub actual_time_step_s: f64,
     /// Necessary sampled envelope checks only, not controller qualification.
+    /// Legacy field name: physical model/voltage compatibility only, never
+    /// design-goal compliance or proof of achieved hardware motion.
     pub feasible: bool,
     pub limiting_factors: Vec<String>,
     pub missing_inputs: Vec<String>,
@@ -175,7 +185,8 @@ pub struct MovePowerResult {
     pub accounted_loss_energy_j: f64,
     pub phase_rms_including_declared_ripple_a: Option<[f64; 3]>,
     pub sampled_phase_peak_including_declared_ripple_a: Option<f64>,
-    /// Withheld for infeasible motion, unknown driver losses or no sink.
+    /// Required demand, independent of design goals and tracking feasibility.
+    /// Withheld only for unsupported motion/source physics or unknown losses.
     pub source: Option<SourceDemand>,
     pub notes: Vec<String>,
     pub samples: Vec<MovePowerSample>,
@@ -226,20 +237,14 @@ fn validate(p: &MoveProfile, e: &MoveElectricalModel) -> Result<usize, String> {
         .into_iter()
         .all(positive)
         || ![
-            p.max_speed_m_s,
-            p.max_acceleration_m_s2,
-            p.max_deceleration_m_s2,
             p.coulomb_friction_n,
             p.damping_n_s_per_m,
             e.phase_resistance_hot_ohm,
             e.effective_phase_inductance_h,
-            e.phase_peak_limit_a,
             e.driver_path_resistance_ohm,
         ]
         .into_iter()
         .all(nonnegative)
-        || !positive(e.voltage_headroom)
-        || e.voltage_headroom > 1.0
         || e.additional_driver_loss_w.is_some_and(|v| !nonnegative(v))
     {
         return Err(
@@ -409,6 +414,7 @@ pub fn evaluate_move_with_cancel(
     let dt = p.duration_s / n as f64;
     let mut samples = Vec::with_capacity(n + 1);
     let mut factors = Vec::new();
+    let mut source_supported = true;
     let r_dc = e
         .phase_model
         .as_ref()
@@ -497,36 +503,7 @@ pub fn evaluate_move_with_cancel(
             x < p.travel_min_m - 1e-12 || x > p.travel_max_m + 1e-12,
             "Trajectory exceeds declared travel bounds",
         );
-        limit(
-            &mut factors,
-            v.abs() > p.max_speed_m_s + 1e-12,
-            "Requested speed exceeds declared speed limit",
-        );
-        let accelerating = a * v >= 0.0;
-        limit(
-            &mut factors,
-            a.abs()
-                > if accelerating {
-                    p.max_acceleration_m_s2
-                } else {
-                    p.max_deceleration_m_s2
-                } + 1e-12,
-            "Requested acceleration/deceleration exceeds its declared limit",
-        );
-        limit(
-            &mut factors,
-            current.abs() > e.phase_peak_limit_a + 1e-12,
-            "Required phase-current amplitude exceeds declared limit",
-        );
-        limit(
-            &mut factors,
-            losses.as_ref().is_some_and(|l| {
-                l.phase_peak_envelope_a
-                    .into_iter()
-                    .any(|i| i > e.phase_peak_limit_a + 1e-12)
-            }),
-            "Required phase current including declared ripple exceeds declared limit",
-        );
+        source_supported &= factors.is_empty();
         samples.push(MovePowerSample {
             time_s: i as f64 * dt,
             position_m: x,
@@ -651,14 +628,16 @@ pub fn evaluate_move_with_cancel(
             .map(|power| power / e.source_voltage_v);
         limit(
             &mut factors,
-            s.required_line_voltage_v > e.source_voltage_v * e.voltage_headroom + 1e-12,
-            "Required line voltage exceeds available envelope; imposed motion is not achieved",
+            s.required_line_voltage_v > e.source_voltage_v + 1e-12,
+            "Required line voltage exceeds the physical DC-link voltage; demand is calculated for imposed motion, not achieved tracking",
         );
         limit(
             &mut factors,
             !e.source_accepts_regeneration && s.required_source_power_w.is_some_and(|p| p < -1e-12),
             "Source cannot absorb returned energy; DC-link transient or brake model is required",
         );
+        source_supported &=
+            e.source_accepts_regeneration || !s.required_source_power_w.is_some_and(|p| p < -1e-12);
     }
     let first = &samples[0];
     let last = &samples[n];
@@ -701,7 +680,7 @@ pub fn evaluate_move_with_cancel(
             - accounted_losses
             - magnetic_delta
     });
-    let source = if factors.is_empty() && source_known {
+    let source = if source_supported && source_known {
         let power = |s: &MovePowerSample| s.required_source_power_w.unwrap();
         let (drawn, returned) = signed_energy(&samples, power);
         let peak = samples.iter().map(power).fold(0.0, f64::max);
@@ -743,7 +722,7 @@ pub fn evaluate_move_with_cancel(
         loss_energy,
         source,
         notes: vec![
-            "Required imposed quintic motion, not force/mass-integrated achieved motion. Feasibility is a sampled necessary envelope check, not a controller or thermal qualification.".into(),
+            "Required imposed quintic motion, not force/mass-integrated achieved motion. Design goals for speed, acceleration, phase current and voltage margin do not affect or suppress calculated demand. Physical tracking findings do not turn required demand into achieved hardware performance.".into(),
             "PWM-cycle-averaged scenario samples; no analytical or switching-resolved ripple. Sampled peaks are not guaranteed worst-case maxima.".into(),
             "Boundary: explicitly stiff source directly at the DC link, constant voltage; capacitor energy change is zero. Positive P=VI draws power; negative returns it.".into(),
             "Interval [0, duration] only. No preceding current startup, subsequent shutdown, idle, settling or repetition model. Endpoint magnetic/kinetic energy is recorded.".into(),
@@ -767,9 +746,9 @@ pub fn evaluate_move_with_cancel(
                 && !s.starts_with("Balanced sinusoidal FOC id=0")
         });
         result.notes.push("Declared cycle-average loss model: native hot DC winding R plus separate fundamental/ripple AC increments, external series resistance/core watts, driver conduction, whole-inverter switching/dead-time energy per PWM cycle, controller and other DC-link watts. No term is counted twice.".into());
-        result.notes.push("Phase currents/voltages remain cycle means. Declared zero-mean ripple covariance adds RMS heating and constant stored magnetic energy; peak-deviation bounds affect current-limit checks. No switching waveform or switching-resolution source peak is synthesized.".into());
+        result.notes.push("Phase currents/voltages remain cycle means. Declared zero-mean ripple covariance adds RMS heating and constant stored magnetic energy. The supplied peak envelope is reported without comparison to design goals. No switching waveform or switching-resolution source peak is synthesized.".into());
         result.notes.push(format!("Loss parameters reference: {}. Ripple reference: {}. Applicability is restricted to the declared driver, bus voltage, PWM, temperature, current and speed domain; no extrapolation. These are simulated conditional model totals, not measured hardware totals or guaranteed maxima.", losses.reference, losses.ripple.reference));
-        result.notes.push("Mean phase voltages include fundamental AC and external-series IR drops. Dead-time energy is a declared averaged loss law, not a switching/compensation simulation. Voltage headroom and imposed tracking remain explicit assumptions, not controller qualification.".into());
+        result.notes.push("Mean phase voltages include fundamental AC and external-series IR drops. Dead-time energy is a declared averaged loss law, not a switching/compensation simulation. Imposed tracking is an assumption, not controller qualification. Required demand remains available even when voltage exceeds the physical bus.".into());
         if !losses.supplies_declared_totals() {
             result.missing_inputs.push("Idealized basis, zero-ripple assumption or named omissions keep total source demand Unknown; only partial modeled values are available".into());
         }

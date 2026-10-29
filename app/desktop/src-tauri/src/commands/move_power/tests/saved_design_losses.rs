@@ -1,5 +1,5 @@
-//! Read-only supplied-design regressions. Coefficients are numerical fixtures,
-//! never production presets. Infeasibility is an expected result, not repaired.
+//! Read-only supplied-design regressions. Design goals must not affect demand.
+//! Loss coefficients are numerical fixtures, never production presets.
 use super::*;
 
 pub(super) fn inputs(state: &serde_json::Value) -> serde_json::Value {
@@ -36,20 +36,18 @@ pub(super) fn inputs(state: &serde_json::Value) -> serde_json::Value {
 
 #[test]
 #[ignore = "Requires PCB_MOTOR_SUPPLIED_DESIGN_DIR; read-only numerical loss fixtures, not hardware data"]
-fn supplied_loss_model_rejects_current_voltage_and_unsupported_stack_without_repair() {
+fn supplied_loss_model_demand_is_independent_of_design_goals() {
     let root = std::env::var("PCB_MOTOR_SUPPLIED_DESIGN_DIR")
         .expect("set PCB_MOTOR_SUPPLIED_DESIGN_DIR to the supplied archives folder");
     // Pin exact input archives. A changed archive needs deliberate requalification.
-    for (filename, expected_hash, expected_limit) in [
+    for (filename, expected_hash) in [
         (
             "star_2-layer.pmmotor",
             "0ed215f6ff403b927dbeac1ea3d4d9587489a1f1c0680e4ce3a2a48658475d82",
-            "current",
         ),
         (
             "star_4-layer.pmmotor",
             "6a550dcb4327a6e846582fb883c4958a0d275cba85b33271337deee405794e81",
-            "voltage",
         ),
     ] {
         let path = std::path::Path::new(&root).join(filename);
@@ -75,18 +73,10 @@ fn supplied_loss_model_rejects_current_voltage_and_unsupported_stack_without_rep
             .unwrap();
             assert_eq!(result.inputs, input);
             let m = &result.result.demand;
-            assert!(
-                !m.feasible,
-                "Do not change the supplied design to make this request feasible"
-            );
-            assert!(
-                m.source.is_none(),
-                "Infeasible demand cannot publish source totals"
-            );
-            assert!(m
-                .limiting_factors
-                .iter()
-                .any(|s| s.contains(expected_limit)));
+            let source = m
+                .source
+                .as_ref()
+                .expect("Design goals cannot suppress calculated demand");
             assert_eq!(m.source_model_scope, "declared_loss_model");
             assert!(m.loss_energy.is_some());
             let scale = m.accounted_loss_energy_j.max(1e-6);
@@ -98,13 +88,45 @@ fn supplied_loss_model_rejects_current_voltage_and_unsupported_stack_without_rep
                 .iter()
                 .map(|s| s.required_line_voltage_v)
                 .fold(0.0, f64::max);
-            let available = m.electrical.source_voltage_v * m.electrical.voltage_headroom;
-            if expected_limit == "current" {
-                assert!(peak > m.electrical.phase_peak_limit_a);
-                assert!(voltage < available, "The current-limited fixture must remain distinct from the voltage-limited fixture");
-            } else {
-                assert!(voltage > available);
-                assert!(peak < m.electrical.phase_peak_limit_a);
+            assert!(
+                (source.net_energy_j
+                    - m.mechanical_work_j
+                    - m.accounted_loss_energy_j
+                    - m.magnetic_energy_change_j)
+                    .abs()
+                    < 1e-6 * scale
+            );
+            if positions == 129 {
+                let mut changed = input.clone();
+                changed["config"]["max_current_a"] = serde_json::json!(0.0);
+                changed["config"]["target_force_n"] = serde_json::json!(100.0);
+                changed["config"]["peak_force_n"] = serde_json::json!(0.001);
+                changed["config"]["max_accel_m_s2"] = serde_json::json!(0.0);
+                changed["drive"]["target_speed_m_s"] = serde_json::json!(0.0001);
+                changed["drive"]["voltage_headroom"] = serde_json::json!(0.001);
+                changed["drive"]["driver"]["peak_current_a"] = serde_json::json!(0.001);
+                changed["move_request"]["phase_peak_limit_a"] = serde_json::json!(0.0);
+                for key in [
+                    "max_speed_m_s",
+                    "max_acceleration_m_s2",
+                    "max_deceleration_m_s2",
+                ] {
+                    changed["move_request"]["profile"][key] = serde_json::json!(0.0);
+                }
+                let rerun = tauri::async_runtime::block_on(evaluate_move_power(
+                    format!("independent-goals-{filename}"),
+                    changed.clone(),
+                ))
+                .unwrap();
+                assert_eq!(rerun.inputs, changed);
+                let other = &rerun.result.demand;
+                assert_eq!(serde_json::to_value(&m.samples).unwrap(), serde_json::to_value(&other.samples).unwrap(),
+                    "Same geometry, physical settings and move must produce identical traces despite changed goals");
+                assert_eq!(
+                    serde_json::to_value(&m.source).unwrap(),
+                    serde_json::to_value(&other.source).unwrap()
+                );
+                assert_eq!(m.limiting_factors, other.limiting_factors);
             }
             if let Some((loss, current, line_v)) = previous {
                 for (value, old) in [
@@ -118,8 +140,8 @@ fn supplied_loss_model_rejects_current_voltage_and_unsupported_stack_without_rep
                     );
                 }
             }
-            eprintln!("rejected declared-loss fixture {filename} version=1 force_positions={positions} dt={dt} input_sha256={} limits={:?} phase_envelope={peak} A line_voltage={voltage} V accounted_losses={} J source_balance={} J source=null",
-                result.input_sha256, m.limiting_factors, m.accounted_loss_energy_j, m.source_balance_residual_j.unwrap());
+            eprintln!("declared-loss demand fixture {filename} version=1 force_positions={positions} dt={dt} input_sha256={} physical_findings={:?} phase_envelope={peak} A line_voltage={voltage} V accounted_losses={} J source_balance={} J source={}",
+                result.input_sha256, m.limiting_factors, m.accounted_loss_energy_j, m.source_balance_residual_j.unwrap(), serde_json::to_string(source).unwrap());
             previous = Some((m.accounted_loss_energy_j, peak, voltage));
         }
         if filename == "star_2-layer.pmmotor" {

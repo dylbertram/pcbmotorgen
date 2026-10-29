@@ -121,7 +121,7 @@ test("native move transport state updates UI and exports, and a cancelled late r
         return { request_id:id, input_sha256:'a'.repeat(64), inputs, provenance:'simulated_not_measured',
           result: { demand: { model_version:'synthetic-ui-transport-test', source_model_scope:full?'declared_loss_model':'partial_declared_scenario', profile:p,
             electrical:{additional_driver_loss_w:full?null:0, loss_model:full?inputs.move_request.loss_model:null, source_accepts_regeneration:true, phase_model:{phase_names:['A','B','C']}},
-            feasible:true, limiting_factors:[], missing_inputs:[], notes:['Synthetic transport fixture, not numerical evidence.'],
+            feasible:!full, limiting_factors:full?['Required voltage exceeds the physical bus; imposed demand remains available']:[], missing_inputs:[], notes:['Synthetic transport fixture, not numerical evidence.'],
             actual_time_step_s:0.001, requested_distance_m:0.001, sampled_requested_peak_speed_m_s:0.002,
             sampled_requested_positive_acceleration_m_s2:0.01, sampled_requested_negative_acceleration_m_s2:-0.01,
             sampled_phase_peak_a:0.2, phase_rms_a:[0.1,0.1,0.1], copper_energy_j:0.1,
@@ -194,6 +194,8 @@ test("native move transport state updates UI and exports, and a cancelled late r
   const complete = JSON.parse(await page.evaluate(() => (window as any).__savedPower.content));
   expect(complete.moveResult.result.demand.loss_energy.controller_energy_j).toBe(0.02);
   expect(complete.sections.flatMap((s: any) => s.rows).find((r: any) => r.label === "Electrical energy per move").value).toBe("1 J");
+  expect(complete.sections.flatMap((s: any) => s.rows).find((r: any) => r.label === "Physical tracking findings").value).toBe("Imposed demand only");
+  await expect(panel.getByText(/Calculated imposed-motion demand remains available/)).toBeVisible();
   request.loss_model.switching.constant_j = 9e-7;
   await editor.fill(JSON.stringify(request, null, 2));
   await expect(trace).toBeDisabled();
