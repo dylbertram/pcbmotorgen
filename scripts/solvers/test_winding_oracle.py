@@ -35,6 +35,19 @@ class WindingOracleTest(unittest.TestCase):
             _,dl=conductor_samples(network,shares,sim,{},8);sums.append(dl.sum(axis=0))
         np.testing.assert_allclose(sums[0],sums[1],atol=1e-14)
 
+    def test_performance_goals_do_not_change_independent_winding_reference(self):
+        sim,drive,net=self.fixture()
+        def solve(sim,drive):
+            r=resistances(net,sim,drive,{})
+            shares,equivalent=unit_currents(net,r)
+            positions,dl=conductor_samples(net,shares,sim,{},8)
+            return r,shares,equivalent,positions,dl
+        baseline=solve(sim,drive)
+        sim.update(target_force_n=100.,peak_force_n=.001,max_accel_m_s2=0.,max_temperature_rise_c=0.)
+        drive.update(voltage_headroom=.001,ripple_limit_fraction=.0001,allowed_rise_c=.1)
+        changed=solve(sim,drive)
+        for a,b in zip(baseline,changed):np.testing.assert_array_equal(a,b)
+
     def test_imported_depth_replaces_equal_spacing_and_invalid_data_fail(self):
         sim,drive,net=self.fixture();hints={'layer_z_m':[0.0002,-0.003]}
         shares,_=unit_currents(net,resistances(net,sim,drive,hints))

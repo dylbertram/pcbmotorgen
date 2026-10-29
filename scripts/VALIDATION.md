@@ -2,6 +2,114 @@
 
 Run from the repository root.
 
+## Design-goal independence audit, 2026-10-29
+
+Simulation accuracy is not design-goal compliance. A calculated force, loss,
+current, ripple or voltage must not be accepted/rejected because it meets or
+misses a desired force/speed/current/temperature-rise/margin value. Check
+numerics against independent references, conservation laws and convergence.
+Do not change geometry or fit constants to make performance checks pass.
+
+The audit searched current simulation/native Rust sources and their tests,
+all Python validation/solver sources, and frontend unit/browser tests for goal
+fields, comparisons and aggregate driver-check status assertions. The tracked
+scan covered 74 simulation/native Rust files, 379 Python sources including 169
+test modules, and 96 frontend test files. Repository-wide Rust searches found
+no additional performance-goal benchmarks outside those areas. This is a
+source audit with targeted execution, not a rerun of every external-solver job.
+
+### Findings corrected
+
+In `app/desktop/src-tauri/src/commands/physics.rs`:
+
+- `drv8311_star_reference_passes_all_checks` mixed independently verified
+  numerical pins with a requirement that all suitability checks pass. It is
+  now `drv8311_star_reference_matches_independent_numerics_regardless_of_goals`.
+  The Kf/thrust/voltage pins and 1e-8 absolute tolerances are unchanged. It also
+  reruns the same physical case with deliberately conflicting/strict goals
+  and requires identical electrical results, not green advice statuses.
+- `drv8311_compare_five_and_twelve_volts` required the nine-strand design to
+  pass all checks at 12 V and fail at 5 V. That outcome requirement is gone;
+  it now checks thrust/current reciprocity and the analytical RL ripple at
+  the actual voltage and PWM. Printed advice is diagnostic only.
+- `closed_infinity_user_project_diagnostics` required force below the desired
+  target and ripple above its goal. Those comparisons were not numerical
+  validation. They are replaced by force/current consistency and unchanged
+  calculated electrical quantities after goal edits. Its original 0.2% mesh
+  convergence gate remains unchanged.
+- The version-2 diagnostic no longer requires an eddy-drag advice status to
+  equal Fail. Its material saturation, inductance and physical drag/thrust
+  relationships remain checked. The winding-oracle exporter no longer emits
+  `all_checks_passed` as supposed reference evidence; it names the independent
+  numerical validation basis instead.
+
+The core `test_ripple_at_*_is_low` names were misleading. They already checked
+finite force/controller compatibility, not low ripple, and now say so. The
+ripple-goal-to-PWM inversion assertion is separated into an explicitly named
+design-advice utility test. Tightening that goal must leave predicted ripple
+at the actual configured PWM unchanged.
+
+New native tests in `commands/physics_goal_independence_tests.rs` initially
+failed in force and visualization calls because common configuration validation
+rejected a zero temperature-rise goal before doing physics. Simulation paths
+now use `validate_for_simulation`, preserving geometry/material/capability checks
+without enforcing goal relationships. Ordinary saved-design validation remains
+separate. Covered paths include field/force, electrical quantities, height,
+friction, coil geometry, charge-based travel, PM-field/copper-loss visualization,
+DC winding-geometry preparation and housing motion at an explicit speed.
+
+### References and utility tests retained
+
+- The DRV8311 numerical pins have independent geometric-edge R, branch-current,
+  dL and Magpylib force provenance recorded below and in
+  `scripts/solvers/results/drv8311-via-corrected-2026-10-19.json`. They are not
+  desired force values. No pin, tolerance, remanence, resistivity or geometry
+  was adjusted for this audit.
+- `test_vectors.rs` compares numerical field/force arrays with its recorded
+  Python-oracle arrays, not target force. Analytical RL, R/L, phase excitation,
+  symmetry, scaling, constitutive-law, energy and action/reaction tests remain.
+- Solver comparison/refinement/conservation gates use computed/reference
+  quantities and explicit absolute floors. The 2%/5% numerical gates are
+  accuracy tolerances, not desired motor performance. None were weakened.
+  Existing solver receipts, failures and immutable evidence are untouched.
+- The only old Python goal-field references were defaults in the housing
+  reference's input schema, not acceptance comparisons. Added winding-oracle
+  and housing-reference tests prove identical numerical results after goal
+  edits. They run locally without launching an external solver.
+- Static `max_current_a` is actual prescribed phase excitation, and
+  `target_speed_m_s` is the operating speed where a static voltage/drag result
+  is evaluated. Changing those physical operating inputs can change those
+  results. That is distinct from requiring the result to satisfy a goal.
+  In the imposed-move solver, excitation/speed come from the move instead.
+- Configuration validation, goal-advice status, recommendation inversion,
+  schema/formatting and UI-display tests still test those separate utilities.
+  They are not evidence of simulation accuracy or hardware feasibility.
+
+### Verification
+
+`cargo test -p pcbmotorgen -p pcbmotorgen-simulation` passes 135 desktop,
+238 simulation unit and seven integration tests, with 18 explicit ignores.
+The three repaired optional diagnostics were separately executed and pass:
+
+```sh
+cargo test -p pcbmotorgen drv8311_compare_five_and_twelve_volts -- --ignored --nocapture
+cargo test -p pcbmotorgen closed_infinity_user_project_diagnostics -- --ignored --nocapture
+cargo test -p pcbmotorgen closed_infinity_version_two_diagnostics -- --ignored --nocapture
+```
+
+Fifteen local Python reference/control tests pass:
+
+```sh
+cd scripts/solvers
+OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 python3 -m unittest test_winding_oracle test_comparisons test_project_balance test_incremental_gates test_housing_motion_reference -v
+```
+
+No external-solver campaign or hardware measurement was run. No frontend
+production code changed in this audit. Historical reference results are not
+silently promoted to current solver/source admission after source hashes change.
+
+## Existing numerical methods and evidence
+
 Force sweeps use physical outer-edge travel limits. The reported position
 is the absolute center of the first magnet. Routed sweeps run from
 `copper_start + width / 2` to

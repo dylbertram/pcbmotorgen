@@ -875,7 +875,7 @@ mod tests {
     /// passes the 3-point guard, and yields finite forces with positive mean
     /// thrust.
     #[test]
-    fn test_ripple_at_default_is_low() {
+    fn default_braid_force_is_finite_without_a_ripple_goal() {
         let cfg = SimulationInput::default();
         let coils = generate_coils(&cfg);
         assert!(!coils.is_empty(), "infinity-braid must produce coils for the default config");
@@ -896,7 +896,7 @@ mod tests {
     /// did, so the 3-point polarity + alignment guard may legitimately reject
     /// the config (that is the guard doing its job, not an FOC bug).
     #[test]
-    fn test_ripple_at_vernier_4_5_is_low() {
+    fn vernier_braid_force_is_finite_or_reports_controller_model_incompatibility() {
         let cfg = SimulationInput {
             spacing_ratio: 0.8,
             ..SimulationInput::default()

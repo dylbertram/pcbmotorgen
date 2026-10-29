@@ -575,14 +575,31 @@ fn ripple_estimate_matches_the_assumed_fifty_percent_rl_loop() {
         current = -target + (high + target) * decay;
     }
     assert!((high - current - a.ripple_pp_a).abs() < 1e-9);
-    let at_required_pwm = cfg.supply_voltage_v / r_loop
-        * (r_loop / (4.0 * a.min_pwm_hz * l_loop)).tanh();
-    assert!((at_required_pwm - settings.ripple_limit_fraction * cfg.max_current_a).abs() < 1e-9);
     let mut higher_bus = cfg.clone();
     higher_bus.supply_voltage_v *= 2.0;
     let higher = analyze_drive(&higher_bus, &two_strand_fixture(), &settings, Some(0.5));
     assert!((higher.ripple_pp_a - 2.0 * a.ripple_pp_a).abs() < 1e-10);
     assert_eq!(higher.thrust_n, a.thrust_n);
+}
+
+#[test]
+fn ripple_goal_recommendation_inverts_the_formula_without_changing_predicted_ripple() {
+    // This is a design-advice utility test, not numerical physics acceptance
+    // based on meeting a ripple target. Tightening the goal changes the proposed
+    // PWM floor, never the calculated ripple at the actual configured frequency.
+    let cfg = sim();
+    let settings = DriveSettings::default();
+    let baseline = analyze_drive(&cfg, &two_strand_fixture(), &settings, Some(0.5));
+    for fraction in [0.1, 0.3, 0.6] {
+        let goals = DriveSettings { ripple_limit_fraction: fraction, ..settings.clone() };
+        let a = analyze_drive(&cfg, &two_strand_fixture(), &goals, Some(0.5));
+        assert_eq!(a.ripple_pp_a, baseline.ripple_pp_a);
+        let r_loop = 2.0 * a.phase_resistance_ohm;
+        let l_loop = 2.0 * a.synchronous_inductance_h;
+        let at_proposed_pwm = cfg.supply_voltage_v / r_loop
+            * (r_loop / (4.0 * a.min_pwm_hz * l_loop)).tanh();
+        assert!((at_proposed_pwm - fraction * cfg.max_current_a).abs() < 1e-9);
+    }
 }
 
 #[test]

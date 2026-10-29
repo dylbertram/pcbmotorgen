@@ -169,7 +169,7 @@ impl BackplaneStack {
     }
 
     fn motion_estimate(&self, sim: &SimulationInput, speed: f64, profile: HousingMotionProfile) -> Result<HousingMotionEstimate, String> {
-        self.validate()?; sim.validate().map_err(|e| e.to_string())?;
+        self.validate()?; sim.validate_for_simulation().map_err(|e| e.to_string())?;
         let housing = self.housing.as_ref().ok_or("Housing motion requires a housing")?;
         if !speed.is_finite() || !profile.duration_s.is_finite() || profile.duration_s <= 0.0 {
             return Err("Housing motion requires finite speed and positive finite exposure duration".into());

@@ -30,7 +30,7 @@ pub async fn sample_simulation_visualization(
 ) -> Result<VisualizationReport, String> {
     request.validate()?;
     let core = config.to_core();
-    core.validate().map_err(|e| e.to_string())?;
+    core.validate_for_simulation().map_err(|e| e.to_string())?;
     let input_sha256 = format!(
         "{:x}",
         Sha256::digest(

@@ -19,6 +19,11 @@ impl SimulationInput {
         self.validate_with_design_goals(false)
     }
 
+    /// Preserve geometry/material checks without enforcing performance goals.
+    pub fn validate_for_simulation(&self) -> Result<(), SimulationError> {
+        self.validate_with_design_goals(false)
+    }
+
     fn validate_with_design_goals(&self, check_goals: bool) -> Result<(), SimulationError> {
         if let Some(stack) = &self.backplane {
             stack.validate().map_err(SimulationError)?;
