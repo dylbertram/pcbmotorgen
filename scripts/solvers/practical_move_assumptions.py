@@ -1,8 +1,9 @@
 """Build explicit screening assumptions, not measured hardware parameters.
 
-The generated declaration deliberately names omissions so the native model
-does not present a complete source total. The 100 kHz small-signal Q estimate
-is a combined inductor AC-loss proxy, not a measured separation of core loss.
+The generated declaration names omissions so the native model does not present
+a complete source total. Explicit --engineering-estimate additionally labels
+the values as estimates, never as measured or complete hardware totals. The
+100 kHz small-signal Q estimate combines inductor AC losses, not core alone.
 """
 import argparse
 import json
@@ -99,7 +100,10 @@ def screening_assumptions(*, voltage, pwm_hz, phase_inductance_h, winding_temp_c
         "basis": "declared_parameters", "reference": reference,
         "domain": {"driver_name": "DRV8311", "source_voltage_v": voltage, "pwm_hz": pwm_hz,
                    "winding_temp_c": winding_temp_c, "driver_path_resistance_ohm": driver_path_ohm,
-                   "max_phase_peak_a": max_phase_peak_a, "max_speed_m_s": max_speed_m_s},
+                   "max_phase_peak_a": max_phase_peak_a, "max_speed_m_s": max_speed_m_s,
+                   "geometry": {"phase_resistance_hot_ohm": list(phase_resistances_ohm),
+                                "effective_phase_inductance_h": phase_inductance_h,
+                                "copper_thickness_m": copper_thickness_m, "electrical_period_m": electrical_period_m}},
         "phase_names": list(phase_names),
         "winding_fundamental_ac_increment_ohm": [r * fundamental_factor for r in phase_resistances_ohm],
         "winding_ripple_ac_increment_ohm": [r * ripple_factor for r in phase_resistances_ohm],
@@ -121,6 +125,7 @@ if __name__ == "__main__":
     parser.add_argument("input", type=Path, help="JSON keyword inputs, including per-phase inductance in H")
     parser.add_argument("output", type=Path, help="new loss-model JSON; existing files are never replaced")
     parser.add_argument("--from-native-receipt", action="store_true", help="derive screening inputs from a native saved-design baseline receipt")
+    parser.add_argument("--engineering-estimate", action="store_true", help="explicitly label the approximate scenario as an engineering estimate; named exclusions remain")
     args = parser.parse_args()
     raw = json.loads(args.input.read_text())
     if args.from_native_receipt:
@@ -143,6 +148,9 @@ if __name__ == "__main__":
                    # formula, never a component rating or operating limit.
                    max_phase_peak_a=20, max_speed_m_s=1)
     result = screening_assumptions(**raw)
+    if args.engineering_estimate:
+        result['basis'] = 'engineering_estimate'
+        result['reference'] += " Explicit engineering estimate: named omitted effects are excluded, not estimated to be exactly zero. This is not a complete hardware total or a bound."
     with args.output.open("x") as stream:
         json.dump(result, stream, indent=2, allow_nan=False)
         stream.write("\n")

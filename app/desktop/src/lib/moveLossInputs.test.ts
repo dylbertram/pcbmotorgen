@@ -16,6 +16,17 @@ it("preserves declared coefficients and references without doing loss arithmetic
   expect(validateLossInputs(model)).toEqual(model);
 });
 
+it("requires a complete geometry binding for engineering estimates without changing legacy models", () => {
+  const model = declaredLossFixture();
+  model.basis = "engineering_estimate";
+  expect(() => validateLossInputs(model)).toThrow("geometry");
+  model.domain.geometry = { phase_resistance_hot_ohm: [1, 2, 3], effective_phase_inductance_h: 0.001,
+    copper_thickness_m: 0.000035, electrical_period_m: 0.01 };
+  expect(validateLossInputs(model)).toEqual(model);
+  expect(() => validateLossInputs({ ...model, domain: { ...model.domain, geometry: { ...model.domain.geometry, unexpected: 1 } } })).toThrow("Unsupported");
+  expect(() => validateLossInputs({ ...model, domain: { ...model.domain, geometry: { ...model.domain.geometry, phase_resistance_hot_ohm: [1, 2] } } })).toThrow("three values");
+});
+
 it("rejects missing terms, unknown laws, absent references and wrong array shapes", () => {
   for (const mutate of [(m: any) => { delete m.controller_power_w; },
     (m: any) => { m.ripple.reference = ""; }, (m: any) => { m.switching.invented_multiplier = 6; },

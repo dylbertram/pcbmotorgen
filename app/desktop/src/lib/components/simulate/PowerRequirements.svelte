@@ -7,6 +7,7 @@
   import { MovePowerJob } from "../../movePowerJob";
   import { emptyMoveTemplate, parseMoveRequest, useDesignMechanicalInputs } from "../../movePowerInputs";
   import { emptyLossTemplate } from "../../moveLossInputs";
+  import { practicalMoveEstimate } from "../../practicalMoveEstimate";
 
   let { input, config }: { input: PowerRequirementsInput; config: ConfigStore } = $props();
   let revision = $state(0);
@@ -52,6 +53,20 @@
     moveError = "";
     try { draft = useDesignMechanicalInputs(draft, config); }
     catch (error) { moveError = error instanceof Error ? error.message : String(error); }
+  }
+  function addPracticalEstimate(): void {
+    job.setInputs(null);
+    moveError = "";
+    try {
+      if (!input.native || !input.drive) throw new Error("Run a current native driver analysis before adding an engineering estimate.");
+      const value = JSON.parse(draft);
+      if (!value || typeof value !== "object" || Array.isArray(value) || !value.profile || typeof value.profile !== "object")
+        throw new Error("Keep a profile object in the move definition before adding an estimate.");
+      if (value.loss_model != null) throw new Error("The draft already has a loss model. Existing coefficients were not replaced.");
+      if (value.additional_driver_loss_w !== null) throw new Error("Set additional_driver_loss_w to null before adding component estimates.");
+      value.loss_model = practicalMoveEstimate(input.config, input.driveSettings, input.drive);
+      draft = JSON.stringify(value, null, 2);
+    } catch (error) { moveError = error instanceof Error ? error.message : String(error); }
   }
   let saving = $state(false);
   let message = $state("");
@@ -121,12 +136,14 @@
       <p>Positions are absolute first-magnet-center coordinates in metres. The profile is imposed quintic motion with zero endpoint acceleration. Control explicitly uses balanced-star sinusoidal currents, independent of the static preview. The source is directly at a constant-voltage DC link. Keep additional_driver_loss_w null when switching, dead-time and control losses are unknown. Zero declares an idealized scenario, not hardware total power.</p>
       <p>Simulation results are independent of design goals. Legacy speed, acceleration and current-limit fields do not clamp the motion or hide its calculated demand. Required voltage above the physical bus is reported separately; this model calculates imposed-motion demand, not actual controller tracking.</p>
       <p>Optional loss_model fields require referenced coefficients, phase order from the native snapshot, balanced ripple statistics and an operating domain matching the active driver, supply, PWM and temperature. Switching and dead-time laws are whole-inverter joules per PWM cycle, not per FET or edge. Set the legacy additional_driver_loss_w to null before using component laws. Idealized declarations, zero-ripple assumptions or listed omissions keep totals Unknown. Declared-model totals are conditional scenario results, not measurements or guaranteed maxima.</p>
+      <p>For a supported DRV8311 design, “Add engineering estimate” builds a referenced 12 V / 100 kHz scenario using the current native winding analysis and a representative 47 µH inductor when configured. Review its references, settings and named exclusions in the draft. It estimates, but does not measure or bound, supply demand. The model covers phase peaks up to 20 A and speeds up to 1 m/s as formula applicability, not hardware ratings.</p>
       <label class="block space-y-1"><span>Move model JSON</span>
         <textarea aria-label="Move model JSON" rows="14" spellcheck="false" bind:value={draft} oninput={() => { job.setInputs(null); moveError = ""; }} class="w-full rounded border border-slate-600 bg-slate-900 p-2 font-mono text-xs text-slate-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-400"></textarea>
       </label>
       <div class="flex flex-wrap gap-2">
         <button type="button" onclick={applyMove} class="rounded border border-slate-600 px-3 py-1.5 text-slate-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-400">Apply move definition</button>
         <button type="button" onclick={addLossModel} class="rounded border border-slate-600 px-3 py-1.5 text-slate-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-400">Add loss-model fields</button>
+        <button type="button" disabled={!input.native || !input.drive} onclick={addPracticalEstimate} class="rounded border border-slate-600 px-3 py-1.5 text-slate-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-400 disabled:opacity-40">Add engineering estimate</button>
         <button type="button" onclick={copyMechanicalInputs} class="rounded border border-slate-600 px-3 py-1.5 text-slate-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-400">Use design mass and friction</button>
         <button type="button" disabled={!input.native || input.topology !== "linear" || editing || !config.power_move || moveStatus === "pending"} onclick={() => { job.setInputs(activeInputs); void job.run(); }} class="rounded border border-sky-500/60 px-3 py-1.5 text-sky-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-400 disabled:opacity-40">Calculate move power</button>
         <button type="button" disabled={moveStatus !== "pending"} onclick={() => job.cancel()} class="rounded border border-slate-600 px-3 py-1.5 text-slate-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-400 disabled:opacity-40">Cancel calculation</button>

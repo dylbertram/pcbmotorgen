@@ -98,6 +98,33 @@ async function syntheticResults(page: Page) {
   }));
 }
 
+test("engineering estimate requires current native inputs and does not overwrite a draft", async ({ page }) => {
+  await syntheticResults(page);
+  await gotoDesignApp(page);
+  const tools = page.getByRole("toolbar", { name: "Design side tools", exact: true });
+  await tools.getByRole("button", { name: "Drive & force targets", exact: true }).click();
+  const bus = page.getByRole("spinbutton", { name: "Bus voltage (V)", exact: true });
+  await bus.fill("12");
+  await bus.press("Enter");
+  await tools.getByRole("button", { name: "Drive & force targets", exact: true }).click();
+  const panel = await openPower(page);
+  await expect(panel.getByRole("button", { name: "Phase electrical CSV", exact: true })).toBeEnabled();
+  await panel.locator("summary").filter({ hasText: "Move definition and calculation" }).click();
+  const editor = panel.getByRole("textbox", { name: "Move model JSON", exact: true });
+  const button = panel.getByRole("button", { name: "Add engineering estimate", exact: true });
+  await expect(button).toBeEnabled();
+  await button.click();
+  const draft = JSON.parse(await editor.inputValue());
+  expect(draft.loss_model.basis).toBe("engineering_estimate");
+  expect(draft.loss_model.omitted_losses.length).toBeGreaterThan(0);
+  expect(draft.loss_model.domain.source_voltage_v).toBe(12);
+  expect(draft.profile.duration_s).toBeNull();
+  expect(draft.source.accepts_regeneration).toBeNull();
+  await button.click();
+  await expect(panel.getByRole("alert")).toContainText("already has a loss model");
+  expect(JSON.parse(await editor.inputValue()).loss_model).toEqual(draft.loss_model);
+});
+
 test("native move transport state updates UI and exports, and a cancelled late result cannot reappear", async ({ page }) => {
   await syntheticResults(page);
   // Transport fixtures only. This test does not claim browser physics evidence.

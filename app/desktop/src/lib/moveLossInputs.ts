@@ -15,10 +15,10 @@ export function emptyLossTemplate(): object {
   };
 }
 
-function object(value: unknown, keys: readonly string[], path: string): Record<string, unknown> {
+function object(value: unknown, keys: readonly string[], path: string, optional: readonly string[] = []): Record<string, unknown> {
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error(`Set ${path} to an object.`);
   const v = value as Record<string, unknown>;
-  for (const key of Object.keys(v)) if (!keys.includes(key)) throw new Error(`Unsupported ${path}.${key}; it would not be applied.`);
+  for (const key of Object.keys(v)) if (!keys.includes(key) && !optional.includes(key)) throw new Error(`Unsupported ${path}.${key}; it would not be applied.`);
   for (const key of keys) if (!(key in v)) throw new Error(`Set ${path}.${key} explicitly; unknown losses are not zero.`);
   return v;
 }
@@ -42,13 +42,19 @@ export function validateLossInputs(value: unknown): DeclaredLossModel {
     "winding_ripple_ac_increment_ohm", "external_series_resistance_ohm", "external_core_loss_w", "ripple",
     "switching", "deadtime", "controller_power_w", "other_dc_link_power_w", "omitted_losses"];
   const v = object(value, keys, "loss_model");
-  if (v.basis !== "declared_parameters" && v.basis !== "idealized")
-    throw new Error("Choose loss_model.basis as declared_parameters or idealized. Neither claims measured results or a bound.");
+  if (v.basis !== "declared_parameters" && v.basis !== "idealized" && v.basis !== "engineering_estimate")
+    throw new Error("Choose loss_model.basis as declared_parameters, engineering_estimate or idealized. None claims measured results or a bound.");
   text(v.reference, "loss_model.reference");
   const d = object(v.domain, ["driver_name", "source_voltage_v", "pwm_hz", "winding_temp_c",
-    "driver_path_resistance_ohm", "max_phase_peak_a", "max_speed_m_s"], "loss_model.domain");
+    "driver_path_resistance_ohm", "max_phase_peak_a", "max_speed_m_s"], "loss_model.domain", ["geometry"]);
   text(d.driver_name, "loss_model.domain.driver_name");
-  for (const [key, value] of Object.entries(d)) if (key !== "driver_name") number(value, `loss_model.domain.${key}`);
+  for (const [key, value] of Object.entries(d)) if (key !== "driver_name" && key !== "geometry") number(value, `loss_model.domain.${key}`);
+  if (v.basis === "engineering_estimate" && d.geometry == null) throw new Error("Engineering estimates require loss_model.domain.geometry.");
+  if (d.geometry != null) {
+    const g = object(d.geometry, ["phase_resistance_hot_ohm", "effective_phase_inductance_h", "copper_thickness_m", "electrical_period_m"], "loss_model.domain.geometry");
+    phases(g.phase_resistance_hot_ohm, "loss_model.domain.geometry.phase_resistance_hot_ohm");
+    for (const key of ["effective_phase_inductance_h", "copper_thickness_m", "electrical_period_m"]) number(g[key], `loss_model.domain.geometry.${key}`);
+  }
   if (!Array.isArray(v.phase_names) || v.phase_names.length !== 3) throw new Error("Declare all three loss_model.phase_names in native phase order.");
   v.phase_names.forEach((name, i) => text(name, `loss_model.phase_names[${i}]`));
   for (const key of ["winding_fundamental_ac_increment_ohm", "winding_ripple_ac_increment_ohm", "external_series_resistance_ohm", "external_core_loss_w"])

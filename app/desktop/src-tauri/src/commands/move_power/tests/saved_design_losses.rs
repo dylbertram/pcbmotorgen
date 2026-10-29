@@ -58,6 +58,7 @@ fn evaluate_saved_design_screening_assumptions() {
     let baselines = std::path::PathBuf::from(std::env::var("PCB_MOTOR_SCREENING_BASELINES").unwrap());
     let models = std::path::PathBuf::from(std::env::var("PCB_MOTOR_SCREENING_MODELS").unwrap());
     let output = std::path::PathBuf::from(std::env::var("PCB_MOTOR_SCREENING_OUTPUT").unwrap());
+    let estimate = std::env::var_os("PCB_MOTOR_ENGINEERING_ESTIMATE").is_some();
     std::fs::create_dir(&output).expect("output must be a new, exclusive directory");
     for design in ["fader", "star2"] {
         for scenario in ["full-forward", "short-forward", "short-return"] {
@@ -76,7 +77,7 @@ fn evaluate_saved_design_screening_assumptions() {
                     format!("screen-{design}-{scenario}-{positions}-{dt}"), input.clone())).unwrap();
                 assert_eq!(r.inputs, input);
                 let m = &r.result.demand;
-                assert_eq!(m.source_model_scope, "partial_declared_scenario");
+                assert_eq!(m.source_model_scope, if estimate { "engineering_estimate" } else { "partial_declared_scenario" });
                 let source = m.source.as_ref().unwrap();
                 let scale = m.accounted_loss_energy_j.max(1e-6);
                 assert!(m.source_balance_residual_j.unwrap().abs() < 1e-6 * scale);
@@ -133,6 +134,43 @@ fn screening_assumption_sensitivity() {
         }
         let mut file = std::fs::OpenOptions::new().write(true).create_new(true).open(output.join(filename)).unwrap();
         serde_json::to_writer(&mut file, &records).unwrap();
+        file.write_all(b"\n").unwrap();
+    }
+}
+
+#[test]
+#[ignore = "Requires engineering results and new output directory; hypothetical winding sensitivity only"]
+fn winding_ac_uncertainty_sensitivity() {
+    use std::io::Write;
+    let base = std::path::PathBuf::from(std::env::var("PCB_MOTOR_SCREENING_RESULTS").unwrap());
+    let output = std::path::PathBuf::from(std::env::var("PCB_MOTOR_SCREENING_OUTPUT").unwrap());
+    std::fs::create_dir(&output).expect("output must be new");
+    for design in ["fader", "star2"] {
+        let filename = format!("{design}-full-forward.json");
+        let baseline: Vec<serde_json::Value> = serde_json::from_slice(&std::fs::read(base.join(&filename)).unwrap()).unwrap();
+        let reference = baseline.last().unwrap();
+        let r = reference["result"]["drive"]["phases"].as_array().unwrap().iter()
+            .map(|p| p["resistance_hot_ohm"].as_f64().unwrap()).collect::<Vec<_>>();
+        let mut results = Vec::new();
+        // Stress tests, not new purported component data or fitted values.
+        for multiplier in [0.10, 1.0] {
+            let mut input = reference["inputs"].clone();
+            let model = &mut input["move_request"]["loss_model"];
+            for key in ["winding_fundamental_ac_increment_ohm", "winding_ripple_ac_increment_ohm"] {
+                for (i, entry) in model[key].as_array_mut().unwrap().iter_mut().enumerate() {
+                    *entry = serde_json::json!(entry.as_f64().unwrap() + multiplier * r[i]);
+                }
+            }
+            model["reference"] = serde_json::json!(format!("{}; hypothetical AC sensitivity adds {:.0}% hot DC phase resistance, not measured winding data", model["reference"].as_str().unwrap(), 100.0 * multiplier));
+            let result = tauri::async_runtime::block_on(evaluate_move_power(format!("{design}-ac-{multiplier}"), input)).unwrap();
+            let demand = &result.result.demand;
+            assert_eq!(demand.source_model_scope, "engineering_estimate");
+            assert!(demand.source_balance_residual_j.unwrap().abs() < 1e-6 * demand.accounted_loss_energy_j.max(1e-6));
+            eprintln!("{design} winding +{:.0}% R: {}", 100.0 * multiplier, serde_json::to_string(&demand.source).unwrap());
+            results.push(result);
+        }
+        let mut file = std::fs::OpenOptions::new().write(true).create_new(true).open(output.join(filename)).unwrap();
+        serde_json::to_writer(&mut file, &results).unwrap();
         file.write_all(b"\n").unwrap();
     }
 }
