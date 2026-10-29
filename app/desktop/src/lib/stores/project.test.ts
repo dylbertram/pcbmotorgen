@@ -8,6 +8,7 @@ import type { ProjectState } from "../types";
 import type { CadGeometry } from "../types";
 import type { LoadProjectResult } from "../types";
 import { confirmDiscardChanges, loadProject, saveProject, pickProjectSavePath, updateProjectVersion, relocateProject } from "../ipc";
+import { declaredLossFixture } from "../testFixtures/moveLosses";
 
 // Track load calls without losing the real module's other exports (the
 // config store uses them for its routing-pattern/magnet-grade catalog).
@@ -48,13 +49,17 @@ describe("explicit move persistence", () => {
       control: "balanced_star_sinusoidal", electrical_angle_at_zero_rad: 0, phase_peak_limit_a: 1,
       source: { boundary: "stiff_dc_link", accepts_regeneration: false },
       additional_driver_loss_w: null, force_positions: 65,
+      loss_model: declaredLossFixture(config.drive.driver.name, config.drive.driver.rds_on_ohm),
     };
     const snapshot = projects.snapshotIpc();
     config.power_move.profile.duration_s = 2;
     expect(snapshot.config.power_move?.profile.duration_s).toBe(1);
+    config.power_move.loss_model!.switching.constant_j = 9e-7;
+    expect(snapshot.config.power_move?.loss_model?.switching.constant_j).toBe(1e-7);
     projects.applyToState(snapshot);
     expect(config.power_move?.profile.duration_s).toBe(1);
     expect(config.power_move?.additional_driver_loss_w).toBeNull();
+    expect(config.power_move?.loss_model?.switching.constant_j).toBe(1e-7);
     config.power_move!.profile.max_deceleration_m_s2 = 3;
     expect(snapshot.config.power_move?.profile.max_deceleration_m_s2).toBe(1);
   });

@@ -26,6 +26,8 @@ pub struct RoutedMoveRequest {
     pub phase_peak_limit_a: f64,
     pub source: MoveSource,
     pub additional_driver_loss_w: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub loss_model: Option<DeclaredLossModel>,
     /// Uniform force-map positions over the declared move bounds.
     pub force_positions: usize,
 }
@@ -144,6 +146,14 @@ pub fn evaluate_routed_move(
     if coils.len() != 3 {
         return Err("Move power requires exactly three solved phase networks".into());
     }
+    if request.loss_model.as_ref().is_some_and(|l| {
+        coils
+            .iter()
+            .zip(&l.phase_names)
+            .any(|(coil, name)| &coil.phase_name != name)
+    }) {
+        return Err("Loss-model phase order does not match the actual winding networks".into());
+    }
     let samples = evaluator
         .routed_conductor_samples()
         .unwrap()
@@ -199,6 +209,12 @@ pub fn evaluate_routed_move(
             } => accepts_regeneration,
         },
         phase_model: None,
+        loss_model: request.loss_model.clone(),
+        loss_operating_point: Some(LossOperatingPoint {
+            driver_name: settings.driver.name.clone(),
+            pwm_hz: settings.pwm_hz,
+            winding_temp_c: settings.winding_temp_c,
+        }),
     };
     validate(p, &electrical)?;
     let step = (p.travel_max_m - p.travel_min_m) / (request.force_positions - 1) as f64;
@@ -274,7 +290,7 @@ pub fn evaluate_routed_move(
     });
     let mut demand = evaluate_move_with_cancel(p, &electrical, cancelled)?;
     demand.notes.extend(drive.notes.iter().cloned());
-    demand.notes.push("Move control explicitly uses balanced-star sine currents with the declared electrical zero. The static preview commutation is not used. Current allocation is bounded by the move limit, configured maximum phase amplitude and driver peak rating. No ripple, OCP response, peak-duration or thermal safety prediction.".into());
+    demand.notes.push("Move control explicitly uses balanced-star sine currents with the declared electrical zero. The static preview commutation is not used. Current allocation is bounded by the move limit, configured maximum phase amplitude and driver peak rating. Declared ripple, when supplied, also affects the peak-current check. No OCP response, peak-duration or thermal safety prediction.".into());
     if p.travel_min_m < physical_min || p.travel_max_m > physical_max {
         demand.notes.push(format!("Declared bounds include partial magnetic-array overlap with copper. The actual field/force is evaluated there without extending copper. Full-overlap interval is [{physical_min:.9}, {physical_max:.9}] m, not a verified mechanical limit."));
     }

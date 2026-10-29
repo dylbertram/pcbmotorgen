@@ -1,5 +1,165 @@
 use super::*;
+use pcbmotorgen_simulation::drive::move_power::losses::{
+    CycleLossLaw, DeclaredLossModel, DeclaredRipple, LossBasis, LossDomain,
+};
 use pcbmotorgen_simulation::drive::move_power::{MoveProfile, WindingModel};
+
+/// Explicit numerical integration-test parameters, NOT driver/material data.
+fn declared_test_losses(c: &crate::ipc::ProjectConfigStateIpc) -> DeclaredLossModel {
+    DeclaredLossModel {
+        basis: LossBasis::DeclaredParameters,
+        reference: "Numerical law-integration coefficients only; not measured or datasheet-qualified DRV8311/inductor/copper AC properties".into(),
+        domain: LossDomain { driver_name: c.drive.driver.name.clone(), source_voltage_v: c.supply_voltage_v,
+            pwm_hz: c.drive.pwm_hz, winding_temp_c: c.drive.winding_temp_c,
+            driver_path_resistance_ohm: c.drive.driver.rds_on_ohm, max_phase_peak_a: 5.0, max_speed_m_s: 1.0 },
+        phase_names: ["A".into(), "B".into(), "C".into()],
+        winding_fundamental_ac_increment_ohm: [0.01,0.02,0.03], winding_ripple_ac_increment_ohm: [0.1,0.2,0.3],
+        external_series_resistance_ohm: [0.05;3], external_core_loss_w: [0.001,0.002,0.003],
+        ripple: DeclaredRipple { covariance_a2: [[1e-4,-5e-5,-5e-5],[-5e-5,1e-4,-5e-5],[-5e-5,-5e-5,1e-4]],
+            peak_deviation_a: [0.02;3], reference: "Analytic balanced moment/bound fixture, not a prediction or measurement of this board's PWM ripple".into() },
+        switching: CycleLossLaw { constant_j:1e-7, abs_mean_current_j_per_a:2e-8, mean_square_current_j_per_a2:1e-9 },
+        deadtime: CycleLossLaw { constant_j:2e-8, abs_mean_current_j_per_a:1e-8, mean_square_current_j_per_a2:0.0 },
+        controller_power_w:0.02, other_dc_link_power_w:0.03, omitted_losses:vec![],
+    }
+}
+
+#[test]
+fn component_loss_declarations_roundtrip_without_creating_legacy_requirements() {
+    let c = crate::ipc::ProjectConfigStateIpc::default();
+    let mut state = crate::ipc::ProjectStateIpc::default();
+    let request = RoutedMoveRequest {
+        profile: profile(),
+        control: WindingModel::BalancedStarSinusoidal,
+        electrical_angle_at_zero_rad: 0.0,
+        phase_peak_limit_a: 1.0,
+        source: MoveSource::StiffDcLink {
+            accepts_regeneration: false,
+        },
+        additional_driver_loss_w: None,
+        loss_model: Some(declared_test_losses(&c)),
+        force_positions: 65,
+    };
+    state.config.power_move = Some(request);
+    let json = serde_json::to_value(&state).unwrap();
+    let restored: crate::ipc::ProjectStateIpc = serde_json::from_value(json.clone()).unwrap();
+    assert_eq!(serde_json::to_value(restored).unwrap(), json);
+    let legacy: crate::ipc::ProjectStateIpc =
+        serde_json::from_value(serde_json::json!({})).unwrap();
+    assert!(legacy.config.power_move.is_none());
+}
+
+#[test]
+#[ignore = "Requires PCB_MOTOR_PROJECT_PATH; conditional numerical loss-law integration, not hardware data"]
+fn supplied_saved_design_declared_loss_model() {
+    let path = std::env::var("PCB_MOTOR_PROJECT_PATH").expect("set PCB_MOTOR_PROJECT_PATH");
+    let original = std::fs::read(&path).unwrap();
+    let file: serde_json::Value = serde_json::from_slice(&original).unwrap();
+    let state = &file["versions"][0]["state"];
+    let c: crate::ipc::ProjectConfigStateIpc =
+        serde_json::from_value(state["config"].clone()).unwrap();
+    let mut p = profile();
+    p.start_m = c.magnet_width_mm * 0.0005 + 0.01;
+    p.end_m = p.start_m - 0.001;
+    p.duration_s = 0.25;
+    p.time_step_s = 0.0005;
+    p.travel_min_m = c.magnet_width_mm * 0.0005;
+    p.travel_max_m = p.travel_min_m + c.desired_travel_mm * 1e-3;
+    p.max_speed_m_s = c.drive.target_speed_m_s;
+    p.max_acceleration_m_s2 = c.max_accel_m_s2;
+    p.max_deceleration_m_s2 = c.max_accel_m_s2;
+    p.moving_mass_kg = c.carriage_mass_kg;
+    p.coulomb_friction_n = c.friction_n;
+    let request = RoutedMoveRequest {
+        profile: p,
+        control: WindingModel::BalancedStarSinusoidal,
+        electrical_angle_at_zero_rad: std::f64::consts::FRAC_PI_2,
+        phase_peak_limit_a: c.max_current_a,
+        source: MoveSource::StiffDcLink {
+            accepts_regeneration: true,
+        },
+        additional_driver_loss_w: None,
+        loss_model: Some(declared_test_losses(&c)),
+        force_positions: 129,
+    };
+    let inputs = serde_json::json!({ "topology":"linear", "config":c.to_linear_motor_ipc(), "drive":c.drive,
+        "cad_geometry":state["cad_geometry"], "move_request":request });
+    let result = tauri::async_runtime::block_on(evaluate_move_power(
+        "saved-declared-loss-model".into(),
+        inputs.clone(),
+    ))
+    .unwrap();
+    assert_eq!(result.inputs, inputs);
+    let m = &result.result.demand;
+    eprintln!("Conditional numerical loss-law fixture: file={path}, file_sha256={:x}, selected version={}, input_sha256={}",
+        Sha256::digest(&original), file["versions"][0]["id"], result.input_sha256);
+    eprintln!("scope={}, feasible={}, current/voltage findings={:?}, phase mean peak={} A, ripple envelope={:?} A, ledger={}, source={}",
+        m.source_model_scope, m.feasible, m.limiting_factors, m.sampled_phase_peak_a,
+        m.sampled_phase_peak_including_declared_ripple_a, serde_json::to_string(&m.loss_energy).unwrap(), serde_json::to_string(&m.source).unwrap());
+    assert_eq!(m.source_model_scope, "declared_loss_model");
+    assert!(
+        m.feasible,
+        "Do not alter the supplied design to force a passing request: {:?}",
+        m.limiting_factors
+    );
+    let source = m
+        .source
+        .as_ref()
+        .expect("complete in-domain numerical model should produce conditional source totals");
+    let residual = source.net_energy_j
+        - m.mechanical_work_j
+        - m.accounted_loss_energy_j
+        - m.magnetic_energy_change_j;
+    eprintln!("source_balance={} J; independent mechanical balance={} J; accounted losses={} J; mean phase RMS={:?} A; RMS with declared ripple={:?} A",
+        residual, m.mechanical_balance_residual_j, m.accounted_loss_energy_j, m.phase_rms_a, m.phase_rms_including_declared_ripple_a);
+    assert!(residual.abs() < 1e-6 * m.accounted_loss_energy_j.max(1e-6));
+    assert!((residual - m.source_balance_residual_j.unwrap()).abs() < 1e-12);
+    assert!((source.average_power_w - source.net_energy_j / m.profile.duration_s).abs() < 1e-12);
+    assert!(
+        (source.sampled_positive_peak_current_a
+            - source.sampled_positive_peak_power_w / c.supply_voltage_v)
+            .abs()
+            < 1e-12
+    );
+    let ripple_rms = m.phase_rms_including_declared_ripple_a.unwrap();
+    assert!((0..3).all(|i| ripple_rms[i] > m.phase_rms_a[i]));
+    if std::env::var_os("PCB_MOTOR_DECLARED_LOSS_REFINEMENT").is_some() {
+        let mut previous_energy = source.net_energy_j;
+        let mut previous_peak = source.sampled_positive_peak_power_w;
+        for (positions, dt) in [(193, 0.0005), (193, 0.00025)] {
+            let mut refined_inputs = inputs.clone();
+            refined_inputs["move_request"]["force_positions"] = serde_json::json!(positions);
+            refined_inputs["move_request"]["profile"]["time_step_s"] = serde_json::json!(dt);
+            let refined = tauri::async_runtime::block_on(evaluate_move_power(
+                format!("declared-loss-{positions}-{dt}"),
+                refined_inputs,
+            ))
+            .unwrap();
+            let demand = refined.result.demand;
+            assert!(
+                demand.feasible,
+                "Refinement must not hide an invalid motion request"
+            );
+            let source = demand.source.unwrap();
+            let energy_change =
+                (source.net_energy_j - previous_energy).abs() / source.net_energy_j.abs();
+            let peak_change = (source.sampled_positive_peak_power_w - previous_peak).abs()
+                / source.sampled_positive_peak_power_w;
+            eprintln!("declared-loss refinement: force_positions={positions}, dt={dt} s, net={} J, sampled peak={} W, energy_change={energy_change:.9}, peak_change={peak_change:.9}, source_balance={} J",
+                source.net_energy_j, source.sampled_positive_peak_power_w, demand.source_balance_residual_j.unwrap());
+            assert!(
+                energy_change < 0.02 && peak_change < 0.02,
+                "Separate spatial and time refinements must agree within the declared 2% gates"
+            );
+            assert!(
+                demand.source_balance_residual_j.unwrap().abs()
+                    < 1e-6 * demand.accounted_loss_energy_j.max(1e-6)
+            );
+            previous_energy = source.net_energy_j;
+            previous_peak = source.sampled_positive_peak_power_w;
+        }
+    }
+    assert_eq!(std::fs::read(&path).unwrap(), original);
+}
 
 fn profile() -> MoveProfile {
     MoveProfile {
@@ -62,6 +222,7 @@ fn saved_housing_cannot_silently_lose_its_dynamic_drag_and_eddy_losses() {
             accepts_regeneration: false,
         },
         additional_driver_loss_w: None,
+        loss_model: None,
         force_positions: 65,
     };
     let error = evaluate_routed_move(
@@ -157,6 +318,7 @@ fn invalid_move_requirements_are_rejected_before_a_force_map() {
             accepts_regeneration: false,
         },
         additional_driver_loss_w: None,
+        loss_model: None,
         force_positions: 1,
     };
     let core = crate::config::LinearMotorConfig::default();
@@ -217,6 +379,7 @@ fn supplied_saved_design_move_scenario() {
             accepts_regeneration: true,
         },
         additional_driver_loss_w: None,
+        loss_model: None,
         force_positions: 65,
     };
     let permit = MovePermit::acquire("saved-design-move-regression".into()).unwrap();
