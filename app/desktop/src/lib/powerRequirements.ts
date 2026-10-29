@@ -49,7 +49,9 @@ export function powerRequirements(input: PowerRequirementsInput): RequirementSec
   const source = m?.source;
   const declaredTotals = m?.source_model_scope === "declared_loss_model" && !!m.loss_energy
     && m.electrical.loss_model?.basis === "declared_parameters" && m.missing_inputs.length === 0;
-  const scenarioLabel = declaredTotals ? "Declared-model" : "Partial scenario";
+  const estimated = m?.source_model_scope === "engineering_estimate" && !!m.loss_energy
+    && m.electrical.loss_model?.basis === "engineering_estimate" && !!source;
+  const scenarioLabel = declaredTotals ? "Declared-model" : estimated ? "Engineering estimate" : "Partial scenario";
   const unavailable = m ? [...m.limiting_factors, ...m.missing_inputs].join(". ") || "No complete source model." : "No current native move result.";
   const interval = m ? `Imposed-motion required demand, independent of design goals, not actual delivered power. PWM-cycle-averaged over [0, ${number(m.profile.duration_s, "s")}], dt ${number(m.actual_time_step_s, "s")}. Stiff source at the DC link. Positive P=VI draws power, negative returns it. Not a worst-case or switching-peak bound.` : "";
   const moveValue = (label: string, value: number | undefined, unit: string, detail: string) => source
@@ -72,6 +74,12 @@ export function powerRequirements(input: PowerRequirementsInput): RequirementSec
       declaredTotals ? moveValue("Peak supply power during a move", source?.sampled_positive_peak_power_w, "W", "Sampled positive total for the declared loss model and operating domain, including declared ripple heating. Not measured hardware demand or a guaranteed maximum.") : unknown("Peak supply power during a move", `${unavailable} A complete in-domain, non-idealized loss declaration is required. Partial scenario values are not total supply demand or a maximum. Copper loss is not maximum input power.`),
       declaredTotals ? moveValue("Average supply power over a move", source?.average_power_w, "W", "Declared-model net source energy divided by the exact move duration. Repeated-operation average is Unknown without repetition and idle/hold inputs.") : unknown("Average supply power over a move", "Total supply average remains Unknown while loss accounting is partial. Repeated-operation average also needs repetition and idle/hold inputs."),
       declaredTotals ? moveValue("Electrical energy per move", source?.net_energy_j, "J", "Signed net energy for the declared model, drawn minus returned. Conditional on the supplied loss laws, ripple statistics and their applicability, not a hardware measurement.") : unknown("Electrical energy per move", "Total supply energy remains Unknown while loss accounting is partial. Signed partial scenario energy, when available, is reported separately."),
+      ...(estimated ? [
+        moveValue("Estimated peak supply power", source?.sampled_positive_peak_power_w, "W", "Engineering estimate from the stated approximations and exclusions, not a complete hardware total or guaranteed maximum."),
+        moveValue("Estimated peak supply current", source?.sampled_positive_peak_current_a, "A", "Engineering estimate at the stated DC-link boundary. Excluded effects are not included in the value."),
+        moveValue("Estimated average move power", source?.average_power_w, "W", "Engineering estimate over this move only, with the stated exclusions."),
+        row("Estimated drawn / returned / net energy", `${number(source?.drawn_energy_j, "J")} / ${number(source?.returned_energy_j, "J")} / ${number(source?.net_energy_j, "J")}`, "Simulated", `Engineering estimate, not a measured or complete hardware total. ${interval}`),
+      ] : []),
       simulated("One-motor copper loss at setpoint", d?.copper_loss_w, "W", "Sinusoidal check: 1.5 × I_amplitude² × R_phase_hot. Excludes ripple heating and driver losses; not total or average input power."),
     ] },
     { title: "Move and load", rows: [
@@ -133,8 +141,8 @@ export function powerRequirements(input: PowerRequirementsInput): RequirementSec
     row("Declared moving mass", number(m.profile.moving_mass_kg, "kg"), "Configured", m.profile.mass_includes),
     row("Move phase peak, no ripple", number(m.sampled_phase_peak_a, "A"), "Simulated", "Sampled phase current, not supply current. Excludes analytical and switching ripple."),
     row("Move phase time RMS", m.phase_rms_a.map(v => number(v, "A")).join(", "), "Simulated", "Cycle-mean-only phase RMS over the exact move interval; declared ripple, when supplied, has a separate RMS row. Not blindly peak / sqrt(2) at a holding position."),
-    row("Source model scope", declaredTotals ? "Declared loss-model total" : "Partial declared scenario", "Model", declaredTotals ? "All supplied model terms are accounted for within the declared applicability domain. Conditional model totals are not measured hardware totals, controller qualification or a worst-case bound." : "Missing component laws, idealized basis, zero-ripple assumptions or stated omissions keep totals Unknown. A legacy constant driver-loss declaration cannot make the accounting complete."),
-    moveValue(`${scenarioLabel} peak source power`, source?.sampled_positive_peak_power_w, "W", declaredTotals ? "Sampled positive declared-model total, not a guaranteed maximum." : "Sampled positive scenario peak only, not total supply power or a worst-case bound."),
+    row("Source model scope", declaredTotals ? "Declared loss-model total" : estimated ? "Engineering estimate with exclusions" : "Partial declared scenario", "Model", declaredTotals ? "All supplied model terms are accounted for within the declared applicability domain. Conditional model totals are not measured hardware totals, controller qualification or a worst-case bound." : estimated ? `Approximate engineering scenario; excluded contributions are not included in its W/A/J values. Complete hardware totals remain Unknown. ${m.missing_inputs.join(". ")}` : "Missing component laws, idealized basis, zero-ripple assumptions or stated omissions keep totals Unknown. A legacy constant driver-loss declaration cannot make the accounting complete."),
+    moveValue(`${scenarioLabel} peak source power`, source?.sampled_positive_peak_power_w, "W", declaredTotals ? "Sampled positive declared-model total, not a guaranteed maximum." : estimated ? "Sampled engineering estimate, not complete hardware supply power or a worst-case bound." : "Sampled positive scenario peak only, not total supply power or a worst-case bound."),
     moveValue(`${scenarioLabel} average source power`, source?.average_power_w, "W", "Signed modeled source energy divided by the exact move duration."),
     moveValue(`${scenarioLabel} net source energy`, source?.net_energy_j, "J", "Modeled drawn energy minus modeled returned energy, conditional on the stated model scope."),
     moveValue(`${scenarioLabel} peak source current`, source?.sampled_positive_peak_current_a, "A", "Sampled positive modeled source current at the stated boundary, not phase current."),
@@ -165,7 +173,7 @@ export function powerRequirements(input: PowerRequirementsInput): RequirementSec
       row("Ripple DC winding energy", number(l.winding_dc_ripple_energy_j, "J"), "Simulated", "Already included in Required copper energy. Not added a second time to source demand."),
       row("Additional winding AC energy", number(l.winding_ac_energy_j, "J"), "Simulated", "Fundamental and ripple AC resistance increments above native hot DC winding resistance."),
       row("External series resistive energy", number(l.external_series_energy_j, "J"), "Simulated", "Supplied external phase resistance times mean-current squared plus ripple variance. Its fundamental IR drop also enters voltage feasibility."),
-      row("External inductor core energy", number(l.external_core_energy_j, "J"), "Simulated", "Declared per-inductor constant watts over the supplied operating domain, not an inferred material-loss law."),
+      row("External inductor core / AC energy", number(l.external_core_energy_j, "J"), "Simulated", "Declared constant watts. Check the loss-law reference: an engineering estimate may use combined excess AC loss as a proxy rather than separately measured core loss."),
       row("Driver switching energy", number(l.switching_energy_j, "J"), "Simulated", "Whole-inverter energy per PWM cycle integrated at the actual PWM frequency. Not per FET or edge."),
       row("Driver dead-time energy", number(l.deadtime_energy_j, "J"), "Simulated", "Separate declared averaged law, not reconstructed switching-event currents or voltage compensation."),
       row("Controller energy", number(l.controller_energy_j, "J"), "Simulated", "Declared controller watts over exactly this move interval."),

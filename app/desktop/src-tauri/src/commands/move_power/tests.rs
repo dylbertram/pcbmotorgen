@@ -13,7 +13,7 @@ fn declared_test_losses(c: &crate::ipc::ProjectConfigStateIpc) -> DeclaredLossMo
         reference: "Numerical law-integration coefficients only; not measured or datasheet-qualified DRV8311/inductor/copper AC properties".into(),
         domain: LossDomain { driver_name: c.drive.driver.name.clone(), source_voltage_v: c.supply_voltage_v,
             pwm_hz: c.drive.pwm_hz, winding_temp_c: c.drive.winding_temp_c,
-            driver_path_resistance_ohm: c.drive.driver.rds_on_ohm, max_phase_peak_a: 5.0, max_speed_m_s: 1.0 },
+            driver_path_resistance_ohm: c.drive.driver.rds_on_ohm, max_phase_peak_a: 5.0, max_speed_m_s: 1.0, geometry: None },
         phase_names: ["A".into(), "B".into(), "C".into()],
         winding_fundamental_ac_increment_ohm: [0.01,0.02,0.03], winding_ripple_ac_increment_ohm: [0.1,0.2,0.3],
         external_series_resistance_ohm: [0.05;3], external_core_loss_w: [0.001,0.002,0.003],

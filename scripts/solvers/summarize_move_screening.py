@@ -9,7 +9,7 @@ def sha(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def summarize(baselines, models, results, sensitivity=None):
+def summarize(baselines, models, results, sensitivity=None, engineering_estimate=False, builder=None):
     cases = {}
     for design in ('fader', 'star2'):
         for move in ('full-forward', 'short-forward', 'short-return'):
@@ -23,7 +23,8 @@ def summarize(baselines, models, results, sensitivity=None):
             levels = []
             for r in run:
                 demand = r['result']['demand']
-                if demand['source_model_scope'] != 'partial_declared_scenario' or demand['source'] is None:
+                expected_scope = 'engineering_estimate' if engineering_estimate else 'partial_declared_scenario'
+                if demand['source_model_scope'] != expected_scope or demand['source'] is None:
                     raise ValueError('Incomplete screening results cannot be represented as complete')
                 levels.append(dict(input_sha256=r['input_sha256'],
                     positions=r['inputs']['move_request']['force_positions'],
@@ -39,10 +40,10 @@ def summarize(baselines, models, results, sensitivity=None):
                 baseline_input_sha256=baseline['native']['input_sha256'],
                 omitted_losses=model['omitted_losses'], model_reference=model['reference'],
                 ripple_reference=model['ripple']['reference'], refinements=levels)
-    summary = dict(schema='partial-saved-design-screening-v1',
-                scope='Partial modeled demand, NOT a complete supply total, measured hardware demand, a guaranteed maximum, or achieved tracking',
+    summary = dict(schema='engineering-saved-design-estimate-v1' if engineering_estimate else 'partial-saved-design-screening-v1',
+                scope=('Engineering estimate with named exclusions' if engineering_estimate else 'Partial modeled demand') + ', NOT a complete supply total, measured hardware demand, a guaranteed maximum, or achieved tracking',
                 source_boundary='12 V stiff DC link, explicit regeneration sink accepted; no upstream or capacitor transient model',
-                generator_sha256=sha(Path(__file__).with_name('practical_move_assumptions.py')),
+                generator_sha256=sha(builder or Path(__file__).with_name('practical_move_assumptions.py')),
                 cases=cases)
     if sensitivity:
         summary['sensitivity'] = {}
@@ -66,8 +67,10 @@ if __name__ == '__main__':
     parser.add_argument('results', type=Path)
     parser.add_argument('output', type=Path)
     parser.add_argument('--sensitivity', type=Path)
+    parser.add_argument('--engineering-estimate', action='store_true')
+    parser.add_argument('--builder', type=Path, help='actual model builder; defaults to the Python reference')
     args = parser.parse_args()
-    value = summarize(args.baselines, args.models, args.results, args.sensitivity)
+    value = summarize(args.baselines, args.models, args.results, args.sensitivity, args.engineering_estimate, args.builder)
     with args.output.open('x') as stream:
         json.dump(value, stream, indent=2, allow_nan=False)
         stream.write('\n')

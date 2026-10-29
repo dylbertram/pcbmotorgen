@@ -696,7 +696,7 @@ pub fn evaluate_move_with_cancel(
         None
     };
     let result = MovePowerResult {
-        model_version: MODEL_VERSION.into(), source_model_scope: if e.loss_model.as_ref().is_some_and(DeclaredLossModel::supplies_declared_totals) { "declared_loss_model" } else { "partial_declared_scenario" }.into(),
+        model_version: MODEL_VERSION.into(), source_model_scope: if e.loss_model.as_ref().is_some_and(DeclaredLossModel::supplies_declared_totals) { "declared_loss_model" } else if e.loss_model.as_ref().is_some_and(DeclaredLossModel::is_engineering_estimate) { "engineering_estimate" } else { "partial_declared_scenario" }.into(),
         profile: p.clone(), electrical: e.clone(), actual_time_step_s: dt,
         feasible: factors.is_empty(), limiting_factors: factors,
         missing_inputs: if let Some(losses) = &e.loss_model { losses.omitted_losses.iter().map(|s| format!("Declared omitted loss: {s}")).collect() }
@@ -747,7 +747,7 @@ pub fn evaluate_move_with_cancel(
         });
         result.notes.push("Declared cycle-average loss model: native hot DC winding R plus separate fundamental/ripple AC increments, external series resistance/core watts, driver conduction, whole-inverter switching/dead-time energy per PWM cycle, controller and other DC-link watts. No term is counted twice.".into());
         result.notes.push("Phase currents/voltages remain cycle means. Declared zero-mean ripple covariance adds RMS heating and constant stored magnetic energy. The supplied peak envelope is reported without comparison to design goals. No switching waveform or switching-resolution source peak is synthesized.".into());
-        result.notes.push(format!("Loss parameters reference: {}. Ripple reference: {}. Applicability is restricted to the declared driver, bus voltage, PWM, temperature, current and speed domain; no extrapolation. These are simulated conditional model totals, not measured hardware totals or guaranteed maxima.", losses.reference, losses.ripple.reference));
+        result.notes.push(format!("Loss parameters reference: {}. Ripple reference: {}. Applicability is restricted to the declared driver, bus voltage, PWM, temperature, current and speed domain; no extrapolation. These are conditional model results, not measured hardware totals or guaranteed maxima.", losses.reference, losses.ripple.reference));
         result.notes.push("Mean phase voltages include fundamental AC and external-series IR drops. Dead-time energy is a declared averaged loss law, not a switching/compensation simulation. Imposed tracking is an assumption, not controller qualification. Required demand remains available even when voltage exceeds the physical bus.".into());
         if !losses.supplies_declared_totals() {
             result.missing_inputs.push("Idealized basis, zero-ripple assumption or named omissions keep total source demand Unknown; only partial modeled values are available".into());

@@ -6,6 +6,7 @@ export interface LossOperatingPoint {
   driver_name: string;
   pwm_hz: number;
   winding_temp_c: number;
+  copper_thickness_m?: number | null;
 }
 
 export interface LossDomain extends LossOperatingPoint {
@@ -13,6 +14,8 @@ export interface LossDomain extends LossOperatingPoint {
   driver_path_resistance_ohm: number;
   max_phase_peak_a: number;
   max_speed_m_s: number;
+  geometry?: { phase_resistance_hot_ohm: PhaseValues; effective_phase_inductance_h: number;
+    copper_thickness_m: number; electrical_period_m: number } | null;
 }
 
 /** Whole-inverter joules per configured PWM cycle, not per FET or edge. */
@@ -23,7 +26,7 @@ export interface CycleLossLaw {
 }
 
 export interface DeclaredLossModel {
-  basis: "declared_parameters" | "idealized";
+  basis: "declared_parameters" | "idealized" | "engineering_estimate";
   reference: string;
   domain: LossDomain;
   phase_names: [string, string, string];

@@ -186,16 +186,24 @@ describe("move power report consistency", () => {
       expect(item(input, "Peak supply power during a move").value).toBe("Unknown");
       const peak = `${Number(source.sampled_positive_peak_power_w.toPrecision(7))} W`;
       const net = `${Number(source.net_energy_j.toPrecision(7))} J`;
-      expect(item(input, "Partial scenario peak source power").value).toBe(peak);
-      expect(item(input, "Partial scenario net source energy").value).toBe(net);
+      const estimate = native.result.demand.source_model_scope === "engineering_estimate";
+      const label = estimate ? "Engineering estimate" : "Partial scenario";
+      expect(item(input, `${label} peak source power`).value).toBe(peak);
+      expect(item(input, `${label} net source energy`).value).toBe(net);
       expect(powerReportMarkdown(powerRequirements(input))).toContain(peak);
-      expect(powerRequirementsCsv(powerRequirements(input))).toContain(`"Partial scenario net source energy","${net}"`);
+      expect(powerRequirementsCsv(powerRequirements(input))).toContain(`"${label} net source energy","${net}"`);
       expect(JSON.parse(powerModelSnapshot(input)).moveResult.result.demand.source).toEqual(source);
       const trace = moveTraceCsv(input)!;
       expect(trace).toContain('"required_source_power_W"');
       expect(trace).toContain('"simulated_not_measured"');
       if (scenario === "full-forward") expect(item(input, "Physical tracking findings").value).toBe("Imposed demand only");
-      expect(item(input, "Source model scope").detail).toContain("omissions keep totals Unknown");
+      expect(item(input, "Source model scope").detail).toContain(estimate ? "excluded contributions" : "omissions keep totals Unknown");
+      if (estimate) {
+        expect(item(input, "Estimated peak supply power").value).toBe(peak);
+        expect(item(input, "Estimated peak supply current").value).toBe(`${Number(source.sampled_positive_peak_current_a.toPrecision(7))} A`);
+        expect(item(input, "Estimated average move power").value).toBe(`${Number(source.average_power_w.toPrecision(7))} W`);
+        expect(item(input, "Estimated drawn / returned / net energy").value).toContain(net);
+      }
     }
   });
 
@@ -239,6 +247,20 @@ describe("move power report consistency", () => {
     expect(item(input, "Partial scenario peak source power").value).toBe("2 W");
     expect(moveTraceCsv(input)).toContain('"simulated_not_measured","false"');
   });
+});
+
+it("an explicit engineering estimate never becomes a complete or measured total", () => {
+  const input = withDeclaredLosses();
+  const model = input.moveRequest!.loss_model!;
+  model.basis = "engineering_estimate";
+  model.omitted_losses = ["Proximity effects are approximated only"];
+  input.moveResult!.result.demand.electrical.loss_model = model;
+  input.moveResult!.result.demand.source_model_scope = "engineering_estimate";
+  input.moveResult!.result.demand.missing_inputs = ["Declared omitted loss: Proximity effects are approximated only"];
+  expect(item(input, "Peak supply power during a move").value).toBe("Unknown");
+  expect(item(input, "Estimated peak supply power").value).toBe("2 W");
+  expect(item(input, "Source model scope").detail).toContain("Proximity");
+  expect(moveTraceCsv(input)).toContain('"engineering_estimate"');
 });
 
 function withDeclaredLosses(): PowerRequirementsInput {

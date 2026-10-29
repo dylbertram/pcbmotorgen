@@ -10,6 +10,9 @@ use serde::{Deserialize, Serialize};
 pub enum LossBasis {
     DeclaredParameters,
     Idealized,
+    /// Explicit approximate scenario. Named omissions remain visible; this is
+    /// neither a complete loss model nor a measured hardware result.
+    EngineeringEstimate,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -18,6 +21,18 @@ pub struct LossOperatingPoint {
     pub driver_name: String,
     pub pwm_hz: f64,
     pub winding_temp_c: f64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub copper_thickness_m: Option<f64>,
+}
+
+/// Physical inputs used to construct a geometry-dependent estimate.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct LossGeometry {
+    pub phase_resistance_hot_ohm: [f64; 3],
+    pub effective_phase_inductance_h: f64,
+    pub copper_thickness_m: f64,
+    pub electrical_period_m: f64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -31,6 +46,8 @@ pub struct LossDomain {
     /// Includes the declared ripple peak-deviation bound, not only mean current.
     pub max_phase_peak_a: f64,
     pub max_speed_m_s: f64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub geometry: Option<LossGeometry>,
 }
 
 /// Energy for the WHOLE inverter per configured PWM cycle, not per FET or edge.
@@ -215,6 +232,32 @@ impl DeclaredLossModel {
         {
             return Err("Loss-model driver, voltage, PWM, temperature or conduction resistance does not match the active design; no extrapolation is supported".into());
         }
+        if self.basis == LossBasis::EngineeringEstimate && d.geometry.is_none() {
+            return Err("Engineering estimates require a binding to actual winding resistance, inductance, copper thickness and electrical period".into());
+        }
+        if let Some(g) = &d.geometry {
+            if !g.phase_resistance_hot_ohm.into_iter().all(positive)
+                || !positive(g.effective_phase_inductance_h)
+                || !positive(g.copper_thickness_m)
+                || !positive(g.electrical_period_m)
+            {
+                return Err("Loss-model geometry binding must contain finite positive values".into());
+            }
+            if !same(g.electrical_period_m, e.electrical_period_m)
+                || !context.copper_thickness_m.is_some_and(|t| same(g.copper_thickness_m, t))
+            {
+                return Err("Loss-model copper thickness or electrical period changed; regenerate the estimate".into());
+            }
+            // Routed preflight has no solved phase network yet. The move
+            // evaluation repeats validation after the native solve completes.
+            if let Some(ph) = &e.phase_model {
+                if !same(g.effective_phase_inductance_h, e.effective_phase_inductance_h)
+                    || (0..3).any(|i| !same(g.phase_resistance_hot_ohm[i], ph.resistance_hot_ohm[i]))
+                {
+                    return Err("Loss-model winding resistance or inductance changed; regenerate the estimate".into());
+                }
+            }
+        }
         if !positive(d.pwm_hz)
             || !positive(d.source_voltage_v)
             || !nonnegative(d.max_phase_peak_a)
@@ -266,6 +309,11 @@ impl DeclaredLossModel {
     pub fn supplies_declared_totals(&self) -> bool {
         self.basis == LossBasis::DeclaredParameters
             && self.omitted_losses.is_empty()
+            && (0..3).any(|i| self.ripple.covariance_a2[i][i] > 0.0)
+    }
+
+    pub fn is_engineering_estimate(&self) -> bool {
+        self.basis == LossBasis::EngineeringEstimate
             && (0..3).any(|i| self.ripple.covariance_a2[i][i] > 0.0)
     }
 

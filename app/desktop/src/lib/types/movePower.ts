@@ -88,7 +88,7 @@ export interface MovePowerSample {
 
 export interface MovePowerResult {
   model_version: string;
-  source_model_scope: "partial_declared_scenario" | "declared_loss_model";
+  source_model_scope: "partial_declared_scenario" | "declared_loss_model" | "engineering_estimate";
   profile: MoveProfile;
   electrical: MoveElectricalModel;
   actual_time_step_s: number;

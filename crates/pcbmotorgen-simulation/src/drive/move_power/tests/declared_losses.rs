@@ -1,5 +1,5 @@
 use super::*;
-use crate::drive::move_power::losses::{CycleLossLaw, DeclaredRipple, LossBasis, LossDomain};
+use crate::drive::move_power::losses::{CycleLossLaw, DeclaredRipple, LossBasis, LossDomain, LossGeometry};
 
 fn with_losses(mut e: MoveElectricalModel) -> MoveElectricalModel {
     e.additional_driver_loss_w = None;
@@ -7,6 +7,7 @@ fn with_losses(mut e: MoveElectricalModel) -> MoveElectricalModel {
         driver_name: "Analytic fixture only".into(),
         pwm_hz: 100_000.0,
         winding_temp_c: 75.0,
+        copper_thickness_m: None,
     });
     e.loss_model = Some(DeclaredLossModel {
         basis: LossBasis::DeclaredParameters,
@@ -20,6 +21,7 @@ fn with_losses(mut e: MoveElectricalModel) -> MoveElectricalModel {
             driver_path_resistance_ohm: e.driver_path_resistance_ohm,
             max_phase_peak_a: 5.0,
             max_speed_m_s: 1.0,
+            geometry: None,
         },
         phase_names: ["A".into(), "B".into(), "C".into()],
         winding_fundamental_ac_increment_ohm: [0.01, 0.02, 0.03],
@@ -158,6 +160,57 @@ fn legacy_idealized_zero_ripple_and_omitted_models_do_not_claim_complete_totals(
         let r = evaluate_move(&profile(), &e).unwrap();
         assert_eq!(r.source_model_scope, "partial_declared_scenario");
         assert!(!r.missing_inputs.is_empty());
+    }
+}
+
+#[test]
+fn explicitly_selected_engineering_estimate_keeps_named_omissions_visible() {
+    let mut e = with_losses(phase_electrical());
+    e.loss_operating_point.as_mut().unwrap().copper_thickness_m = Some(35e-6);
+    let geometry = LossGeometry { phase_resistance_hot_ohm: e.phase_model.as_ref().unwrap().resistance_hot_ohm,
+        effective_phase_inductance_h: e.effective_phase_inductance_h, copper_thickness_m: 35e-6,
+        electrical_period_m: e.electrical_period_m };
+    let model = e.loss_model.as_mut().unwrap();
+    model.basis = LossBasis::EngineeringEstimate;
+    model.domain.geometry = Some(geometry);
+    model.omitted_losses.push("Unmodeled proximity loss".into());
+    assert!(!model.supplies_declared_totals());
+    let mut p = profile();
+    p.end_m = 0.0;
+    let r = evaluate_move(&p, &e).unwrap();
+    assert_eq!(r.source_model_scope, "engineering_estimate");
+    assert!(r.source.is_some());
+    assert!(r.missing_inputs.iter().any(|s| s.contains("Unmodeled proximity")));
+    assert!(r.notes.iter().any(|s| s.contains("not measured hardware totals")));
+    let model = e.loss_model.as_mut().unwrap();
+    model.ripple.covariance_a2 = [[0.0; 3]; 3];
+    model.ripple.peak_deviation_a = [0.0; 3];
+    let r = evaluate_move(&p, &e).unwrap();
+    assert_eq!(r.source_model_scope, "partial_declared_scenario");
+}
+
+#[test]
+fn geometry_bound_estimate_rejects_stale_winding_inputs() {
+    let mut e = with_losses(phase_electrical());
+    e.loss_operating_point.as_mut().unwrap().copper_thickness_m = Some(35e-6);
+    let g = LossGeometry { phase_resistance_hot_ohm: e.phase_model.as_ref().unwrap().resistance_hot_ohm,
+        effective_phase_inductance_h: e.effective_phase_inductance_h, copper_thickness_m: 35e-6,
+        electrical_period_m: e.electrical_period_m };
+    let model = e.loss_model.as_mut().unwrap();
+    model.basis = LossBasis::EngineeringEstimate;
+    model.domain.geometry = Some(g);
+    let mut p = profile();
+    p.end_m = 0.0;
+    assert!(evaluate_move(&p, &e).is_ok());
+    for kind in 0..4 {
+        let mut changed = e.clone();
+        match kind {
+            0 => changed.phase_model.as_mut().unwrap().resistance_hot_ohm[0] *= 1.1,
+            1 => changed.effective_phase_inductance_h *= 1.1,
+            2 => changed.loss_operating_point.as_mut().unwrap().copper_thickness_m = Some(70e-6),
+            _ => changed.electrical_period_m *= 1.1,
+        }
+        assert!(evaluate_move(&p, &changed).unwrap_err().contains("regenerate"));
     }
 }
 

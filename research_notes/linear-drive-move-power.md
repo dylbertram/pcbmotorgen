@@ -7,6 +7,43 @@ remain as a record of what was implemented and tested, not current requirements.
 
 ## Supported model
 
+### Geometry-bound engineering estimate, 2026-10-29
+
+The move editor can explicitly construct an approximate DRV8311 12 V / 100 kHz
+scenario from the current native three-phase analysis. It uses the referenced
+driver and Bourns 47 µH data and the RL, phase-pair and isolated-slab estimates
+described below. The inductor Q-derived term is combined excess AC loss, not
+separately measured core loss. Winding proximity and via AC distribution,
+inductor bias/harmonics and board-level auxiliary loads remain excluded. Complete
+hardware totals remain Unknown. The stiff DC-link boundary explicitly accepts
+regeneration; upstream supply and capacitor transients are not modeled. Dynamic
+housing/backplane move losses remain unsupported.
+
+The model snapshot binds the estimate to hot phase resistances, effective
+inductance, copper thickness and electrical period; changing these rejects stale
+coefficients. The UI does not replace an existing declaration. The full Fader
+uses its unchanged 15 g assembly, 63 mm travel, 0.5 m/s target, 12 V, 100 kHz,
+47 µH per phase and saved copper/connectivity/depths. Both full moves report a
+physical voltage tracking conflict separately from imposed-motion demand.
+
+`scripts/solvers/results/practical-move-ui-bound-estimate-2026-10-29.json`
+hashes the unchanged archives, model declarations, inputs and native receipts
+for both designs and six moves. At 193 positions and 0.25 ms, full-forward
+Fader is 158.238 W peak, 13.186 A peak and 41.609 J net; the two-layer star is
+approximately 115.102 W and 31.812 J net. They are estimates with exclusions,
+not achieved motion or guaranteed maxima. Each move passed the existing 2%
+force-map and time-step energy/peak convergence checks and independent energy
+balances. The UI report, CSV, snapshot and trace mappings were checked against
+the regenerated native receipts. Earlier ripple/driver and hypothetical +10%
+and +100% winding-AC resistance probes illustrate sensitivity, not confidence
+intervals or measurements. Full receipts remain outside the checkout.
+
+Verification: 386 Rust tests passed (22 ignored), 553 frontend tests passed
+(2 skipped), five independent Python formula tests passed, Svelte check and
+build passed, and six Chromium power tests passed. All four supplied files
+retained their recorded SHA-256 hashes. These checks establish numerical and
+export consistency, not physical accuracy or hardware qualification.
+
 ### Carriage setup clarification, 2026-10-29
 
 The user accepts 15 g as a reasonable full moving-assembly estimate for the
