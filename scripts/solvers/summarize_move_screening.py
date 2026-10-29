@@ -64,6 +64,8 @@ def summarize(baselines, models, results, sensitivity=None, engineering_estimate
                 omitted_losses=model['omitted_losses'], model_reference=model['reference'],
                 ripple_reference=model['ripple']['reference'],
                 profile=baseline['native']['inputs']['move_request']['profile'],
+                pcb_thickness_m=baseline['native']['inputs'].get('config', {}).get('pcb_thickness_m'),
+                scenario_overrides=baseline.get('scenario_overrides', {}),
                 geometry=model['domain'].get('geometry'), refinements=levels)
     summary = dict(schema='engineering-saved-design-estimate-v1' if engineering_estimate else 'partial-saved-design-screening-v1',
                 scope=('Engineering estimate with named exclusions' if engineering_estimate else 'Partial modeled demand') + ', NOT a complete supply total, measured hardware demand, a guaranteed maximum, or achieved tracking',

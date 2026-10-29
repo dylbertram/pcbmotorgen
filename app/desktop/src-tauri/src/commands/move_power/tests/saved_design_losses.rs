@@ -10,6 +10,10 @@ fn export_saved_design_screening_inputs() {
     use std::io::Write;
     let root = std::env::var("PCB_MOTOR_SUPPLIED_DESIGN_DIR").unwrap();
     let output = std::path::PathBuf::from(std::env::var("PCB_MOTOR_SCREENING_OUTPUT").unwrap());
+    // Explicit what-if input only; never edit the supplied archive or defaults.
+    let fader_thickness = std::env::var("PCB_MOTOR_FADER_PCB_THICKNESS_M").ok()
+        .map(|v| v.parse::<f64>().expect("Fader thickness must be SI metres"));
+    if let Some(t) = fader_thickness { assert!(t.is_finite() && t > 0.0); }
     std::fs::create_dir(&output).expect("output must be a new, exclusive directory");
     for (file, hash) in [
         ("Fader-traces-workspace.pmmotor", "567d97900475c92598f9ad6f7df9e7aeaf374dfc542fa25fa7e04b90dbfb287b"),
@@ -22,6 +26,10 @@ fn export_saved_design_screening_inputs() {
             .find(|v| v["id"] == 1).unwrap();
         let state = &version["state"];
         let mut baseline = inputs(state);
+        let thickness_override = if file.starts_with("Fader") { fader_thickness } else { None };
+        if let Some(t) = thickness_override {
+            baseline["config"]["pcb_thickness_m"] = serde_json::json!(t);
+        }
         baseline["move_request"]["loss_model"] = serde_json::Value::Null;
         let c: crate::ipc::ProjectConfigStateIpc = serde_json::from_value(state["config"].clone()).unwrap();
         let start = c.magnet_width_mm * 0.0005;
@@ -45,7 +53,7 @@ fn export_saved_design_screening_inputs() {
             assert_eq!(result.inputs, input);
             assert!(result.result.demand.source.is_none());
             let receipt = serde_json::json!({"archive":file,"archive_sha256":hash,"version":1,
-                "scenario":name,"native":result});
+                "scenario":name,"scenario_overrides":{"pcb_thickness_m":thickness_override},"native":result});
             let filename = format!("{}-{name}.json", if file.starts_with("Fader") {"fader"} else {"star2"});
             let mut out = std::fs::OpenOptions::new().write(true).create_new(true).open(output.join(filename)).unwrap();
             serde_json::to_writer(&mut out, &receipt).unwrap();
