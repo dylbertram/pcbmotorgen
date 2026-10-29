@@ -237,21 +237,22 @@ fn unknown_driver_losses_withhold_total_power_not_partial_diagnostics() {
 }
 
 #[test]
-fn current_and_voltage_limits_reject_motion_without_inventing_saturation_response() {
+fn current_goals_do_not_gate_demand_and_physical_voltage_does_not_hide_it() {
     let p = profile();
     let mut e = electrical();
     e.phase_peak_limit_a = 0.0;
     let r = evaluate_move(&p, &e).unwrap();
-    assert!(!r.feasible);
-    assert!(r.source.is_none());
-    assert!(r
-        .limiting_factors
-        .iter()
-        .any(|s| s.contains("phase-current")));
+    assert!(r.feasible);
+    assert!(r.source.is_some());
+    assert!(r.limiting_factors.is_empty());
     e = electrical();
     e.source_voltage_v = 0.001;
     let r = evaluate_move(&p, &e).unwrap();
     assert!(!r.feasible);
+    assert!(
+        r.source.is_some(),
+        "Required demand is independent of achieved tracking"
+    );
     assert!(r
         .limiting_factors
         .iter()
@@ -260,18 +261,26 @@ fn current_and_voltage_limits_reject_motion_without_inventing_saturation_respons
 }
 
 #[test]
-fn motion_limits_and_asymmetric_acceleration_limits_are_checked() {
+fn design_speed_acceleration_current_and_headroom_goals_do_not_change_demand() {
     let mut p = profile();
+    let baseline = evaluate_move(&p, &electrical()).unwrap();
     p.max_speed_m_s = 0.001;
     p.max_deceleration_m_s2 = 0.001;
-    let r = evaluate_move(&p, &electrical()).unwrap();
-    assert!(!r.feasible);
-    assert!(r.limiting_factors.iter().any(|s| s.contains("speed")));
-    assert!(r
-        .limiting_factors
-        .iter()
-        .any(|s| s.contains("deceleration")));
-    assert_eq!(r.limiting_factors.len(), 2); // Findings are deduplicated.
+    p.max_acceleration_m_s2 = 0.0;
+    let mut e = electrical();
+    e.phase_peak_limit_a = 0.0;
+    e.voltage_headroom = 0.001;
+    let r = evaluate_move(&p, &e).unwrap();
+    assert!(r.feasible);
+    assert!(r.limiting_factors.is_empty());
+    assert_eq!(
+        serde_json::to_value(&r.samples).unwrap(),
+        serde_json::to_value(&baseline.samples).unwrap()
+    );
+    assert_eq!(
+        serde_json::to_value(&r.source).unwrap(),
+        serde_json::to_value(&baseline.source).unwrap()
+    );
 }
 
 #[test]

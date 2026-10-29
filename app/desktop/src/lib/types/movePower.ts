@@ -12,9 +12,10 @@ export interface MoveProfile {
   duration_s: number;
   travel_min_m: number;
   travel_max_m: number;
-  max_speed_m_s: number;
-  max_acceleration_m_s2: number;
-  max_deceleration_m_s2: number;
+  /** Legacy design goals. Ignored by the imposed-demand simulation. */
+  max_speed_m_s?: number;
+  max_acceleration_m_s2?: number;
+  max_deceleration_m_s2?: number;
   moving_mass_kg: number;
   mass_includes: string;
   coulomb_friction_n: number;
@@ -27,7 +28,8 @@ export interface RoutedMoveRequest {
   profile: MoveProfile;
   control: "balanced_star_sinusoidal" | "delta" | "phase_a_only";
   electrical_angle_at_zero_rad: number;
-  phase_peak_limit_a: number;
+  /** Legacy design goal, not a simulation limit. */
+  phase_peak_limit_a?: number;
   source: { boundary: "stiff_dc_link"; accepts_regeneration: boolean };
   additional_driver_loss_w: number | null;
   force_positions: number;
@@ -90,6 +92,7 @@ export interface MovePowerResult {
   profile: MoveProfile;
   electrical: MoveElectricalModel;
   actual_time_step_s: number;
+  /** Physical tracking compatibility only. Never gates required demand or compares design goals. */
   feasible: boolean;
   limiting_factors: string[];
   missing_inputs: string[];

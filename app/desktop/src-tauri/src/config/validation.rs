@@ -19,6 +19,15 @@ impl LinearMotorConfig {
 
     /// Validate all fields (mirrors Python `_validate_base` + `_validate_linear`).
     pub fn validate(&self) -> Result<(), ConfigError> {
+        self.validate_with_design_goals(true)
+    }
+
+    /// Imposed-move physics does not depend on force or acceleration goals.
+    pub fn validate_for_move(&self) -> Result<(), ConfigError> {
+        self.validate_with_design_goals(false)
+    }
+
+    fn validate_with_design_goals(&self, check_goals: bool) -> Result<(), ConfigError> {
         if let Some(stack) = &self.backplane {
             stack.validate().map_err(ConfigError)?;
         }
@@ -77,7 +86,7 @@ impl LinearMotorConfig {
                 self.spacing_ratio
             )));
         }
-        if self.max_current_a <= 0.0 {
+        if check_goals && self.max_current_a <= 0.0 {
             return Err(ConfigError(format!(
                 "max_current_a must be positive, got {}",
                 self.max_current_a
@@ -158,7 +167,7 @@ impl LinearMotorConfig {
                 self.drive_frequency_hz
             )));
         }
-        if self.max_temperature_rise_c <= 0.0 {
+        if check_goals && self.max_temperature_rise_c <= 0.0 {
             return Err(ConfigError(format!(
                 "max_temperature_rise_c must be positive, got {}",
                 self.max_temperature_rise_c
@@ -219,13 +228,13 @@ impl LinearMotorConfig {
                 )));
             }
         }
-        if self.target_force_n <= 0.0 {
+        if check_goals && self.target_force_n <= 0.0 {
             return Err(ConfigError(format!(
                 "target_force_n must be positive, got {}",
                 self.target_force_n
             )));
         }
-        if self.peak_force_n < self.target_force_n {
+        if check_goals && self.peak_force_n < self.target_force_n {
             return Err(ConfigError(format!(
                 "peak_force_n ({:.3} N) must be ≥ target_force_n ({:.3} N)",
                 self.peak_force_n, self.target_force_n
@@ -243,7 +252,7 @@ impl LinearMotorConfig {
                 self.carriage_mass_kg
             )));
         }
-        if self.max_accel_m_s2 <= 0.0 {
+        if check_goals && self.max_accel_m_s2 <= 0.0 {
             return Err(ConfigError(format!(
                 "max_accel_m_s2 must be positive, got {}",
                 self.max_accel_m_s2

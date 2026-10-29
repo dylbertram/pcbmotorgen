@@ -112,6 +112,7 @@
     <div class="mt-3 space-y-3 text-xs text-slate-400">
       <p>Specify the move in SI units using the JSON editor. Replace every required null, state the mass breakdown and choose the source's return capability. Existing designs have no inferred move. Applying this definition adds it to the saved design.</p>
       <p>Positions are absolute first-magnet-center coordinates in metres. The profile is imposed quintic motion with zero endpoint acceleration. Control explicitly uses balanced-star sinusoidal currents, independent of the static preview. The source is directly at a constant-voltage DC link. Keep additional_driver_loss_w null when switching, dead-time and control losses are unknown. Zero declares an idealized scenario, not hardware total power.</p>
+      <p>Simulation results are independent of design goals. Legacy speed, acceleration and current-limit fields do not clamp the motion or hide its calculated demand. Required voltage above the physical bus is reported separately; this model calculates imposed-motion demand, not actual controller tracking.</p>
       <p>Optional loss_model fields require referenced coefficients, phase order from the native snapshot, balanced ripple statistics and an operating domain matching the active driver, supply, PWM and temperature. Switching and dead-time laws are whole-inverter joules per PWM cycle, not per FET or edge. Set the legacy additional_driver_loss_w to null before using component laws. Idealized declarations, zero-ripple assumptions or listed omissions keep totals Unknown. Declared-model totals are conditional scenario results, not measurements or guaranteed maxima.</p>
       <label class="block space-y-1"><span>Move model JSON</span>
         <textarea aria-label="Move model JSON" rows="14" spellcheck="false" bind:value={draft} oninput={() => { job.setInputs(null); moveError = ""; }} class="w-full rounded border border-slate-600 bg-slate-900 p-2 font-mono text-xs text-slate-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-400"></textarea>
@@ -128,7 +129,7 @@
       {#if moveStatus === "pending"}<p role="status">Calculating from the active copper and move inputs. Cancellation takes effect at the next solver checkpoint.</p>{/if}
       {#if moveStatus === "cancelled"}<p>Calculation cancelled. No retained move results are available.</p>{/if}
       {#if moveError || jobError}<p role="alert" class="text-rose-300">{moveError || jobError}</p>{/if}
-      {#if matchedMove && !matchedMove.result.demand.feasible}<p role="alert" class="text-amber-200">Requested motion is not achieved. {matchedMove.result.demand.limiting_factors.join(". ")} The trace contains required commands, not achieved motion.</p>{/if}
+      {#if matchedMove && !matchedMove.result.demand.feasible}<p role="status" class="text-amber-200">Physical tracking findings: {matchedMove.result.demand.limiting_factors.join(". ")} Calculated imposed-motion demand remains available. The trace is not achieved motion.</p>{/if}
     </div>
   </details>
   <div class="flex flex-wrap gap-2" aria-label="Power requirements exports">

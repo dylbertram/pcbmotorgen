@@ -110,7 +110,7 @@ fn calculate(
     }
     validate_star(&config, cad_geometry.as_ref())?;
     let core = config.to_core();
-    core.validate().map_err(|e| e.to_string())?;
+    core.validate_for_move().map_err(|e| e.to_string())?;
     let (routing, sim, hints) = if let Some(cad) = &cad_geometry {
         let board = super::cad_source::CadBoard::new(cad, &core)?;
         let sim = board.simulation_input(cad, &core);

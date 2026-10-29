@@ -23,6 +23,8 @@ pub struct RoutedMoveRequest {
     /// Balanced sine basis at absolute first-magnet-center x = 0.
     /// This is a declared controller reference, not a fitted motor constant.
     pub electrical_angle_at_zero_rad: f64,
+    /// Legacy design goal, ignored by the imposed-demand simulation.
+    #[serde(default)]
     pub phase_peak_limit_a: f64,
     pub source: MoveSource,
     pub additional_driver_loss_w: Option<f64>,
@@ -57,7 +59,7 @@ pub fn evaluate_routed_move(
     if cancelled() {
         return Err("Move power calculation cancelled".into());
     }
-    sim.validate().map_err(|e| e.to_string())?;
+    sim.validate_for_move().map_err(|e| e.to_string())?;
     if sim.phases != 3 || request.control != WindingModel::BalancedStarSinusoidal {
         return Err(
             "Move calculation requires an explicit three-phase balanced-star sinusoidal controller"
@@ -82,11 +84,9 @@ pub fn evaluate_routed_move(
         settings.inner_copper_oz,
         settings.via_plating_m,
         settings.pwm_hz,
-        settings.voltage_headroom,
     ]
     .into_iter()
     .all(positive)
-        || settings.voltage_headroom > 1.0
         || !settings.winding_temp_c.is_finite()
         || !positive(crate::drive::rho_cu_at(settings.winding_temp_c))
         || !nonnegative(settings.series_inductance_h)
@@ -101,7 +101,6 @@ pub fn evaluate_routed_move(
         || settings.driver.min_supply_v > settings.driver.max_supply_v
         || !nonnegative(settings.driver.peak_current_a)
         || !nonnegative(settings.driver.continuous_rms_a)
-        || !nonnegative(request.phase_peak_limit_a)
         || !request.electrical_angle_at_zero_rad.is_finite()
         || request
             .additional_driver_loss_w
@@ -195,10 +194,7 @@ pub fn evaluate_routed_move(
                 kf_n_per_a: 1.0,
             },
         ],
-        phase_peak_limit_a: request
-            .phase_peak_limit_a
-            .min(sim.max_current_a)
-            .min(settings.driver.peak_current_a),
+        phase_peak_limit_a: request.phase_peak_limit_a,
         source_voltage_v: sim.supply_voltage_v,
         voltage_headroom: settings.voltage_headroom,
         driver_path_resistance_ohm: settings.driver.rds_on_ohm,
@@ -290,7 +286,7 @@ pub fn evaluate_routed_move(
     });
     let mut demand = evaluate_move_with_cancel(p, &electrical, cancelled)?;
     demand.notes.extend(drive.notes.iter().cloned());
-    demand.notes.push("Move control explicitly uses balanced-star sine currents with the declared electrical zero. The static preview commutation is not used. Current allocation is bounded by the move limit, configured maximum phase amplitude and driver peak rating. Declared ripple, when supplied, also affects the peak-current check. No OCP response, peak-duration or thermal safety prediction.".into());
+    demand.notes.push("Move control explicitly uses balanced-star sine currents with the declared electrical zero. The static preview current setpoint and design goals do not bound current allocation or suppress demand. No OCP response, peak-duration or thermal safety prediction.".into());
     if p.travel_min_m < physical_min || p.travel_max_m > physical_max {
         demand.notes.push(format!("Declared bounds include partial magnetic-array overlap with copper. The actual field/force is evaluated there without extending copper. Full-overlap interval is [{physical_min:.9}, {physical_max:.9}] m, not a verified mechanical limit."));
     }

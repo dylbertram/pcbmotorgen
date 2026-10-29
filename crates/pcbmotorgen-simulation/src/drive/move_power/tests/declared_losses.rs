@@ -219,7 +219,7 @@ fn nonpassive_unbalanced_ripple_invalid_coefficients_and_missing_references_are_
 }
 
 #[test]
-fn declared_ripple_changes_current_limit_checks_without_fabricating_switching_samples() {
+fn declared_ripple_is_reported_above_current_goals_without_suppressing_demand() {
     let mut p = profile();
     p.end_m = 0.0;
     p.external_load_n = 1.98;
@@ -233,12 +233,9 @@ fn declared_ripple_changes_current_limit_checks_without_fabricating_switching_sa
         1.01,
         1e-12,
     );
-    assert!(!r.feasible);
-    assert!(r.source.is_none());
-    assert!(r
-        .limiting_factors
-        .iter()
-        .any(|s| s.contains("including declared ripple")));
+    assert!(r.feasible);
+    assert!(r.source.is_some());
+    assert!(r.limiting_factors.is_empty());
     assert_eq!(r.samples.len(), 1001); // Still cycle-mean time samples, not synthetic PWM cycles.
 }
 

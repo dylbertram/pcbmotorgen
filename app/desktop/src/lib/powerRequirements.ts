@@ -46,12 +46,12 @@ export function powerRequirements(input: PowerRequirementsInput): RequirementSec
   const d = input.native ? input.drive : null;
   const nativeMove = currentMoveResult(input), m = nativeMove?.result.demand;
   const declaredMove = input.moveRequest, p = declaredMove?.profile;
-  const source = m?.feasible ? m.source : null;
+  const source = m?.source;
   const declaredTotals = m?.source_model_scope === "declared_loss_model" && !!m.loss_energy
     && m.electrical.loss_model?.basis === "declared_parameters" && m.missing_inputs.length === 0;
   const scenarioLabel = declaredTotals ? "Declared-model" : "Partial scenario";
   const unavailable = m ? [...m.limiting_factors, ...m.missing_inputs].join(". ") || "No complete source model." : "No current native move result.";
-  const interval = m ? `PWM-cycle-averaged scenario over [0, ${number(m.profile.duration_s, "s")}], dt ${number(m.actual_time_step_s, "s")}. Stiff source at the DC link. Positive P=VI draws power, negative returns it. Not a worst-case or switching-peak bound.` : "";
+  const interval = m ? `Imposed-motion required demand, independent of design goals, not actual delivered power. PWM-cycle-averaged over [0, ${number(m.profile.duration_s, "s")}], dt ${number(m.actual_time_step_s, "s")}. Stiff source at the DC link. Positive P=VI draws power, negative returns it. Not a worst-case or switching-peak bound.` : "";
   const moveValue = (label: string, value: number | undefined, unit: string, detail: string) => source
     ? row(label, number(value, unit), "Simulated", `${detail} ${interval}`) : unknown(label, `${unavailable} ${detail}`);
   const simulated = (label: string, value: number | null | undefined, unit: string, detail: string) => {
@@ -123,7 +123,7 @@ export function powerRequirements(input: PowerRequirementsInput): RequirementSec
     ] },
   ];
   if (m) sections.push({ title: "Move model results", rows: [
-    row("Motion feasibility", m.feasible ? "Sampled envelope checks pass" : "Not achieved", "Simulated", m.limiting_factors.join(". ") || "Necessary current/voltage/motion checks only. Not controller or thermal qualification."),
+    row("Physical tracking findings", m.feasible ? "No modeled conflict" : "Imposed demand only", "Model", m.limiting_factors.join(". ") || "Design goals do not gate simulation results. The imposed trajectory is not an achieved-motion or controller simulation."),
     row("Requested distance", number(m.requested_distance_m, "m"), "Configured", "Absolute first-magnet-center coordinate. An imposed trajectory is not an achieved-motion simulation."),
     unknown("Achieved motion", "No force/mass-integrated trajectory or measured motion is provided. The trace contains required position, velocity and acceleration, not observed achievement."),
     row("Requested peak speed", number(m.sampled_requested_peak_speed_m_s, "m/s"), "Simulated", "Sampled imposed speed, not achieved speed or a voltage-limited threshold."),
@@ -139,7 +139,7 @@ export function powerRequirements(input: PowerRequirementsInput): RequirementSec
     moveValue(`${scenarioLabel} drawn source energy`, source?.drawn_energy_j, "J", "Positive magnitude integral of positive modeled source power."),
     moveValue(`${scenarioLabel} returned source energy`, source?.returned_energy_j, "J", "Positive magnitude integral of negative modeled source power."),
     unknown("Guaranteed maximum source power", "A sampled scenario peak is not a bound over loads, uncertainty, current limiting or switching transients."),
-    row("Required copper energy", number(m.copper_energy_j, "J"), "Simulated", "Native hot DC winding loss, including declared ripple DC heating when provided. AC increments are listed separately. Required excitation is not delivered energy if motion fails."),
+    row("Required copper energy", number(m.copper_energy_j, "J"), "Simulated", "Native hot DC winding loss, including declared ripple DC heating when provided. AC increments are listed separately. Calculated for imposed motion independently of design goals, not measured delivered energy."),
     row("Required driver conduction energy", number(m.conduction_energy_j, "J"), "Simulated", "Equal high/low FET on-resistance assumption. Switching/dead-time/control losses remain separate."),
     row("Required mechanical work", number(m.mechanical_work_j, "J"), "Simulated", "Integral of required motor force times imposed velocity. Not measured delivered work."),
     row("Friction and damping energy", number(m.friction_damping_energy_j, "J"), "Simulated", "Coulomb friction plus viscous dissipation, counted once."),
@@ -204,7 +204,7 @@ export function phaseElectricalCsv(drive: DriveAnalysis): string {
 }
 
 export function powerModelSnapshot(input: PowerRequirementsInput): string {
-  return JSON.stringify({ format: "pcbmotorgen-power-requirements", format_version: 3, app_version: version,
+  return JSON.stringify({ format: "pcbmotorgen-power-requirements", format_version: 4, app_version: version,
     generated_at: new Date().toISOString(), results_provenance: input.native ? "simulated_not_measured" : "demo_results_withheld",
     ...input, sweep: input.native ? input.sweep : null, drive: input.native ? input.drive : null,
     moveResult: currentMoveResult(input),
@@ -217,7 +217,7 @@ export function moveTraceCsv(input: PowerRequirementsInput): string | null {
   if (!native) return null;
   const r = native.result.demand;
   const names = r.electrical.phase_model?.phase_names ?? ["Unknown", "Unknown", "Unknown"];
-  return csv([["model_version", "input_sha256", "provenance", "scenario_feasible", "time_s",
+  return csv([["model_version", "input_sha256", "provenance", "physical_tracking_compatible", "time_s",
     "first_magnet_center_position_m", "requested_velocity_m_s", "requested_acceleration_m_s2", "required_motor_force_N",
     "required_source_voltage_V", "required_source_current_A", "required_source_power_W", "q_phase_amplitude_A",
     "phase_0_current_A", "phase_1_current_A", "phase_2_current_A", "phase_0_voltage_V", "phase_1_voltage_V", "phase_2_voltage_V",
