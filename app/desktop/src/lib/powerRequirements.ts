@@ -2,6 +2,7 @@ import type { CadGeometry, DriveAnalysis, DriveSettings, ForceSweepResult, Linea
 import { version } from "../../package.json";
 import type { NativeMoveResult, RoutedMoveRequest } from "./types/movePower";
 import { moveInputKey } from "./movePowerJob";
+import { copperLayerPositionsMm } from "./copperLayerPlacement";
 
 export interface PowerRequirementsInput {
   config: LinearMotorConfig;
@@ -97,7 +98,7 @@ export function powerRequirements(input: PowerRequirementsInput): RequirementSec
       simulated("Available thrust at setpoint", d?.thrust_n, "N", "Force constant × phase-current amplitude. Does not establish a complete move profile."),
     ] },
     { title: "Motor electrical parameters", rows: [
-      row("Winding arrangement", cad ? `Imported copper: ${cad.source_file_name}` : c.routing_pattern, "Configured", cad ? `Uses imported geometry, not generated routing parameters. Trace width ${number(cad.trace_width_mm, "mm")}; layer Z ${cad.layer_z_mm.join(", ")} mm. See snapshot for terminals and all traces.` : `Routing parameters ${JSON.stringify(c.routing_params)}; ${c.strands_per_phase} configured strands per phase.`),
+      row("Winding arrangement", cad ? `Imported copper: ${cad.source_file_name}` : c.routing_pattern, "Configured", cad ? `Uses imported XY geometry, not generated routing parameters. Trace width ${number(cad.trace_width_mm, "mm")}; source layer Z ${cad.layer_z_mm.join(", ")} mm. Physical layer Z ${copperLayerPositionsMm(cad.layer_z_mm, c.pcb_thickness_m * 1000).map(z => Number(z.toPrecision(7))).join(", ")} mm, scaled proportionately to configured PCB thickness with top at zero. See snapshot for terminals and all traces.` : `Routing parameters ${JSON.stringify(c.routing_params)}; ${c.strands_per_phase} configured strands per phase.`),
       configured("Phase count", c.phases, "phases"),
       connection === "Unknown" ? unknown("Phase connection", "Not declared by this geometry/pattern. A source filename is not proof of electrical connection.") : row("Phase connection", connection, "Configured", "Connection declaration, not a measured continuity check."),
       simulated("Winding resistance per phase", d?.phase_resistance_ohm, "Ω", `Worst hot DC phase value at ${s.winding_temp_c} °C; excludes driver. Per-net values are in the electrical CSV.`),

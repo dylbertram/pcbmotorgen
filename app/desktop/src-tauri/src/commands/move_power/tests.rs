@@ -261,7 +261,7 @@ fn supplied_saved_design_phase_diagnostics() {
     let core = ipc.to_core();
     let board = super::super::cad_source::CadBoard::new(&cad, &core).unwrap();
     let sim = board.simulation_input(&cad, &core);
-    let hints = super::super::cad_source::CadBoard::drive_hints(&cad);
+    let hints = board.drive_hints(&cad);
     let (evaluator, _) = pcbmotorgen_simulation::ForceEvaluator::new(
         2,
         4,

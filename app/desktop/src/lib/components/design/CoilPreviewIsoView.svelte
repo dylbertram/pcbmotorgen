@@ -3,8 +3,9 @@
   import type { CoilPreviewViewState } from "./coilPreviewViewState.svelte";
   import type { VisualizationInput } from "../../types/simulationVisualization";
 
-  let { geometry, view, isVisible = () => true, showTerminals = true, simulation = null }: {
+  let { geometry, pcbThicknessMm, view, isVisible = () => true, showTerminals = true, simulation = null }: {
     geometry: CadGeometry | null;
+    pcbThicknessMm: number;
     view: CoilPreviewViewState;
     isVisible?: (coil: string, layer: number) => boolean;
     showTerminals?: boolean;
@@ -18,7 +19,7 @@
 {#await viewer}
   <div class="flex h-full items-center justify-center text-sm text-slate-400" role="status">Loading 3D viewer…</div>
 {:then { default: Viewer }}
-  <Viewer {geometry} {view} {isVisible} {showTerminals} {simulation} />
+  <Viewer {geometry} {pcbThicknessMm} {view} {isVisible} {showTerminals} {simulation} />
 {:catch}
   <div class="flex h-full items-center justify-center text-sm text-slate-400" role="status">Could not load the 3D viewer. Switch to Top-down to view this geometry.</div>
 {/await}

@@ -14,15 +14,18 @@
   import type { DcWindingFieldResult } from "../../types/dcCoupling";
   import QualifiedCoilFieldControls from "./QualifiedCoilFieldControls.svelte";
   import { combineVisualizationFields } from "../../combineVisualizationFields";
+  import { placedCopperGeometry } from "../../copperLayerPlacement";
 
-  let { geometry, view, isVisible = () => true, showTerminals = true, simulation = null }: {
+  let { geometry: sourceGeometry, pcbThicknessMm, view, isVisible = () => true, showTerminals = true, simulation = null }: {
     geometry: CadGeometry | null;
+    pcbThicknessMm: number;
     view: CoilPreviewViewState;
     isVisible?: (coil: string, layer: number) => boolean;
     showTerminals?: boolean;
     simulation?: VisualizationInput | null;
   } = $props();
 
+  const geometry = $derived(sourceGeometry ? placedCopperGeometry(sourceGeometry, pcbThicknessMm) : null);
   let scene = $derived(buildCoilScene(geometry));
   let paths = $derived(scene?.paths.filter(p => view.isLayerVisible(p.layer) && isVisible(p.net, p.layer)) ?? []);
   let vias = $derived(view.showVias ? scene?.vias.filter(v =>
