@@ -65,8 +65,9 @@ DC winding-geometry preparation and housing motion at an explicit speed.
   `scripts/solvers/results/drv8311-via-corrected-2026-10-19.json`. They are not
   desired force values. No pin, tolerance, remanence, resistivity or geometry
   was adjusted for this audit.
-- `test_vectors.rs` compares numerical field/force arrays with its recorded
-  Python-oracle arrays, not target force. Analytical RL, R/L, phase excitation,
+- The legacy `test_vectors.rs` field arrays remain independent references.
+  Its old force checks were weaker than this first audit reported; the second
+  pass below replaces them. Analytical RL, R/L, phase excitation,
   symmetry, scaling, constitutive-law, energy and action/reaction tests remain.
 - Solver comparison/refinement/conservation gates use computed/reference
   quantities and explicit absolute floors. The 2%/5% numerical gates are
@@ -108,6 +109,73 @@ No external-solver campaign or hardware measurement was run. No frontend
 production code changed in this audit. Historical reference results are not
 silently promoted to current solver/source admission after source hashes change.
 
+## Second investigation pass, 2026-10-29
+
+Two additional problems were reproduced and corrected:
+
+- The legacy force integration test no longer compared force to an independent
+  oracle. It accepted 30–120 mN mean force, broad component bounds and ripple
+  below 20%/50%, then compared ripple to a live-Rust pin. Those checks are gone.
+  The old fixture is unchanged and used only for geometry/field data.
+- `drive::analyze_drive_with` searched the goal-dependent voltage plot for the
+  drag/thrust crossing. At identical physical inputs, changing headroom from
+  its default to 0.0001 changed `Some(0.3388660792050303)` m/s to `None`.
+  The new regression failed before the fix. A separate finite logarithmic scan
+  from 1e-6 to 1000 m/s, plus the zero-speed endpoint, now brackets a crossing
+  independently of plot bounds and refines it by bisection. The result and
+  operating-point backplane physics must be identical after goal edits. A
+  direct drag/thrust residual and actual-current positive control also pass.
+  This screening scan does not prove absence of a crossing between samples or
+  outside its range, and does not qualify hardware motion or finite 3D drag.
+  The no-crossing advice now states that limitation instead of claiming a
+  continuous below-thrust bound.
+
+`scripts/solvers/serpentine_reference.py` independently integrates signed XYZ
+Lorentz force with Magpylib using only unchanged legacy segment geometry and
+explicit physical inputs, never old force/ripple numbers or Rust output. Its
+declared cosine excitation has phase zero pi, 1 A peak, ten alternating
+10×10×4 mm magnets at 12 mm pitch, Br 1.35 T, 0.5 mm gap, and 20 positions
+from 0.005 to 0.082 m. Subdivisions 20/40/80 give mean force
+0.0689556876683/0.0689615223222/0.0689629817162 N and ripple
+3.79882218890/3.79869902820/3.79866818383%. Both conductor refinements meet the
+unchanged 2% norm gate. Rust compares positions, all phase currents, all XYZ
+forces and mean force at each resolution, with 1e-8 relative or 1e-10 N absolute
+force tolerances, and ripple within 1e-6 percentage points at subdivision 20.
+These tight matching-quadrature comparisons do not imply that the continuum
+solution or hardware is accurate to 1e-8.
+
+The new JSON records geometry/generator hashes, declared inputs, refinement
+results and the actual runtime: Python 3.14.6, Magpylib 5.2.3, NumPy 1.26.4,
+SciPy 1.17.1. This is not the separate requirements file's NumPy 2.4.6 runtime.
+The initial object-oriented Magpylib probe produced SciPy identity-rotation
+warnings and was preserved outside the checkout at
+`/private/var/folders/5h/nqd6sd8963q4vl5yff2mcbf40000gn/T/opencode/serpentine-reference-initial-warning-20261029.json`.
+The accepted generator uses the direct axis-aligned `cuboid_field` interface
+and reproduces exactly with warnings treated as errors:
+
+```sh
+OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 python3 -W error scripts/solvers/serpentine_reference.py --check
+OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 PYTHONPATH=scripts/solvers python3 -W error -m unittest test_serpentine_reference test_winding_oracle test_comparisons test_project_balance test_incremental_gates test_housing_motion_reference -v
+cargo test -p pcbmotorgen -p pcbmotorgen-simulation
+```
+
+Eighteen local Python tests pass. The Rust suite passes 136 desktop, 239
+simulation unit and seven integration tests, with 18 explicit ignores.
+The three optional closed-infinity/DRV8311 diagnostics listed in the first
+audit were rerun against this second-pass implementation and also pass.
+The added native regression covers mapped imported copper with an aluminum
+housing, conflicting force/acceleration/thermal goals and strict driver advice
+goals. Force arrays, electrical quantities and non-plot backplane results are
+unchanged. Doubling actual current doubles force and quadruples copper loss;
+the imported CAD payload remains unchanged. Python positive controls likewise
+exercise actual current, polarity and segment direction.
+
+This validates free-space integration under declared excitation and numerical
+goal independence in the covered paths. It does not qualify production winding
+AC/ripple losses, driver/inductor component data, dynamic backplane move losses,
+actual tracking or hardware safety. No external-solver campaign, physical
+design change or frontend production change was made.
+
 ## Existing numerical methods and evidence
 
 Force sweeps use physical outer-edge travel limits. The reported position
@@ -148,7 +216,7 @@ RAYON_NUM_THREADS=4 cargo test -p pcbmotorgen closed_infinity_user_project_diagn
 
 This reruns all 50 positions at mesh densities 10, 20, 40 and 80, compares their
 pointwise forces, prints phase contributions and electrical checks, and
-asserts the design still misses its thrust target and ripple allowance.
+checks unchanged physical results under goal edits and force/current consistency.
 
 The five-to-six magnet transition also has a normal backend regression:
 

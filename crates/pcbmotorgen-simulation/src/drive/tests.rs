@@ -694,6 +694,34 @@ fn al_stack() -> Option<crate::backplane::BackplaneStack> {
 }
 
 #[test]
+fn backplane_physics_and_drag_crossing_do_not_depend_on_goal_driven_plot_bounds() {
+    let cfg = SimulationInput { backplane: al_stack(), ..sim() };
+    let baseline = DriveSettings { target_speed_m_s: 0.001, ..Default::default() };
+    let strict = DriveSettings { voltage_headroom: 0.0001, ripple_limit_fraction: 0.0001,
+        allowed_rise_c: 0.1, ..baseline.clone() };
+    let a = analyze_drive(&cfg, &two_strand_fixture(), &baseline, Some(0.5));
+    let b = analyze_drive(&cfg, &two_strand_fixture(), &strict, Some(0.5));
+    let x = a.backplane.unwrap();
+    let y = b.backplane.unwrap();
+    assert_eq!(x.drag_n, y.drag_n);
+    assert_eq!(x.normal_force_n, y.normal_force_n);
+    assert_eq!(x.pwm_inductance_h, y.pwm_inductance_h);
+    assert_eq!(x.pwm_resistance_ohm, y.pwm_resistance_ohm);
+    assert_eq!(x.ripple_eddy_loss_w, y.ripple_eddy_loss_w);
+    assert_eq!(x.net_thrust_n, y.net_thrust_n);
+    assert!(x.drag_limited_speed_m_s.is_some());
+    assert_eq!(x.drag_limited_speed_m_s, y.drag_limited_speed_m_s,
+        "A goal-dependent plot range cannot decide whether the physical drag/thrust crossing exists");
+    let thrust = a.thrust_n.unwrap();
+    let solved = cfg.backplane.as_ref().unwrap().solve(&cfg);
+    let crossing = x.drag_limited_speed_m_s.unwrap();
+    assert!((solved.magnet_forces(&cfg, crossing).drag_n / thrust - 1.0).abs() < 1e-9);
+    let changed_excitation = SimulationInput { max_current_a: 2.0 * cfg.max_current_a, ..cfg };
+    let physical = analyze_drive(&changed_excitation, &two_strand_fixture(), &baseline, Some(0.5));
+    assert_ne!(physical.backplane.unwrap().drag_limited_speed_m_s, x.drag_limited_speed_m_s);
+}
+
+#[test]
 fn braid_fixture_produces_plausible_values() {
     let ctx = RoutingContext {
         active_area_length_mm: 147.0,
