@@ -27,6 +27,39 @@ function makeStores(recents?: RecentFilesStore, kind: "motor" | "sensor" = "moto
   return { config, motion, sensor, projects };
 }
 
+describe("explicit move persistence", () => {
+  it("loads legacy designs without inferred move requirements", () => {
+    const { config, projects } = makeStores();
+    expect(config.power_move).toBeNull();
+    const state = projects.snapshotIpc();
+    delete state.config.power_move;
+    projects.applyToState(state);
+    expect(config.power_move).toBeNull();
+  });
+
+  it("snapshots and restores an explicit move without sharing mutable state", () => {
+    const { config, projects } = makeStores();
+    config.power_move = {
+      profile: { start_m: 0.0025, end_m: 0.0655, initial_velocity_m_s: 0, final_velocity_m_s: 0,
+        duration_s: 1, travel_min_m: 0.0025, travel_max_m: 0.0655,
+        max_speed_m_s: 0.5, max_acceleration_m_s2: 2, max_deceleration_m_s2: 1,
+        moving_mass_kg: 0.015, mass_includes: "Test assumption, cap included", coulomb_friction_n: 0.05,
+        damping_n_s_per_m: 0, external_load_n: 0, time_step_s: 0.001 },
+      control: "balanced_star_sinusoidal", electrical_angle_at_zero_rad: 0, phase_peak_limit_a: 1,
+      source: { boundary: "stiff_dc_link", accepts_regeneration: false },
+      additional_driver_loss_w: null, force_positions: 65,
+    };
+    const snapshot = projects.snapshotIpc();
+    config.power_move.profile.duration_s = 2;
+    expect(snapshot.config.power_move?.profile.duration_s).toBe(1);
+    projects.applyToState(snapshot);
+    expect(config.power_move?.profile.duration_s).toBe(1);
+    expect(config.power_move?.additional_driver_loss_w).toBeNull();
+    config.power_move!.profile.max_deceleration_m_s2 = 3;
+    expect(snapshot.config.power_move?.profile.max_deceleration_m_s2).toBe(1);
+  });
+});
+
 describe("title-bar project name and location", () => {
   beforeEach(() => vi.clearAllMocks());
 

@@ -35,6 +35,25 @@ test("power tab discloses demo data and downloads a report without fabricated wa
   await expect(page.locator('[data-dock-panel="flux"]')).toBeVisible();
 });
 
+test("move definition requires explicit inputs and demo mode cannot calculate or export a trace", async ({ page }) => {
+  await gotoDesignApp(page);
+  const panel = await openPower(page);
+  await panel.locator("summary").filter({ hasText: "Move definition and calculation" }).click();
+  const editor = panel.getByRole("textbox", { name: "Move model JSON", exact: true });
+  const template = JSON.parse(await editor.inputValue());
+  expect(template.profile.duration_s).toBeNull();
+  expect(template.profile.mass_includes).toBe("");
+  expect(template.source.accepts_regeneration).toBeNull();
+  await editor.fill("{}");
+  await panel.getByRole("button", { name: "Apply move definition", exact: true }).click();
+  await expect(panel.getByRole("alert")).toContainText("explicit move and load inputs");
+  await expect(panel.getByRole("button", { name: "Calculate move power", exact: true })).toBeDisabled();
+  await expect(panel.getByRole("button", { name: "Move time-series CSV", exact: true })).toBeDisabled();
+  await panel.getByRole("button", { name: "Clear move definition", exact: true }).click();
+  await expect(panel.getByRole("alert")).toHaveCount(0);
+  expect(JSON.parse(await editor.inputValue()).profile.duration_s).toBeNull();
+});
+
 // These tests inject synthetic DTOs at the transport boundary. They verify
 // report state and native save flows, not the Rust solver or native dialogs.
 async function syntheticResults(page: Page) {
@@ -71,6 +90,85 @@ async function syntheticResults(page: Page) {
     }`,
   }));
 }
+
+test("native move transport state updates UI and exports, and a cancelled late result cannot reappear", async ({ page }) => {
+  await syntheticResults(page);
+  // Transport fixtures only. This test does not claim browser physics evidence.
+  await page.route(/\/src\/lib\/movePowerJob\.ts(?:\?t=\d+)?$/, async route => {
+    const response = await route.fetch();
+    const original = await response.text();
+    expect(original).toContain("native: isTauriAvailable");
+    await route.fulfill({ response, body: original.replace("native: isTauriAvailable", "native: () => true") });
+  });
+  await page.route(/\/src\/lib\/ipc\/physics\.ts(?:\?t=\d+)?$/, route => route.fulfill({
+    contentType: "application/javascript",
+    body: `export * from '/src/lib/ipc/physics.ts?original';
+      import { mockDriveAnalysis, mockForceSweep } from '/src/lib/ipc/mocks.ts';
+      export async function evaluateForceSweep(c) { return mockForceSweep(c); }
+      export async function analyzeDrive(c,s,k) { return mockDriveAnalysis(c,s,k); }
+      export async function cancelMovePower(id) { window.__cancelledMove = id; return true; }
+      export async function evaluateMovePower(id, inputs) {
+        if (window.__holdMove) { window.__moveWaiting = true; await new Promise(resolve => window.addEventListener('release-move', resolve, {once:true})); }
+        const p = inputs.move_request.profile;
+        return { request_id:id, input_sha256:'a'.repeat(64), inputs, provenance:'simulated_not_measured',
+          result: { demand: { model_version:'synthetic-ui-transport-test', source_model_scope:'partial_declared_scenario', profile:p,
+            electrical:{additional_driver_loss_w:0, source_accepts_regeneration:true, phase_model:{phase_names:['A','B','C']}},
+            feasible:true, limiting_factors:[], missing_inputs:[], notes:['Synthetic transport fixture, not numerical evidence.'],
+            actual_time_step_s:0.001, requested_distance_m:0.001, sampled_requested_peak_speed_m_s:0.002,
+            sampled_requested_positive_acceleration_m_s2:0.01, sampled_requested_negative_acceleration_m_s2:-0.01,
+            sampled_phase_peak_a:0.2, phase_rms_a:[0.1,0.1,0.1], copper_energy_j:0.1,
+            mechanical_balance_residual_j:0, electrical_balance_residual_j:0,
+            source:{sampled_positive_peak_power_w:2, sampled_positive_peak_current_a:0.1666667, average_power_w:1,
+              drawn_energy_j:1.2, returned_energy_j:0.2, net_energy_j:1},
+            samples:[{time_s:0,position_m:p.start_m,velocity_m_s:0,acceleration_m_s2:0,motor_force_n:0,
+              required_source_voltage_v:12, required_source_current_a:0.1666667, required_source_power_w:2,
+              q_current_phase_peak_a:0.2,phase_currents_a:[0.2,-0.1,-0.1], required_phase_voltages_v:[1,-0.5,-0.5],
+              required_line_voltage_v:1.5,copper_loss_w:0.1,driver_conduction_loss_w:0.01,mechanical_power_w:0,
+              friction_damping_loss_w:0,external_load_power_w:0,kinetic_energy_j:0,magnetic_energy_j:0,
+              magnetic_power_w:0,partial_dc_link_power_w:1.99}] } } };
+      }`,
+  }));
+  await gotoDesignApp(page);
+  const panel = await openPower(page);
+  await panel.locator("summary").filter({ hasText: "Move definition and calculation" }).click();
+  const editor = panel.getByRole("textbox", { name: "Move model JSON", exact: true });
+  const request = JSON.parse(await editor.inputValue());
+  Object.assign(request, { electrical_angle_at_zero_rad: 0, phase_peak_limit_a: 1, force_positions: 65, additional_driver_loss_w: 0 });
+  Object.assign(request.profile, { start_m: 0.0025, end_m: 0.0035, initial_velocity_m_s: 0, final_velocity_m_s: 0,
+    duration_s: 1, travel_min_m: 0.0025, travel_max_m: 0.0655, max_speed_m_s: 0.5,
+    max_acceleration_m_s2: 2, max_deceleration_m_s2: 2, moving_mass_kg: 0.015,
+    mass_includes: "Synthetic UI fixture only", coulomb_friction_n: 0.05, damping_n_s_per_m: 0, external_load_n: 0, time_step_s: 0.001 });
+  request.source.accepts_regeneration = true;
+  await editor.fill(JSON.stringify(request, null, 2));
+  await panel.getByRole("button", { name: "Apply move definition", exact: true }).click();
+  const calculate = panel.getByRole("button", { name: "Calculate move power", exact: true });
+  await expect(calculate).toBeEnabled();
+  await calculate.click();
+  const trace = panel.getByRole("button", { name: "Move time-series CSV", exact: true });
+  await expect(trace).toBeEnabled();
+  await expect(panel.locator("dl > div").filter({ has: page.getByText("Partial scenario peak source power", { exact: true }) })).toContainText("2 W");
+  await expect(panel.locator("dl > div").filter({ has: page.getByText("Peak supply power during a move", { exact: true }) })).toContainText("Unknown");
+  await trace.click();
+  expect(await page.evaluate(() => (window as any).__savedPower.content)).toContain('"required_source_power_W"');
+  await panel.getByRole("button", { name: "Model snapshot JSON", exact: true }).click();
+  const snapshot = JSON.parse(await page.evaluate(() => (window as any).__savedPower.content));
+  expect(snapshot.moveResult.result.demand.source.net_energy_j).toBe(1);
+  expect(snapshot.moveRequest.profile.mass_includes).toBe("Synthetic UI fixture only");
+  await panel.locator("summary").filter({ hasText: "Move definition and calculation" }).click();
+  await page.locator('[data-dock-panel="power"]').evaluate(el => { el.scrollTop = 0; });
+  await page.screenshot({ path: test.info().outputPath("move-power.png") });
+  await panel.locator("summary").filter({ hasText: "Move definition and calculation" }).click();
+  await page.evaluate(() => { (window as any).__holdMove = true; });
+  await calculate.click();
+  await expect(trace).toBeDisabled();
+  await expect.poll(() => page.evaluate(() => (window as any).__moveWaiting)).toBe(true);
+  await panel.getByRole("button", { name: "Cancel calculation", exact: true }).click();
+  await expect.poll(() => page.evaluate(() => !!(window as any).__cancelledMove)).toBe(true);
+  await page.evaluate(() => window.dispatchEvent(new Event("release-move")));
+  await expect(trace).toBeDisabled();
+  await panel.getByRole("button", { name: "Model snapshot JSON", exact: true }).click();
+  expect(JSON.parse(await page.evaluate(() => (window as any).__savedPower.content)).moveResult).toBeNull();
+});
 
 test("current results export; pending and failed updates never export retained driver values", async ({ page }) => {
   await syntheticResults(page);

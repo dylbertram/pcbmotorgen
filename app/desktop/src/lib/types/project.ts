@@ -16,6 +16,7 @@ import type { CadGeometry } from "./dxf";
 import type { SensorConfig } from "./sensor";
 import type { DriveSettings } from "./drive";
 import type { BackplaneStack } from "./backplane";
+import type { RoutedMoveRequest } from "./movePower";
 
 export type DocumentKind = "motor" | "sensor";
 
@@ -88,6 +89,8 @@ export interface ProjectConfigState {
   // --- Driver suitability (Simulation tab) ---
   /** Missing in files saved before the driver check existed. */
   drive?: DriveSettings;
+  /** Absent in legacy files. No operating requirements are inferred on load. */
+  power_move?: RoutedMoveRequest | null;
 
   // --- Backplane and housing (t707) ---
   /** Missing in files saved before the backplane existed. `null` = none. */

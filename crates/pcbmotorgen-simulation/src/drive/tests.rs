@@ -85,6 +85,36 @@ fn empty_routing_cannot_produce_a_force_result() {
 }
 
 #[test]
+fn unit_terminal_coefficients_reproduce_calibrated_routed_force_without_dividing_by_current() {
+    use crate::magnetic::{CommutationMode, ForceEvaluator};
+    let routing = two_strand_fixture();
+    let mut sim = sim();
+    let (mut evaluator, coils) = ForceEvaluator::new(3, 8, CommutationMode::PhaseAOnly, 0.0)
+        .with_routed_currents(&routing, &sim, &DriveSettings::default(), &DriveGeometryHints::default()).unwrap();
+    let x = 0.003;
+    let force = evaluator.evaluate_at(&sim, &coils, x).unwrap().0[0];
+    let currents = evaluator.excitation_currents_at(&sim, &coils, x).unwrap();
+    let coefficients = evaluator.unit_phase_force_constants_at(&sim, x).unwrap();
+    let reconstructed: f64 = coefficients.iter().zip(currents).map(|(k,i)| k*i).sum();
+    assert!((force-reconstructed).abs() < 1e-12);
+    sim.max_current_a = 0.0;
+    assert_eq!(coefficients, evaluator.unit_phase_force_constants_at(&sim, x).unwrap());
+    assert!(evaluator.unit_phase_force_constants_at(&sim, f64::NAN).is_err());
+}
+
+#[test]
+fn native_inductance_matrix_retains_self_mutual_and_phase_order() {
+    let routing = two_strand_fixture();
+    let analysis = analyze_drive(&sim(), &routing, &DriveSettings::default(), None);
+    let matrix = &analysis.phase_inductance_matrix_h;
+    assert_eq!(matrix.len(), analysis.phases.len());
+    for i in 0..matrix.len() {
+        assert_eq!(matrix[i][i], analysis.phases[i].self_inductance_h);
+        for j in 0..matrix.len() { assert_eq!(matrix[i][j], matrix[j][i]); }
+    }
+}
+
+#[test]
 fn curved_copper_is_integrated_and_endpoint_order_is_not_current_direction() {
     use crate::magnetic::force_eval::{ForceEvaluator, CommutationMode};
     let mut routing = RoutingResult::default();

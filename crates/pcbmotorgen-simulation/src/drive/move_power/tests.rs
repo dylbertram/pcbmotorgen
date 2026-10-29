@@ -44,6 +44,7 @@ fn electrical() -> MoveElectricalModel {
         driver_path_resistance_ohm: 0.2,
         additional_driver_loss_w: Some(0.01),
         source_accepts_regeneration: true,
+        phase_model: None,
     }
 }
 
@@ -494,4 +495,116 @@ fn finite_inputs_that_overflow_do_not_publish_results() {
         .unwrap_err()
         .contains("overflow"));
     assert!(capacitor_energy_change_j(1.0, 1.0, f64::MAX).is_err());
+}
+
+fn phase_electrical() -> MoveElectricalModel {
+    let mut e = electrical();
+    let theta = e.electrical_angle_at_zero_rad;
+    let coeff = std::array::from_fn(|j| 4.0 / 3.0 * (theta - TAU * j as f64 / 3.0).sin());
+    e.phase_model = Some(PhaseDomainModel {
+        phase_names: ["A".into(), "B".into(), "C".into()],
+        resistance_hot_ohm: [0.2, 0.4, 0.6],
+        inductance_h: [
+            [2e-3, -0.2e-3, -0.3e-3],
+            [-0.2e-3, 3e-3, -0.4e-3],
+            [-0.3e-3, -0.4e-3, 4e-3],
+        ],
+        force_map: vec![
+            PhaseForcePoint {
+                position_m: -1.0,
+                force_n_per_a: coeff,
+            },
+            PhaseForcePoint {
+                position_m: 1.0,
+                force_n_per_a: coeff,
+            },
+        ],
+    });
+    e
+}
+
+#[test]
+fn phase_domain_hold_uses_individual_resistances_and_preserves_stored_energy() {
+    let mut p = profile();
+    p.end_m = 0.0;
+    p.external_load_n = 2.0;
+    let e = phase_electrical();
+    let r = evaluate_move(&p, &e).unwrap();
+    near(r.copper_energy_j, 0.75 * (0.4 + 0.6), 1e-12);
+    near(r.electrical_balance_residual_j, 0.0, 1e-12);
+    near(r.magnetic_energy_change_j, 0.0, 1e-12);
+    let s = &r.samples[0];
+    let phase = e.phase_model.unwrap();
+    near(
+        s.magnetic_energy_j,
+        0.5 * dot(
+            s.phase_currents_a,
+            multiply(phase.inductance_h, s.phase_currents_a),
+        ),
+        1e-12,
+    );
+    assert!(s.magnetic_energy_j > 0.0);
+    near(
+        s.required_phase_voltages_v[1],
+        s.phase_currents_a[1] * 0.4,
+        1e-12,
+    );
+    near(
+        dot(s.required_phase_voltages_v, s.phase_currents_a),
+        s.copper_loss_w,
+        1e-12,
+    );
+}
+
+#[test]
+fn phase_domain_terminal_power_balances_full_mutual_inductance_and_force_work() {
+    let mut p = profile();
+    p.end_m = 0.0002;
+    p.external_load_n = 0.3;
+    p.final_velocity_m_s = 0.0001;
+    let e = phase_electrical();
+    let r = evaluate_move(&p, &e).unwrap();
+    assert!(r.feasible);
+    near(r.mechanical_balance_residual_j, 0.0, 1e-10);
+    near(r.electrical_balance_residual_j, 0.0, 1e-9);
+    for s in r.samples {
+        near(
+            dot(s.required_phase_voltages_v, s.phase_currents_a),
+            s.mechanical_power_w + s.copper_loss_w + s.magnetic_power_w,
+            1e-12,
+        );
+        near(s.phase_currents_a.iter().sum(), 0.0, 1e-12);
+    }
+}
+
+#[test]
+fn nonpassive_or_asymmetric_phase_inductance_and_bad_phase_maps_are_rejected() {
+    let mut e = phase_electrical();
+    e.phase_model.as_mut().unwrap().inductance_h[0][0] = -0.1;
+    assert!(evaluate_move(&profile(), &e)
+        .unwrap_err()
+        .contains("positive semidefinite"));
+    e = phase_electrical();
+    e.phase_model.as_mut().unwrap().inductance_h[1][0] = 0.1;
+    assert!(evaluate_move(&profile(), &e)
+        .unwrap_err()
+        .contains("symmetric"));
+    e = phase_electrical();
+    e.phase_model.as_mut().unwrap().force_map[1].position_m = -1.0;
+    assert!(evaluate_move(&profile(), &e)
+        .unwrap_err()
+        .contains("per-phase"));
+}
+
+#[test]
+fn cancellation_never_returns_a_partial_or_old_result() {
+    use std::cell::Cell;
+    let checks = Cell::new(0);
+    let error = evaluate_move_with_cancel(&profile(), &electrical(), &|| {
+        checks.set(checks.get() + 1);
+        checks.get() > 10
+    })
+    .unwrap_err();
+    assert!(error.contains("cancelled"));
+    assert_eq!(checks.get(), 11);
 }
