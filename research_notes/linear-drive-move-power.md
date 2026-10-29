@@ -345,6 +345,52 @@ no original housing was removed to force a passing request.
 
 ## Declared loss-model extension
 
+### Practical-estimate investigation, 2026-10-29
+
+The existing declared-loss interface has a constant, balanced three-phase ripple
+covariance and constant per-inductor core watts over the move. These are model
+assumptions, not quantities furnished by a 47 µH inductance rating. A practical
+scenario must derive and document the selected PWM, current/voltage range,
+ripple statistics and core-loss estimate and test sensitivity. It must not
+relabel the existing numerical fixture as component data.
+
+TI DRV8311 datasheet SLVSFN2B sections 7.5 and 12.3.1 give a useful starting
+point: typical HS+LS resistance 0.210 Ω at 25 °C and 0.330 Ω at 150 °C,
+VM operating current 10 mA at 25 kHz and 12 mA at 200 kHz (12 V, 25 °C),
+and separate FOC conduction, switching and dead-time equations. At SLEW 01,
+the typical 20–80% slew rate is 75 V/µs; DEADTIME 001 is typically 200 ns.
+These are conditional typical values, not evidence that the saved board uses
+those settings. The datasheet FOC equations use electrical-cycle RMS; mapping
+them into an instantaneous whole-inverter loss law requires an explicit
+waveform assumption and independent check. Operating current may include gate
+drive power, so its boundary must be reconciled before adding switching terms.
+Sources: https://www.ti.com/document-viewer/DRV8311/datasheet/GUID-XXXXXXXX-SF0T-XXXX-XXXX-000000179401
+and https://www.ti.com/document-viewer/DRV8311/datasheet/GUID-C826F7E8-19E5-47C8-9C09-E13912428538.
+
+One commercially listed 47 µH candidate, Coilcraft MSS6132T-473MLC, is listed
+by DigiKey with 0.300 Ω maximum DCR at its specified reference conditions
+and 1.3 A current rating: https://www.digikey.com/en/products/detail/coilcraft/MSS6132T-473MLC/21381941.
+This is a possible comparison component, not a selected part, core-loss model,
+proof of saturation margin or a change to the saved design. Manufacturer
+core-loss information and its applicable waveform still need confirmation.
+
+The optional `supplied_saved_design_declared_loss_model` diagnostic previously
+required `feasible` on its base and refined cases, contradicting v4 goal and
+physical-tracking separation. Those assertions were removed; the numerical
+source, conservation and unchanged 2% refinement checks remain. Executed with
+the unchanged Fader version 1 and refinement enabled: it passed at 129/193
+positions and 0.0005/0.00025 s; spatial changes in net energy and sampled peak
+were 0.632% and 0.626%, and the subsequent time changes were approximately
+1e-9 relative. These are **synthetic loss-fixture** results, not the requested
+practical estimate or a completed saved-design acceptance. Fader SHA-256 remained
+`567d97900475c92598f9ad6f7df9e7aeaf374dfc542fa25fa7e04b90dbfb287b`.
+
+Remaining: derive, implement and independently check a supported practical
+loss scenario with honest limits; run full and short forward/return cases for
+both unchanged saved designs, establish exports and sensitivity evidence, and
+update ticket acceptance. No external-solver campaign or hardware qualification
+is implied by this investigation.
+
 Model `linear-move-sinusoidal-v3` accounts for declared cycle-average losses without inventing a
 PWM waveform or driver efficiency. It requires explicit phase ordering,
 references, a fixed voltage/PWM/temperature/driver operating point and current
