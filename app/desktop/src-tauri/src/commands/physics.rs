@@ -886,11 +886,11 @@ mod analyze_drive_tests {
             let sweep = tauri::async_runtime::block_on(evaluate_force_sweep(ipc.clone(), None, Some(force_settings))).unwrap();
             let kf = sweep.mean_thrust_n.abs() / sweep.current_a;
             eprintln!("width={width_mm} computed Kf={kf} N/A");
-            // Compact braid geometry, physical barrel spans and signed via force.
+            // Full four-layer compact braid, physical spans and signed via force.
             // This legacy excitation reference does not qualify a star controller.
             // Magpylib + independent R/current/dL reconstruction verifies this
             // fixture with its exported excitation; controller PWM is unqualified.
-            assert!((kf - 0.5942095155).abs() < 1e-8, "DRV8311 Kf changed: {kf}");
+            assert!((kf - 0.9262418795).abs() < 1e-8, "DRV8311 Kf changed: {kf}");
             for copper in [3.0] {
                 for voltage in [5.0] {
                     for current in [1.1] {
@@ -903,8 +903,8 @@ mod analyze_drive_tests {
                         settings.ripple_limit_fraction = 0.35;
                         settings.voltage_headroom = 0.95;
                         let a = tauri::async_runtime::block_on(analyze_drive(ipc.clone(), settings.clone(), Some(kf), None)).unwrap();
-                        assert!((a.thrust_n.unwrap() - 0.6536304671).abs() < 1e-8);
-                        assert!((a.speed_voltage_v.unwrap() - 4.0956500486).abs() < 1e-8);
+                        assert!((a.thrust_n.unwrap() - 1.0188660674).abs() < 1e-8);
+                        assert!((a.speed_voltage_v.unwrap() - 7.8028210070).abs() < 1e-8);
                         let mut goals = ipc.clone();
                         goals.target_force_n = 100.0;
                         goals.peak_force_n = 0.001;
@@ -958,7 +958,7 @@ mod analyze_drive_tests {
     }
 
     /// The command runs on the app's default design and reports the routed
-    /// braid: three connected phases with five strands each.
+    /// four-layer star braid: three connected phases with one routed line each.
     #[test]
     fn command_reports_the_default_braid() {
         let ipc = crate::ipc::ProjectConfigStateIpc::default().to_linear_motor_ipc();

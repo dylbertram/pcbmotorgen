@@ -8,10 +8,8 @@ use crate::model::RoutingResult;
 ///
 /// Elements are grouped by `(layer_idx, phase_name)`. Because a `PhaseCoil`
 /// carries a single `layer_idx`, each (layer, net) pair becomes its own coil.
-/// Vias are collected (by net+layer pair only as positions — the writer's
-/// through-via model does not carry from/to direction, which is acceptable for
-/// preview; the dedicated writer path can read the full directions from the
-/// `RoutingResult` when needed).
+/// Vias retain exact spans as well as legacy preview positions. A single
+/// per-coil layer pair cannot represent mixed pair/full-stack barrels.
 pub fn routing_result_to_phase_coils(result: &RoutingResult, pattern_id: &str) -> Vec<PhaseCoil> {
     // key: (layer, net) -> coil index
     let mut coils: Vec<PhaseCoil> = Vec::new();
@@ -71,15 +69,17 @@ pub fn routing_result_to_phase_coils(result: &RoutingResult, pattern_id: &str) -
 
     for v in &result.vias {
         let key = (v.from_layer, v.net.clone());
-        if let Some(&idx) = index.get(&key) {
-            coils[idx]
-                .center_via_positions
-                .push((v.position.x, v.position.y));
-        } else {
-            // Via on a layer with no conductor — attach to a coil on that
-            // layer+net if one exists later, else drop (preview only).
-            let _ = v;
-        }
+        let idx = *index.entry(key).or_insert_with(|| {
+            coils.push(PhaseCoil {
+                layer_idx: v.from_layer,
+                phase_name: v.net.clone(),
+                pattern_id: pattern_id.to_string(),
+                ..PhaseCoil::default()
+            });
+            coils.len() - 1
+        });
+        coils[idx].routed_vias.push(v.clone());
+        coils[idx].center_via_positions.push((v.position.x, v.position.y));
     }
 
     // Assign a distinct enumerated phase_idx per distinct net for stability.

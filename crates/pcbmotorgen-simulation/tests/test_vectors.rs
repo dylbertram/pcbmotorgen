@@ -155,6 +155,7 @@ fn coil_vector_to_phase_coil(cv: &CoilVector) -> PhaseCoil {
         pattern_id: cv.topology.clone(),
         layer_pair: None,
         center_via_positions: vec![],
+        routed_vias: vec![],
     }
 }
 

@@ -67,6 +67,9 @@ pub struct PhaseCoil {
     pub layer_pair: Option<(u32, u32)>,
     #[serde(default)]
     pub center_via_positions: Vec<(f64, f64)>,
+    /// Exact barrel spans, including mixed pair and full-stack connections.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub routed_vias: Vec<crate::Via>,
 }
 
 fn default_pattern_id() -> String {
@@ -193,6 +196,7 @@ impl Default for PhaseCoil {
             pattern_id: "infinity-braid".into(),
             layer_pair: None,
             center_via_positions: vec![],
+            routed_vias: vec![],
         }
     }
 }

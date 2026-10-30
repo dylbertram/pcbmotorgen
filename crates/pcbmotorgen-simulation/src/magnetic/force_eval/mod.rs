@@ -650,6 +650,7 @@ mod tests {
             pattern_id: "infinity-braid".to_string(),
             layer_pair: None,
             center_via_positions: vec![],
+            routed_vias: vec![],
         }
     }
 
@@ -698,6 +699,7 @@ mod tests {
                     pattern_id: "serpentine-test".to_string(),
                     layer_pair: None,
                     center_via_positions: vec![],
+                    routed_vias: vec![],
                 }
             })
             .collect()

@@ -1,12 +1,12 @@
 //! The "infinity" diamond braid routing pattern.
 //!
 //! Faithful Rust port of `docs/reference/pcbBraid` (after Verbeek & Dehez).
-//! Produces a two-layer braid: `top_layer_segments` on layer 0, `bottom_layer_segments`
-//! on layer 1, and vias (at every peak/valley/edge endpoint) routing 0 → 1.
+//! Produces a two-layer braid on 0/1, or a four-layer series stack on
+//! 0/1 and 2/3 with matching active XY geometry on each pair.
 //!
-//! Pattern-owned layer semantics: this pattern is inherently 2-layer and uses
-//! vias at crossing points. It is not constrained by the earlier single-layer
-//! ranking.
+//! Pattern-owned layer semantics: the repeating braid uses two layers and
+//! vias at crossing points. The four-layer termination connects the pairs in
+//! series, with line leads on layer 3 and star neutral on layer 0.
 //!
 //! ## Magnet-aware period count
 //!
@@ -81,8 +81,15 @@
 //!
 //! Leads are inactive (non-thrust) conductors and are the only copper the
 //! braid places outside the board width.
+//!
+//! Those lead details describe the unchanged two-layer layout. Four-layer
+//! star/delta repeats the braid on 2/3, joins the opened 1/2 ends at raised
+//! barrels and brings the line leads out on layer 3. Layer-0 outer ends make
+//! the neutral or delta connection. Closed mode retains separate closed
+//! rings in each pair, without inventing external terminals or series links.
 
 mod diamonds;
+mod four_layer;
 mod peaks_valleys;
 mod segments;
 
@@ -105,7 +112,7 @@ enum Connection {
     Closed,
     /// Each phase is opened and both ends are brought out as leads.
     Delta,
-    /// As [`Connection::Delta`], with the layer-1 ends tied by a neutral bus.
+    /// Layer-0 ends tied by a neutral bus; opposite outer-layer ends are leads.
     Star,
 }
 
@@ -137,7 +144,7 @@ impl RoutingPattern for InfinityBraidPattern {
     }
 
     fn description(&self) -> &str {
-        "Two-layer overlapping diamond braid after Verbeek & Dehez, with vias at crossing points."
+        "Two- or four-layer diamond braid after Verbeek & Dehez; four-layer star/delta connects two braid pairs in series."
     }
 
     fn author(&self) -> &str {
@@ -180,6 +187,16 @@ impl RoutingPattern for InfinityBraidPattern {
         Some(2)
     }
 
+    fn max_layers(&self) -> Option<u32> {
+        // Only the two-layer braid and the reference four-layer series stack
+        // have defined terminations. Never silently leave extra layers empty.
+        Some(4)
+    }
+
+    fn layers_multiple_of(&self) -> Option<u32> {
+        Some(2)
+    }
+
     fn expects_continuous(&self) -> bool {
         // The braid is a deliberate weave of many interleaved strands; it is
         // not a single continuous per-(layer,net) path, so we do not enforce
@@ -209,6 +226,7 @@ impl RoutingPattern for InfinityBraidPattern {
             num_strands,
             connection,
             lead_pitch,
+            ctx.num_layers,
         );
 
         // Pattern-declared leg grid: the braid's active legs populate a
@@ -248,6 +266,10 @@ fn validated_braid_context(ctx: &RoutingContext) -> Result<Option<f64>, RoutingE
                 ctx.num_layers
             ),
         ));
+    }
+    if !matches!(ctx.num_layers, 2 | 4) {
+        return Err(RoutingError::new(0, "num_layers", RoutingErrorKind::BadLayer,
+            "the infinity braid supports 2 or 4 copper layers"));
     }
     if !ctx.active_area_length_mm.is_finite() || ctx.active_area_length_mm <= 0.0 {
         return Err(RoutingError::new(
@@ -381,6 +403,7 @@ fn braid_geometry(
     num_strands: i64,
     connection: Connection,
     lead_pitch: f64,
+    num_layers: u32,
 ) -> BraidGeometry {
     let offset_step = -layout.o * num_strands as f64;
     let mut geometry = BraidGeometry {
@@ -492,7 +515,9 @@ fn braid_geometry(
         }
     }
 
-    if connection != Connection::Closed {
+    if num_layers == 4 {
+        four_layer::stack_and_terminate(&mut geometry, &ends, connection, lead_pitch);
+    } else if connection != Connection::Closed {
         add_leads(&mut geometry, &ends, connection, lead_pitch);
     }
 
@@ -917,7 +942,9 @@ mod tests {
             link(node(s.layer, s.start), node(s.layer, s.end));
         }
         for v in r.vias.iter().filter(|v| v.net == net) {
-            link(node(v.from_layer, v.position), node(v.to_layer, v.position));
+            for layer in v.from_layer..v.to_layer {
+                link(node(layer, v.position), node(layer + 1, v.position));
+            }
         }
         g
     }
@@ -1038,7 +1065,9 @@ mod tests {
             link(node(s.layer, s.start), node(s.layer, s.end));
         }
         for v in vias {
-            link(node(v.from_layer, v.position), node(v.to_layer, v.position));
+            for layer in v.from_layer..v.to_layer {
+                link(node(layer, v.position), node(layer + 1, v.position));
+            }
         }
         g
     }
@@ -1136,6 +1165,59 @@ mod tests {
         assert!(report.dimensions.pole_pitch_mm.is_none());
         assert_eq!(report.dimensions.period_count, Some(4));
         assert!(report.dimensions.period_pitch_mm.unwrap() > 0.0);
+    }
+
+    #[test]
+    fn four_layer_stack_populates_every_layer_and_connects_pairs_in_series() {
+        for strands in [2, 3, 5] {
+            let mut context = fader_ctx(2.0);
+            context.num_layers = 4;
+            context.params.insert("num_strands".into(), strands as f64);
+            let result = InfinityBraidPattern.generate(&context).unwrap();
+            assert!(Validator::validate(&result, &context, false).is_ok());
+            assert_eq!(result.phase_bands.len(), 12);
+            for layer in 0..4 {
+                assert!(result.segments.iter().any(|s| s.layer == layer && s.is_active));
+                for net in ["A", "B", "C"] {
+                    let active = |l| result.segments.iter().filter(|s| s.layer == l && s.is_active && s.net == net)
+                        .map(|s| (s.start, s.end)).collect::<Vec<_>>();
+                    assert_eq!(active(layer), active(layer % 2));
+                }
+            }
+            let bridges: Vec<_> = result.vias.iter().filter(|v| v.from_layer == 0 && v.to_layer == 3).collect();
+            assert_eq!(bridges.len(), 3);
+            for net in ["A", "B", "C"] {
+                assert!(connected(&net_graph(&result, net)));
+                let bridge = bridges.iter().find(|v| v.net == net).unwrap();
+                // Only layers 1 and 2 land on the through barrel. No outer
+                // lead or neutral trace may touch it and bypass a braid pair.
+                for layer in [0, 3] {
+                    assert!(!result.segments.iter().filter(|s| s.layer == layer).any(|s| {
+                        let p = bridge.position;
+                        let cross = (p.x-s.start.x)*(s.end.y-s.start.y) - (p.y-s.start.y)*(s.end.x-s.start.x);
+                        cross.abs() < 1e-8 && p.x >= s.start.x.min(s.end.x)-1e-8 && p.x <= s.start.x.max(s.end.x)+1e-8
+                            && p.y >= s.start.y.min(s.end.y)-1e-8 && p.y <= s.start.y.max(s.end.y)+1e-8
+                    }));
+                }
+                let mut cut = result.clone();
+                cut.vias.retain(|v| !(v.net == net && v.from_layer == 0 && v.to_layer == 3));
+                assert!(!connected(&net_graph(&cut, net)), "removing the series join must separate the two winding pairs");
+            }
+            assert!(result.segments.iter().filter(|s| !s.is_active && s.start.x == 0.0 || !s.is_active && s.end.x == 0.0)
+                .all(|s| s.layer == 3));
+        }
+    }
+
+    #[test]
+    fn rejects_undefined_braid_stack_counts_instead_of_leaving_layers_empty() {
+        for layers in [1, 3, 5, 6, 8] {
+            let mut context = fader_ctx(2.0);
+            context.num_layers = layers;
+            assert_eq!(InfinityBraidPattern.generate(&context).unwrap_err().kind, RoutingErrorKind::BadLayer);
+            assert!(crate::generate_routing_result(&context, "infinity-braid").is_err());
+        }
+        assert_eq!(InfinityBraidPattern.layers_multiple_of(), Some(2));
+        assert_eq!(InfinityBraidPattern.max_layers(), Some(4));
     }
 
     #[test]

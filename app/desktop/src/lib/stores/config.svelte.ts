@@ -83,7 +83,7 @@ export class ConfigStore {
   /** User-editable routing-pattern parameter values, keyed by `def.key`
    *  (e.g. `num_strands`, `n_periods`). Empty = pattern defaults. Sent to
    *  the backend as `routing_params`. */
-  routing_params = $state<Record<string, number>>({});
+  routing_params = $state<Record<string, number>>({ connection: 2 });
   /** Declared user-editable parameter definitions for the currently
    *  selected routing pattern (`routing_pattern_parameters`). */
   routing_param_defs = $state<RoutingParamDef[]>([]);

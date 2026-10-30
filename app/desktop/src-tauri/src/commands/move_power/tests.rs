@@ -178,6 +178,8 @@ fn profile() -> MoveProfile {
 #[test]
 fn generated_unknown_and_delta_connections_are_not_silently_reinterpreted() {
     let mut config = crate::ipc::ProjectConfigStateIpc::default().to_linear_motor_ipc();
+    assert!(validate_star(&config, None).is_ok());
+    config.routing_params.clear();
     assert!(validate_star(&config, None).is_err());
     config.routing_params.insert("connection".into(), 1.0);
     assert!(validate_star(&config, None).is_err());
