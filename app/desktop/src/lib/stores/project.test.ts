@@ -440,6 +440,18 @@ describe("ProjectStore newProject", () => {
     vi.mocked(confirmDiscardChanges).mockReset();
   });
 
+  it("starts new motor designs in star without changing saved connection choices", () => {
+    const { config, projects } = makeStores();
+    expect(config.routing_params.connection).toBe(2);
+    const choices: Record<string, number>[] = [{}, { connection: 0 }, { connection: 1 }, { connection: 2 }];
+    for (const params of choices) {
+      const saved = projects.snapshotIpc();
+      saved.config.routing_params = params;
+      projects.applyToState(saved);
+      expect(projects.snapshotIpc().config.routing_params).toEqual(params);
+    }
+  });
+
   it("resets motor, sensor, mover, file path, CAD, and messages", async () => {
     const { config, motion, sensor, projects } = makeStores();
     const defaults = projects.snapshotIpc();

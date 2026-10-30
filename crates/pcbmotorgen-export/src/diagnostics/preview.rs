@@ -195,13 +195,11 @@ fn test_preview_coils_produces_tracks() {
 
 #[test]
 fn test_preview_coils_per_layer_count_matches_phases() {
-    // The infinity-braid is an inherently 2-layer weave: it produces one coil
-    // per (layer, net) pair on layers 0 and 1 only. On a 3-phase board that
-    // is 3 coils per populated layer (A, B, C).
+    // The four-layer braid populates both pairs, with one presentation coil
+    // per (layer, net), three coils per layer on a three-phase board.
     let coils = braid_coils(4);
     let preview = preview_coils(&coils, 4).expect("preview");
-    // Only the two distinct used layers (0 and 1) are reported.
-    assert_eq!(preview.layers.len(), 2);
+    assert_eq!(preview.layers.len(), 4);
     for layer in &preview.layers {
         assert_eq!(
             layer.phase_count, 3,

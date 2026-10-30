@@ -7,6 +7,79 @@ remain as a record of what was implemented and tested, not current requirements.
 
 ## Supported model
 
+### Four-layer braid generation and DXF references, 2026-10-30
+
+The user confirmed the restored compact two-layer generation, then supplied
+`star_2-layer.pmmotor`, `star_4-layer.pmmotor` and both `star-wye_*-layer.dxf`
+files to correct the four-layer case. The generator had ignored the requested
+four layers and emitted copper only on 0/1. Four-layer star/delta now repeats
+the unchanged active braid on 2/3 and connects the opened 1/2 ends in series at
+raised full-span barrels. Those barrels land on copper only on layers 1 and 2;
+outer-layer leads extend away from them to avoid bypassing a winding pair.
+Line terminals are on layer 3, star neutral on layer 0. No terminal reversal,
+phase relabeling or compact-XY change was made. Closed mode remains separate
+closed rings in each pair, not a terminated driver winding.
+
+Only two and four layers have implemented stack semantics. The pattern now
+rejects other counts rather than silently leaving selected layers empty.
+New projects explicitly select star in both frontend and native defaults.
+Saved choices, including empty/missing routing parameters, retain their old
+meaning; native deserialization and frontend restore regressions cover this.
+The four-layer project's config is stale delta/five-strand data; its actual
+embedded copper, confirmed by the four-layer DXF, is three-strand star.
+Neither supplied project nor DXF was rewritten to fix that mismatch.
+
+`PhaseCoil.routed_vias` preserves mixed 0/1, 2/3 and 0/3 barrel spans through
+presentation and CAD conversion. Legacy position-only coils retain their
+fallback. A CAD/DXF round-trip regression checks every via's net, position and
+span after accounting for DXF's bottom-to-top plane indexing. The generated
+top-to-bottom stack still spans 0 to minus the configured PCB thickness.
+The existing KiCad IPC writer only emits through vias. Direct writes and
+dry runs now reject separate layer-pair barrels before any IPC instead of
+widening them and shorting the series pairs. Blind/buried-via writing remains
+unsupported; use span-preserving 3D DXF for this geometry. No fabrication or
+finite-width clearance acceptance is claimed.
+
+Evidence, all under the approved OpenCode temp directory:
+
+- `four-layer-final-references-20261030.log`: ignored native reference test
+  passed against both unchanged projects and both DXFs. Generated active copper
+  on every layer matches clipped reference copper at 1e-5 mm rounding. Clipping
+  to y=0..8 mm excludes differently extended/filleted external leads, so this
+  is not an exact external-lead-shape comparison. Barrel-span counts match,
+  inferred line/neutral layers match, each four-layer series link carries one
+  amp per terminal amp, and removing it disconnects the winding pairs.
+- Routing/current regressions cover 2/3/5 strands, equal signed currents in
+  matching active layers of both pairs and absence of outer-layer copper at
+  series joins. Existing compact endpoint-grid checks remain unchanged.
+- `four-layer-generated-oracle-20261030/summary.json` and
+  `four-layer-driver-oracle-20261030/summary.json`: independent R/current/dL and
+  prescribed-PM free-space force checks pass at meshes 20 and 40. Source capture
+  now includes `four_layer.rs`. Summary SHA-256 values are respectively
+  `0eb037d83113f02f6078d9a2b096489b5d6bc6e114da5a8b63c8e30ef10a455d`
+  and `24b74e517b86e9b158074678728e83f736388c1a40b29ee189ee705f2548c0b8`.
+  The independent driver fixture verifies Kf=0.9262418794532284 N/A,
+  thrust=1.0188660673985515 N and speed voltage=7.80282100697782 V at mesh 20.
+  Only after this check were geometry-specific regression constants updated.
+  This verifies the exported legacy excitation, not controller applicability.
+- `four-layer-braid-20261030.png`: actual native generated copper on all four
+  layers and enlarged lead/join regions was visually inspected.
+- `four-layer-all-rust-final-20261030.log`: 718 Rust tests pass, 24 unit and
+  three doc tests explicitly ignored. The supplied-reference test passed
+  separately. Frontend: 555 tests pass, four skipped; Svelte check/build pass.
+  Old writer mocks that requested unsupported three-layer braids now use
+  nonempty two-layer fixtures rather than passing with no submitted items.
+  The historical two-layer plausibility fixture now explicitly requests two
+  layers; its physical bounds were not widened for the new four-layer case.
+
+The new two-layer DXF SHA-256 is
+`fc166c0f3bf82e16bf5531878001c281b1c9e7946f5cc45b5921479c5d70009b`.
+The four earlier supplied file hashes are unchanged from the rollback record.
+Model version `linear-move-demand-v8` distinguishes the populated four-layer
+geometry. No new move-power estimate is accepted or substituted for the
+retracted result below. Terminal/controller audit and the other #7744 practical
+estimate limitations remain open.
+
 ### Retraction of doubled phase-start spacing, 2026-10-30
 
 **Current status:** the widened layout introduced by `a496f71` is rejected.

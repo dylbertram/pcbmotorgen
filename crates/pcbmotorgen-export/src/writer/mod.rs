@@ -197,6 +197,7 @@ pub fn sensor_geometry_to_board_items(
                     .collect(),
                 phase_name: net.name.clone(),
                 pattern_id: "induction-position-sensor".into(),
+                routed_vias: Vec::new(),
                 layer_pair: Some((0, 1)),
                 // Emit each net's vias exactly once, along with its B.Cu path.
                 center_via_positions: if board_layer == 0 {

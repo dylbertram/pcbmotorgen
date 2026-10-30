@@ -155,6 +155,8 @@ pub struct ProjectConfigStateIpc {
 
     // --- Coil / routing (generation settings) ---
     pub routing_pattern: String,
+    // Do not apply the new-project termination to old files with no params.
+    #[serde(default)]
     pub routing_params: HashMap<String, f64>,
     pub phases: u32,
     pub num_layers: u32,
@@ -230,7 +232,9 @@ impl Default for ProjectConfigStateIpc {
             air_gap_mm: 0.5,
             electrical_pitch_mm: 12.0,
             routing_pattern: "infinity-braid".to_string(),
-            routing_params: HashMap::new(),
+            // New driver-ready projects use terminated star windings. Bare
+            // routing contexts can still explicitly request closed rings.
+            routing_params: HashMap::from([("connection".into(), 2.0)]),
             phases: 3,
             num_layers: 4,
             max_current_a: 1.0,
@@ -652,6 +656,21 @@ mod tests {
         assert_eq!(state.config.capacitor_bank_uf, 1000.0);
         assert!(state.config.routing_params.is_empty());
         assert!(state.cad_geometry.is_none());
+    }
+
+    #[test]
+    fn new_project_star_default_does_not_reinterpret_legacy_or_explicit_connections() {
+        assert_eq!(ProjectConfigStateIpc::default().routing_params["connection"], 2.0);
+        for value in [serde_json::json!({}), serde_json::json!({"routing_params": {}})] {
+            let loaded: ProjectConfigStateIpc = serde_json::from_value(value).unwrap();
+            assert!(loaded.routing_params.is_empty());
+        }
+        for connection in [0.0, 1.0, 2.0] {
+            let loaded: ProjectConfigStateIpc = serde_json::from_value(serde_json::json!({
+                "routing_params": {"connection": connection}
+            })).unwrap();
+            assert_eq!(loaded.routing_params["connection"], connection);
+        }
     }
 
     #[test]

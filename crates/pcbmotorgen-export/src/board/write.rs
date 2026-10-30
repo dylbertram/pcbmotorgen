@@ -17,6 +17,42 @@ use crate::writer::{
     coils_to_board_items, io_elements_to_board_items, sensor_geometry_to_board_items,
 };
 
+// The current IPC writer emits through vias only. Widening separate 0/1 and
+// 2/3 barrels to the full board would short the new series winding pairs.
+fn validate_through_via_spans(coils: &[PhaseCoil], num_layers: u32) -> Result<(), KiCadError> {
+    for via in coils.iter().flat_map(|c| &c.routed_vias) {
+        if num_layers < 2 || via.from_layer.min(via.to_layer) != 0
+            || via.from_layer.max(via.to_layer) != num_layers - 1 {
+            return Err(KiCadError::Protocol(
+                "KiCad writing currently supports through vias only. This winding needs separate layer-pair barrels; use the span-preserving 3D DXF export until blind/buried-via writing is supported.".into(),
+            ));
+        }
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod via_span_tests {
+    use super::*;
+
+    #[test]
+    fn layer_pair_barrels_are_rejected_instead_of_shorting_a_series_stack() {
+        let mut coil = PhaseCoil {
+            routed_vias: vec![pcbmotorgen_routing::Via {
+                position: pcbmotorgen_routing::Point::new(1.0, 2.0),
+                from_layer: 0, to_layer: 1, net: "A".into(),
+            }],
+            ..Default::default()
+        };
+        assert!(validate_through_via_spans(&[coil.clone()], 2).is_ok());
+        assert!(validate_through_via_spans(&[coil.clone()], 4).is_err());
+        coil.routed_vias[0].to_layer = 3;
+        assert!(validate_through_via_spans(&[coil.clone()], 4).is_ok());
+        coil.routed_vias[0].from_layer = 2;
+        assert!(validate_through_via_spans(&[coil], 4).is_err());
+    }
+}
+
 impl<'a> BoardHandle<'a> {
     /// Write coils to the board atomically.
     ///
@@ -133,6 +169,7 @@ impl<'a> BoardHandle<'a> {
         active_area_length_mm: f64,
         dry_run: bool,
     ) -> Result<WriteCoilsResult, KiCadError> {
+        validate_through_via_spans(coils, num_layers)?;
         let items = coils_to_board_items(coils, num_layers, rules, active_area_length_mm);
         let items_attempted = items.len() as u32;
 

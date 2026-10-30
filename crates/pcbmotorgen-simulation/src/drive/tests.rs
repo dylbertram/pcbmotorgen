@@ -40,6 +40,54 @@ fn compact_braid_simulated_terminal_axes_are_diagnostic_not_a_spacing_target() {
 }
 
 #[test]
+fn four_layer_braid_carries_series_current_in_both_pairs_without_polarity_reversal() {
+    for strands in [2, 3, 5] {
+        let ctx = RoutingContext {
+            active_area_length_mm: 92.0, board_width_mm: 8.0, num_layers: 4, phases: 3,
+            min_trace_mm: 0.127, trace_width_mm: 0.2, min_space_mm: 0.127,
+            params: std::collections::HashMap::from([("num_strands".into(), strands as f64), ("connection".into(), 2.0)]),
+            magnet_pitch_mm: Some(6.0), magnet_array_span_mm: Some(29.0), ..Default::default()
+        };
+        let routing = generate_routing_result(&ctx, "infinity-braid").unwrap();
+        let networks = extract_phase_networks(&routing);
+        assert_eq!(networks.len(), 3);
+        for net in &networks {
+            assert_eq!(net.layers(), vec![0, 1, 2, 3]);
+            let solution = solve_network(net, &vec![1.0; net.edges.len()]);
+            assert!(solution.connected, "{} must connect line to neutral", net.net);
+            let mut joins = 0;
+            for (edge, current) in net.edges.iter().zip(&solution.current_share) {
+                if let EdgeKind::Via { layers: [1, 2], .. } = edge.kind {
+                    joins += 1;
+                    assert!((current.abs() - 1.0).abs() < 1e-8, "the series link carries the entire terminal current");
+                }
+            }
+            assert_eq!(joins, 1);
+            let active = |layer| net.edges.iter().zip(&solution.current_share).filter_map(|(edge, current)| {
+                match &edge.kind {
+                    EdgeKind::Trace { layer: l, points, .. } if *l == layer && points.iter().all(|p| p[1] <= 0.008 + 1e-12) => Some((points, current)),
+                    _ => None,
+                }
+            }).collect::<Vec<_>>();
+            for layer in [0, 1] {
+                let first = active(layer);
+                let second = active(layer + 2);
+                assert_eq!(first.len(), second.len());
+                for ((a, ia), (b, ib)) in first.iter().zip(&second) {
+                    assert_eq!(a, b);
+                    assert!((*ia - *ib).abs() < 1e-8, "stacked active paths must carry equal signed currents");
+                }
+            }
+        }
+        let mut cut = routing.clone();
+        cut.vias.retain(|v| v.from_layer != 0 || v.to_layer != 3);
+        for net in extract_phase_networks(&cut) {
+            assert!(!solve_network(&net, &vec![1.0; net.edges.len()]).connected);
+        }
+    }
+}
+
+#[test]
 fn signed_branch_currents_obey_kirchhoff_and_power_balance() {
     use super::geometry::Edge;
     let net = PhaseNetwork {
@@ -758,11 +806,13 @@ fn backplane_physics_and_drag_crossing_do_not_depend_on_goal_driven_plot_bounds(
 }
 
 #[test]
-fn braid_fixture_produces_plausible_values() {
+fn two_layer_braid_fixture_produces_plausible_values() {
+    // These original bounds describe the two-layer weave that this fixture
+    // historically generated, even when it incorrectly requested four layers.
     let ctx = RoutingContext {
         active_area_length_mm: 147.0,
         board_width_mm: 20.0,
-        num_layers: 4,
+        num_layers: 2,
         phases: 3,
         min_trace_mm: 0.127,
         trace_width_mm: 0.127,
@@ -774,7 +824,7 @@ fn braid_fixture_produces_plausible_values() {
         phase_clearance_mm: None,
     };
     let routing = generate_routing_result(&ctx, "infinity-braid").expect("braid");
-    let s = SimulationInput { num_layers: 4, min_trace_m: 0.127e-3, magnet_pitch_m: 6e-3, ..SimulationInput::default() };
+    let s = SimulationInput { num_layers: 2, min_trace_m: 0.127e-3, magnet_pitch_m: 6e-3, ..SimulationInput::default() };
     let a = analyze_drive(&s, &routing, &DriveSettings::default(), Some(0.3));
     eprintln!(
         "R={:.3} Ω L={:.2} µH M={:.2} µH L_LL={:.2} µH ripple={:.2} A strands={} vias/strand={} len/strand={:.1} mm",

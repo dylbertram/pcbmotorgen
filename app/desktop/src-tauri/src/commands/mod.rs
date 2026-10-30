@@ -81,6 +81,9 @@ pub mod workspace;
 pub mod routing_plugins;
 pub mod sensor;
 
+#[cfg(test)]
+mod braid_reference_tests;
+
 // Flat re-exports keep `commands::Foo` paths working for any consumer that
 // does not want to name the submodule. `main.rs` currently registers handlers
 // with the explicit submodule paths, so these globs are referenced by the

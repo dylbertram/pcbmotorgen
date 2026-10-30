@@ -8,7 +8,7 @@ use losses::{DeclaredLossModel, LossEnergy, LossOperatingPoint, LossSample};
 use serde::{Deserialize, Serialize};
 use std::f64::consts::TAU;
 
-pub const MODEL_VERSION: &str = "linear-move-demand-v7";
+pub const MODEL_VERSION: &str = "linear-move-demand-v8";
 const MAX_INTERVALS: usize = 200_000;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
