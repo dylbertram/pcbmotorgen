@@ -12,22 +12,15 @@ import numpy as np
 from scipy.sparse import coo_matrix
 from scipy.sparse.linalg import spsolve
 from solvers.winding_oracle import resistances,unit_currents,conductor_samples
+from solvers.prescribed_pm_oracle import field_b
 
 parser=argparse.ArgumentParser(description=__doc__)
 parser.add_argument('--fixture',type=Path,default=Path('app/desktop/src-tauri/magpylib-fixture.json'))
 args=parser.parse_args()
 data = json.loads(args.fixture.read_text())
 s = data["sim"]
-magnets = magpy.Collection(*[
-    magpy.magnet.Cuboid(
-        dimension=s["magnet_dims_m"],
-        polarization=(0, 0, s["magnet_remanence_t"] * (-1)**k),
-        position=(k*s["magnet_pitch_m"], s["board_width_m"]/2,
-                  s["air_gap_m"] + s["magnet_dims_m"][2]/2))
-    for k in range(s["magnet_count"])
-])
 points = np.array([(x, s["board_width_m"]/2, 0) for x in data["field_x_m"]])
-reference = magnets.getB(points)
+reference = field_b(s, points)
 rust = np.array(data["rust_b_t"])
 print("Magpylib", magpy.__version__)
 print("Maximum B discrepancy [T]:", np.max(np.abs(reference-rust)))
@@ -58,7 +51,7 @@ if "phase_a_samples" in data:
         for (positions,dl),current in zip(phases,currents):
             if current==0:continue
             observations = positions - np.array([offset, 0, 0])
-            field = magnets.getB(observations)
+            field = field_b(s, observations)
             force-=np.cross(dl,field).sum(axis=0)[0]*current
         forces.append(force)
     rust_force = np.array(data["rust_force_x_n"])

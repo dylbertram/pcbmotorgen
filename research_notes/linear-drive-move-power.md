@@ -7,6 +7,77 @@ remain as a record of what was implemented and tested, not current requirements.
 
 ## Supported model
 
+### Generated three-phase spacing correction, 2026-10-30
+
+Confirmed the generated two-layer star had the same 60-degree directed phase
+axes as the imported Fader. Root cause: the infinity braid translated equally
+oriented phase windings by `pole_pitch / 3`. This is one 60-degree phase belt,
+not a 120-degree equal-polarity phase separation. The generator now uses
+`2 * pole_pitch / 3` for three phases, with no terminal-polarity reversal or
+fitted motor constant. For a 6 mm pole pitch, starts are 4 mm apart rather than
+2 mm. Within-phase strand spacing stays `pole_pitch / (phases * strands)`.
+The complete staggered end span is reserved before choosing connected complete
+periods, so the corrected layout remains inside the configured board.
+Other phase counts retain their previous placement; they are not newly qualified.
+
+Generated phase-band positions now reach the routed static force commutation
+law instead of being lost to its legacy analytic 60-degree fallback. When CAD
+exchange omits the sidecar, three-phase routed MaxThrust uses an explicit
+balanced 120-degree current law. Legacy independent-coil analytic fixtures are
+unchanged. Exported/imported copies of the same new copper agree again.
+This also supersedes old imported static-force results that used unbalanced
+independent-coil currents. The supplied Fader copper itself is not regenerated
+or modified and still has its original noncanonical phase layout. Its explicit
+balanced-star move calculations are not silently converted to new geometry.
+
+Regression coverage includes three strand counts, signed unit-terminal force
+axes, zero-sum star currents, neutral/lead connectivity, strict routing bounds,
+delta/closed lead construction and generator/CAD parity. The new generated
+star force-map offsets are 70.4602°, -49.5403°, -169.5338°, with residuals below
+0.005° from a common 120-degree sequence. Evidence:
+`scripts/solvers/results/generated-star-commutation-2026-10-30.json`.
+
+All six saved-design/control moves were regenerated with fresh loss models and
+unchanged 2% energy/peak refinement and balance gates. The generated star v1,
+1.6 mm PCB, 0.2 mm width/1 oz, original 90-degree reference now estimates
+10.5056 W peak / 6.49745 J net for the full move, and 5.56903/5.57500 W peak
+for short forward/return. Full source peak is 0.875468 A and required maximum
+line voltage is 5.83679 V, with no modeled voltage finding. These are results
+for **new generated copper**, not improved numbers for the unchanged imported
+four-layer Fader. The regenerated Fader control retains its 0.8 mm scenario
+37.6338 W peak at 90 degrees. Model version v6 records the implementation change.
+Receipt: `scripts/solvers/results/practical-move-generator120-2026-10-30.json`.
+
+Independent verification used reconstructed nodal currents, R and trace/via
+dL with Magpylib cuboid fields at 20/40 conductor subdivisions. The first two
+attempts exposed batch-size-dependent SciPy/Magpylib identity-rotation output;
+their failed evidence remains in approved temp `generator120-oracle-20261030`
+and `generator120-oracle-v2-20261030`. The final oracle evaluates the same
+public functional cuboid field in bounded batches, tested against scalar
+object results and repeated arrays larger than 33,000 points. No reference
+force or tolerance was fitted to Rust output. Final 20/40 checks passed with
+force-vector refinement 0.000896 N below the unchanged 2% gate. Accepted full
+report: approved temp `generator120-oracle-final-20261030/summary.json`, SHA-256
+`6ae643a40540b79bec65e44e7d29dea3b2fae626acd3adae1a40a54a3c13ceab`.
+The earlier successful v3 report is retained as an intermediate checkpoint.
+This is free-space prescribed-magnet validation, not material/hardware qualification.
+
+The old generated driver-reference numbers were replaced only after the new
+geometry's independent check. The geometry-specific equilibrium test now pins
+the corrected 120-degree charge state and explicitly unbracketed legacy planar
+rest fallback, rather than requiring the old 60-degree braid's rest point.
+The known layered/imported travel-equilibrium limitation remains open.
+A one-ULP backplane repeatability failure now uses the existing tested 1e-13
+numerical-repeatability helper, with physical positive controls retained;
+energy, force-reference and convergence tolerances were not changed.
+
+Final affected Rust suites: 504 passed, 22 unit and one documentation test
+ignored. Frontend full suite 554 passed/4 skipped, native-receipt mapping
+17 passed separately; Svelte check/build pass; ten Python formula/audit tests
+pass. Additional DFM/export suites passed 206 tests, with one optional user-file
+and two documentation tests ignored. Supplied archive/DXF hashes remain unchanged. No push or supplied-file
+rewrite, and no nonlinear or long external-solver campaign was performed.
+
 ### Commutation alignment and copper-width check, 2026-10-30
 
 User clarified the requested copper is **0.2 mm trace width with 1 oz copper**.

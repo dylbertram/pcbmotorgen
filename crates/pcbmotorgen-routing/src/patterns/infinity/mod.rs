@@ -22,6 +22,12 @@
 //! Contexts built without a magnet layout fall back to the packaged `n_periods`
 //! default (kept for backward compatibility with plugin probes and unit tests).
 //!
+//! Three-phase windings use equal-polarity phase starts separated by two
+//! phase-belt pitches: `2 * pole_pitch / 3`, or 120 electrical degrees.
+//! The within-strand grid remains `pole_pitch / (phases * strands)`.
+//! One belt pitch would give 60-degree directed winding axes and is not a
+//! balanced three-phase star winding without an explicit polarity reversal.
+//!
 //! The geometry is split into three submodules:
 //! - [`diamonds`] — the diamond / period geometry engine,
 //! - [`peaks_valleys`] — peak / valley / braid-crossing computation,
@@ -292,16 +298,16 @@ fn resolve_braid_layout(
     phases: i64,
     num_strands: i64,
 ) -> Result<BraidLayout, RoutingError> {
+    let phase_stride = if phases == 3 { 2 } else { 1 };
+    let tail_slots = (phase_stride * (phases - 1) + 1) * num_strands - 1;
     match magnet_pitch {
         Some(pitch) => {
-            // The final right-hand endpoint is one interleave step before
-            // the end of the next period. Reserve that step before
-            // selecting the number of complete periods; otherwise the
-            // leftover remainder creates a visibly wide via gap between
-            // the last strand of one period and the first strand of the
-            // next period.
+            // Reserve the complete staggered phase/strand end span before
+            // selecting complete periods. Three equal-polarity phases need
+            // two belt pitches between starts, not the former one-belt span.
             let interleave_step = pitch / (num_strands * phases) as f64;
-            let mut n_periods = ((d_tot + interleave_step) / pitch).floor() as i64 - 1;
+            let tail_span = tail_slots as f64 * interleave_step;
+            let mut n_periods = ((d_tot - tail_span) / pitch).floor() as i64;
             // The braid's end joins permute its strands by the repeat
             // count. A shared divisor creates separate closed rings rather
             // than the single winding that the lead cut is meant to open.
@@ -320,14 +326,12 @@ fn resolve_braid_layout(
                     format!(
                         "the routable length ({:.3} mm) cannot fit one complete pole-pitched braid period plus its phase/strand interleave ({:.3} mm required); increase the active area",
                         d_tot,
-                        2.0 * pitch - interleave_step
+                        pitch + tail_span
                     ),
                 ));
             }
-            // One pole pitch contains every phase/strand position exactly
-            // once. This keeps the final point of one phase to the first
-            // point of the next phase equal to the preceding within-phase
-            // point spacing on both layer copies.
+            // Interior repeats retain the uniform phase/strand grid. The
+            // staggered phase starts need their complete end span reserved.
             let o = -interleave_step;
             Ok(BraidLayout {
                 n_periods,
@@ -339,8 +343,8 @@ fn resolve_braid_layout(
             // No magnet layout: fall back to the packaged `n_periods` default
             // (kept for plugin probes and unit tests).
             let n_periods = (ctx.param("n_periods", 4.0) as i64).max(1);
-            let o = d_tot / ((n_periods + 1) * num_strands * phases - 1) as f64 * -1.0;
-            let d_phase = d_tot - ((o * num_strands as f64 * -1.0) * phases as f64) - o;
+            let o = -d_tot / (n_periods * num_strands * phases + tail_slots) as f64;
+            let d_phase = n_periods as f64 * num_strands as f64 * phases as f64 * -o;
             Ok(BraidLayout {
                 n_periods,
                 d_phase,
@@ -382,7 +386,8 @@ fn braid_geometry(
     connection: Connection,
     lead_pitch: f64,
 ) -> BraidGeometry {
-    let offset_step = layout.o * num_strands as f64 * -1.0;
+    let phase_stride = if phases == 3 { 2.0 } else { 1.0 };
+    let offset_step = -layout.o * num_strands as f64 * phase_stride;
     let mut geometry = BraidGeometry {
         segments: Vec::new(),
         vias: Vec::new(),
@@ -418,7 +423,7 @@ fn braid_geometry(
         }
         // Declared phase bands (kata hzs2), consistent with the pole regions:
         // the centerline is the first region's center (the band's first
-        // repeat — adjacent phases sit one phase-band pitch apart), the
+        // repeat — three-phase starts sit two phase-belt pitches apart), the
         // extent spans all of the phase's pole regions, and the diamonds map
         // onto the full board width [0, 2a].
         if let (Some(first), Some(last)) = (region_xs.first(), region_xs.last()) {
@@ -842,11 +847,11 @@ mod tests {
             }
         }
 
-        // Adjacent phase centerlines sit exactly one phase-band pitch apart:
+        // Equal-polarity three-phase centerlines sit two belt pitches apart:
         // the commutation offsets read from the declaration equal the
         // analytic pi * tau_band / tau_p law.
         let pitch = magnet_ctx().magnet_pitch().unwrap();
-        let tau_band = pitch / f64::from(magnet_ctx().phases);
+        let tau_band = 2.0 * pitch / f64::from(magnet_ctx().phases);
         let center = |phase: &str, layer: u32| {
             bands
                 .iter()
@@ -954,7 +959,8 @@ mod tests {
 
     const T: f64 = 1.0 / 3.0;
     const LEAD: [f64; 3] = [8.0 + 4.0 / 9.0, 8.0 + 8.0 / 9.0, 8.0 + 12.0 / 9.0];
-    const BREAK_X: [f64; 3] = [4.0 + T, 6.0 + T, 8.0 + T];
+    // Pole pitch 6 mm: equal-polarity phase starts are 4 mm apart (120°).
+    const BREAK_X: [f64; 3] = [4.0 + T, 8.0 + T, 12.0 + T];
 
     fn has_lead(r: &RoutingResult, net: &str, layer: u32, a: (f64, f64), b: (f64, f64)) -> bool {
         r.segments.iter().any(|s| {
@@ -980,19 +986,19 @@ mod tests {
     }
 
     #[test]
-    fn delta_matches_the_fader_example() {
-        // Reference: motor-coils_3s_0-4mm_delta.dxf, made from
-        // closed_infinity_pattern.pmmotor. Each phase's layer-0 end runs on
+    fn delta_leads_preserve_connections_at_corrected_120_degree_phase_spacing() {
+        // Same lead construction as the historical Fader example, with
+        // corrected equal-polarity phase spacing. Each layer-0 end runs on
         // along the braid line and drops onto the previous phase's lead.
         let r = InfinityBraidPattern.generate(&fader_ctx(1.0)).unwrap();
         assert_layer_one_leads(&r);
 
-        assert!(has_lead(&r, "B", 0, (6.0 + T, 8.0), (6.0, LEAD[0])));
-        assert!(has_lead(&r, "B", 0, (6.0, LEAD[0]), (4.0 + T, LEAD[0])));
-        assert!(has_lead(&r, "C", 0, (8.0 + T, 8.0), (7.0 + 2.0 * T, LEAD[1])));
-        assert!(has_lead(&r, "C", 0, (7.0 + 2.0 * T, LEAD[1]), (6.0 + T, LEAD[1])));
+        assert!(has_lead(&r, "B", 0, (8.0 + T, 8.0), (8.0, LEAD[0])));
+        assert!(has_lead(&r, "B", 0, (8.0, LEAD[0]), (4.0 + T, LEAD[0])));
+        assert!(has_lead(&r, "C", 0, (12.0 + T, 8.0), (11.0 + 2.0 * T, LEAD[1])));
+        assert!(has_lead(&r, "C", 0, (11.0 + 2.0 * T, LEAD[1]), (8.0 + T, LEAD[1])));
         assert!(has_lead(&r, "A", 0, (4.0 + T, 8.0), (3.0 + T, LEAD[2])));
-        for (net, x, y) in [("B", 4.0 + T, LEAD[0]), ("C", 6.0 + T, LEAD[1]), ("A", 3.0 + T, LEAD[2])] {
+        for (net, x, y) in [("B", 4.0 + T, LEAD[0]), ("C", 8.0 + T, LEAD[1]), ("A", 3.0 + T, LEAD[2])] {
             assert!(
                 r.vias.iter().any(|v| v.net == net && approx(v.position, x, y)),
                 "delta joint via for {net} at ({x}, {y})"
@@ -1007,9 +1013,8 @@ mod tests {
     }
 
     #[test]
-    fn star_matches_the_fader_example() {
-        // Reference: motor-coils_3s_0-4mm_star.dxf. Each layer-0 end rises
-        // one lead pitch onto a layer-0 neutral bar.
+    fn star_leads_preserve_connections_at_corrected_120_degree_phase_spacing() {
+        // Each layer-0 end rises one lead pitch onto a layer-0 neutral bar.
         let r = InfinityBraidPattern.generate(&fader_ctx(2.0)).unwrap();
         assert_layer_one_leads(&r);
 
@@ -1139,7 +1144,7 @@ mod tests {
     }
 
     #[test]
-    fn via_x_spacing_is_uniform_across_phase_boundaries_on_both_layers() {
+    fn via_grid_keeps_strand_pitch_and_120_degree_staggered_phase_starts() {
         let context = magnet_ctx();
         let result = InfinityBraidPattern.generate(&context).unwrap();
         let phases = context.phases as usize;
@@ -1150,8 +1155,8 @@ mod tests {
 
         // The first `num_strands` vias in each phase are its left-side
         // endpoints. They form the horizontal via grid shared by the top and
-        // bottom layer copies. The boundary between phase i and phase i+1
-        // must be the same as the final within-phase step.
+        // bottom layer copies. Three-phase starts are now two belts apart;
+        // preserve the interior interleave grid, not the old 60-degree starts.
         for phase in 0..phases {
             let left = &phase_vias[phase][..strands];
             let within_phase = (left[strands - 1].position.x - left[strands - 2].position.x).abs();
@@ -1160,7 +1165,9 @@ mod tests {
             if let Some(next) = phase_vias.get(phase + 1) {
                 let across_phases =
                     (next[0].position.x - left[strands - 1].position.x).abs();
-                assert!((across_phases - within_phase).abs() < 1e-12);
+                assert!((across_phases - (strands + 1) as f64 * within_phase).abs() < 1e-12);
+                let start_step = next[0].position.x - left[0].position.x;
+                assert!((start_step - 2.0 * context.magnet_pitch().unwrap() / 3.0).abs() < 1e-12);
             }
         }
 
