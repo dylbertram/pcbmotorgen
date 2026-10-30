@@ -47,6 +47,8 @@ def main():
         root/'app/desktop/src-tauri/src/commands/physics.rs',
         root/'crates/pcbmotorgen-routing/src/patterns/infinity/mod.rs',
         root/'crates/pcbmotorgen-routing/src/patterns/infinity/four_layer.rs',
+        root/'crates/pcbmotorgen-routing/src/context.rs',
+        root/'app/desktop/src-tauri/src/config/bridges.rs',
         Path(__file__).parent/'prescribed_pm_oracle.py',
         root/'crates/pcbmotorgen-simulation/src/magnetic/force_eval/commutation.rs'])
     report={'scope':__doc__,'status':'running','project':str(project) if project else None,'version_index':args.version,

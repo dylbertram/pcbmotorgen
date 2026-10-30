@@ -127,6 +127,7 @@ fn generated_braid_currents_obey_kirchhoff_and_power_balance() {
                 expects_continuous: false,
                 params: std::collections::HashMap::from([("num_strands".into(), strands as f64), ("connection".into(), 2.0)]),
                 magnet_pitch_mm: Some(6.0), magnet_array_span_mm: Some(35.0), phase_clearance_mm: None,
+                via_pad_diameter_mm: None,
             };
             let routing = pcbmotorgen_routing::generate_routing_result(&ctx, "infinity-braid").unwrap();
             for net in extract_phase_networks(&routing) {
@@ -343,7 +344,7 @@ fn housing_motion_is_opt_in_and_computed_for_generated_and_imported_copper() {
     let ctx = RoutingContext { active_area_length_mm: 110., board_width_mm: 8., num_layers: 2, phases: 3,
         min_trace_mm: 0.1, trace_width_mm: 0.1, min_space_mm: 0.127, expects_continuous: false,
         params: std::collections::HashMap::from([("num_strands".into(), 2.), ("connection".into(), 2.)]),
-        magnet_pitch_mm: Some(6.), magnet_array_span_mm: Some(35.), phase_clearance_mm: None };
+        magnet_pitch_mm: Some(6.), magnet_array_span_mm: Some(35.), phase_clearance_mm: None, via_pad_diameter_mm: None };
     let generated = generate_routing_result(&ctx, "infinity-braid").unwrap();
     let mut config = config;
     config.backplane = Some(BackplaneStack { layers: vec![], housing: Some(HousingSpec { material: HousingMaterial::Stainless304, thickness_m: 0.001, gap_m: 0.0 }) });
@@ -596,6 +597,7 @@ fn generated_braid_remains_one_connected_winding_across_repeat_counts() {
                 expects_continuous: false,
                 params: std::collections::HashMap::from([("num_strands".into(), strands as f64), ("connection".into(), 2.0)]),
                 magnet_pitch_mm: Some(6.0), magnet_array_span_mm: Some(35.0), phase_clearance_mm: None,
+                via_pad_diameter_mm: None,
             };
             let routing = pcbmotorgen_routing::generate_routing_result(&ctx, "infinity-braid").unwrap();
             for net in extract_phase_networks(&routing) {
@@ -822,6 +824,7 @@ fn two_layer_braid_fixture_produces_plausible_values() {
         magnet_pitch_mm: Some(6.0),
         magnet_array_span_mm: Some(72.0),
         phase_clearance_mm: None,
+        via_pad_diameter_mm: None,
     };
     let routing = generate_routing_result(&ctx, "infinity-braid").expect("braid");
     let s = SimulationInput { num_layers: 2, min_trace_m: 0.127e-3, magnet_pitch_m: 6e-3, ..SimulationInput::default() };
