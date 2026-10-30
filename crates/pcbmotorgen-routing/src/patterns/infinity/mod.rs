@@ -226,8 +226,8 @@ impl RoutingPattern for InfinityBraidPattern {
             num_strands,
             connection,
             lead_pitch,
-            ctx.num_layers,
-        );
+            ctx,
+        )?;
 
         // Pattern-declared leg grid: the braid's active legs populate a
         // uniform interleave grid of one slot per phase/strand position per
@@ -403,8 +403,8 @@ fn braid_geometry(
     num_strands: i64,
     connection: Connection,
     lead_pitch: f64,
-    num_layers: u32,
-) -> BraidGeometry {
+    ctx: &RoutingContext,
+) -> Result<BraidGeometry, RoutingError> {
     let offset_step = -layout.o * num_strands as f64;
     let mut geometry = BraidGeometry {
         segments: Vec::new(),
@@ -515,13 +515,13 @@ fn braid_geometry(
         }
     }
 
-    if num_layers == 4 {
-        four_layer::stack_and_terminate(&mut geometry, &ends, connection, lead_pitch);
+    if ctx.num_layers == 4 {
+        four_layer::stack_and_terminate(&mut geometry, &ends, connection, lead_pitch, ctx)?;
     } else if connection != Connection::Closed {
         add_leads(&mut geometry, &ends, connection, lead_pitch);
     }
 
-    geometry
+    Ok(geometry)
 }
 
 /// Bring each opened phase out to the edge (see the module docs).
@@ -1165,6 +1165,97 @@ mod tests {
         assert!(report.dimensions.pole_pitch_mm.is_none());
         assert_eq!(report.dimensions.period_count, Some(4));
         assert!(report.dimensions.period_pitch_mm.unwrap() > 0.0);
+    }
+
+    #[test]
+    fn four_layer_series_pads_are_centered_in_the_triangle_with_real_clearance() {
+        let distance = |p: Point, a: Point, b: Point| {
+            let (dx, dy) = (b.x - a.x, b.y - a.y);
+            let t = (((p.x - a.x) * dx + (p.y - a.y) * dy) / (dx * dx + dy * dy)).clamp(0.0, 1.0);
+            p.distance_to(Point::new(a.x + t * dx, a.y + t * dy))
+        };
+        for width in [8.0, 20.0] {
+            for strands in [2, 3, 5] {
+                for (pad, trace) in [(0.4, 0.127), (0.5, 0.2), (0.7, 0.5)] {
+                    let mut context = fader_ctx(2.0);
+                    context.num_layers = 4;
+                    context.board_width_mm = width;
+                    context.via_pad_diameter_mm = Some(pad);
+                    context.trace_width_mm = trace;
+                    context.params.insert("num_strands".into(), strands as f64);
+                    let result = InfinityBraidPattern.generate(&context).unwrap();
+                    let layout = resolve_braid_layout(&context, context.active_area_length_mm, context.magnet_pitch_mm, 3, strands).unwrap();
+                    let old_pitch = lead_pitch_mm(layout, width / 2.0, &context);
+                    let top = result.segments.iter().filter(|s| !s.is_active && s.layer == 0
+                        && (s.start.y - width).abs() < 1e-9 && s.end.y > width)
+                        .map(|s| s.end.y).next().unwrap();
+                    assert!(top > width + 2.0 * old_pitch, "upper traces must move outward");
+                    for via in result.vias.iter().filter(|v| (v.from_layer, v.to_layer) == (0, 3)) {
+                        let side = result.segments.iter().find(|s| !s.is_active && s.layer == 0 && s.net == via.net
+                            && (s.start.y - width).abs() < 1e-9 && s.end.y > width).unwrap();
+                        let apex = side.start;
+                        let left = side.end;
+                        let right = Point::new(2.0 * apex.x - left.x, top);
+                        // Independent barycentric construction of the incenter.
+                        let opposite_apex = left.distance_to(right);
+                        let opposite_left = apex.distance_to(right);
+                        let opposite_right = apex.distance_to(left);
+                        let perimeter = opposite_apex + opposite_left + opposite_right;
+                        let expected = Point::new(
+                            (opposite_apex * apex.x + opposite_left * left.x + opposite_right * right.x) / perimeter,
+                            (opposite_apex * apex.y + opposite_left * left.y + opposite_right * right.y) / perimeter,
+                        );
+                        assert!(via.position.distance_to(expected) < 1e-9);
+                        let radius = distance(via.position, apex, left);
+                        assert!((distance(via.position, apex, right) - radius).abs() < 1e-9);
+                        assert!((top - via.position.y - radius).abs() < 1e-9);
+                        for s in result.segments.iter().filter(|s| s.layer == 0 || s.layer == 3 || s.net != via.net) {
+                            assert!(distance(via.position, s.start, s.end) - pad / 2.0 - context.trace_width() / 2.0
+                                >= context.min_space_mm - 1e-9, "pad must clear outer-layer traces and other-phase copper on every layer");
+                        }
+                        for other in result.vias.iter().filter(|v| v.position != via.position) {
+                            assert!(other.position.distance_to(via.position) - pad >= context.min_space_mm - 1e-9);
+                        }
+                    }
+                    let mut two = context.clone();
+                    two.num_layers = 2;
+                    let two_with_size = InfinityBraidPattern.generate(&two).unwrap();
+                    two.via_pad_diameter_mm = None;
+                    assert_eq!(two_with_size, InfinityBraidPattern.generate(&two).unwrap(), "two-layer copper must not change");
+                }
+            }
+        }
+        // The screenshot's old half-height placement is neither centered nor
+        // clear of the sloping sides for the supplied 0.5 mm pad/0.2 mm trace.
+        let apex = Point::new(0.0, 0.0);
+        let left = Point::new(-2.0 / 3.0, 8.0 / 9.0);
+        let old_join = Point::new(0.0, 4.0 / 9.0);
+        assert!(distance(old_join, apex, left) - 0.5 / 2.0 - 0.2 / 2.0 < 0.127);
+    }
+
+    #[test]
+    fn centered_four_layer_star_and_delta_keep_their_series_topology() {
+        for connection in [1.0, 2.0] {
+            let mut context = fader_ctx(connection);
+            context.num_layers = 4;
+            context.via_pad_diameter_mm = Some(0.5);
+            context.trace_width_mm = 0.2;
+            let result = InfinityBraidPattern.generate(&context).unwrap();
+            assert!(Validator::validate(&result, &context, false).is_ok());
+            for phase in ["A", "B", "C"] {
+                assert!(connected(&net_graph(&result, phase)));
+            }
+        }
+    }
+
+    #[test]
+    fn four_layer_rejects_invalid_or_unfittable_series_pad_sizes() {
+        let mut context = fader_ctx(2.0);
+        context.num_layers = 4;
+        for size in [0.0, -0.4, f64::NAN, f64::INFINITY, 4.0] {
+            context.via_pad_diameter_mm = Some(size);
+            assert!(InfinityBraidPattern.generate(&context).is_err(), "invalid/unfittable pad {size}");
+        }
     }
 
     #[test]

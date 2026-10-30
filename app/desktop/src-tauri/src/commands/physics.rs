@@ -890,7 +890,7 @@ mod analyze_drive_tests {
             // This legacy excitation reference does not qualify a star controller.
             // Magpylib + independent R/current/dL reconstruction verifies this
             // fixture with its exported excitation; controller PWM is unqualified.
-            assert!((kf - 0.9262418795).abs() < 1e-8, "DRV8311 Kf changed: {kf}");
+            assert!((kf - 0.9262415028).abs() < 1e-8, "DRV8311 Kf changed: {kf}");
             for copper in [3.0] {
                 for voltage in [5.0] {
                     for current in [1.1] {
@@ -903,8 +903,8 @@ mod analyze_drive_tests {
                         settings.ripple_limit_fraction = 0.35;
                         settings.voltage_headroom = 0.95;
                         let a = tauri::async_runtime::block_on(analyze_drive(ipc.clone(), settings.clone(), Some(kf), None)).unwrap();
-                        assert!((a.thrust_n.unwrap() - 1.0188660674).abs() < 1e-8);
-                        assert!((a.speed_voltage_v.unwrap() - 7.8028210070).abs() < 1e-8);
+                        assert!((a.thrust_n.unwrap() - 1.0188656531).abs() < 1e-8);
+                        assert!((a.speed_voltage_v.unwrap() - 7.8071363716).abs() < 1e-8);
                         let mut goals = ipc.clone();
                         goals.target_force_n = 100.0;
                         goals.peak_force_n = 0.001;

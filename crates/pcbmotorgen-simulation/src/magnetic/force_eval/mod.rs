@@ -625,6 +625,7 @@ mod tests {
             phases: config.phases,
             min_trace_mm: config.min_trace_m * 1e3,
             trace_width_mm: config.min_trace_m * 1e3,
+            via_pad_diameter_mm: Some(config.min_via_pad_m() * 1e3),
             min_space_mm: config.min_space_m * 1e3,
             expects_continuous: false,
             params: std::collections::HashMap::new(),

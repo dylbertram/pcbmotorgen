@@ -20,6 +20,7 @@ fn reference_context() -> RoutingContext {
         phases: 3,
         min_trace_mm: 0.127,
         trace_width_mm: 0.127,
+        via_pad_diameter_mm: None,
         min_space_mm: 0.127,
         expects_continuous: true,
         params: HashMap::new(), // pattern defaults (num_strands = 5; 2 is only the minimum)

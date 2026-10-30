@@ -7,6 +7,66 @@ remain as a record of what was implemented and tested, not current requirements.
 
 ## Supported model
 
+### Centered full-stack vias and pad clearance, 2026-10-30
+
+The user's next screenshot exposed a finite-pad clearance defect in
+`959d40c`: a full-stack via at half the triangle height can overlap the sloping
+outer-layer traces. The prior centerline-only no-bypass check did not catch
+this. This correction supersedes that commit's series-via/lead placement,
+not its active braid, series topology or unchanged two-layer layout.
+
+Full-stack series vias now sit at the incenter of the triangle between the
+outer diagonals and the first upper routing row. This gives equal perpendicular
+distance to the slopes and upper row. That row moves outward by at least one
+configured pad diameter beyond its old two-pitch height, and farther if the
+trace width and clearance require it. The host supplies the actual pad diameter
+from `DesignRules`, drill plus twice the annular ring, through an additive
+`RoutingContext.via_pad_diameter_mm` field. Older contexts may omit it, but
+cannot establish finite-pad clearance without their DFM sizes.
+
+Generation checks each series pad against every outer-layer trace, including
+same-phase copper that could bypass a winding pair, other-phase traces on all
+layers and other via pads. A size that cannot fit at the existing phase pitch
+is rejected explicitly; active copper is not stretched to hide the conflict.
+This is a series-terminal-region check, not whole-board DRC or fabrication
+qualification. The through-only KiCad writer guard remains in place.
+
+For the supplied two-layer config generated as four layers, the 0.3 mm drill
+and 0.1 mm annular ring give 0.5 mm pads; nominal traces are 0.2 mm and required
+space is 0.127 mm. The series-via row moves from y=8.444444 to 8.868056 mm,
+and the first upper routing row from 8.888889 to 9.388889 mm. Independently
+measured minimum pad-to-outer-trace edge gap changes from -0.083333 mm,
+an overlap, to +0.170833 mm. The actual generated geometry and finite copper
+widths were plotted and visually inspected in approved temp
+`braid-vias-centered-before-after-20261030.png`.
+
+Regression coverage includes 18 board-width/strand/pad/trace cases, independent
+barycentric incenter construction, distance-to-segment and pad-to-pad checks,
+an old-placement negative control, invalid/unfittable sizes, the DFM-to-routing
+size bridge, star/delta topology and exact two-layer geometry invariance under
+pad-size changes. `braid-via-clearance-verified-20261030.log` records 722 passing
+Rust tests with 24 unit and three doc tests ignored. No frontend code changed.
+The supplied-project/DXF active-copper and topology test still passes separately
+and writes generated artifacts only to approved temp
+`braid-via-centered-reference-20261030`.
+All five supplied project/DXF hashes remain unchanged.
+
+Fresh independent R/current/dL/free-space force checks at meshes 20/40 pass in
+`braid-via-centered-generated-oracle-20261030` and
+`braid-via-centered-driver-oracle-20261030`. Their summary SHA-256 values are
+`649fadb19c40d48c83728de113c85ff40460fdf9fe80f93021a57d4129c8cba1`
+and `4ba00ce171e44d617abb4fc906c263a738af752eee91fc06dc75409284f75046`.
+Source capture includes the new pad-size context and host bridge. The verified
+mesh-20 driver fixture is Kf=0.9262415028019103 N/A,
+thrust=1.0188656530821014 N and speed voltage=7.807136371602488 V.
+Only after this check were its geometry-specific regression constants updated;
+no force, energy or convergence tolerance was loosened. These checks do not
+qualify the exported legacy excitation as a controller waveform.
+
+Model version is `linear-move-demand-v9`. No new move-power result, physical
+wiring/polarity change, supplied-file rewrite or hardware qualification is
+claimed; the earlier power retraction and open #7744 limits still apply.
+
 ### Four-layer braid generation and DXF references, 2026-10-30
 
 The user confirmed the restored compact two-layer generation, then supplied

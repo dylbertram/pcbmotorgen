@@ -32,6 +32,7 @@ impl LinearMotorConfig {
             phases: self.phases.max(1),
             min_trace_mm: self.min_trace_m * 1e3,
             trace_width_mm: self.trace_width_m * 1e3,
+            via_pad_diameter_mm: Some(self.design_rules().via_pad_diameter_mm()),
             min_space_mm: self.min_space_m * 1e3,
             expects_continuous: false,
             params: self.routing_params.clone(),
@@ -124,6 +125,18 @@ impl LinearMotorConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn routing_receives_the_same_via_pad_size_as_dfm() {
+        let mut cfg = LinearMotorConfig::default();
+        for (drill_m, ring_m) in [(0.2e-3, 0.1e-3), (0.4e-3, 0.15e-3)] {
+            cfg.min_via_drill_m = drill_m;
+            cfg.min_via_annular_ring_m = ring_m;
+            assert_eq!(cfg.routing_context().via_pad_diameter_mm,
+                Some(cfg.design_rules().via_pad_diameter_mm()));
+            assert!((cfg.routing_context().via_pad_diameter_mm.unwrap() - (drill_m + 2.0 * ring_m) * 1e3).abs() < 1e-12);
+        }
+    }
 
     #[test]
     fn test_sync_magnet_grade_n44() {

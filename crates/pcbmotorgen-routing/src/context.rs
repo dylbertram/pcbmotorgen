@@ -37,6 +37,10 @@ pub struct RoutingContext {
     /// contexts serialized before this field existed keep their behaviour.
     #[serde(default)]
     pub trace_width_mm: f64,
+    /// Via pad diameter supplied by the host's DFM sizing authority. None
+    /// preserves older routing contexts, which cannot claim pad clearance.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub via_pad_diameter_mm: Option<f64>,
     /// Minimum trace-to-trace clearance [mm].
     ///
     /// Also the default inter-phase clearance: when
