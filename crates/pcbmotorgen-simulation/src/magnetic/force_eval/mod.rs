@@ -81,6 +81,7 @@ pub struct ForceEvaluator {
     calibrated: bool,
     routed_samples: Option<Vec<Vec<ConductorSample>>>,
     routed_phase_names: Vec<String>,
+    routed_phase_bands: Vec<crate::params::PhaseBandPosition>,
     routed_x_bounds_m: Option<(f64, f64)>,
 }
 
@@ -95,12 +96,32 @@ impl Default for ForceEvaluator {
             calibrated: false,
             routed_samples: None,
             routed_phase_names: Vec::new(),
+            routed_phase_bands: Vec::new(),
             routed_x_bounds_m: None,
         }
     }
 }
 
 impl ForceEvaluator {
+    /// Generated routing's declared band locations must reach commutation;
+    /// otherwise a corrected 120-degree layout would still use the legacy
+    /// 60-degree analytic fallback. Explicit simulation bands take precedence.
+    fn phase_currents(&self, config: &SimulationInput, x: f64, labels: &[&str]) -> Vec<f64> {
+        if config.phase_bands.is_empty() && !self.routed_phase_bands.is_empty() {
+            let mut physical = config.clone();
+            physical.phase_bands = self.routed_phase_bands.clone();
+            commutation_currents(self.commutation, self.phase_shift, &physical, x, labels)
+        } else if config.phase_bands.is_empty() && self.routed_samples.is_some()
+            && labels.len() == 3 && self.commutation == CommutationMode::MaxThrust {
+            // CAD exchange can omit the generator's phase-band sidecar.
+            // A three-phase routed winding still needs a balanced current
+            // law, not the legacy independent-coil 60-degree fallback.
+            let theta = std::f64::consts::TAU * x / (2.0 * config.pole_pitch_m()) + self.phase_shift;
+            (0..3).map(|j| config.max_current_a * (theta - j as f64 * std::f64::consts::TAU / 3.0).cos()).collect()
+        } else {
+            commutation_currents(self.commutation, self.phase_shift, config, x, labels)
+        }
+    }
     fn coils_match_routing(&self, coils: &[PhaseCoil]) -> bool {
         !coils.is_empty() && self.routed_samples.as_ref().map_or(true, |samples| {
             samples.len() == coils.len() && coils.iter().enumerate().all(|(i, coil)| {
@@ -150,7 +171,7 @@ impl ForceEvaluator {
             return Err(SimulationError("Excitation diagnostics require a calibrated run, matching coils and finite position".into()));
         }
         let labels: Vec<&str> = coils.iter().map(|coil| coil.phase_name.as_str()).collect();
-        let currents = commutation_currents(self.commutation, self.phase_shift, config, position_m, &labels);
+        let currents = self.phase_currents(config, position_m, &labels);
         if currents.iter().any(|current| !current.is_finite()) {
             return Err(SimulationError("Excitation diagnostics produced a nonfinite current".into()));
         }
@@ -230,6 +251,10 @@ impl ForceEvaluator {
         }
         self.routed_samples = Some(all_samples);
         self.routed_phase_names = coils.iter().map(|coil| coil.phase_name.clone()).collect();
+        self.routed_phase_bands = routing.phase_bands.iter().map(|b| crate::params::PhaseBandPosition {
+            phase: b.net.clone(), centerline_m: b.centerline_x_mm * 1e-3,
+            start_m: b.start_x_mm * 1e-3, end_m: b.end_x_mm * 1e-3,
+        }).collect();
         self.routed_x_bounds_m = Some(x_bounds);
         self.calibrated = false;
         Ok((self, coils))
@@ -256,6 +281,7 @@ impl ForceEvaluator {
             calibrated: false,
             routed_samples: None,
             routed_phase_names: Vec::new(),
+            routed_phase_bands: Vec::new(),
             routed_x_bounds_m: None,
         }
     }
@@ -326,13 +352,7 @@ impl ForceEvaluator {
         let results: Vec<(f64, f64, f64, f64, Vec<f64>)> = positions
             .par_iter()
             .map(|&pos| {
-                let currents = commutation_currents(
-                    self.commutation,
-                    self.phase_shift,
-                    config,
-                    pos,
-                    &phase_labels,
-                );
+                let currents = self.phase_currents(config, pos, &phase_labels);
                 let assembly = magnet_array.build_assembly(pos);
 
                 // Collect all observation points (sub-segment midpoints)
@@ -527,13 +547,7 @@ impl ForceEvaluator {
         mover_position_m: f64,
     ) -> ([f64; 3], [f64; 3]) {
         let phase_labels: Vec<&str> = coils.iter().map(|coil| coil.phase_name.as_str()).collect();
-        let currents = commutation_currents(
-            self.commutation,
-            self.phase_shift,
-            config,
-            mover_position_m,
-            &phase_labels,
-        );
+        let currents = self.phase_currents(config, mover_position_m, &phase_labels);
         let magnet_array = MagnetArray::new(config);
         let coil_model = CoilCurrentModel::new(self.meshing, false, self.layer_z_m);
         let assembly = magnet_array.build_assembly(mover_position_m);

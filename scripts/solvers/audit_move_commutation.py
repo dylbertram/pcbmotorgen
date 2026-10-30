@@ -71,7 +71,10 @@ def audit(path):
                   input_sha256=native['input_sha256'],
                   phase_names=electrical['phase_model']['phase_names'],
                   configured_reference_rad=electrical['electrical_angle_at_zero_rad'],
-                  trace_width_mm=native['inputs']['cad_geometry']['trace_width_mm'],
+                  source_kind='imported' if native['inputs'].get('cad_geometry') else 'generated',
+                  trace_width_mm=(native['inputs']['cad_geometry']['trace_width_mm'] if native['inputs'].get('cad_geometry')
+                                  else native['inputs']['config']['trace_width_m'] * 1000),
+                  pcb_thickness_m=native['inputs']['config']['pcb_thickness_m'],
                   outer_copper_oz=native['inputs']['drive']['outer_copper_oz'],
                   inner_copper_oz=native['inputs']['drive']['inner_copper_oz'],
                   scope='Geometry fundamental audit, not controller calibration, rewiring, measured performance or a realizable optimal-current proof')

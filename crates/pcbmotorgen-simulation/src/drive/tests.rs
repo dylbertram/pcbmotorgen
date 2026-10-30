@@ -4,6 +4,46 @@ use pcbmotorgen_routing::{
 };
 
 #[test]
+fn generated_three_phase_star_has_120_degree_terminal_force_axes() {
+    use crate::magnetic::{CommutationMode, ForceEvaluator};
+    let period = 0.012;
+    for strands in [2, 3, 5] {
+        let ctx = RoutingContext {
+            active_area_length_mm: 92.0, board_width_mm: 8.0, num_layers: 2, phases: 3,
+            min_trace_mm: 0.127, trace_width_mm: 0.2, min_space_mm: 0.127,
+            params: std::collections::HashMap::from([("num_strands".into(), strands as f64), ("connection".into(), 2.0)]),
+            magnet_pitch_mm: Some(6.0), magnet_array_span_mm: Some(29.0), ..Default::default()
+        };
+        let routing = generate_routing_result(&ctx, "infinity-braid").unwrap();
+        let sim = SimulationInput { active_area_length_m: 0.092, board_width_m: 0.008,
+            magnet_dims_m: [0.005, 0.005, 0.003], magnet_count: 5, magnet_pitch_m: 0.006,
+            min_trace_m: 0.0002, num_layers: 2, air_gap_m: 0.0005, ..Default::default() };
+        let (mut evaluator, coils) = ForceEvaluator::new(2, 8, CommutationMode::MaxThrust, 0.0)
+            .with_routed_currents(&routing, &sim, &DriveSettings::default(), &Default::default()).unwrap();
+        evaluator.evaluate_at(&sim, &coils, 0.024).unwrap();
+        for x in [0.018, 0.020, 0.024] {
+            let currents = evaluator.excitation_currents_at(&sim, &coils, x).unwrap();
+            assert!(currents.iter().sum::<f64>().abs() < 1e-12,
+                "generated star currents must sum to zero, not use old 60-degree fallback: {currents:?}");
+        }
+        let mut sine = [0.0; 3];
+        let mut cosine = [0.0; 3];
+        for n in 0..48 {
+            let x = 0.018 + period * n as f64 / 48.0;
+            let theta = std::f64::consts::TAU * x / period;
+            let force = evaluator.unit_phase_force_constants_at(&sim, x).unwrap();
+            for j in 0..3 { sine[j] += force[j] * theta.sin(); cosine[j] += force[j] * theta.cos(); }
+        }
+        let angles: [f64; 3] = std::array::from_fn(|j| cosine[j].atan2(sine[j]));
+        for j in 1..3 {
+            let error = angles[j] - angles[0] + j as f64 * std::f64::consts::TAU / 3.0;
+            let wrapped = error.sin().atan2(error.cos());
+            assert!(wrapped.abs() < 0.02, "strands={strands}, terminal phase {j}: error {wrapped} rad");
+        }
+    }
+}
+
+#[test]
 fn signed_branch_currents_obey_kirchhoff_and_power_balance() {
     use super::geometry::Edge;
     let net = PhaseNetwork {

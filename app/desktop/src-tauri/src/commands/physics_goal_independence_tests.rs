@@ -51,7 +51,7 @@ pub(super) fn assert_electrical_equal(a: &DriveAnalysis, b: &DriveAnalysis) {
     }
 }
 
-fn assert_numerically_equal(a: &serde_json::Value, b: &serde_json::Value, label: &str) {
+pub(super) fn assert_numerically_equal(a: &serde_json::Value, b: &serde_json::Value, label: &str) {
     if let (Some(x), Some(y)) = (a.as_f64(), b.as_f64()) {
         // Rayon sums filament contributions in an unspecified order. Repeated
         // runs can differ by a few ulps without any goal-dependent physics.
