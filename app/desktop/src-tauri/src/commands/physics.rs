@@ -886,12 +886,11 @@ mod analyze_drive_tests {
             let sweep = tauri::async_runtime::block_on(evaluate_force_sweep(ipc.clone(), None, Some(force_settings))).unwrap();
             let kf = sweep.mean_thrust_n.abs() / sweep.current_a;
             eprintln!("width={width_mm} computed Kf={kf} N/A");
-            // Corrected 120-degree generator phase spacing, physical barrel
-            // spans, and signed vertical via force. Values independently
-            // reconstructed from the new generated geometry, not old 60° data.
+            // Compact braid geometry, physical barrel spans and signed via force.
+            // This legacy excitation reference does not qualify a star controller.
             // Magpylib + independent R/current/dL reconstruction verifies this
             // fixture with its exported excitation; controller PWM is unqualified.
-            assert!((kf - 0.590107220326026).abs() < 1e-8, "DRV8311 Kf changed: {kf}");
+            assert!((kf - 0.5942095155).abs() < 1e-8, "DRV8311 Kf changed: {kf}");
             for copper in [3.0] {
                 for voltage in [5.0] {
                     for current in [1.1] {
@@ -904,8 +903,8 @@ mod analyze_drive_tests {
                         settings.ripple_limit_fraction = 0.35;
                         settings.voltage_headroom = 0.95;
                         let a = tauri::async_runtime::block_on(analyze_drive(ipc.clone(), settings.clone(), Some(kf), None)).unwrap();
-                        assert!((a.thrust_n.unwrap() - 0.6491179423586286).abs() < 1e-8);
-                        assert!((a.speed_voltage_v.unwrap() - 3.9456475617714446).abs() < 1e-8);
+                        assert!((a.thrust_n.unwrap() - 0.6536304671).abs() < 1e-8);
+                        assert!((a.speed_voltage_v.unwrap() - 4.0956500486).abs() < 1e-8);
                         let mut goals = ipc.clone();
                         goals.target_force_n = 100.0;
                         goals.peak_force_n = 0.001;
