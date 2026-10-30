@@ -881,7 +881,7 @@ mod tests {
     /// re-anchors onto C, giving the requester's mirrored charges
     /// (A −0.5, B +0.5, C +1) and pushing the max endpoint outward.
     #[test]
-    fn corrected_braid_charge_states_use_120_degrees_and_unbracketed_rest_falls_back() {
+    fn coil_derived_states_reanchor_the_max_endpoint() {
         use crate::equilibrium::travel_envelope_over_slots;
         use pcbmotorgen_routing::{generate_coils_from_context, RoutingContext};
 
@@ -920,22 +920,30 @@ mod tests {
         let braid = generate_coils_from_context(&ctx, "infinity-braid");
         let first = band_charge_state_from_coils(&cfg, &braid, EndMagnet::First).expect("first");
         assert!((first[0].charge - 1.0).abs() < 1e-12);
-        // Corrected equal-polarity phase starts are 120°, not 60°, apart.
-        assert!((first[1].charge + 0.5).abs() < 1e-12);
+        assert!((first[1].charge - 0.5).abs() < 1e-12);
         assert!((first[2].charge + 0.5).abs() < 1e-12);
         let last = band_charge_state_from_coils(&cfg, &braid, EndMagnet::Last).expect("last");
         assert!((last[0].charge + 0.5).abs() < 1e-9, "A {}", last[0].charge);
-        assert!((last[1].charge + 0.5).abs() < 1e-9, "B {}", last[1].charge);
+        assert!((last[1].charge - 0.5).abs() < 1e-9, "B {}", last[1].charge);
         assert!((last[2].charge - 1.0).abs() < 1e-9, "C owns the braid's edge band");
 
-        // The old assertion that this braid must bracket a rest belonged to
-        // the superseded 60-degree geometry. The legacy planar equilibrium
-        // solver does not bracket this corrected case; pin its disclosed
-        // flush fallback, not an invented resting position.
-        let rest = solve_end_magnet_rest_m(
+        // The re-anchored max state pushes the max endpoint outward (toward
+        // the copper end) versus the old reference-phase anchor.
+        let config_only = band_charge_state(&cfg, EndMagnet::Last, 0.0, 147.0 * MM).expect("cfg");
+        let rest_new = solve_end_magnet_rest_m(
             &cfg, &braid, &last, EndMagnet::Last, 0.0, 147.0 * MM,
+        )
+        .expect("edge-anchored rest");
+        let rest_old = solve_end_magnet_rest_m(
+            &cfg, &braid, &config_only, EndMagnet::Last, 0.0, 147.0 * MM,
+        )
+        .expect("old-anchor rest");
+        assert!(
+            rest_new > rest_old,
+            "edge-anchored rest {:.3} mm not outward of {:.3} mm",
+            rest_new / MM,
+            rest_old / MM
         );
-        assert!(rest.is_none());
 
         // The composed envelope keeps the flush-clamp discipline.
         let env = travel_envelope_charge_based(&cfg, &braid, 0.0, 147.0 * MM);
@@ -943,7 +951,6 @@ mod tests {
         assert!(env.min_position_m >= base.min_position_m - 1e-9);
         assert!(env.max_position_m <= base.max_position_m + 1e-9);
         assert!(env.max_position_m > env.min_position_m);
-        assert!((env.max_position_m - base.max_position_m).abs() < 1e-9);
     }
 
     /// The Clarke angle of the crate's baseline excitation (1, 0, −1) is the

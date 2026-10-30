@@ -7,7 +7,64 @@ remain as a record of what was implemented and tested, not current requirements.
 
 ## Supported model
 
-### Generated three-phase spacing correction, 2026-10-30
+### Retraction of doubled phase-start spacing, 2026-10-30
+
+**Current status:** the widened layout introduced by `a496f71` is rejected.
+The user's combined/top/bottom screenshots exposed missing bundle positions at
+both finite ends, including an isolated final phase group. Doubling phase-start
+translation while keeping strand spacing fixed produces this directly. The
+previous test requiring a uniform cross-phase endpoint pitch was incorrectly
+changed to accept the wider gap. Force-axis agreement and independent numerical
+force checks verified the altered model, not the validity of that design change.
+
+Restored compact consecutive phase bundles with start pitch `pole_pitch / 3`,
+unchanged strand pitch `pole_pitch / (phases * strands)`, and the compact end-span
+budget. Restored the original lead geometry and planar-equilibrium regression.
+Also rolled back the static commutation changes coupled to the widened geometry
+to avoid leaving a partial new controller policy. This restores legacy behavior;
+it does **not** validate that behavior as a realizable star-controller waveform.
+No polarity inversion, phase relabeling, supplied-file rewrite or new controller
+assumption was introduced. The independent oracle batching fix and tiny numerical
+repeatability helper remain, as they are unrelated to the geometry mistake.
+Model version is now `linear-move-demand-v7` to distinguish restored geometry
+from the v6 widened-layout receipts.
+
+New end-grid coverage checks actual left and right midpoint via rows for
+2/3/5 strands, closed/delta/star connections, and magnet-aware/fallback contexts.
+All 18 cases must have uniform intra- and inter-phase endpoint pitch and pass
+the routing validator. A negative control reproduces the extra per-phase
+translation and must fail the uniform-grid check at **both** ends. Signed
+terminal force axes remain a simulation diagnostic under the current terminal
+convention, not measured hardware angles or a reason to move copper.
+
+Affected Rust suites passed 505 tests with 22 unit and one doc test ignored.
+Log: approved temp `compact-braid-rollback-tests-20261030.log`.
+Additional DFM/export suites passed 206 tests with one unit and two doc tests
+ignored, logged in approved temp `compact-braid-export-tests-20261030.log`.
+Fresh independent current/R/dL/free-space force checks passed at 20 and 40
+subdivisions in approved temp `compact-braid-oracle-20261030/summary.json`.
+Native geometry from the old and restored driver fixtures was plotted side by
+side in approved temp `compact-braid-layout-comparison-20261030.png` and visually
+inspected. The rejected fixture's midpoint endpoint-row pitches ranged from
+0.4 to 2.4 mm at each end; the restored fixture is uniformly 0.4 mm at both
+ends. This is a generated reference fixture, not the user's exact screenshot
+configuration or a rewrite of the imported Fader.
+The restored legacy driver-reference assertions pass without refitting their
+constants. No new practical move-power estimate is claimed in this rollback.
+All four supplied archive/DXF SHA-256 hashes are unchanged.
+
+The v6 files `generated-star-commutation-2026-10-30.json` and
+`practical-move-generator120-2026-10-30.json` remain historical evidence of the
+**rejected widened geometry**, not current-design acceptance evidence. In
+particular, 10.5056 W is withdrawn as a proposed design improvement. #7744 stays
+open. Correct terminal polarity, phase order, electrical-period convention and
+controller applicability must be established while preserving the compact
+physical interleave, before making another layout or performance claim.
+
+### Rejected generated-spacing attempt, retained historical record, 2026-10-30
+
+The following account records the superseded `a496f71` attempt. Its layout
+acceptance and performance-improvement claims are retracted above.
 
 Confirmed the generated two-layer star had the same 60-degree directed phase
 axes as the imported Fader. Root cause: the infinity braid translated equally
