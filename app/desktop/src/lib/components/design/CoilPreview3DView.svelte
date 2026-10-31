@@ -271,7 +271,7 @@
 <style>
   .coil-3d { container-type: size; }
   .overlay-legends { bottom: calc(2rem + var(--coil-overlay-inset, 0px)); max-height: 40cqh; right: auto; max-width: min(26rem, calc(100% - 4.75rem)); }
-  .z-height { bottom: calc(2rem + var(--coil-overlay-inset, 0px)); }
+  .z-height { top: var(--coil-preset-inset, 3rem); bottom: calc(2rem + var(--coil-overlay-inset, 0px)); }
   .navigation-hint { bottom: calc(.5rem + var(--coil-overlay-inset, 0px)); }
   .simulation-controls { width: 22rem; max-width: calc(100% - 4.5rem); }
   .inspector-toggle { display: flex; justify-content: space-between; align-items: center; width: 100%; min-height: 2rem; text-align: left; padding: 0.5rem 0.75rem; }
@@ -293,7 +293,7 @@
   .simulation-depths { display: none; }
   .compact-overlay-toggle { display: none; }
   @container (max-width: 760px) {
-    .simulation-controls { top: 3rem; }
+    .simulation-controls { top: max(3rem, var(--coil-preset-inset, 0px)); }
     .overlay-control-fields { max-height: min(calc(65cqh - 4rem), calc(100cqh - 5rem - var(--coil-overlay-inset, 0px))); }
   }
   @container (max-width: 520px) {
@@ -305,7 +305,7 @@
     .control-row { grid-template-columns: 4.75rem minmax(0, 1fr); }
   }
   @container (max-height: 180px) {
-    .z-height { top: 2.75rem; bottom: calc(.25rem + var(--coil-overlay-inset, 0px)); padding: 0.25rem; gap: 0.25rem; }
+    .z-height { top: var(--coil-preset-inset, 2.75rem); bottom: calc(.25rem + var(--coil-overlay-inset, 0px)); padding: 0.25rem; gap: 0.25rem; }
     .z-label { display: none; }
   }
   button { padding: 0.25rem 0.5rem; border-radius: 0.25rem; font-size: 0.75rem; }

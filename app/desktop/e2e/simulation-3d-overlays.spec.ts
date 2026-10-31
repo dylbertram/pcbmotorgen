@@ -313,7 +313,8 @@ test("mobile overlays stay inside the viewer and use scrollable explicit legends
   await expect(viewer.getByLabel("Copper loss legend")).toBeHidden();
   const box = (await viewer.boundingBox())!, controls = (await viewer.getByRole("group", { name: "3D simulation overlays" }).boundingBox())!;
   const viewSwitch = (await page.getByRole("group", { name: "Viewport view", exact: true }).boundingBox())!;
-  expect(box.y).toBeGreaterThanOrEqual(viewSwitch.y + viewSwitch.height);
+  expect(viewSwitch.y).toBeCloseTo(box.y + 8, 0);
+  expect(controls.y).toBeGreaterThanOrEqual(viewSwitch.y + viewSwitch.height + 6);
   expect(controls.x).toBeGreaterThanOrEqual(box.x); expect(controls.x + controls.width).toBeLessThanOrEqual(box.x + box.width + 1);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   const legend = (await viewer.getByLabel("Simulation overlay legend").boundingBox())!;

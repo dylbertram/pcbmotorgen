@@ -13,10 +13,13 @@ test("view choices live at the viewport top-left and survive both views", async 
   const modes = workspace.getByRole("group", { name: "Viewport view", exact: true });
   const top = modes.getByRole("button", { name: "Top-down", exact: true });
   const iso = modes.getByRole("button", { name: "3D fields and heat", exact: true });
-  const frame = await workspace.getByRole("img", { name: "Coil preview", exact: true }).boundingBox();
+  const toolbar = workspace.getByRole("toolbar", { name: "Coil preview tools", exact: true });
+  const tools = (await toolbar.boundingBox())!;
+  await expect(toolbar.getByRole("group", { name: "Viewport view", exact: true })).toHaveCount(0);
   const box = (await modes.boundingBox())!;
-  expect(box.x).toBeLessThan(frame!.x + 24);
-  expect(box.y).toBeLessThan(frame!.y + 12);
+  const routing = (await workspace.getByRole("dialog", { name: "Routing", exact: true }).boundingBox())!;
+  expect(box.x).toBeCloseTo(routing.x + routing.width + 8, 0);
+  expect(box.y).toBeCloseTo(tools.y + tools.height + 8, 0);
   await workspace.getByRole("button", { name: "Display", exact: true }).click();
   const display = workspace.getByRole("dialog", { name: "Coil preview display", exact: true });
   await expect(display.getByRole("radio", { name: "Top-down", exact: true })).toHaveCount(0);
@@ -26,7 +29,8 @@ test("view choices live at the viewport top-left and survive both views", async 
   await expect(workspace.getByTestId("coil-iso")).toBeVisible();
   const viewer = (await workspace.getByTestId("coil-iso").boundingBox())!;
   const viewSwitch = (await modes.boundingBox())!;
-  expect(viewer.y).toBeGreaterThanOrEqual(viewSwitch.y + viewSwitch.height);
+  expect(viewSwitch.x).toBeCloseTo(viewer.x + 8, 0);
+  expect(viewSwitch.y).toBeCloseTo(viewer.y + 8, 0);
   await expect.poll(() => checked(page, "view:3d")).toBe(true);
   await page.screenshot({ path: testInfo.outputPath("viewport-3d-switch.png") });
   await top.click();
