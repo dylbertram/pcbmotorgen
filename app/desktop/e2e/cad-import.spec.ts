@@ -482,24 +482,32 @@ test("shared editing tools measure and edit CAD drafts, then keep those edits in
   await page.screenshot({ path: testInfo.outputPath("shared-motor-editor.png") });
 });
 
-test("Routing mirrors imported copper and its picked endpoints without reassigning their roles", async ({ page }) => {
+for (const width of [1280, 390]) test(`Routing DXF checkboxes retain flips and picked endpoints at ${width}px`, async ({ page }, info) => {
+  await page.setViewportSize({ width, height: 844 });
   const { command } = await openTerminalTool(page);
   await command.getByRole("button", { name: "Apply terminals", exact: true }).click();
   const motor = coilWorkspace(page);
   await expect(motor.getByRole("img", { name: "Coil A Driver end, L0, X 0 mm, Y 0 mm", exact: true })).toBeVisible();
   await selectDesignPanel(page, "Routing");
   const panel = motor.getByRole("dialog", { name: "Routing", exact: true });
+  const orientation = panel.getByRole("group", { name: "Routing orientation", exact: true });
+  await expect(orientation.getByRole("checkbox")).toHaveCount(3);
+  await expect(orientation.getByRole("button")).toHaveCount(0);
   for (const [label, marker] of [
     ["Mirror left/right (X)", "Coil A Driver end, L0, X 2 mm, Y 0 mm"],
     ["Mirror up/down (Y)", "Coil A Driver end, L0, X 2 mm, Y 2 mm"],
     ["Reverse layers (Z)", "Coil A Driver end, L1, X 2 mm, Y 2 mm"],
   ]) {
-    await panel.getByRole("button", { name: label, exact: true }).click();
+    await panel.getByRole("checkbox", { name: label, exact: true }).check();
+    await expect(panel.getByRole("checkbox", { name: label, exact: true })).toBeChecked();
     await expect(motor.getByRole("img", { name: marker, exact: true })).toBeVisible();
   }
   await expect(panel.getByRole("group", { name: "Imported CAD pattern", exact: true })).toBeVisible();
+  await page.screenshot({ path: info.outputPath(`dxf-flip-checkboxes-${width}.png`) });
+  await selectDesignPanel(page, "Stackup"); await selectDesignPanel(page, "Routing");
+  for (const checkbox of await orientation.getByRole("checkbox").all()) await expect(checkbox).toBeChecked();
   for (const label of ["Mirror left/right (X)", "Mirror up/down (Y)", "Reverse layers (Z)"]) {
-    await panel.getByRole("button", { name: label, exact: true }).click();
+    await panel.getByRole("checkbox", { name: label, exact: true }).uncheck();
   }
   await expect(motor.getByRole("img", { name: "Coil A Driver end, L0, X 0 mm, Y 0 mm", exact: true })).toBeVisible();
 });

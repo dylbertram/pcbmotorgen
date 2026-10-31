@@ -21,6 +21,9 @@ pub struct CadGeometry {
     /// Imported CAD basename, retained by project persistence.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub source_file_name: Option<String>,
+    /// UI checkbox state; the reflections are already baked into `routing`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub applied_orientation: Option<pcbmotorgen_routing::RoutingOrientation>,
     /// Copper plane heights in mm, indexed bottom-to-top.
     pub layer_z_mm: Vec<f64>,
     pub trace_width_mm: f64,
@@ -314,6 +317,7 @@ pub fn sensor_geometry_to_cad_geometry(sensor: &SensorGeometry) -> CadGeometry {
         trace_width_mm: sensor.nets[0].trace_width_mm,
         source_layer_coils: BTreeMap::new(),
         source_file_name: None,
+        applied_orientation: None,
         coil_terminals: BTreeMap::new(),
         terminal_connection: None,
         coil_phases: BTreeMap::new(),
@@ -510,6 +514,7 @@ pub fn phase_coils_to_cad_geometry(
         trace_width_mm,
         source_layer_coils: BTreeMap::new(),
         source_file_name: None,
+        applied_orientation: None,
         coil_terminals: BTreeMap::new(),
         terminal_connection: None,
         coil_phases: BTreeMap::new(),
@@ -988,6 +993,7 @@ pub fn import_3d_dxf_with_coils(
         trace_width_mm: embedded_width.unwrap_or(options.default_trace_width_mm),
         source_layer_coils,
         source_file_name: None,
+        applied_orientation: None,
         coil_terminals: BTreeMap::new(),
         terminal_connection: None,
         coil_phases: BTreeMap::new(),
@@ -1528,6 +1534,7 @@ mod tests {
             trace_width_mm: 0.15,
             source_layer_coils: BTreeMap::new(),
             source_file_name: None,
+            applied_orientation: None,
             coil_terminals: BTreeMap::new(),
             terminal_connection: None,
             coil_phases: BTreeMap::new(),
@@ -1729,6 +1736,7 @@ mod tests {
             trace_width_mm: 0.2,
             source_layer_coils: BTreeMap::new(),
             source_file_name: None,
+            applied_orientation: None,
             coil_terminals: BTreeMap::new(),
             terminal_connection: None,
             coil_phases: BTreeMap::new(),
@@ -1771,6 +1779,23 @@ mod tests {
             "unexpected import warnings: {:?}",
             imported.warnings
         );
+    }
+
+    #[test]
+    fn applied_orientation_metadata_roundtrips_without_reapplying_flips_to_export() {
+        let mut geometry = sample();
+        let original_dxf = cad_geometry_to_3d_dxf(&geometry).unwrap();
+        assert!(!serde_json::to_value(&geometry).unwrap().as_object().unwrap().contains_key("applied_orientation"));
+        geometry.applied_orientation = Some(pcbmotorgen_routing::RoutingOrientation {
+            mirror_x: true, mirror_y: false, reverse_layers: true,
+        });
+        let loaded: CadGeometry = serde_json::from_str(&serde_json::to_string(&geometry).unwrap()).unwrap();
+        assert_eq!(loaded, geometry);
+        assert_eq!(cad_geometry_to_3d_dxf(&loaded).unwrap(), original_dxf, "metadata describes already transformed copper");
+        let legacy: CadGeometry = serde_json::from_value(serde_json::json!({
+            "routing":geometry.routing,"layer_z_mm":geometry.layer_z_mm,"trace_width_mm":geometry.trace_width_mm,
+        })).unwrap();
+        assert_eq!(legacy.applied_orientation, None);
     }
 
     #[test]

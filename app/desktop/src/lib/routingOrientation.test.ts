@@ -25,10 +25,23 @@ describe("routing reflections", () => {
     expect(result.routing.splines![0].control_points[0]).toEqual(result.routing.segments[0].start);
     expect(result.coil_phases).toEqual(source.coil_phases);
     expect(result.source_file_name).toBe(source.source_file_name);
+    expect(result.applied_orientation ?? DEFAULT_ROUTING_ORIENTATION).toEqual(flip);
     const twice = flipCadGeometry(result, flip);
     expect(twice.routing).toEqual(source.routing);
+    expect(twice.applied_orientation).toBeUndefined();
     twice.layer_z_mm.forEach((z, layer) => expect(z).toBeCloseTo(source.layer_z_mm[layer], 12));
     expect(JSON.stringify(source)).toBe(before);
+  });
+
+  it("retains independent DXF checkbox states through edits and project serialization", () => {
+    let geometry = flipCadGeometry(fixture(), { ...DEFAULT_ROUTING_ORIENTATION, mirror_x: true });
+    geometry = flipCadGeometry(geometry, { ...DEFAULT_ROUTING_ORIENTATION, reverse_layers: true });
+    geometry = JSON.parse(JSON.stringify({ ...geometry, trace_width_mm: .3 }));
+    expect(geometry.applied_orientation).toEqual({ mirror_x: true, mirror_y: false, reverse_layers: true });
+    geometry = flipCadGeometry(geometry, { ...DEFAULT_ROUTING_ORIENTATION, mirror_x: true });
+    expect(geometry.applied_orientation).toEqual({ mirror_x: false, mirror_y: false, reverse_layers: true });
+    expect(geometry.routing.segments[0].start).toEqual(fixture().routing.segments[0].start);
+    expect(geometry.routing.segments[0].layer).toBe(3);
   });
 
   it("reverses asymmetric stackups once and restores them on the second flip", () => {
