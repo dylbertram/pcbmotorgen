@@ -2,19 +2,21 @@
   /**
    * Global display options for the shared preview viewers: how copper is
    * drawn (traces or centerlines), whole copper-layer visibility, and the
-   * via markers. These are the controls that apply to every coil, as opposed
-   * to the per-coil/layer tree in the Layers panel.
+   * via markers. The motor viewport keeps the global options in View;
+   * import previews retain them here while the document menu is disabled.
    */
   import type { CoilPreviewViewState } from "./coilPreviewViewState.svelte";
 
-  let { view, uniqueLayers }: {
+  let { view, uniqueLayers, viewControlsInMenu = false }: {
     view: CoilPreviewViewState;
     uniqueLayers: { idx: number }[];
+    viewControlsInMenu?: boolean;
   } = $props();
   const displayGroup = $props.id();
 </script>
 
 <div class="display-controls">
+  {#if !viewControlsInMenu}
   <fieldset>
     <legend>Traces</legend>
     <div class="mode-options">
@@ -22,6 +24,7 @@
       <label><input type="radio" name={displayGroup} value="centerlines" bind:group={view.traceMode} />Centerlines</label>
     </div>
   </fieldset>
+  {/if}
 
   {#if uniqueLayers.length > 0}
     <fieldset>
@@ -35,6 +38,7 @@
     </fieldset>
   {/if}
 
+  {#if !viewControlsInMenu}
   <fieldset>
     <legend>Overlays</legend>
     <label class="layer-row" class:hidden-row={!view.showTerminals}>
@@ -46,6 +50,7 @@
       <span class="swatch" style:background-color="#fbbf24"></span><span>Vias</span>
     </label>
   </fieldset>
+  {/if}
 </div>
 
 <style>

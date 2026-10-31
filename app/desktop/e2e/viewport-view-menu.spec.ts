@@ -1,28 +1,11 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 import { gotoDesignApp } from "./helpers";
 import { readFileSync } from "node:fs";
-import type { ViewMenuState } from "../src/lib/viewMenu";
+import { installViewMenu, nativeViewAction as nativeAction, viewMenuSnapshot as snapshot, viewMenuChecked as checked } from "./view-menu-helpers";
 const groups = JSON.parse(readFileSync(new URL("../src/lib/viewMenu.json", import.meta.url), "utf8")) as { id: string; label: string }[][];
 
 // Exercise the real state/ownership bridge at its native IPC boundary.
-test.beforeEach(async ({ page }) => {
-  await page.route(/\/src\/lib\/ipc\/viewMenu\.ts(?:\?t=\d+)?$/, route => route.fulfill({
-    contentType: "application/javascript",
-    body: `export async function publishViewMenu(state) { window.__nativeViewMenu = state; }
-      export async function listenViewMenu(handler) {
-        const listener = e => handler(e.detail); window.addEventListener('native-view-action', listener);
-        return () => window.removeEventListener('native-view-action', listener);
-      }`,
-  }));
-});
-
-const snapshot = (page: Page) => page.evaluate(() => (window as any).__nativeViewMenu as ViewMenuState);
-async function nativeAction(page: Page, id: string, owner?: string) {
-  await page.evaluate(({ id, owner }) => window.dispatchEvent(new CustomEvent("native-view-action", {
-    detail: { id, owner: owner ?? (window as any).__nativeViewMenu.owner },
-  })), { id, owner });
-}
-const checked = async (page: Page, id: string) => (await snapshot(page))?.items.find(item => item.id === id)?.checked;
+test.beforeEach(async ({ page }) => { await installViewMenu(page); });
 
 test("view choices live at the viewport bottom-right and survive both views", async ({ page }, testInfo) => {
   await gotoDesignApp(page);
@@ -53,34 +36,52 @@ test("view choices live at the viewport bottom-right and survive both views", as
   await expect(page.getByRole("region", { name: "Simulation results", exact: true }).getByRole("button", { name: /3D fields/ })).toHaveCount(0);
 });
 
-test("native checks mirror Display and Layers groups without phase/layer entries", async ({ page }) => {
+test("View owns global controls while the side panels retain phase and layer filters", async ({ page }, info) => {
   await gotoDesignApp(page);
   await expect.poll(async () => (await snapshot(page))?.items.length).toBe(11);
   expect((await snapshot(page)).items.map(item => item.id)).toEqual(groups.flat().map(item => item.id));
   expect(groups[3].map(item => item.label)).toEqual(["Pole pitch", "Conductor band widths", "Pole regions"]);
   const workspace = page.getByRole("region", { name: "Coil design workspace", exact: true });
+  const canvas = workspace.getByRole("img", { name: "Coil preview", exact: true }).locator("canvas");
   await workspace.getByRole("button", { name: "Display", exact: true }).click();
   const display = workspace.getByRole("dialog", { name: "Coil preview display", exact: true });
-  await display.getByRole("checkbox", { name: "Show vias", exact: true }).uncheck();
-  await expect.poll(() => checked(page, "view:vias")).toBe(false);
+  await expect(display.getByRole("radio")).toHaveCount(0);
+  await expect(display.getByRole("checkbox", { name: "Show vias", exact: true })).toHaveCount(0);
+  await expect(display.getByRole("checkbox", { name: "Show terminal arrows", exact: true })).toHaveCount(0);
+  const copper = display.getByRole("checkbox", { name: "Show layer 0", exact: true });
+  await copper.uncheck();
+  await expect(copper).not.toBeChecked();
+  await copper.check();
+  await page.screenshot({ path: info.outputPath("display-copper-layers-only.png") });
   await nativeAction(page, "view:vias");
-  await expect(display.getByRole("checkbox", { name: "Show vias", exact: true })).toBeChecked();
+  await expect.poll(() => checked(page, "view:vias")).toBe(false);
+  await expect(canvas).toHaveAttribute("data-vias", "0");
+  await nativeAction(page, "view:vias");
+  await expect(canvas).toHaveAttribute("data-vias", /[1-9]/);
   await nativeAction(page, "view:centerlines");
-  await expect(display.getByRole("radio", { name: "Centerlines", exact: true })).toBeChecked();
+  await expect(canvas).toHaveAttribute("data-trace-mode", "centerlines");
   await expect.poll(() => checked(page, "view:traces")).toBe(false);
   await nativeAction(page, "view:terminals");
-  await expect(display.getByRole("checkbox", { name: "Show terminal arrows", exact: true })).not.toBeChecked();
+  await expect.poll(() => checked(page, "view:terminals")).toBe(false);
   await workspace.getByRole("button", { name: "Layers", exact: true }).click();
+  await expect(display).toHaveCount(0);
   const layers = workspace.getByRole("dialog", { name: "Coil preview layers", exact: true });
   for (const [id, label] of [["view:pole-pitch", "Show pole-pitch dimension ruler"], ["view:band-widths", "Show band-width diagnostics"], ["view:pole-regions", "Show pole regions"], ["view:waveform", "Show phase waveform"], ["view:one-period", "Show only one repeating section of the pattern"]]) {
-    const control = layers.getByRole("checkbox", { name: label, exact: true });
-    const before = await control.isChecked();
+    await expect(layers.getByRole("checkbox", { name: label, exact: true })).toHaveCount(0);
+    const before = await checked(page, id);
     await nativeAction(page, id);
-    await expect(control).toBeChecked({ checked: !before });
     await expect.poll(() => checked(page, id)).toBe(!before);
   }
   await nativeAction(page, "view:layer-0");
   await expect(layers.getByRole("checkbox", { name: "Show phase A", exact: true })).toBeChecked();
+  await expect(layers.getByRole("combobox", { name: "Pole regions phase", exact: true })).toBeEnabled();
+  await layers.getByRole("combobox", { name: "Pole regions phase", exact: true }).selectOption("B");
+  await expect(layers.getByRole("combobox", { name: "Pole regions phase", exact: true })).toHaveValue("B");
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(layers.getByRole("checkbox", { name: "Show phase A", exact: true })).toBeVisible();
+  await expect(layers.getByRole("checkbox", { name: "Show pole regions", exact: true })).toHaveCount(0);
+  await layers.getByRole("combobox", { name: "Pole regions phase", exact: true }).scrollIntoViewIfNeeded();
+  await page.screenshot({ path: info.outputPath("layers-phase-filters-mobile.png") });
 });
 
 test("menu follows the active file and ignores stale events and modal actions", async ({ page }) => {

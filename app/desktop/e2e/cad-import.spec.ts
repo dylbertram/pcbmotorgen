@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { gotoDesignApp, openCoilPreview, coilWorkspace, selectDesignPanel } from "./helpers";
+import { installViewMenu, setViewMenuChecked } from "./view-menu-helpers";
 
 async function revisitWorkspace(page: Page) {
   await page.getByRole("tab", { name: /^Simulate/i }).click();
@@ -10,6 +11,7 @@ async function revisitWorkspace(page: Page) {
 // Exercise the real dialog, store and preview with a deterministic IPC boundary.
 // Parsing and coil assignments themselves are covered by Rust DXF fixtures.
 test.beforeEach(async ({ page }) => {
+  await installViewMenu(page);
   await page.route(/\/@tauri-apps_plugin-dialog\.js(?:\?.*)?$/, async route => {
     const response = await route.fetch();
     const body = (await response.text()).replace(/async function confirm\(message2, options\) \{[\s\S]*?\n\}/, "async function confirm() { return window.__cadConfirmResult ?? false; }");
@@ -291,9 +293,9 @@ test("terminal panel configures multiple phases, switches topology and temporari
   await expect(modal.getByRole("dialog", { name: "Phase waveform", exact: true })).toHaveCount(0);
   await expect(modal.getByRole("slider", { name: "Mover position slider (mm)", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Display", exact: true }).click();
-  await page.getByRole("checkbox", { name: "Show terminal arrows", exact: true }).uncheck();
+  await setViewMenuChecked(page, "view:terminals", false);
   await expect(modal.getByRole("img", { name: /Coil A Driver end,/ })).toHaveCount(0);
-  await page.getByRole("checkbox", { name: "Show terminal arrows", exact: true }).check();
+  await setViewMenuChecked(page, "view:terminals", true);
   await revisitWorkspace(page);
   await expect(modal.getByRole("img", { name: "Coil A Driver end, L0, X 2 mm, Y 0 mm", exact: true })).toBeVisible();
 });

@@ -4,8 +4,9 @@
    * and Display stay on the right. CAD import retains its single right rail.
    *
     * Each toggle pulls a panel out from the rail: the
-   * Layers panel (coil/phase/layer tree plus diagnostics overlays) and the
-    * Display panel (traces, copper layers, vias and arrows), terminals,
+    * Layers panel (coil/phase/layer tree) and the Display panel (copper layers),
+     * with global visibility options in View. Import previews keep local options,
+     * terminals,
     * and optional driver settings in the expanded coil preview.
    * Panels overlay the drawing, so opening one never resizes the viewer, and
     * only one is open at a time. Terminal picking keeps the panel open for
@@ -36,7 +37,7 @@
     phases = [], showMotorControls = false, hasPolePitchData = false,
     hasBandWidthData = false, hasPoleRegionData = false, poleRegionPhases = [],
     geometry, selection, assignmentDisabled = false, terminalTool, onStartTerminals,
-    terminalsDisabled = false, dismissOnOutsideClick = true, config, generated = false,
+    terminalsDisabled = false, dismissOnOutsideClick = true, viewControlsInMenu = false, config, generated = false,
     drive = null, driveError = null, drivePending = false,
     designSettings, designOnly = false, drawingOnly = false, open = $bindable<PreviewPanelId | null>(null), active = true }: {
     designOnly?: boolean;
@@ -61,6 +62,8 @@
     displayLabel: string;
     phases?: { idx: number; name: string; colorIdx: number }[];
     showMotorControls?: boolean;
+    /** Global display options live in the motor document's native View menu. */
+    viewControlsInMenu?: boolean;
     hasPolePitchData?: boolean;
     hasBandWidthData?: boolean;
     hasPoleRegionData?: boolean;
@@ -149,7 +152,7 @@
     </button>
     <button type="button" bind:this={triggers.display} aria-label="Display" aria-expanded={open === "display"} onclick={() => toggle("display")}
       class="flex h-8 w-8 items-center justify-center rounded-md border border-transparent text-slate-300 hover:bg-slate-800 aria-expanded:border-emerald-500 aria-expanded:text-emerald-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
-      title="Show display options: traces, copper layers and vias.">
+      title={viewControlsInMenu ? "Show copper-layer visibility." : "Show display options: traces, copper layers and vias."}>
       <SlidersHorizontal size={16} aria-hidden="true" />
     </button>
     {/if}
@@ -252,7 +255,7 @@
       </header>
       <div class="min-h-0 overflow-y-auto overscroll-contain p-3">
         <CoilPreviewVisibilityPanel {view} uniqueLayers={layers} uniquePhases={phases} {coils} {isCoilVisible} {onToggleCoil}
-          {showMotorControls} {hasPolePitchData} {hasBandWidthData} {hasPoleRegionData} {poleRegionPhases} {geometry} {selection} {assignmentDisabled} />
+          {showMotorControls} {viewControlsInMenu} {hasPolePitchData} {hasBandWidthData} {hasPoleRegionData} {poleRegionPhases} {geometry} {selection} {assignmentDisabled} />
       </div>
     </div>
   {/if}
@@ -266,7 +269,7 @@
         </button>
       </header>
       <div class="min-h-0 overflow-y-auto overscroll-contain p-3">
-        <CoilPreviewDisplayPanel {view} uniqueLayers={layers} />
+        <CoilPreviewDisplayPanel {view} uniqueLayers={layers} {viewControlsInMenu} />
       </div>
     </div>
   {/if}
