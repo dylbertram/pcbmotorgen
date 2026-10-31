@@ -40,10 +40,11 @@ fn compact_braid_simulated_terminal_axes_are_diagnostic_not_a_spacing_target() {
 }
 
 #[test]
-fn four_layer_braid_carries_series_current_in_both_pairs_without_polarity_reversal() {
+fn staggered_braid_pairs_carry_their_own_opening_currents_without_polarity_reversal() {
     for strands in [2, 3, 5] {
+      for layers in [2, 4, 6, 8, 10] {
         let ctx = RoutingContext {
-            active_area_length_mm: 92.0, board_width_mm: 8.0, num_layers: 4, phases: 3,
+            active_area_length_mm: 92.0, board_width_mm: 8.0, num_layers: layers, phases: 3,
             min_trace_mm: 0.127, trace_width_mm: 0.2, min_space_mm: 0.127,
             params: std::collections::HashMap::from([("num_strands".into(), strands as f64), ("connection".into(), 2.0)]),
             magnet_pitch_mm: Some(6.0), magnet_array_span_mm: Some(29.0), ..Default::default()
@@ -52,38 +53,62 @@ fn four_layer_braid_carries_series_current_in_both_pairs_without_polarity_revers
         let networks = extract_phase_networks(&routing);
         assert_eq!(networks.len(), 3);
         for net in &networks {
-            assert_eq!(net.layers(), vec![0, 1, 2, 3]);
+            assert_eq!(net.layers(), (0..layers).collect::<Vec<_>>());
             let solution = solve_network(net, &vec![1.0; net.edges.len()]);
             assert!(solution.connected, "{} must connect line to neutral", net.net);
             let mut joins = 0;
             for (edge, current) in net.edges.iter().zip(&solution.current_share) {
-                if let EdgeKind::Via { layers: [1, 2], .. } = edge.kind {
+                if let EdgeKind::Via { layers: [a, b], .. } = edge.kind {
+                  if a % 2 == 1 && b == a + 1 {
                     joins += 1;
-                    assert!((current.abs() - 1.0).abs() < 1e-8, "the series link carries the entire terminal current");
+                    assert!((current + 1.0).abs() < 1e-8, "each series link carries one amp from the driver toward neutral");
+                  }
                 }
             }
-            assert_eq!(joins, 1);
+            assert_eq!(joins, layers / 2 - 1);
             let active = |layer| net.edges.iter().zip(&solution.current_share).filter_map(|(edge, current)| {
                 match &edge.kind {
                     EdgeKind::Trace { layer: l, points, .. } if *l == layer && points.iter().all(|p| p[1] <= 0.008 + 1e-12) => Some((points, current)),
                     _ => None,
                 }
             }).collect::<Vec<_>>();
-            for layer in [0, 1] {
-                let first = active(layer);
-                let second = active(layer + 2);
-                assert_eq!(first.len(), second.len());
-                for ((a, ia), (b, ib)) in first.iter().zip(&second) {
-                    assert_eq!(a, b);
-                    assert!((*ia - *ib).abs() < 1e-8, "stacked active paths must carry equal signed currents");
+            // Different cuts in the braid mesh need not have equal edge
+            // currents. Solve each actual pair separately, keeping its own
+            // opening and lead orientation, then compare signed active paths.
+            for pair in 0..layers / 2 {
+                let lo = 2 * pair;
+                let hi = lo + 1;
+                let isolated = RoutingResult {
+                    segments: routing.segments.iter().filter(|s| s.layer == lo || s.layer == hi).cloned().collect(),
+                    vias: routing.vias.iter().filter(|v| v.from_layer == lo && v.to_layer == hi).cloned().collect(),
+                    ..Default::default()
+                };
+                let single = extract_phase_networks(&isolated).into_iter().find(|n| n.net == net.net).unwrap();
+                let expected = solve_network(&single, &vec![1.0; single.edges.len()]);
+                assert!(expected.connected);
+                for layer in [lo, hi] {
+                    let actual = active(layer);
+                    let standalone: Vec<_> = single.edges.iter().zip(&expected.current_share).filter_map(|(edge, current)| {
+                        match &edge.kind {
+                            EdgeKind::Trace { layer: l, points, .. } if *l == layer && points.iter().all(|p| p[1] <= 0.008 + 1e-12) => Some((points, current)),
+                            _ => None,
+                        }
+                    }).collect();
+                    assert_eq!(actual.len(), standalone.len());
+                    for ((a, ia), (b, ib)) in actual.iter().zip(&standalone) {
+                        assert_eq!(a, b);
+                        assert!((*ia - *ib).abs() < 1e-8, "a series connection must preserve the standalone pair's signed currents");
+                    }
                 }
             }
         }
-        let mut cut = routing.clone();
-        cut.vias.retain(|v| v.from_layer != 0 || v.to_layer != 3);
-        for net in extract_phase_networks(&cut) {
+        for via in routing.vias.iter().filter(|v| layers > 2 && v.from_layer == 0 && v.to_layer == layers - 1) {
+            let mut cut = routing.clone();
+            cut.vias.retain(|v| v.position != via.position || v.net != via.net);
+            let net = extract_phase_networks(&cut).into_iter().find(|n| n.net == via.net).unwrap();
             assert!(!solve_network(&net, &vec![1.0; net.edges.len()]).connected);
         }
+      }
     }
 }
 

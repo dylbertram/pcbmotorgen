@@ -2139,17 +2139,19 @@ mod tests {
     }
 
     #[test]
-    fn generated_four_layer_braid_preserves_mixed_via_spans_through_cad_and_dxf() {
+    fn generated_even_layer_braid_preserves_mixed_via_spans_through_cad_and_dxf() {
         use pcbmotorgen_routing::{generate_routing_result, routing_result_to_phase_coils, RoutingContext};
+      for layers in [2, 4, 6, 8, 10] {
         let context = RoutingContext {
-            active_area_length_mm: 92.0, board_width_mm: 8.0, num_layers: 4, phases: 3,
+            active_area_length_mm: 92.0, board_width_mm: 8.0, num_layers: layers, phases: 3,
             min_trace_mm: 0.127, trace_width_mm: 0.2, min_space_mm: 0.127,
+            via_pad_diameter_mm: Some(0.5),
             params: std::collections::HashMap::from([("num_strands".into(), 3.0), ("connection".into(), 2.0)]),
             magnet_pitch_mm: Some(6.0), magnet_array_span_mm: Some(29.0), ..Default::default()
         };
         let routing = generate_routing_result(&context, "infinity-braid").unwrap();
         let coils = routing_result_to_phase_coils(&routing, "infinity-braid");
-        let cad = phase_coils_to_cad_geometry(&coils, 4, 1.6, 0.2).unwrap();
+        let cad = phase_coils_to_cad_geometry(&coils, layers, 1.6, 0.2).unwrap();
         let via_keys = |r: &RoutingResult| {
             let mut keys: Vec<_> = r.vias.iter().map(|v| (
                 v.net.clone(), v.from_layer, v.to_layer,
@@ -2158,24 +2160,35 @@ mod tests {
             keys.sort(); keys
         };
         assert_eq!(via_keys(&cad.routing), via_keys(&routing));
-        for span in [(0, 1), (2, 3), (0, 3)] {
+        for span in (0..layers).step_by(2).map(|l| (l, l + 1)).chain(std::iter::once((0, layers - 1))) {
             assert!(cad.routing.vias.iter().any(|v| (v.from_layer, v.to_layer) == span));
         }
         let dxf = cad_geometry_to_3d_dxf(&cad).unwrap();
         let imported = import_3d_dxf(&dxf, CadImportOptions {
             units_to_mm: 1.0, z_tolerance_mm: 1e-6, default_trace_width_mm: 0.2,
-            legacy_layer_count: 4, legacy_pcb_thickness_mm: 1.6, prefer_detected_units: false,
+            legacy_layer_count: layers, legacy_pcb_thickness_mm: 1.6, prefer_detected_units: false,
         }).unwrap();
-        assert_eq!(imported.warnings.len(), 4);
+        assert_eq!(imported.warnings.len(), layers as usize);
         assert!(imported.warnings.iter().all(|w| w.starts_with("DXF layer name suggested copper index") && w.ends_with("used Z.")));
         // Import sorts planes bottom-to-top; compare after mapping back to
         // the generated top-to-bottom layer indices.
         let mut restored = imported.geometry.routing;
         for v in &mut restored.vias {
-            let (a, b) = (3 - v.from_layer, 3 - v.to_layer);
+            let (a, b) = (layers - 1 - v.from_layer, layers - 1 - v.to_layer);
             v.from_layer = a.min(b); v.to_layer = a.max(b);
         }
         assert_eq!(via_keys(&restored), via_keys(&routing));
+        for s in &mut restored.segments { s.layer = layers - 1 - s.layer; }
+        let segment_keys = |r: &RoutingResult| {
+            let mut keys: Vec<_> = r.segments.iter().map(|s| (
+                s.net.clone(), s.layer,
+                (s.start.x * 1e6).round() as i64, (s.start.y * 1e6).round() as i64,
+                (s.end.x * 1e6).round() as i64, (s.end.y * 1e6).round() as i64,
+            )).collect();
+            keys.sort(); keys
+        };
+        assert_eq!(segment_keys(&restored), segment_keys(&routing));
+      }
     }
 
     #[test]
