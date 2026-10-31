@@ -261,7 +261,7 @@
       <Slider orientation="vertical" min={1} max={20} step={0.1} bind:value={view.zScale} ariaLabel="Z height scale" class="min-h-0 flex-1" />
       <output class="font-mono text-[10px] text-emerald-300" aria-label="Z height multiplier">{view.zScale}×</output>
     </div>
-    <div class="pointer-events-none absolute bottom-2 left-16 right-12 text-[10px] text-slate-400">
+    <div class="navigation-hint pointer-events-none absolute bottom-2 left-16 right-12 text-[10px] text-slate-400">
       {view.viewMode === "iso" ? "Drag to orbit" : "Drag to pan"} · Right-drag to pan · Scroll or pinch to zoom · Z × {view.zScale}
     </div>
     <div class="layer-depths pointer-events-none absolute right-12 top-2 text-right font-mono text-[10px] text-slate-400" class:simulation-depths={simulation !== null}>
@@ -277,11 +277,13 @@
 
 <style>
   .coil-3d { container-type: size; }
-  .overlay-legends { max-height: 40cqh; right: auto; max-width: min(26rem, calc(100% - 4.75rem)); }
+  .overlay-legends { bottom: calc(2rem + var(--coil-overlay-inset, 0px)); max-height: 40cqh; right: auto; max-width: min(26rem, calc(100% - 4.75rem)); }
+  .z-height { bottom: calc(2rem + var(--coil-overlay-inset, 0px)); }
+  .navigation-hint { bottom: calc(.5rem + var(--coil-overlay-inset, 0px)); }
   .simulation-controls { width: 22rem; max-width: calc(100% - 4.5rem); }
   .inspector-toggle { display: flex; justify-content: space-between; align-items: center; width: 100%; min-height: 2rem; text-align: left; padding: 0.5rem 0.75rem; }
   .inspector-toggle:hover { background: rgb(var(--slate-800)); }
-  .overlay-control-fields { display: grid; gap: 0.625rem; padding: 0.625rem; max-height: calc(100cqh - 5rem); overflow-y: auto; border-top: 1px solid rgb(var(--slate-700)); }
+  .overlay-control-fields { display: grid; gap: 0.625rem; padding: 0.625rem; max-height: calc(100cqh - 5rem - var(--coil-overlay-inset, 0px)); overflow-y: auto; border-top: 1px solid rgb(var(--slate-700)); }
   .overlay-control-fields[hidden] { display: none; }
   .control-row { display: grid; grid-template-columns: 5.75rem minmax(0, 1fr); align-items: center; gap: 0.5rem; }
   .control-row select { width: 100%; min-width: 0; min-height: 2rem; }
@@ -299,7 +301,7 @@
   .compact-overlay-toggle { display: none; }
   @container (max-width: 760px) {
     .simulation-controls { top: 3rem; }
-    .overlay-control-fields { max-height: calc(65cqh - 4rem); }
+    .overlay-control-fields { max-height: min(calc(65cqh - 4rem), calc(100cqh - 5rem - var(--coil-overlay-inset, 0px))); }
   }
   @container (max-width: 520px) {
     .compact-overlay-toggle { display: block; }
@@ -310,7 +312,7 @@
     .control-row { grid-template-columns: 4.75rem minmax(0, 1fr); }
   }
   @container (max-height: 180px) {
-    .z-height { top: 2.75rem; bottom: 0.25rem; padding: 0.25rem; gap: 0.25rem; }
+    .z-height { top: 2.75rem; bottom: calc(.25rem + var(--coil-overlay-inset, 0px)); padding: 0.25rem; gap: 0.25rem; }
     .z-label { display: none; }
   }
   button { padding: 0.25rem 0.5rem; border-radius: 0.25rem; font-size: 0.75rem; }
