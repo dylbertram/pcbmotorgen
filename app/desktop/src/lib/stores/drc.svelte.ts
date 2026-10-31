@@ -2,7 +2,7 @@
  * DRC controller — extracted from App.svelte.
  *
  * Owns the interference-check state machine (violations / loading / error /
- * checkedLayoutKey) together with the request-id + layout-key staleness
+ * checkedLayoutKey) together with the generation + layout-key staleness
  * guards, so a DRC result computed for an older layout can never gate the
  * export panel for a newer one.
  *
@@ -12,7 +12,8 @@
  * the underlying config field reads are tracked there.
  */
 
-import { checkCoilInterference, debounce } from "../ipc";
+import { checkCoilInterference } from "../ipc";
+import { LatestAsyncTask } from "../utils/latestAsyncTask";
 import type { CadGeometry, InterferenceViolation } from "../types";
 import type { ConfigStore } from "./config.svelte";
 
@@ -31,18 +32,27 @@ export class DrcController {
   error = $state<string | null>(null);
   checkedLayoutKey = $state<string | null>(null);
 
-  /** Monotonic counter — every `request()` invalidates older in-flight checks. */
-  #requestId = 0;
-
   constructor(options: DrcControllerOptions) {
     this.config = options.config;
     this.getLayoutKey = options.getLayoutKey;
     this.getCadGeometry = options.getCadGeometry ?? (() => null);
   }
 
-  readonly #schedule = debounce((requestId: number, layoutKey: string): void => {
-    void this.#perform(requestId, layoutKey);
-  }, 300);
+  readonly #schedule = new LatestAsyncTask<string, InterferenceViolation[]>({
+    delayMs: 300,
+    run: () => checkCoilInterference(this.config.toIpc(), this.getCadGeometry()),
+    onResult: (result, layoutKey) => {
+      if (layoutKey !== this.currentLayoutKey) return;
+      this.violations = result;
+      this.checkedLayoutKey = layoutKey;
+      this.loading = false;
+    },
+    onError: (reason, layoutKey) => {
+      if (layoutKey !== this.currentLayoutKey) return;
+      this.error = reason instanceof Error ? reason.message : String(reason);
+      this.loading = false;
+    },
+  });
 
   private readonly config: ConfigStore;
   private readonly getLayoutKey: () => string;
@@ -66,36 +76,21 @@ export class DrcController {
     );
   }
 
-  /** Bump the request id, snapshot the layout key, schedule the check. */
+  /** Invalidate immediately, but never pile up native checks during edits. */
   request(): void {
-    const requestId = ++this.#requestId;
     const layoutKey = this.currentLayoutKey;
     this.loading = true;
     this.error = null;
     this.violations = [];
     this.checkedLayoutKey = null;
-    this.#schedule(requestId, layoutKey);
+    this.#schedule.request(layoutKey);
   }
 
-  async #perform(requestId: number, layoutKey: string): Promise<void> {
-    try {
-      const result = await checkCoilInterference(this.config.toIpc(), this.getCadGeometry());
-      if (requestId !== this.#requestId || layoutKey !== this.currentLayoutKey) {
-        return;
-      }
-      this.violations = result;
-      this.checkedLayoutKey = layoutKey;
-    } catch (reason) {
-      if (requestId !== this.#requestId || layoutKey !== this.currentLayoutKey) {
-        return;
-      }
-      this.violations = [];
-      this.checkedLayoutKey = null;
-      this.error = reason instanceof Error ? reason.message : String(reason);
-    } finally {
-      if (requestId === this.#requestId && layoutKey === this.currentLayoutKey) {
-        this.loading = false;
-      }
-    }
+  cancel(): void {
+    this.#schedule.cancel();
+    this.loading = false;
+    this.error = null;
+    this.violations = [];
+    this.checkedLayoutKey = null;
   }
 }
