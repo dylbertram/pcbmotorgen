@@ -8,8 +8,7 @@ fn generated_preview_flips_cover_closed_delta_and_star_reference_settings() {
             let mut state = ProjectConfigStateIpc::default();
             state.active_area_width_mm = 8.;
             state.pcb_thickness_mm = 0.8;
-            if connection == 0. { state.routing_params.remove("connection"); }
-            else { state.routing_params.insert("connection".into(), connection); }
+            state.routing_params.insert("connection".into(), connection);
             state.routing_params.insert("num_strands".into(), strands);
             let base = state.to_linear_motor_ipc();
             let original = tauri::async_runtime::block_on(super::physics::generate_coils(base.clone())).unwrap();

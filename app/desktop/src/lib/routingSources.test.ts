@@ -24,6 +24,8 @@ describe("generator-driven routing sources", () => {
     expect(generatorConnection(braid.end_type, { connection: 99 })).toBeNull();
     expect(routingSources([braid], braid.id, { connection: 99 }).map((source) => source.label)).toContain("Infinity Braid - Unknown connection (99)");
     expect(routingSources([braid], braid.id, {}).map((source) => source.label)).toContain("Infinity Braid - Closed (legacy)");
+    expect(routingSources([braid], braid.id, { connection: 0 }).map((source) => source.label)).toContain("Infinity Braid - Closed (legacy)");
+    expect(routingSources([braid], braid.id, { connection: 2 }).map((source) => source.label)).not.toContain("Infinity Braid - Closed (legacy)");
   });
   it("supports fixed metadata and generators without metadata", () => {
     const fixed: RoutingPatternInfo = { id: "fixed", display_name: "Fixed", end_type: { kind: "fixed", connection: "delta" } };
