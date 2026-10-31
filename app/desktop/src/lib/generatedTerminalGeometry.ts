@@ -14,7 +14,10 @@ export function generatedTerminalGeometry(coils: CoilPathDto, layerCount: number
       format_version: 2,
       segments: coils.phases.flatMap((phase) => phase.segments.map((segment) => ({ ...segment, start: point(segment.start), end: point(segment.end), layer: phase.layer_idx, net: phase.phase_name }))),
       curves: coils.phases.flatMap((phase) => (phase.corner_arcs ?? []).map((arc) => ({ start: point(arc.start), mid: point(arc.mid), end: point(arc.end), is_active: arc.is_active ?? false, layer: phase.layer_idx, net: phase.phase_name }))),
-      vias: coils.phases.flatMap((phase) => (phase.via_positions ?? []).map((position) => ({ position: point(position), net: phase.phase_name, from_layer: phase.layer_idx % 2 === 0 ? phase.layer_idx : phase.layer_idx - 1, to_layer: phase.layer_idx % 2 === 0 ? phase.layer_idx + 1 : phase.layer_idx }))).filter((via) => via.to_layer < layerCount),
+      vias: coils.phases.flatMap((phase) => phase.routed_vias != null
+        ? phase.routed_vias.map((via) => ({ ...via, position: point(via.position), net: phase.phase_name }))
+        : (phase.via_positions ?? []).map((position) => ({ position: point(position), net: phase.phase_name, from_layer: phase.layer_idx % 2 === 0 ? phase.layer_idx : phase.layer_idx - 1, to_layer: phase.layer_idx % 2 === 0 ? phase.layer_idx + 1 : phase.layer_idx })))
+        .filter((via) => via.from_layer >= 0 && via.to_layer >= 0 && via.from_layer < layerCount && via.to_layer < layerCount),
     },
   };
   // Both layer presentations can carry the same physical via.

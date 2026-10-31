@@ -38,6 +38,14 @@ pub struct CoilArcIpc {
     pub is_active: bool,
 }
 
+/// A via's exact barrel span. Coordinates are metres, like the preview traces.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct CoilViaIpc {
+    pub position: [f64; 2],
+    pub from_layer: u32,
+    pub to_layer: u32,
+}
+
 /// A single phase coil on a single PCB layer.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -53,6 +61,10 @@ pub struct PhaseCoilIpc {
     /// Center positions of inter-layer vias on this coil's layer+net, `(x, y)` [m].
     #[serde(default)]
     pub via_positions: Vec<[f64; 2]>,
+    /// Authoritative physical spans when present, including an empty list.
+    /// Absent only for legacy coils that supply positions without spans.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub routed_vias: Option<Vec<CoilViaIpc>>,
     pub total_length_m: f64,
     pub active_length_m: f64,
     pub end_turn_length_m: f64,
@@ -211,6 +223,12 @@ impl PhaseCoilIpc {
             .map(|&(x, y)| [x * MM_TO_M, y * MM_TO_M])
             .collect();
         let bbox = coil.bounding_box();
+        let routed_vias = (!coil.routed_vias.is_empty() || coil.center_via_positions.is_empty()).then(||
+            coil.routed_vias.iter().map(|v| CoilViaIpc {
+                position: [v.position.x * MM_TO_M, v.position.y * MM_TO_M],
+                from_layer: v.from_layer,
+                to_layer: v.to_layer,
+            }).collect());
         let terminal_start = coil
             .segments
             .first()
@@ -229,6 +247,7 @@ impl PhaseCoilIpc {
             segments,
             corner_arcs,
             via_positions,
+            routed_vias,
             total_length_m: coil.total_length_mm() * MM_TO_M,
             active_length_m: coil.active_length_mm() * MM_TO_M,
             end_turn_length_m: coil.end_turn_length_mm() * MM_TO_M,
@@ -324,6 +343,57 @@ impl PoleRegionIpc {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn preview_keeps_exact_spans_and_converts_only_coordinates() {
+        let mut coil = CorePhaseCoil::default();
+        coil.routed_vias = vec![pcbmotorgen_routing::Via {
+            position: pcbmotorgen_routing::Point::new(10.0, 5.0),
+            from_layer: 0, to_layer: 7, net: "A".into(),
+        }];
+        coil.center_via_positions = vec![(10.0, 5.0)];
+        let dto = PhaseCoilIpc::from_core(&coil);
+        assert_eq!(dto.routed_vias, Some(vec![CoilViaIpc {
+            position: [0.01, 0.005], from_layer: 0, to_layer: 7,
+        }]));
+        let json = serde_json::to_value(&dto).unwrap();
+        let restored: PhaseCoilIpc = serde_json::from_value(json.clone()).unwrap();
+        assert_eq!(restored.routed_vias, dto.routed_vias);
+        let mut legacy = json;
+        legacy.as_object_mut().unwrap().remove("routed_vias");
+        assert!(serde_json::from_value::<PhaseCoilIpc>(legacy).unwrap().routed_vias.is_none());
+        coil.routed_vias.clear();
+        assert!(PhaseCoilIpc::from_core(&coil).routed_vias.is_none(), "position-only legacy data must retain the fallback");
+        coil.center_via_positions.clear();
+        assert_eq!(PhaseCoilIpc::from_core(&coil).routed_vias, Some(vec![]));
+    }
+
+    #[test]
+    fn every_even_braid_via_survives_the_preview_boundary() {
+        for layers in [2, 4, 6, 8] {
+            let context = pcbmotorgen_routing::RoutingContext {
+                active_area_length_mm: 92.0, board_width_mm: 8.0, num_layers: layers, phases: 3,
+                min_trace_mm: 0.2, trace_width_mm: 0.2, min_space_mm: 0.127,
+                magnet_pitch_mm: Some(6.0),
+                params: std::collections::HashMap::from([("num_strands".into(), 3.0), ("connection".into(), 2.0)]),
+                ..Default::default()
+            };
+            let routing = pcbmotorgen_routing::generate_routing_result(&context, "infinity-braid").unwrap();
+            let coils = pcbmotorgen_routing::routing_result_to_phase_coils(&routing, "infinity-braid");
+            let mut actual: Vec<_> = coils.iter().flat_map(|c| {
+                PhaseCoilIpc::from_core(c).routed_vias.unwrap().into_iter().map(|v| (
+                    c.phase_name.clone(), v.from_layer, v.to_layer,
+                    (v.position[0] * 1e9).round() as i64, (v.position[1] * 1e9).round() as i64,
+                ))
+            }).collect();
+            let mut expected: Vec<_> = routing.vias.iter().map(|v| (
+                v.net.clone(), v.from_layer, v.to_layer,
+                (v.position.x * 1e6).round() as i64, (v.position.y * 1e6).round() as i64,
+            )).collect();
+            actual.sort(); expected.sort();
+            assert_eq!(actual, expected);
+        }
+    }
 
     #[test]
     fn routing_mm_is_converted_to_frontend_si() {
