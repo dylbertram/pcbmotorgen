@@ -30,6 +30,7 @@
   import HelpTag from "../ui/HelpTag.svelte";
   import TravelStackupView from "./TravelStackupView.svelte";
   import PcbStackupEditor from "./PcbStackupEditor.svelte";
+  import CopperPanel from "./parameters/CopperPanel.svelte";
   import PeriodicReferencePanel from "./PeriodicReferencePanel.svelte";
   import HousingMotionPanel from "./HousingMotionPanel.svelte";
 
@@ -172,6 +173,7 @@
     <div class="mx-auto w-full max-w-[160px]"><TravelStackupView {config} /></div>
   </div>
 
+  <CopperPanel {config} />
   <PcbStackupEditor {config} />
 
   {#if !backplane}

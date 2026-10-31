@@ -191,22 +191,33 @@ test("operating and thermal settings live in the left target panel and update li
   await expect(targets.getByRole("spinbutton", { name: "Winding temperature (°C)", exact: true })).toHaveValue("60");
 });
 
-test("copper weights and via plating belong to Routing and persist across panels", async ({ page }) => {
+test("copper weights belong to Stackup and via plating stays with Routing via sizes across panels", async ({ page }) => {
   await gotoDesignApp(page);
+  await selectPanel(page, "Stackup");
+  const stackup = page.getByRole("dialog", { name: "Stackup", exact: true });
+  await stackup.getByRole("combobox", { name: "Outer layer copper weight", exact: true }).selectOption("2");
+  await stackup.getByRole("combobox", { name: "Inner layer copper weight", exact: true }).selectOption("0.5");
+  await expect(stackup.getByRole("spinbutton", { name: "Via plating thickness (µm)", exact: true })).toHaveCount(0);
   await selectPanel(page, "Routing");
   const routing = page.getByRole("dialog", { name: "Routing", exact: true });
-  await routing.getByRole("combobox", { name: "Outer layer copper weight", exact: true }).selectOption("2");
-  await routing.getByRole("combobox", { name: "Inner layer copper weight", exact: true }).selectOption("0.5");
-  const plating = routing.getByRole("spinbutton", { name: "Via plating thickness (µm)", exact: true });
+  await expect(routing.getByRole("combobox", { name: /layer copper weight/ })).toHaveCount(0);
+  const vias = routing.getByRole("figure", { name: "Via sizing guide", exact: true });
+  await expect(vias.getByRole("spinbutton", { name: "Via hole size (mm)", exact: true })).toBeVisible();
+  await expect(vias.getByRole("spinbutton", { name: "Annular ring width (mm)", exact: true })).toBeVisible();
+  const plating = vias.getByRole("spinbutton", { name: "Via plating thickness (µm)", exact: true });
+  await expect(plating).toHaveAttribute("min", "5");
+  await expect(plating).toHaveAttribute("max", "100");
+  await expect(plating).toHaveAttribute("step", "5");
   await plating.fill("35");
   await plating.press("Enter");
   await expect(routing.getByRole("spinbutton", { name: "Winding temperature (°C)", exact: true })).toHaveCount(0);
   await selectPanel(page, "Driver settings");
   const driver = page.getByRole("dialog", { name: "Preview driver settings", exact: true });
   await expect(driver.getByRole("combobox", { name: "Outer layer copper weight", exact: true })).toHaveCount(0);
+  await selectPanel(page, "Stackup");
+  await expect(stackup.getByRole("combobox", { name: "Outer layer copper weight", exact: true })).toHaveValue("2");
+  await expect(stackup.getByRole("combobox", { name: "Inner layer copper weight", exact: true })).toHaveValue("0.5");
   await selectPanel(page, "Routing");
-  await expect(routing.getByRole("combobox", { name: "Outer layer copper weight", exact: true })).toHaveValue("2");
-  await expect(routing.getByRole("combobox", { name: "Inner layer copper weight", exact: true })).toHaveValue("0.5");
   await expect(plating).toHaveValue("35");
 });
 

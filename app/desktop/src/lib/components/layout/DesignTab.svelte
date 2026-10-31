@@ -4,7 +4,6 @@
   import BackplanePanel from "../design/BackplanePanel.svelte";
   import MagnetsPanel from "../design/parameters/MagnetsPanel.svelte";
   import DrivePanel from "../design/parameters/DrivePanel.svelte";
-  import CopperPanel from "../design/parameters/CopperPanel.svelte";
   import type { MotionStore } from "../../stores/motion.svelte";
   import { stripBoundsDomainMm, type TraceMeasure } from "../../previewGeometry";
   import TravelIsoView from "../design/TravelIsoView.svelte";
@@ -196,7 +195,6 @@
           onTraceWidthChange={cadGeometry && onGeometryChange ? (width) => {
             if (cadGeometry) onGeometryChange?.({ ...cadGeometry, trace_width_mm: width });
            } : undefined} />
-        <CopperPanel {config} />
       </div>
     </section>
 
