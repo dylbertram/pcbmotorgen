@@ -25,6 +25,7 @@ import type {
 } from "../types";
 import type { HousingMotionAnalysis } from "../types/drive";
 import { isTauriAvailable } from "./core";
+import { orientCoilPreview } from "../routingOrientation";
 import type { PeriodicStaticReference } from "../types/periodicReference";
 import type { DcWindingGeometry } from "../types/dcCoupling";
 import type { MovePowerInputs, NativeMoveResult } from "../types/movePower";
@@ -52,7 +53,7 @@ export async function fetchMagnetGrades(): Promise<MagnetGrade[]> {
 export async function generateCoils(
   config: LinearMotorConfig,
 ): Promise<CoilPathDto> {
-  if (!isTauriAvailable()) return mockCoils(config);
+  if (!isTauriAvailable()) return orientCoilPreview(mockCoils(config), config);
   return await invoke<CoilPathDto>("generate_coils", { config });
 }
 

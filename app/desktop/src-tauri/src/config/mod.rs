@@ -114,6 +114,8 @@ pub struct LinearMotorConfig {
     /// pattern and never appear here. Defaults to empty = use pattern defaults.
     #[serde(default)]
     pub routing_params: std::collections::HashMap<String, f64>,
+    #[serde(default)]
+    pub routing_orientation: pcbmotorgen_routing::RoutingOrientation,
     /// Number of electrical phases.
     pub phases: u32,
     /// Vernier phase-band pitch spacing ratio. 1.0 = standard 1:1.
@@ -208,6 +210,7 @@ impl Default for LinearMotorConfig {
             strands_per_phase: 2,
             routing_pattern: "infinity-braid".to_string(),
             routing_params: std::collections::HashMap::new(),
+            routing_orientation: Default::default(),
             phases: 3,
             spacing_ratio: 1.0,
             max_current_a: 1.0,

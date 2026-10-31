@@ -29,6 +29,17 @@ function makeStores(recents?: RecentFilesStore, kind: "motor" | "sensor" = "moto
 }
 
 describe("explicit move persistence", () => {
+  it("round-trips routing orientation and clears it for legacy files", () => {
+    const { config, projects } = makeStores();
+    const legacy = projects.snapshotIpc(); delete legacy.config.routing_orientation;
+    config.toggleRoutingFlip("mirror_x"); config.toggleRoutingFlip("reverse_layers");
+    const saved = projects.snapshotIpc();
+    projects.applyToState(legacy);
+    expect(config.routing_orientation).toEqual({ mirror_x: false, mirror_y: false, reverse_layers: false });
+    projects.applyToState(saved);
+    expect(config.routing_orientation).toEqual({ mirror_x: true, mirror_y: false, reverse_layers: true });
+    expect(config.toIpc().routing_orientation).toEqual(saved.config.routing_orientation);
+  });
   it("persists custom PCB copper/dielectric thicknesses and clears them when restoring a legacy design", () => {
     const { config, projects } = makeStores();
     const legacy = projects.snapshotIpc();

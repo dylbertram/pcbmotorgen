@@ -32,7 +32,7 @@
     fit?: number;
     command: { id: number; zoom: number };
     windowCommand?: { id: number; a: [number, number]; b: [number, number] };
-    onCamera?: (snapshot: { position: number[]; target: number[]; zoom: number; fitZoom: number }) => void;
+    onCamera?: (snapshot: { position: number[]; target: number[]; up: number[]; zoom: number; fitZoom: number }) => void;
     viewMode?: "top" | "front" | "left" | "iso";
     topCamera?: TopCameraTransform | null;
     zScale: number;
@@ -72,7 +72,7 @@
   // Camera snapshots are imperative navigation state, not reactive geometry.
   const cameras = new Map<string,{position:Vector3;up:Vector3;target:Vector3;zoom:number;fitZoom:number}>();
   function reportCamera() {
-    if (camera && controls) onCamera?.({position:camera.position.toArray(),target:controls.target.toArray(),zoom:camera.zoom,fitZoom});
+    if (camera && controls) onCamera?.({position:camera.position.toArray(),target:controls.target.toArray(),up:camera.up.toArray(),zoom:camera.zoom,fitZoom});
   }
   function rememberPrevious(mode:string) {
     if (camera && controls && lastMode && lastMode !== mode && lastMode !== "top")
@@ -81,7 +81,7 @@
   $effect(() => {
     if (!controls || !camera) return;
     const current = controls, cam = camera;
-    const report = () => onCamera?.({ position: cam.position.toArray(), target: current.target.toArray(), zoom: cam.zoom, fitZoom });
+    const report = () => onCamera?.({ position: cam.position.toArray(), target: current.target.toArray(), up: cam.up.toArray(), zoom: cam.zoom, fitZoom });
     current.addEventListener("change", report);
     return () => current.removeEventListener("change", report);
   });

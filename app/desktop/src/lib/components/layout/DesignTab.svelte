@@ -11,6 +11,7 @@
   import ConstraintReadouts from "../design/ConstraintReadouts.svelte";
   import TopologySelector from "../design/TopologySelector.svelte";
   import TracesBoardPanel from "../design/parameters/TracesBoardPanel.svelte";
+  import RoutingOrientationPanel from "../design/RoutingOrientationPanel.svelte";
   import ValidationWarning from "../design/ValidationWarning.svelte";
   import NumberField from "../ui/NumberField.svelte";
   import HelpTag from "../ui/HelpTag.svelte";
@@ -151,6 +152,7 @@
     >
       <div class="space-y-3">
         <TopologySelector {config} cadGeometryActive={cadGeometry !== null} cadSourceFileName={cadGeometry?.source_file_name} {onImportCad} {onUseGenerated} />
+        <RoutingOrientationPanel {config} geometry={cadGeometry} {onGeometryChange} />
         {@render constraints()}
         {#if cadGeometry}
           <div

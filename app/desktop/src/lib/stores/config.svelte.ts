@@ -29,6 +29,7 @@ import { MAX_PCB_LAYERS } from "../types/simulationLimits";
 import type { RoutedMoveRequest } from "../types/movePower";
 import { magnetMass } from "../carriageMass";
 import { pcbStackupThicknessMm, pcbStackupToSi, type PcbStackupMm } from "../pcbStackup";
+import { DEFAULT_ROUTING_ORIENTATION, type RoutingOrientation, type RoutingFlip } from "../routingOrientation";
 
 export class ConfigStore {
   constructor() {
@@ -97,6 +98,7 @@ export class ConfigStore {
    *  this counter after every param write gives the debounced preview and
    *  simulation effects a stable signal to react to. */
   routing_params_version = $state(0);
+  routing_orientation = $state<RoutingOrientation>({ ...DEFAULT_ROUTING_ORIENTATION });
   phases = $state(3);
   num_layers = $state(4);
 
@@ -364,6 +366,17 @@ export class ConfigStore {
     this.routing_params_version += 1;
   }
 
+  toggleRoutingFlip(key: RoutingFlip): void {
+    this.routing_orientation = { ...this.routing_orientation, [key]: !this.routing_orientation[key] };
+    if (key === "reverse_layers") this.reversePcbStackup();
+  }
+
+  reversePcbStackup(): void {
+    if (this.pcb_stackup_mm) {
+      this.pcb_stackup_mm = { copper_mm: [...this.pcb_stackup_mm.copper_mm].reverse(), dielectric_mm: [...this.pcb_stackup_mm.dielectric_mm].reverse() };
+    }
+  }
+
   /** Build the SI LinearMotorConfig for the Tauri backend. */
   toIpc(): LinearMotorConfig {
     return {
@@ -386,6 +399,7 @@ export class ConfigStore {
 
       routing_pattern: this.routing_pattern,
       routing_params: this.routing_params,
+      routing_orientation: { ...this.routing_orientation },
       phases: this.phases,
       spacing_ratio: this.spacing_ratio,
 
