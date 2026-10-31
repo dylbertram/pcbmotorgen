@@ -82,7 +82,7 @@
        line between the toolbar and the viewer. -->
   <div class="flex flex-wrap items-start gap-2 border-b border-slate-700 {borderless ? 'bg-slate-900 py-1.5 pl-3 pr-1.5' : 'border-t p-2'}">
   {#if onToggleZoomWindow && showZoomWindowControl}
-    <button type="button" class="icon-tool" aria-label="Zoom window" aria-pressed={zoomWindow} {disabled} title="Zoom window: click two opposite corners. Escape cancels." onclick={onToggleZoomWindow}><ZoomWindowIcon /></button>
+    <button type="button" class="icon-tool" aria-label="Zoom window" aria-pressed={zoomWindow} {disabled} title="Zoom window: drag a rectangle or click two opposite corners. Escape cancels." onclick={onToggleZoomWindow}><ZoomWindowIcon /></button>
   {/if}
   {#if geometry}
     <CadSelectionToolbar tool={selection} {geometry} disabled={disabled || !!spatialMeasure} onActivate={activateSelection} />
