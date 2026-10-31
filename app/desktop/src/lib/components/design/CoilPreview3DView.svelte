@@ -25,7 +25,7 @@
     geometry: CadGeometry | null;
     pcbThicknessMm: number;
     pcbStackup?: PcbStackupMm | null;
-    viaSizeMm?: {diameter:number;drill:number};
+    viaSizeMm?: {diameter:number;drill:number;plating?:number};
     topCamera?: TopCameraTransform | null;
     visibleCopperKeys?: Set<string> | null;
     onRenderStatus?: (available:boolean)=>void;
@@ -48,9 +48,9 @@
   let paths = $derived(scene?.paths.filter(p => view.isLayerVisible(p.layer) && isVisible(p.net, p.layer) && (!visibleCopperKeys || visibleCopperKeys.has(p.key))) ?? []);
   let vias = $derived(view.showVias ? scene?.vias.filter(v =>
     isViaVisible(v, layer => view.isLayerVisible(layer), isVisible)) ?? [] : []);
-  const pads=$derived(scene?vias.flatMap(v=>Array.from({length:Math.abs(v.to_layer-v.from_layer)+1},(_,i)=>Math.min(v.from_layer,v.to_layer)+i)
+  const pads=$derived(scene?scene.vias.flatMap(v=>Array.from({length:Math.abs(v.to_layer-v.from_layer)+1},(_,i)=>Math.min(v.from_layer,v.to_layer)+i)
     .filter(layer=>view.isLayerVisible(layer)&&isVisible(v.net,layer))
-    .map(layer=>v.points[0].clone().setY(scene!.layerY[layer]))):[]);
+    .map(layer=>({point:v.points[0].clone().setY(scene!.layerY[layer]),thickness:scene!.thicknessByLayer[layer],layer,net:v.net}))):[]);
   let terminals = $derived(showTerminals && view.showTerminals ? scene?.terminals.filter(t => view.isLayerVisible(t.layer) && isVisible(t.net, t.layer)) ?? [] : []);
   let reset = $state(0);
   let command = $state({ id: 0, zoom: 1 });
@@ -158,7 +158,7 @@
   {#if scene}
     <svelte:boundary onerror={() => { glAvailable=false; onRenderStatus?.(false); }}>
       <Canvas renderMode="on-demand">
-         <CoilPreviewScene {scene} {paths} {vias} {pads} viaSize={{diameter:viaSizeMm.diameter*scene.scale,drill:viaSizeMm.drill*scene.scale}} {terminals} {reset} {command} {windowCommand} {board} {measure} {topCamera} viewMode={view.viewMode} onCamera={snapshot => {cameraSnapshot = snapshot; glAvailable=true; onRenderStatus?.(true);}} showPcb={view.showPcb} zScale={view.zScale} traceMode={view.traceMode}
+         <CoilPreviewScene {scene} {paths} {vias} {pads} viaSize={{diameter:viaSizeMm.diameter*scene.scale,drill:viaSizeMm.drill*scene.scale,plating:(viaSizeMm.plating ?? .025)*scene.scale}} {terminals} {reset} {command} {windowCommand} {board} {measure} {topCamera} viewMode={view.viewMode} onCamera={snapshot => {cameraSnapshot = snapshot; glAvailable=true; onRenderStatus?.(true);}} showPcb={view.showPcb} zScale={view.zScale} traceMode={view.traceMode}
            {field} heat={heatMapping.values} {opacity} {fieldStyle} {sliceFraction} {sectionView} magnets={visibleMagnets} />
       </Canvas>
       {#snippet failed()}
