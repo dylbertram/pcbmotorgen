@@ -918,6 +918,7 @@ mod tests {
             magnet_pitch_mm: Some(6.0),
             magnet_array_span_mm: Some(72.0),
             phase_clearance_mm: None,
+            orientation: Default::default(),
         };
         let braid = generate_coils_from_context(&ctx, "infinity-braid");
         let first = band_charge_state_from_coils(&cfg, &braid, EndMagnet::First).expect("first");
