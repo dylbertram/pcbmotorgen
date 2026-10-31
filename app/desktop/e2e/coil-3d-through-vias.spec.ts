@@ -27,12 +27,22 @@ for (const layers of [2, 4, 6, 8]) {
       await expect(viewer.getByRole("status").filter({ hasText: "3D rendering is unavailable" })).toHaveCount(0);
       await expect(viewer).toHaveAttribute("data-vias", /[1-9]/);
       const viaCount=(await viewer.getAttribute("data-vias"))!;
+      const spanPadCount = await page.evaluate(async ({ coils, layers }) => {
+        const { generatedTerminalGeometry } = await import(/* @vite-ignore */ "/src/lib/generatedTerminalGeometry.ts");
+        const geometry = generatedTerminalGeometry(JSON.parse(coils), layers, 1.6, .2, 2);
+        return geometry.routing.vias.reduce((sum, via) => sum + Math.abs(via.to_layer - via.from_layer) + 1, 0);
+      }, { coils, layers });
+      await expect(viewer).toHaveAttribute("data-via-pads", /[1-9]/);
+      const padCount = Number(await viewer.getAttribute("data-via-pads"));
+      expect(padCount).toBeLessThanOrEqual(spanPadCount);
+      if (layers > 2) expect(padCount).toBeLessThan(spanPadCount);
       for(const [label,id] of [["Top-down","top"],["Front","front"],["Left","left"],["3D fields and heat","iso"]]){
         await page.getByRole("button",{name:label,exact:true}).click();
         const shared=page.getByTestId(`coil-${id}`);
         await expect(shared).toHaveAttribute("data-renderer","shared-three");
         await expect(shared).toHaveAttribute("data-layers",String(layers));
         await expect(shared).toHaveAttribute("data-vias",viaCount);
+        await expect(shared).toHaveAttribute("data-via-pads",String(padCount));
         await expect(shared.locator("canvas")).toBeVisible();
       }
       if (layers > 2) {

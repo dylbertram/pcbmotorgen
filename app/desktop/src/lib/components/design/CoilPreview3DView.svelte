@@ -1,7 +1,7 @@
 <script lang="ts">
   import { Canvas } from "@threlte/core";
   import type { CadGeometry } from "../../types";
-  import { buildCoilScene, isViaVisible } from "../../coilScene";
+  import { buildCoilScene, connectedViaPads, isViaVisible } from "../../coilScene";
   import type { CoilPreviewViewState } from "./coilPreviewViewState.svelte";
   import CoilPreviewScene from "./CoilPreviewScene.svelte";
   import Slider from "../ui/Slider.svelte";
@@ -48,9 +48,7 @@
   let paths = $derived(scene?.paths.filter(p => view.isLayerVisible(p.layer) && isVisible(p.net, p.layer) && (!visibleCopperKeys || visibleCopperKeys.has(p.key))) ?? []);
   let vias = $derived(view.showVias ? scene?.vias.filter(v =>
     isViaVisible(v, layer => view.isLayerVisible(layer), isVisible)) ?? [] : []);
-  const pads=$derived(scene?scene.vias.flatMap(v=>Array.from({length:Math.abs(v.to_layer-v.from_layer)+1},(_,i)=>Math.min(v.from_layer,v.to_layer)+i)
-    .filter(layer=>view.isLayerVisible(layer)&&isVisible(v.net,layer))
-    .map(layer=>({point:v.points[0].clone().setY(scene!.layerY[layer]),thickness:scene!.thicknessByLayer[layer],layer,net:v.net}))):[]);
+  const pads = $derived(scene ? connectedViaPads(scene, paths, viaSizeMm.diameter * scene.scale) : []);
   let terminals = $derived(showTerminals && view.showTerminals ? scene?.terminals.filter(t => view.isLayerVisible(t.layer) && isVisible(t.net, t.layer)) ?? [] : []);
   let windowCommand = $state<{ id: number; a: [number, number]; b: [number, number] }>({ id: 0, a: [0, 0], b: [1, 1] });
   let cameraSnapshot = $state<{ position: number[]; target: number[]; zoom: number } | null>(null);
@@ -151,7 +149,7 @@
   data-testid={`coil-${view.viewMode}`} data-renderer={glAvailable === false ? "canvas2d-fallback" : "shared-three"} data-layers={geometry?.layer_z_mm.filter((_, i) => view.isLayerVisible(i)).length ?? 0}
   data-layer-z-mm={JSON.stringify(geometry?.layer_z_mm ?? [])} data-pcb-thickness-mm={pcbThicknessMm}
   data-trace-width-mm={scene ? scene.width / scene.scale : 0} data-trace-width-px={view.traceMode === "centerlines" ? 1 : (scene?.width ?? 0) * (cameraSnapshot?.zoom ?? 0)} data-via-diameter-mm={viaSizeMm.diameter} data-via-drill-mm={viaSizeMm.drill}
-  data-segments={paths.length} data-vias={vias.length} data-terminals={terminals.length} data-trace-mode={view.traceMode} data-z-scale={view.zScale} data-pcb-visible={view.showPcb} data-copper-section="rectangular" data-measure-points={measure?.p2 ? 2 : measure?.p1 ? 1 : 0} data-measure-mm={measure?.distanceMm ?? ""} data-camera={cameraSnapshot ? JSON.stringify(cameraSnapshot) : ""}
+  data-segments={paths.length} data-vias={vias.length} data-via-pads={vias.length ? pads.length : 0} data-terminals={terminals.length} data-trace-mode={view.traceMode} data-z-scale={view.zScale} data-pcb-visible={view.showPcb} data-copper-section="rectangular" data-measure-points={measure?.p2 ? 2 : measure?.p1 ? 1 : 0} data-measure-mm={measure?.distanceMm ?? ""} data-camera={cameraSnapshot ? JSON.stringify(cameraSnapshot) : ""}
   data-field-samples={field?.samples.length ?? 0} data-visible-magnets={visibleMagnets.length} data-include-magnets={includeMagnets} data-field-source={fieldSource} data-field-style={fieldStyle} data-field-slice={sliceFraction} data-heat-unit="W/m" data-settings-open={settingsExpanded} data-legends-open={legendsOpen} data-heat-paths={heatMapping.values?.size ?? 0} data-visualization-state={visualization.phase}>
   {#if scene}
     <svelte:boundary onerror={() => { glAvailable=false; onRenderStatus?.(false); }}>
@@ -254,9 +252,6 @@
       <Slider orientation="vertical" min={1} max={20} step={0.1} bind:value={view.zScale} ariaLabel="Z height scale" class="min-h-0 flex-1" />
       <output class="font-mono text-[10px] text-emerald-300" aria-label="Z height multiplier">{view.zScale}×</output>
     </div>
-    <div class="navigation-hint pointer-events-none absolute bottom-2 left-16 right-12 text-[10px] text-slate-400">
-      {view.viewMode === "iso" ? "Drag to orbit" : "Drag to pan"} · Two-finger scroll to pan · Pinch to zoom · Z × {view.zScale}
-    </div>
     <div class="layer-depths pointer-events-none absolute right-12 top-2 text-right font-mono text-[10px] text-slate-400" class:simulation-depths={simulation !== null}>
       {#each geometry?.layer_z_mm ?? [] as z, idx (idx)}
         {#if view.isLayerVisible(idx)}<div>L{idx + 1} · {z.toFixed(2)} mm</div>{/if}
@@ -272,7 +267,6 @@
   .coil-3d { container-type: size; }
   .overlay-legends { bottom: calc(2rem + var(--coil-overlay-inset, 0px)); max-height: 40cqh; right: auto; max-width: min(26rem, calc(100% - 4.75rem)); }
   .z-height { top: var(--coil-preset-inset, 3rem); bottom: calc(2rem + var(--coil-overlay-inset, 0px)); }
-  .navigation-hint { bottom: calc(.5rem + var(--coil-overlay-inset, 0px)); }
   .simulation-controls { width: 22rem; max-width: calc(100% - 4.5rem); }
   .inspector-toggle { display: flex; justify-content: space-between; align-items: center; width: 100%; min-height: 2rem; text-align: left; padding: 0.5rem 0.75rem; }
   .inspector-toggle:hover { background: rgb(var(--slate-800)); }

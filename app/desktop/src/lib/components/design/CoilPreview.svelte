@@ -582,14 +582,6 @@
     {#if view.viewMode === "top"}<canvas bind:this={canvasRef} data-testid="coil-annotations" class="pointer-events-none absolute inset-0 block h-full w-full"></canvas>{/if}
   </PreviewFrame>
 
-  {#if coils && coils.phases.length > 0}
-    <p class="mt-2 text-xs text-slate-500">
-      <span class="text-slate-600"
-        >{view.viewMode === "iso" ? "Drag to orbit · Scroll or pinch to zoom · Switch to Top-down to edit" : "Drag to pan · Pinch or Ctrl-scroll to zoom · Expand to edit"}</span
-      >
-    </p>
-  {/if}
-
 </div>
 {/if}
 

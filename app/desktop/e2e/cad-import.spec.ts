@@ -482,6 +482,38 @@ test("shared editing tools measure and edit CAD drafts, then keep those edits in
   await page.screenshot({ path: testInfo.outputPath("shared-motor-editor.png") });
 });
 
+test("motor tool feedback stays inside the toolbar instead of behind viewport presets", async ({ page }, testInfo) => {
+  const dialog = await openImport(page);
+  await dialog.getByRole("button", { name: "Open with this geometry" }).click();
+  await openCoilPreview(page);
+  const motor = coilWorkspace(page);
+  const toolbar = motor.getByRole("toolbar", { name: "Coil preview tools", exact: true });
+  const presets = motor.getByRole("group", { name: "Viewport view", exact: true });
+  const feedback = toolbar.getByRole("status").filter({ hasText: "Choose the first segment." });
+  for (const width of [1280, 1600, 390]) {
+    await page.setViewportSize({ width, height: 844 });
+    await motor.getByRole("button", { name: "Top-down", exact: true }).click();
+    const before = await toolbar.boundingBox();
+    await toolbar.getByRole("button", { name: "Chain", exact: true }).click();
+    await expect(feedback).toHaveText("Choose the first segment.");
+    expect(await toolbar.boundingBox()).toEqual(before);
+    for (const view of ["Top-down", "Front", "Left", "3D fields and heat"]) {
+      await presets.getByRole("button", { name: view, exact: true }).click();
+      const bar = (await toolbar.boundingBox())!;
+      const hint = (await feedback.boundingBox())!;
+      const modes = (await presets.boundingBox())!;
+      expect(hint.y).toBeGreaterThanOrEqual(bar.y);
+      expect(hint.y + hint.height).toBeLessThanOrEqual(bar.y + bar.height);
+      expect(hint.x).toBeGreaterThanOrEqual(bar.x);
+      expect(hint.x + hint.width).toBeLessThanOrEqual(bar.x + bar.width);
+      expect(modes.y).toBeGreaterThan(bar.y + bar.height);
+    }
+    await page.screenshot({ path: testInfo.outputPath(`toolbar-chain-feedback-${width}.png`) });
+    await motor.getByRole("button", { name: "Top-down", exact: true }).click();
+    await toolbar.getByRole("button", { name: "Select", exact: true }).click();
+  }
+});
+
 test("CAD terminal editing works on mobile and changing tools cancels unapplied drafts", async ({ page }) => {
   await page.addInitScript(() => { (window as any).__cadNoVias = true; });
   await page.setViewportSize({ width: 390, height: 844 });

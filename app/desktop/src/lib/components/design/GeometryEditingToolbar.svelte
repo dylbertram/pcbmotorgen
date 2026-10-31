@@ -31,8 +31,8 @@
   } = $props();
   let preparing = $state(false);
   let error = $state("");
-  // One fixed-height status line under the toolbar divider. Reserving the row
-  // keeps the drawing from shifting when the selection or merge hint appears.
+  // Embedded feedback stays inside the backed toolbar, not over the viewport.
+  // CAD import reserves a status row so tool hints never shift its drawing.
   let status = $derived(
     error
       || (selection.mode === "chain" || selection.selected.length
@@ -98,10 +98,15 @@
     <button type="button" aria-label="Simplify lines" onclick={() => { selection.clear(); selection.setMode("pan"); onSimplify?.(); }} disabled={disabled || terminalTool?.active || !!spatialMeasure} class="icon-tool" title="Simplify lines: merge collinear lines in saved and exported geometry."><GitMerge size={16} aria-hidden="true" /></button>
     {#if onUndoSimplify}<button type="button" aria-label="Undo simplify" onclick={() => { selection.clear(); onUndoSimplify?.(); }} disabled={disabled || terminalTool?.active || !!spatialMeasure} class="icon-tool" title="Undo line simplification."><Undo2 size={16} aria-hidden="true" /></button>{/if}
   {/if}
+  {#if borderless}
+    <span role="status" class="min-w-0 flex-1 self-center truncate text-xs text-slate-400" title={status}>{status}</span>
+  {/if}
   </div>
-  <div class="flex h-5 min-w-0 items-center text-xs text-slate-400 {borderless ? 'absolute inset-x-0 top-full' : ''}">
+  {#if !borderless}
+  <div class="flex h-5 min-w-0 items-center text-xs text-slate-400">
     <span role="status" class="truncate" title={status}>{status}</span>
   </div>
+  {/if}
 </div>
 
 <style>
