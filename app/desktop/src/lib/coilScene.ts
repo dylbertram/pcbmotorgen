@@ -1,6 +1,7 @@
 import { Box3, Vector3, ArcCurve } from "three";
 import { sampleSpline } from "./curvePaths";
 import type { CadGeometry, CadPoint, CadRouteCurve } from "./types";
+import type { CopperPad } from "./viaCopperMesh";
 
 export interface CopperPath {
   key: string;
@@ -67,3 +68,41 @@ export function buildCoilScene(geometry: CadGeometry | null, copperThicknessMm: 
 }
 
 export type CoilScene = NonNullable<ReturnType<typeof buildCoilScene>>;
+
+/** A through-barrel does not imply a pad on every layer it crosses. */
+export function connectedViaPads(scene: CoilScene, paths: CopperPath[], diameter: number): CopperPad[] {
+  const byLayerNet = new Map<string, CopperPath[]>();
+  for (const path of paths) {
+    const key = JSON.stringify([path.layer, path.net]);
+    const group = byLayerNet.get(key) ?? [];
+    group.push(path);
+    byLayerNet.set(key, group);
+  }
+  // Copper can reach the pad at its edge, not only at the via center.
+  const radiusSquared = (diameter / 2 + 1e-7 * scene.scale) ** 2;
+  function touches(path: CopperPath, point: Vector3): boolean {
+    for (let i = 1; i < path.points.length; i++) {
+      const a = path.points[i - 1], b = path.points[i];
+      const dx = b.x - a.x, dz = b.z - a.z;
+      const length = Math.hypot(dx, dz);
+      if (!length) continue;
+      const px = point.x - a.x, pz = point.z - a.z;
+      const along = (px * dx + pz * dz) / length;
+      // Match the rendered ribbon's butt ends, not a round endpoint cap.
+      const endGap = Math.max(-along, along - length, 0);
+      const sideGap = Math.max(Math.abs(px * dz - pz * dx) / length - scene.width / 2, 0);
+      if (endGap ** 2 + sideGap ** 2 <= radiusSquared) return true;
+    }
+    return false;
+  }
+  return scene.vias.flatMap(via => {
+    const pads: CopperPad[] = [];
+    for (let layer = Math.min(via.from_layer, via.to_layer); layer <= Math.max(via.from_layer, via.to_layer); layer++) {
+      const candidates = byLayerNet.get(JSON.stringify([layer, via.net]));
+      if (candidates?.some(path => touches(path, via.points[0]))) {
+        pads.push({ point: via.points[0].clone().setY(scene.layerY[layer]), thickness: scene.thicknessByLayer[layer], layer, net: via.net });
+      }
+    }
+    return pads;
+  });
+}

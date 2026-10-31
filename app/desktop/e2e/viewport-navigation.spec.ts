@@ -13,6 +13,7 @@ test("all views share bottom-right navigation and top-left view presets", async 
       await page.getByRole("button",{name:label,exact:true}).click();
       const viewer=page.getByTestId(`coil-${id}`);
       await expect(viewer).toHaveAttribute("data-camera",/position/);
+      await expect(page.getByText(/Drag to (orbit|pan)|Two-finger scroll to pan|Pinch to zoom/)).toHaveCount(0);
       const controls=page.getByRole("group",{name:"Zoom controls",exact:true});
       await controls.getByRole("button",{name:"Reset view",exact:true}).click();
       await expect.poll(async()=>Number(await controls.getByRole("button",{name:"Reset zoom",exact:true}).innerText().then(text=>text.replace("×","")))).toBe(1);

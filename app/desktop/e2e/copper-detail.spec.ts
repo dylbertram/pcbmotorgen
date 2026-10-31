@@ -82,3 +82,42 @@ test("small terminal annotations still pick exact physical centers rather than c
   await expect.poll(async()=>Number(await viewer.getAttribute("data-measure-mm"))).toBeCloseTo(.2475,10);
   await page.evaluate(async()=>{await (window as any).closeCopperDetail();});
 });
+
+test("through-via pads follow trace connections while plating crosses unconnected layers", async ({ page }, info) => {
+  const errors: string[] = [];
+  page.on("pageerror", error => errors.push(error.message));
+  await page.goto("/");
+  await page.evaluate(async () => {
+    const { renderConnectedViaPads } = await import(/* @vite-ignore */ "/e2e/fixtures/copperDetailHarness.ts");
+    (window as any).closeConnectedViaPads = renderConnectedViaPads();
+  });
+  const fixture = page.getByTestId("connected-via-pads");
+  for (const [label, id] of [["Top-down", "top"], ["Front", "front"], ["Left", "left"], ["3D fields and heat", "iso"]]) {
+    await fixture.getByRole("button", { name: label, exact: true }).click();
+    const viewer = fixture.getByTestId(`coil-${id}`);
+    await expect(viewer).toHaveAttribute("data-camera", /position/);
+    await expect(viewer).toHaveAttribute("data-via-pads", "3");
+    await expect(viewer).toHaveAttribute("data-vias", "1");
+    await fixture.getByRole("checkbox", { name: "Hide branch connection", exact: true }).check();
+    await expect(viewer).toHaveAttribute("data-via-pads", "2");
+    await fixture.getByRole("checkbox", { name: "Hide branch connection", exact: true }).uncheck();
+    // Isolating L2 leaves a full barrel but no trace or annulus on that layer.
+    for (const layer of [1, 3, 4, 5, 6]) await fixture.getByRole("checkbox", { name: `Show layer ${layer}`, exact: true }).uncheck();
+    await expect(viewer).toHaveAttribute("data-segments", "0");
+    await expect(viewer).toHaveAttribute("data-via-pads", "0");
+    await expect(viewer).toHaveAttribute("data-vias", "1");
+    for (const layer of [1, 3, 4, 5, 6]) await fixture.getByRole("checkbox", { name: `Show layer ${layer}`, exact: true }).check();
+    await expect(viewer).toHaveAttribute("data-via-pads", "3");
+  }
+  const viewer = fixture.getByTestId("coil-iso");
+  await page.emulateMedia({ colorScheme: "dark" });
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+  await page.screenshot({ path: info.outputPath("connected-annuli-physical-height.png") });
+  await viewer.getByRole("slider", { name: "Z height scale", exact: true }).focus();
+  await page.keyboard.press("End");
+  await expect(viewer).toHaveAttribute("data-z-scale", "20");
+  await expect(viewer).toHaveAttribute("data-via-pads", "3");
+  await page.screenshot({ path: info.outputPath("connected-annuli-continuous-barrel.png") });
+  expect(errors).toEqual([]);
+  await page.evaluate(async () => { await (window as any).closeConnectedViaPads(); });
+});

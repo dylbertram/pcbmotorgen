@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildCoilScene, isViaVisible, sampleCopperArc } from "./coilScene";
+import { buildCoilScene, connectedViaPads, isViaVisible, sampleCopperArc } from "./coilScene";
 import type { CadGeometry } from "./types";
 
 function fixture(): CadGeometry {
@@ -13,6 +13,65 @@ function fixture(): CadGeometry {
 }
 
 describe("Threlte coil geometry", () => {
+  for (const layers of [2, 4, 6, 8]) {
+    it(`adds annuli only at the two connected layers of a ${layers}-layer through-via`, () => {
+      const g = fixture();
+      g.layer_z_mm = Array.from({ length: layers }, (_, layer) => -1.6 * layer / (layers - 1));
+      g.routing.segments[1].layer = layers - 1;
+      g.routing.vias[0].to_layer = layers - 1;
+      const before = JSON.stringify(g), scene = buildCoilScene(g, { outer: .07, inner: .035 })!;
+      const pads = connectedViaPads(scene, scene.paths, .4 * scene.scale);
+      expect(pads.map(pad => pad.layer)).toEqual([0, layers - 1]);
+      expect(pads.map(pad => pad.thickness / scene.scale)).toEqual([.07, .07]);
+      expect(pads.map(pad => pad.point.y)).toEqual([scene.layerY[0], scene.layerY[layers - 1]]);
+      expect(Math.abs(scene.vias[0].points[0].y - scene.vias[0].points[1].y) / scene.scale).toBeCloseTo(1.6);
+      expect(JSON.stringify(g)).toBe(before);
+    });
+  }
+
+  it("keeps a branch pad on a connected inner layer, including reversed via spans", () => {
+    const g = fixture();
+    g.layer_z_mm = [0, -.4, -.8, -1.2];
+    g.routing.segments[1].layer = 3;
+    g.routing.segments.push({ ...g.routing.segments[0], layer: 1 });
+    g.routing.vias[0].from_layer = 3;
+    g.routing.vias[0].to_layer = 0;
+    const scene = buildCoilScene(g)!;
+    expect(connectedViaPads(scene, scene.paths, .4 * scene.scale).map(pad => pad.layer)).toEqual([0, 1, 3]);
+    const visible = scene.paths.filter(path => path.layer !== 1);
+    expect(connectedViaPads(scene, visible, .4 * scene.scale).map(pad => pad.layer)).toEqual([0, 3]);
+    expect(connectedViaPads(scene, [], .4 * scene.scale)).toEqual([]);
+  });
+
+  it("does not create pads for isolated vias, unrelated nets, or distant same-net traces", () => {
+    const g = fixture();
+    g.routing.segments[0].net = "B";
+    g.routing.segments[1].start.y = 1;
+    g.routing.segments[1].end.y = 1;
+    let scene = buildCoilScene(g)!;
+    expect(connectedViaPads(scene, scene.paths, .4 * scene.scale)).toEqual([]);
+    g.routing.segments = [];
+    scene = buildCoilScene(g)!;
+    expect(connectedViaPads(scene, scene.paths, .4 * scene.scale)).toEqual([]);
+    expect(scene.vias).toHaveLength(1);
+  });
+
+  it("recognizes trace contact at the pad edge and along a crossing, arc, or spline", () => {
+    const g = fixture();
+    g.layer_z_mm = [0, -.3, -.6, -.9];
+    g.routing.vias[0].to_layer = 3;
+    g.routing.segments[0].end.x = 9.81; // Reaches the .2 mm pad radius, not the center.
+    g.routing.segments[1] = { ...g.routing.segments[1], start: { x: 9, y: 0 }, end: { x: 11, y: 0 } };
+    g.routing.curves = [{ start: { x: 9, y: 1 }, mid: { x: 10, y: 0 }, end: { x: 11, y: 1 }, net: "A", layer: 2, is_active: true }];
+    g.routing.splines = [{ degree: 1, knots: [0, 0, 1, 1], control_points: [{ x: 10, y: 0 }, { x: 11, y: 0 }], net: "A", layer: 3, is_active: true }];
+    const scene = buildCoilScene(g)!;
+    expect(connectedViaPads(scene, scene.paths, .4 * scene.scale).map(pad => pad.layer)).toEqual([0, 1, 2, 3]);
+    expect(connectedViaPads(scene, scene.paths, .2 * scene.scale).map(pad => pad.layer)).toEqual([1, 2, 3]);
+    g.routing.segments[0].end.x = 9.75; // Butt ends must not acquire a round-cap extension.
+    const short = buildCoilScene(g)!;
+    expect(connectedViaPads(short, short.paths, .4 * short.scale).map(pad => pad.layer)).toEqual([1, 2, 3]);
+  });
+
   it("keeps a through-via visible through inner layers without revealing hidden coils", () => {
     const via = { net: "A", from_layer: 0, to_layer: 7 };
     const innerOnly = (layer: number) => layer === 3;
