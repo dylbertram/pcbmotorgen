@@ -253,14 +253,7 @@ pub fn copper_loss(
                 EdgeKind::Trace {
                     layer, length_m, ..
                 } => {
-                    let inner = sim.num_layers > 2 && *layer != 0 && *layer + 1 != sim.num_layers;
-                    rho * length_m
-                        / (sim.min_trace_m
-                            * crate::units::oz_to_m(if inner {
-                                settings.inner_copper_oz
-                            } else {
-                                settings.outer_copper_oz
-                            }))
+                    rho * length_m / (sim.min_trace_m * crate::drive::copper_thickness_m(*layer, sim, settings))
                 }
                 EdgeKind::Via { layers, .. } => via_resistance_ohm(
                     sim.min_via_drill_m,

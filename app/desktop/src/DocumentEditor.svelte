@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { placedCopperGeometry } from "./lib/copperLayerPlacement";
   import { onDestroy, untrack } from "svelte";
   import type { DocumentSession } from "./lib/stores/workspace.svelte";
   import { BitsConfig, Tabs } from "bits-ui";
@@ -147,7 +148,7 @@
     try {
       const cadGeometry = designType === "sensor" ? sensorStore.cadGeometry : projects.cadGeometry;
       const result = cadGeometry
-        ? await exportCadGeometryDxf(cadGeometry)
+        ? await exportCadGeometryDxf(designType !== "sensor" && config.pcb_stackup_mm ? placedCopperGeometry(cadGeometry, config.pcb_thickness_mm, config.pcb_stackup_mm) : cadGeometry)
         : designType === "sensor" ? await exportSensorDxf(sensorStore.toIpc()) : await exportCoilsDxf(config.toIpc());
       const path = await saveTextToFile(result.dxf_content, `${designType}-coil.dxf`, ["dxf"]);
       if (path) projects.notice = `Exported DXF to ${path}.`;

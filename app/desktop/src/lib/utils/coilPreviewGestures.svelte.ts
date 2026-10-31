@@ -177,6 +177,16 @@ export class CoilPreviewGestures {
     this.panY = 0;
   };
 
+  /** Fit two virtual-space corners and center navigation on that window. */
+  zoomWindow(a: Point, b: Point, viewport = { x: 0, y: 0, width: this.virtualW, height: this.virtualH }): void {
+    const width = Math.abs(a.x - b.x), height = Math.abs(a.y - b.y);
+    if (width < 1 || height < 1 || viewport.width <= 0 || viewport.height <= 0) return;
+    const target = clampZoom(this.zoom * Math.min(viewport.width / width, viewport.height / height), this.minZoom, this.maxZoom);
+    this.#anchorWorld((a.x + b.x) / 2, (a.y + b.y) / 2, this.zoom, this.panX, this.panY,
+      viewport.x + viewport.width / 2, viewport.y + viewport.height / 2, target);
+    this.zoom = target;
+  }
+
   // --- coordinate helpers -----------------------------------------------------
   #zoomAtCenter(target: number): void {
     if (!Number.isFinite(target) || target === this.zoom) return;

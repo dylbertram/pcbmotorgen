@@ -2,6 +2,76 @@
 //! Loss coefficients are numerical fixtures, never production presets.
 use super::*;
 
+/// Explicit user-selected generated case, never a saved-file migration.
+fn current_braid_audit_input(state: &serde_json::Value) -> serde_json::Value {
+    let mut input = inputs(state);
+    input["cad_geometry"] = serde_json::Value::Null;
+    input["config"]["pcb_thickness_m"] = serde_json::json!(0.0008);
+    input["config"]["num_layers"] = serde_json::json!(4);
+    input["config"]["trace_width_m"] = serde_json::json!(0.0002);
+    input["config"]["routing_pattern"] = serde_json::json!("infinity-braid");
+    input["config"]["routing_params"] = serde_json::json!({"connection":2.0,"num_strands":3.0});
+    input
+}
+
+#[test]
+fn generated_audit_scenario_is_explicit_and_keeps_the_saved_source_unchanged() {
+    let state = serde_json::json!({"config":crate::ipc::ProjectConfigStateIpc::default(),
+        "cad_geometry":{"saved_import_must_not_be_reused":true}});
+    let before = state.clone();
+    let input = current_braid_audit_input(&state);
+    assert!(input["cad_geometry"].is_null());
+    assert_eq!(input["config"]["pcb_thickness_m"], 0.0008);
+    assert_eq!(input["config"]["trace_width_m"], 0.0002);
+    assert_eq!(input["config"]["num_layers"], 4);
+    assert_eq!(input["config"]["routing_params"], serde_json::json!({"connection":2.0,"num_strands":3.0}));
+    assert_eq!(state, before);
+}
+
+#[test]
+#[ignore = "Requires supplied Fader configuration and a new force-audit directory; signed diagnostic only"]
+fn export_current_braid_signed_force_map() {
+    use pcbmotorgen_simulation::magnetic::{CommutationMode, ForceEvaluator};
+    let root = std::env::var("PCB_MOTOR_SUPPLIED_DESIGN_DIR").unwrap();
+    let path = std::path::Path::new(&root).join("Fader-traces-workspace.pmmotor");
+    let original = std::fs::read(&path).unwrap();
+    assert_eq!(format!("{:x}", Sha256::digest(&original)), "567d97900475c92598f9ad6f7df9e7aeaf374dfc542fa25fa7e04b90dbfb287b");
+    let archive: serde_json::Value = serde_json::from_slice(&original).unwrap();
+    let state = &archive["versions"].as_array().unwrap().iter().find(|v| v["id"] == 1).unwrap()["state"];
+    let input = current_braid_audit_input(state);
+    let config: LinearMotorConfigIpc = serde_json::from_value(input["config"].clone()).unwrap();
+    let drive: DriveSettings = serde_json::from_value(input["drive"].clone()).unwrap();
+    let core = config.to_core();
+    let sim = core.to_simulation();
+    let routing = pcbmotorgen_routing::generate_routing_result(&core.routing_context(), &core.routing_pattern_id()).unwrap();
+    let hints = Default::default();
+    let output = std::path::PathBuf::from(std::env::var("PCB_MOTOR_FORCE_AUDIT_OUTPUT").unwrap());
+    std::fs::create_dir(&output).expect("preserve earlier force audits");
+    for meshing in [20, 40] {
+        let (evaluator, coils) = ForceEvaluator::new(2, meshing, CommutationMode::MaxThrust, 0.0)
+            .with_routed_currents(&routing, &sim, &drive, &hints).unwrap();
+        let bounds = evaluator.sweep_center_limits_m(&sim).unwrap();
+        let map = (0..193).map(|i| {
+            let x = 0.0025 + 0.063 * i as f64 / 192.0;
+            let force = evaluator.unit_phase_force_constants_at(&sim, x).unwrap();
+            serde_json::json!({"position_m":x,"force_n_per_a":force})
+        }).collect::<Vec<_>>();
+        let analysis = pcbmotorgen_simulation::drive::analyze_drive_with(&sim, &routing, &drive, None, &hints);
+        let report = serde_json::json!({"schema":"signed-generated-braid-force-audit-v1",
+            "scope":"Signed unit-terminal simulation, not controller calibration or measured wiring",
+            "model_version":pcbmotorgen_simulation::drive::move_power::MODEL_VERSION,
+            "configuration_reference_sha256":format!("{:x}",Sha256::digest(&original)),
+            "config":config,"drive_settings":drive,"routing":routing,
+            "phase_names":coils.iter().map(|c| &c.phase_name).collect::<Vec<_>>(),
+            "full_overlap_bounds_m":[bounds.0,bounds.1],"electrical_period_m":2.0*sim.magnet_pitch_m,
+            "meshing":meshing,"drive_analysis":analysis,"force_map":map});
+        let file = std::fs::OpenOptions::new().write(true).create_new(true)
+            .open(output.join(format!("mesh-{meshing}.json"))).unwrap();
+        serde_json::to_writer(file, &report).unwrap();
+    }
+    assert_eq!(std::fs::read(path).unwrap(), original);
+}
+
 /// Read-only, explicit saved-design screening export. Output must be a new
 /// directory selected by the caller; never overwrite an earlier receipt.
 #[test]
@@ -17,11 +87,13 @@ fn export_saved_design_screening_inputs() {
     let fader_reference = std::env::var("PCB_MOTOR_FADER_ELECTRICAL_ZERO_RAD").ok()
         .map(|v| v.parse::<f64>().expect("Fader electrical reference must be radians"));
     if let Some(angle) = fader_reference { assert!(angle.is_finite()); }
+    let generated_audit = std::env::var_os("PCB_MOTOR_GENERATED_BRAID_AUDIT").is_some();
     std::fs::create_dir(&output).expect("output must be a new, exclusive directory");
     for (file, hash) in [
         ("Fader-traces-workspace.pmmotor", "567d97900475c92598f9ad6f7df9e7aeaf374dfc542fa25fa7e04b90dbfb287b"),
         ("star_2-layer.pmmotor", "0ed215f6ff403b927dbeac1ea3d4d9587489a1f1c0680e4ce3a2a48658475d82"),
     ] {
+        if generated_audit && !file.starts_with("Fader") { continue; }
         let original = std::fs::read(std::path::Path::new(&root).join(file)).unwrap();
         assert_eq!(format!("{:x}", Sha256::digest(&original)), hash);
         let archive: serde_json::Value = serde_json::from_slice(&original).unwrap();
@@ -36,6 +108,14 @@ fn export_saved_design_screening_inputs() {
         let reference_override = if file.starts_with("Fader") { fader_reference } else { None };
         if let Some(angle) = reference_override {
             baseline["move_request"]["electrical_angle_at_zero_rad"] = serde_json::json!(angle);
+        }
+        // Explicit user-selected scenario, never a change to the saved import.
+        if generated_audit {
+            assert_eq!(fader_thickness, Some(0.0008));
+            baseline = current_braid_audit_input(state);
+            if let Some(angle) = reference_override {
+                baseline["move_request"]["electrical_angle_at_zero_rad"] = serde_json::json!(angle);
+            }
         }
         baseline["move_request"]["loss_model"] = serde_json::Value::Null;
         let c: crate::ipc::ProjectConfigStateIpc = serde_json::from_value(state["config"].clone()).unwrap();
@@ -60,9 +140,11 @@ fn export_saved_design_screening_inputs() {
             assert_eq!(result.inputs, input);
             assert!(result.result.demand.source.is_none());
             let receipt = serde_json::json!({"archive":file,"archive_sha256":hash,"version":1,
+                "archive_role":if generated_audit {"configuration_reference_only"} else {"saved_design"},
+                "geometry_source":if generated_audit {"current_generated_four_layer_star_three_strands_0.2mm_traces"} else {"saved_design"},
                 "scenario":name,"scenario_overrides":{"pcb_thickness_m":thickness_override,
                     "electrical_angle_at_zero_rad":reference_override},"native":result});
-            let filename = format!("{}-{name}.json", if file.starts_with("Fader") {"fader"} else {"star2"});
+            let filename = format!("{}-{name}.json", if generated_audit {"generated4"} else if file.starts_with("Fader") {"fader"} else {"star2"});
             let mut out = std::fs::OpenOptions::new().write(true).create_new(true).open(output.join(filename)).unwrap();
             serde_json::to_writer(&mut out, &receipt).unwrap();
             out.write_all(b"\n").unwrap();
@@ -80,7 +162,8 @@ fn evaluate_saved_design_screening_assumptions() {
     let output = std::path::PathBuf::from(std::env::var("PCB_MOTOR_SCREENING_OUTPUT").unwrap());
     let estimate = std::env::var_os("PCB_MOTOR_ENGINEERING_ESTIMATE").is_some();
     std::fs::create_dir(&output).expect("output must be a new, exclusive directory");
-    for design in ["fader", "star2"] {
+    let designs = if std::env::var_os("PCB_MOTOR_GENERATED_BRAID_AUDIT").is_some() { vec!["generated4"] } else { vec!["fader", "star2"] };
+    for design in designs {
         for scenario in ["full-forward", "short-forward", "short-return"] {
             let filename = format!("{design}-{scenario}.json");
             let receipt: serde_json::Value = serde_json::from_slice(&std::fs::read(baselines.join(&filename)).unwrap()).unwrap();

@@ -411,8 +411,9 @@ test("field inspector aligns inputs and stays clear of the camera and Z rail", a
 test("XZ section changes the actual camera view, not just the selected button", async ({ page }, info) => {
   await gotoDesignApp(page); await nativeFixture(page); const viewer = await show3D(page);
   await expect(viewer).toHaveAttribute("data-field-samples", "240");
-  // Isolate the flat PCB so a section camera must make the copper almost
-  // horizontal. A changed bitmap alone also passes for a stale isometric fit.
+  // Isolate the flat PCB and verify the actual camera axis as well as pixels.
+  // Physical rectangular copper can be subpixel-thin in an XZ section, so a
+  // hue-threshold bounding box can accidentally measure only the via barrels.
   await viewer.getByRole("checkbox", { name: "Include magnets in B-field", exact: true }).uncheck();
   await viewer.getByRole("checkbox", { name: "Show magnets in 3D", exact: true }).uncheck();
   await expect(viewer).toHaveAttribute("data-field-samples", "0");
@@ -429,19 +430,11 @@ test("XZ section changes the actual camera view, not just the selected button", 
   await viewer.getByRole("button", { name: "XZ field section", exact: true }).click();
   await expect(viewer.getByRole("button", { name: "XZ field section", exact: true })).toHaveAttribute("aria-pressed", "true");
   await expect.poll(async () => (await bitmap()).equals(isometric)).toBe(false);
-  await expect.poll(async () => page.evaluate(async image => {
-    const img = new Image(); img.src = `data:image/png;base64,${image}`; await img.decode();
-    const flat = document.createElement("canvas"); flat.width = img.width; flat.height = img.height;
-    const context = flat.getContext("2d")!; context.drawImage(img, 0, 0);
-    const { data } = context.getImageData(0, 0, flat.width, flat.height);
-    let minX = flat.width, maxX = -1, minY = flat.height, maxY = -1;
-    for (let y = 0; y < flat.height; y++) for (let x = 0; x < flat.width; x++) {
-      const i = (y * flat.width + x) * 4, rgb = [data[i], data[i + 1], data[i + 2]];
-      if (Math.max(...rgb) - Math.min(...rgb) < 35) continue;
-      minX = Math.min(minX, x); maxX = Math.max(maxX, x); minY = Math.min(minY, y); maxY = Math.max(maxY, y);
-    }
-    return maxX > minX ? (maxY - minY) / (maxX - minX) : Infinity;
-  }, (await bitmap()).toString("base64"))).toBeLessThan(.08);
+  await expect.poll(async () => {
+    const camera=JSON.parse((await viewer.getAttribute("data-camera"))!);
+    const d=camera.position.map((v:number,i:number)=>v-camera.target[i]);
+    return Math.abs(d[2])/Math.hypot(...d);
+  }).toBeCloseTo(1,10);
   await viewer.screenshot({ path: info.outputPath("projected-xz-section.png") });
 });
 

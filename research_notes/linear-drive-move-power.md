@@ -7,6 +7,96 @@ remain as a record of what was implemented and tested, not current requirements.
 
 ## Supported model
 
+### Current generated four-layer, 0.8 mm power/alignment audit, 2026-10-31
+
+The user selected the **current generated** four-layer, three-strand Star/Wye
+braid and 0.8 mm PCB, not the original imported Fader copper. The Fader archive
+is only the configuration reference. The audit explicitly uses 0.2 mm trace
+width, 1 oz inner/outer copper, DRV8311 at 12 V/100 kHz, 47 µH per phase,
+75 °C winding, 15 g assembly and the previous assumed 50 mN friction. No
+saved file, production route, terminal choice or controller default was edited.
+
+**Finding: the layer pairs oppose each other.** Independent signed-current
+and PM-field reconstruction finds phase A layer-force amplitudes of
+0.030724/0.025910/0.021904/0.018497 N/A on layers 0/1/2/3. The first pair is
+near -110 degrees; the second is near +70 degrees. Their approximately
+180-degree opposition leaves only 16.72% of summed layer-force amplitude.
+The other phases agree. This is force cancellation, not a measured electrical
+efficiency or an assertion that 83% of electrical energy disappears.
+
+`stacked.rs` staggers successive openings by one **braid/pole pitch**, 6 mm in
+this case. `mod.rs` passes `layout.d_phase / layout.n_periods`. The actual
+electrical period is 12 mm, so that opening step is 180 electrical degrees,
+not a complete electrical cycle. The solved series winding has opposite force
+sense between adjacent pairs. This is distinct from the previously rejected
+doubled *phase-start* spacing. Do not repeat that geometry change to force
+120-degree phase axes.
+
+The generated directed phase-force offsets at mesh 40 are approximately
+A=-109.980, B=-169.980, C=+130.030 degrees. Their 60-degree separation under
+the existing terminal convention still does not match the model's canonical
+120-degree balanced-star command. The old 90-degree reference now fails the
+native positive-thrust guard at x=2.5 mm; no old-angle power number is published.
+A geometry-derived fixed reference of 310.030121 degrees allows a diagnostic
+imposed-demand run. It does not fix the opposing pairs, resolve phase
+polarity/ordering or establish a calibrated controller.
+These angles come from simulated force curves, not hardware measurements.
+Review terminal mapping and sign conventions before treating the directed
+phase-axis mismatch as a physical winding defect.
+
+| Imposed quintic move | Required peak W | Average W | Net J | Maximum required line V |
+| --- | ---: | ---: | ---: | ---: |
+| 63 mm / 1 s forward | 458.907 | 147.186 | 147.186 | 61.433 |
+| 1 mm / 0.25 s forward | 104.689 | 66.850 | 16.712 | 32.175 |
+| 1 mm / 0.25 s return | 107.904 | 68.509 | 17.127 | 32.658 |
+
+**None is achieved at the specified 12 V link.** These are hypothetical
+required imposed-motion demands, not actual consumption from an operating
+12 V prototype. Full-move trajectory peak speed remains 0.118125 m/s, not the
+configured 0.5 m/s target. The full run requires 7.763 A phase mean-current
+peak, 7.916 A including the declared approximate ripple, and a hypothetical
+38.242 A positive DC-link peak. Hot phase resistance is about 4.84 ohms;
+140.211 J of the 147.186 J source ledger is mean-current winding copper loss,
+against only 0.00315 J mechanical work. Source totals retain all previously
+named loss-model exclusions and are neither hardware ratings nor bounds.
+
+Validation used the actual generated geometry at conductor meshes 20/40,
+129/193 force positions and 0.5/0.25 ms time steps. Independent graph currents,
+resistance and free-space PM force pass; a separate layer decomposition of all
+three phases agrees with native force to at most 4.24e-12 N/A. Conductor force
+norm changes by 0.01654%. Spatial peak changes are at most 0.824%, passing the
+unchanged 2% peak/energy gates; independent energy balances pass. The frontend
+loss builder agrees with the independent Python formulas, and real native
+receipts map correctly to reports, snapshots and trace exports. No dynamic
+material solve or hardware qualification was performed.
+Final checks passed 580 frontend tests, with 12 optional tests skipped,
+and type-checking reported no errors or warnings. Five independent Python
+loss-formula tests passed. All seven supplied-reference hashes match their
+previously recorded values.
+
+Summary: `scripts/solvers/results/current-generated-braid-power-alignment-2026-10-31.json`.
+Full receipts live in approved temp `current-braid08-{force,oracle}-20261031`
+and `current-braid08-aligned-{baselines,models,results}-20261031`. The initial
+failed old-angle output is preserved separately. Reproduce the signed map with
+`PCB_MOTOR_SUPPLIED_DESIGN_DIR="$PWD" PCB_MOTOR_FORCE_AUDIT_OUTPUT=<new-directory> cargo test -p pcbmotorgen export_current_braid_signed_force_map -- --ignored --nocapture`.
+For baseline export use the existing saved-design command with
+`PCB_MOTOR_GENERATED_BRAID_AUDIT=1`,
+`PCB_MOTOR_FADER_PCB_THICKNESS_M=0.0008` and
+`PCB_MOTOR_FADER_ELECTRICAL_ZERO_RAD=5.41104639575015`.
+Keep the generated-audit flag set for the frontend model export and native
+refinement command; it selects `generated4` cases without reusing imported
+copper or relabeling it as a generated result. The summary CLI accepts
+`--generated-braid-audit`. `audit_braid_layer_force.py` consumes a matching
+independent oracle fixture and the native force map. Existing evidence and
+all seven supplied references remain unchanged.
+
+Next: investigate a series-aiding termination variant, keeping active XY
+unchanged, then verify phase order/polarity and controller reference. Moving
+the cut by a complete electrical period or changing relative pair connection
+sense requires explicit routing/reference review; neither has been applied.
+The exact-spacing DFM warnings, phase/controller applicability, legacy planar
+equilibrium limitation and through-only KiCad guard remain. #7744 stays open.
+
 ### Routing sources and coil-end controls, 2026-10-31
 
 UI work tracked as pcbmotorgen#nstw:

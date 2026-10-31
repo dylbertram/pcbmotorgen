@@ -1,6 +1,8 @@
 [
   [
     { "id": "view:top", "label": "Top-down", "property": "viewMode", "value": "top" },
+    { "id": "view:front", "label": "Front", "property": "viewMode", "value": "front" },
+    { "id": "view:left", "label": "Left", "property": "viewMode", "value": "left" },
     { "id": "view:3d", "label": "3D fields & heat", "property": "viewMode", "value": "iso" }
   ],
   [
@@ -9,7 +11,8 @@
   ],
   [
     { "id": "view:terminals", "label": "Coil-end markers", "property": "showTerminals" },
-    { "id": "view:vias", "label": "Vias", "property": "showVias" }
+    { "id": "view:vias", "label": "Vias", "property": "showVias" },
+    { "id": "view:pcb", "label": "PCB body preview", "property": "showPcb" }
   ],
   [
     { "id": "view:pole-pitch", "label": "Pole pitch", "property": "showPolePitch", "capability": "polePitch" },

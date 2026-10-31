@@ -450,7 +450,7 @@ test("shared editing tools measure and edit CAD drafts, then keep those edits in
   await openCoilPreview(page);
   const motor = coilWorkspace(page);
   const motorTools = motor.getByRole("toolbar", { name: "Coil preview tools" });
-  expect(await motorTools.getByRole("button").evaluateAll(buttons => buttons.map(button => button.getAttribute("aria-label")).filter(Boolean))).toEqual(toolNames);
+  expect(await motorTools.getByRole("button").evaluateAll(buttons => buttons.map(button => button.getAttribute("aria-label")).filter(Boolean))).toEqual(["Zoom window", ...toolNames]);
   await expect(motor.getByRole("img", { name: "Coil A Driver end, L0, X 2 mm, Y 0 mm", exact: true })).toBeVisible();
   await motorTools.getByRole("button", { name: "Toggle measure tool" }).click();
   for (const x of [0, 2]) {
@@ -808,7 +808,7 @@ test("nested motor layers move selections on mobile and toggle only their own co
   const panel = page.getByRole("dialog", { name: "Coil preview layers", exact: true });
   await panel.getByRole("button", { name: "Move selection to B, layer 2", exact: true }).click();
   await expect(motor.getByRole("option", { name: /Segment 1, coil B, layer 1/ })).toHaveCount(1);
-  const canvas = motor.locator("canvas");
+  const canvas = motor.getByTestId("coil-annotations");
   const overlay = motor.getByRole("listbox", { name: "Segment selection preview" }).locator("svg > g");
   const camera = (await overlay.getAttribute("transform"))!;
   const before = Number(await canvas.getAttribute("data-segments"));

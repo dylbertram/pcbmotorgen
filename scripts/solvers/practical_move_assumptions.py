@@ -130,6 +130,7 @@ if __name__ == "__main__":
     raw = json.loads(args.input.read_text())
     if args.from_native_receipt:
         native = raw['native']
+        config = native['inputs']['config']
         drive, actual = native['result']['drive'], native['inputs']['drive']
         ext = actual['series_inductance_h']
         hot_dcr = .0741 * (1 + .00393 * (actual['winding_temp_c'] - 25)) if ext else 0.0
@@ -140,7 +141,7 @@ if __name__ == "__main__":
                    phase_inductance_h=drive['effective_inductance_h'],
                    phase_resistance_ohm=phase_r, winding_temp_c=actual['winding_temp_c'],
                    phase_resistances_ohm=[p['resistance_hot_ohm'] for p in drive['phases']],
-                   copper_thickness_m=max(drive['outer_copper_m'], drive['inner_copper_m']),
+                    copper_thickness_m=max(config['pcb_stackup']['copper_m']) if config.get('pcb_stackup') else max(drive['outer_copper_m'], drive['inner_copper_m']),
                    electrical_period_m=2 * native['inputs']['config']['magnet_pitch_m'],
                    phase_names=[p['net'] for p in drive['phases']],
                    driver_path_ohm=actual['driver']['rds_on_ohm'], external_inductance_h=ext,

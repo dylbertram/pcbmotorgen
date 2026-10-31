@@ -29,6 +29,24 @@ function makeStores(recents?: RecentFilesStore, kind: "motor" | "sensor" = "moto
 }
 
 describe("explicit move persistence", () => {
+  it("persists custom PCB copper/dielectric thicknesses and clears them when restoring a legacy design", () => {
+    const { config, projects } = makeStores();
+    const legacy = projects.snapshotIpc();
+    expect(legacy.config.pcb_stackup_mm).toBeUndefined();
+    projects.markClean();
+    config.pcb_stackup_mm = { copper_mm: [.035,.018,.070,.035], dielectric_mm: [.1,.4,.142] };
+    expect(projects.isDirty).toBe(true);
+    const saved = projects.snapshotIpc();
+    config.pcb_stackup_mm.dielectric_mm[0] = .2;
+    expect(saved.config.pcb_stackup_mm!.dielectric_mm[0]).toBe(.1);
+    projects.applyToState(saved);
+    expect(config.pcb_thickness_mm).toBeCloseTo(.8,12);
+    config.pcb_stackup_mm!.copper_mm[0] = .07;
+    expect(saved.config.pcb_stackup_mm!.copper_mm[0]).toBe(.035);
+    projects.applyToState(legacy);
+    expect(config.pcb_stackup_mm).toBeNull();
+    expect(config.pcb_thickness_mm).toBe(legacy.config.pcb_thickness_mm);
+  });
   it("preserves legacy 15 g assemblies and persists automatic magnet mass selection", () => {
     const { config, projects } = makeStores();
     const legacy = projects.snapshotIpc();

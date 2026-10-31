@@ -51,6 +51,18 @@ describe("formatZoom", () => {
 });
 
 describe("zoom button stepping", () => {
+  it("fits a two-corner window into the available drawing region", () => {
+    const g = makeGestures({ maxZoom: Infinity });
+    g.panX = 50; g.panY = -10;
+    // Current world center at virtual (250,100) is (200,-110).
+    g.zoomWindow({ x: 150, y: 50 }, { x: 350, y: 150 }, { x: 40, y: 20, width: 600, height: 200 });
+    expect(g.zoom).toBe(2);
+    expect(2 * 200 + g.panX).toBe(340);
+    expect(-2 * -110 + g.panY).toBe(120);
+    const before = [g.zoom, g.panX, g.panY];
+    g.zoomWindow({ x: 5, y: 5 }, { x: 5, y: 10 });
+    expect([g.zoom, g.panX, g.panY]).toEqual(before);
+  });
   it("continues beyond the preset steps without an upper zoom limit", () => {
     expect(nextZoomStepUp(10, STEPS, Infinity)).toBe(20);
     expect(nextZoomStepUp(20, STEPS, Infinity)).toBe(40);

@@ -22,7 +22,7 @@
   import type { CoilPreviewMeasure } from "../../utils/coilPreviewMeasure.svelte";
   import { Ruler, RotateCcw } from "@lucide/svelte";
 
-  let { measure, onToggle, disabled = false }: { measure: CoilPreviewMeasure; onToggle?: () => void; disabled?: boolean } = $props();
+  let { measure, onToggle, disabled = false, distanceMm = null, spatial = false }: { measure: Pick<CoilPreviewMeasure, "mode" | "p1" | "p2" | "cursor" | "clear" | "toggleMode">; onToggle?: () => void; disabled?: boolean; distanceMm?: number | null; spatial?: boolean } = $props();
 </script>
 
 <div class="flex items-center gap-3 flex-wrap">
@@ -53,16 +53,16 @@
     <span class="text-xs text-slate-400" role="status" aria-live="polite">
       {#if measure.p1}
         {#if measure.p2}
-          {formatMetresMm(computeMeasureRuler(measure.p1, measure.p2).mm / 1000)} — click again to clear
+          {formatMetresMm((distanceMm ?? computeMeasureRuler(measure.p1, measure.p2).mm) / 1000)}{spatial ? " spatial" : ""} — click again to clear
         {:else}
           {#if measure.cursor}
-            {formatMetresMm(computeMeasureRuler(measure.p1, measure.cursor).mm / 1000)} — click to lock
+            {formatMetresMm((distanceMm ?? computeMeasureRuler(measure.p1, measure.cursor).mm) / 1000)}{spatial ? " spatial" : ""} — click to lock
           {:else}
             click to lock the dimension
           {/if}
         {/if}
       {:else}
-        click to set the start point
+        {spatial ? "Click copper, a via or the PCB to set the start point" : "click to set the start point"}
       {/if}
     </span>
   {/if}

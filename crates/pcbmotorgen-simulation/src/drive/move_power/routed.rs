@@ -210,7 +210,7 @@ pub fn evaluate_routed_move(
             driver_name: settings.driver.name.clone(),
             pwm_hz: settings.pwm_hz,
             winding_temp_c: settings.winding_temp_c,
-            copper_thickness_m: Some(crate::units::oz_to_m(settings.outer_copper_oz.max(settings.inner_copper_oz))),
+            copper_thickness_m: Some(crate::drive::maximum_copper_thickness_m(sim, settings)),
         }),
     };
     validate(p, &electrical)?;

@@ -459,6 +459,9 @@ pub async fn analyze_drive(
 pub async fn travel_envelope(config: LinearMotorConfigIpc) -> Result<TravelEnvelopeIpc, String> {
     let core = config.to_core();
     core.validate_for_simulation().map_err(|e| e.to_string())?;
+    if core.pcb_stackup.is_some() {
+        return Err("The planar equilibrium screen does not support custom PCB stackups. Layer heights were not flattened; routed force and move calculations use the configured stack.".into());
+    }
     tauri::async_runtime::spawn_blocking(move || {
         let sim = core.to_simulation();
         // The copper active area is the whole track: [0, active_area_length].

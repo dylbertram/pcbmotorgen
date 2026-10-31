@@ -172,7 +172,8 @@ function withMove(): PowerRequirementsInput {
 describe("move power report consistency", () => {
   it.skipIf(!process.env.PCB_MOTOR_SCREENING_RESULTS)("maps real native partial screening receipts without promoting omitted losses", () => {
     const root = process.env.PCB_MOTOR_SCREENING_RESULTS!;
-    for (const design of ["fader", "star2"]) for (const scenario of ["full-forward", "short-forward", "short-return"]) {
+    const designs = process.env.PCB_MOTOR_GENERATED_BRAID_AUDIT ? ["generated4"] : ["fader", "star2"];
+    for (const design of designs) for (const scenario of ["full-forward", "short-forward", "short-return"]) {
       const records = JSON.parse(readFileSync(join(root, `${design}-${scenario}.json`), "utf8"));
       const native = records.at(-1);
       const source = native.result.demand.source;

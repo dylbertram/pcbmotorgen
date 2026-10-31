@@ -18,3 +18,20 @@ test("3D reports unavailable WebGL and can return to top-down", async ({ page })
   await expect(dialog.locator("canvas")).toBeVisible();
   await expect(dialog.getByTestId("coil-iso")).toHaveCount(0);
 });
+
+test("a renderer-module load failure also enables the top-down copper fallback",async({page})=>{
+  await page.addInitScript(()=>{
+    const stroke=CanvasRenderingContext2D.prototype.stroke;
+    CanvasRenderingContext2D.prototype.stroke=function(...args:[Path2D?]){
+      if(this.strokeStyle==="#10b981")this.canvas.dataset.fallbackCopper="drawn";
+      if(args[0])stroke.call(this,args[0]);else stroke.call(this);
+    };
+  });
+  await page.route(/\/CoilPreview3DView\.svelte(?:\?.*)?$/,route=>route.abort());
+  await gotoDesignApp(page);
+  const workspace=page.getByRole("region",{name:"Coil design workspace",exact:true});
+  await expect(workspace.getByRole("status").filter({hasText:"Top-down uses the 2D fallback"})).toBeVisible();
+  await expect.poll(async()=>Number(await workspace.getByTestId("coil-annotations").getAttribute("data-segments"))).toBeGreaterThan(0);
+  // Unlike normal annotation-only mode, fallback renders the physical copper.
+  await expect(workspace.getByTestId("coil-annotations")).toHaveAttribute("data-fallback-copper","drawn");
+});

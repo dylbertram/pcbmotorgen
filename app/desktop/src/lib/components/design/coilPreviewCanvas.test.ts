@@ -12,13 +12,14 @@ function phase(layer: number, vias: [number, number][]): PhaseCoilDto {
   };
 }
 
-function drawnVias(visibleLayers: number[], showVias = true): string | undefined {
+function drawnVias(visibleLayers: number[], showVias = true, annotationsOnly = false, calls?:string[]): string | undefined {
   // Every 2D call is a no-op; the renderer reports what it drew in dataset.
-  const ctx = new Proxy({}, { get: () => () => undefined, set: () => true });
+  const ctx = new Proxy({}, { get: (_,key) => () => {calls?.push(String(key));}, set: () => true });
   const canvas = { getContext: () => ctx, dataset: {} as DOMStringMap } as unknown as HTMLCanvasElement;
   const frame = { clientWidth: 760, clientHeight: 260 } as HTMLDivElement;
   const coils = { phases: [phase(0, [[0.0005, 0]]), phase(1, [])] } as unknown as CoilPathDto;
   const input = {
+    annotationsOnly,
     coils, activeAreaLengthMm: 1,
     geometry: { boardRect: { x: 0, y: 0, w: 1, h: 1 }, magnetTop: 0 },
     worldTransform: { s: 1, tx: 0, ty: 0 }, panX: 0, panY: 0, visibleMagnets: [],
@@ -46,5 +47,12 @@ describe("coil preview vias", () => {
 
   it("hide with the via toggle", () => {
     expect(drawnVias([0, 1], false)).toBe("0");
+  });
+  it("does not draw copper or via pads in the shared renderer's annotation layer",()=>{
+    const calls:string[]=[];
+    expect(drawnVias([0,1],true,true,calls)).toBe("1");
+    expect(calls).not.toContain("arc");
+    expect(calls).not.toContain("lineTo");
+    expect(calls).toContain("strokeRect");
   });
 });

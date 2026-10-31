@@ -31,7 +31,7 @@ impl HeightStackCalculator {
     pub fn calculate(&self, config: &SimulationInput) -> HeightStackResult {
         HeightStackResult {
             pcb_thickness_m: config.pcb_thickness_m,
-            cu_protrusion_m: oz_to_m(self.outer_copper_oz),
+            cu_protrusion_m: if config.pcb_stackup.is_some() { 0. } else { oz_to_m(self.outer_copper_oz) },
             solder_mask_m: SOLDER_MASK_M,
             air_gap_m: config.air_gap_m,
             magnet_height_m: config.magnet_dims_m[2],

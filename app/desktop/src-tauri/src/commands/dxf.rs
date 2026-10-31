@@ -40,14 +40,19 @@ pub struct DxfExportSummary {
 pub async fn editable_coil_geometry(config: LinearMotorConfigIpc) -> Result<CadGeometry, String> {
     let core = config.to_core();
     core.design_rules().validate_trace_width()?;
+    if let Some(stack) = &core.pcb_stackup { stack.validate(core.num_layers, core.pcb_thickness_m)?; }
     tauri::async_runtime::spawn_blocking(move || {
         let coils = core.generate_coils_for_board();
-        phase_coils_to_cad_geometry(
+        let mut geometry = phase_coils_to_cad_geometry(
             &coils,
             core.num_layers,
             core.pcb_thickness_m * 1e3,
             core.design_rules().trace_width_mm,
-        )
+        )?;
+        if let Some(stack) = &core.pcb_stackup {
+            geometry.layer_z_mm = (0..core.num_layers).map(|layer| stack.layer_z_m(layer) * 1e3).collect();
+        }
+        Ok(geometry)
     })
     .await
     .map_err(|e| format!("editable_coil_geometry worker failed: {e}"))?
@@ -63,16 +68,20 @@ pub async fn editable_coil_geometry(config: LinearMotorConfigIpc) -> Result<CadG
 pub async fn export_coils_dxf(config: LinearMotorConfigIpc) -> Result<DxfExportResult, String> {
     let core = config.to_core();
     core.design_rules().validate_trace_width()?;
+    if let Some(stack) = &core.pcb_stackup { stack.validate(core.num_layers, core.pcb_thickness_m)?; }
     tauri::async_runtime::spawn_blocking(move || {
         let coils = core.generate_coils_for_board();
         let num_layers = core.num_layers;
         let rules = core.design_rules();
-        let geometry = phase_coils_to_cad_geometry(
+        let mut geometry = phase_coils_to_cad_geometry(
             &coils,
             num_layers,
             core.pcb_thickness_m * 1e3,
             rules.trace_width_mm,
         )?;
+        if let Some(stack) = &core.pcb_stackup {
+            geometry.layer_z_mm = (0..core.num_layers).map(|layer| stack.layer_z_m(layer) * 1e3).collect();
+        }
         // Keep x=0 at the trace start so import, preview and mover travel use
         // the same frame without a hidden half-length translation.
         let dxf_content = cad_geometry_to_3d_dxf(&geometry)?;

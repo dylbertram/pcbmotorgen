@@ -111,6 +111,9 @@ export interface CoilPreviewMeasureOverlay {
 
 /** Per-tick snapshot of everything the canvas paints from. */
 export interface CoilPreviewDrawInput {
+  /** Main motor copper is rendered by the shared WebGL scene. Canvas retains
+   * screen-space diagnostics, or full copper only for explicit WebGL fallback. */
+  annotationsOnly?: boolean;
   coils: CoilPathDto | null;
   /** Active-copper band length, in mm (config.active_area_length_mm). */
   activeAreaLengthMm: number;
@@ -198,8 +201,10 @@ export class CoilPreviewRenderer {
     ctx.setTransform(k, 0, 0, k, 0, 0);
     ctx.clearRect(0, 0, PREVIEW_W, viewportHeight);
     // Page panel behind the (same-coloured) board rect.
-    ctx.fillStyle = "#0f172a";
-    ctx.fillRect(0, 0, PREVIEW_W, viewportHeight);
+    if (!input.annotationsOnly) {
+      ctx.fillStyle = "#0f172a";
+      ctx.fillRect(0, 0, PREVIEW_W, viewportHeight);
+    }
 
     if (!coils) {
       ctx.textAlign = "center";
@@ -272,7 +277,7 @@ export class CoilPreviewRenderer {
       // roundRect is not available in every engine — fall back to a plain rect.
       w.rect(g.boardRect.x, g.boardRect.y, g.boardRect.w, g.boardRect.h);
     }
-    w.fill();
+    if (!input.annotationsOnly) w.fill();
     w.stroke();
 
     // Active-copper band (always on): the copper active area — the full
@@ -322,6 +327,7 @@ export class CoilPreviewRenderer {
         input.visibleArcs.get(ph.phase_idx * 1000 + ph.layer_idx) ??
         ph.corner_arcs ??
         [];
+      if (input.annotationsOnly) { segments += segs.length + (ph.splines?.length ?? 0); continue; }
 
       const centerlines = input.traceMode === "centerlines";
       const band = coils.routing_dimensions?.phase_band_widths.find(
@@ -405,6 +411,7 @@ export class CoilPreviewRenderer {
           const key = `${vx},${vy}`;
           if (seen.has(key)) continue;
           seen.add(key);
+          if (input.annotationsOnly) { vias += 1; continue; }
           w.fillStyle = "#fbbf24";
           w.beginPath();
           w.arc(vx, vy, padRadius, 0, Math.PI * 2);

@@ -180,9 +180,7 @@ impl ForceEvaluator {
             let resistances: Vec<f64> = net.edges.iter().map(|edge| match &edge.kind {
                 EdgeKind::Via { layers, .. } => crate::drive::via_resistance_ohm(config.min_via_drill_m, settings.via_plating_m, hints.via_length_m(config, *layers), rho),
                 EdgeKind::Trace { layer, length_m, .. } => {
-                    let inner = config.num_layers > 2 && *layer != 0 && *layer + 1 != config.num_layers;
-                    let oz = if inner { settings.inner_copper_oz } else { settings.outer_copper_oz };
-                    rho * length_m / (config.min_trace_m * crate::units::oz_to_m(oz))
+                    rho * length_m / (config.min_trace_m * crate::drive::copper_thickness_m(*layer, config, settings))
                 }
             }).collect();
             let solution = solve_network(&net, &resistances);

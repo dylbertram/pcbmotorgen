@@ -81,6 +81,7 @@
   } from "./coilPreviewCanvas";
   import { CoilPreviewViewState } from "./coilPreviewViewState.svelte";
   import type { VisualizationInput } from "../../types/simulationVisualization";
+  import { previewCopperKeys } from "../../previewCopperKeys";
 
   let {
     config,
@@ -294,6 +295,8 @@
   let visibleArcs = $derived(
     computeVisibleArcs(coils, view.oneSection, oneSectionConductorCount),
   );
+  const visibleCopperKeys = $derived(view.oneSection ? previewCopperKeys(terminalGeometry,coils,visibleSegments,visibleArcs) : null);
+  let webglUnavailable = $state(false);
 
   // -------------------------------------------------------------------
   // routing_dimensions sidecar overlays: pole-pitch ruler, band-width rows,
@@ -505,6 +508,7 @@
     void g;
     void expanded;
     renderer.draw(frame, canvas, {
+      annotationsOnly: !webglUnavailable,
       coils,
       activeAreaLengthMm: config.active_area_length_mm,
       geometry: g,
@@ -574,11 +578,8 @@
          data-pole-regions / data-revision are written imperatively by the
          renderer (canvas.dataset in coilPreviewCanvas.ts), NOT bound
          reactively — see the counter comment there. -->
-    {#if view.viewMode === "iso"}
-      <CoilPreviewIsoView geometry={terminalGeometry} pcbThicknessMm={config.pcb_thickness_mm} {view} isVisible={isTerminalVisible} showTerminals={false} simulation={visualizationInput} />
-    {:else}
-      <canvas bind:this={canvasRef} class="block h-full w-full"></canvas>
-    {/if}
+    <CoilPreviewIsoView geometry={terminalGeometry} pcbThicknessMm={config.pcb_thickness_mm} pcbStackup={config.pcb_stackup_mm} copperThicknessMm={{ outer: config.drive.outer_copper_oz * .035, inner: config.drive.inner_copper_oz * .035 }} viaSizeMm={{diameter:config.min_via_drill_mm + 2 * config.min_via_annular_ring_mm,drill:config.min_via_drill_mm}} {view} {visibleCopperKeys} topCamera={{transform:worldTransform,panX:gestures.panX,panY:gestures.panY,width:W,height:H}} onRenderStatus={available=>webglUnavailable=!available} isVisible={isTerminalVisible} showTerminals={false} simulation={visualizationInput} />
+    {#if view.viewMode === "top"}<canvas bind:this={canvasRef} data-testid="coil-annotations" class="pointer-events-none absolute inset-0 block h-full w-full"></canvas>{/if}
   </PreviewFrame>
 
   {#if coils && coils.phases.length > 0}
@@ -611,6 +612,8 @@
       {view}
       {gestures}
       {measure}
+      {visibleCopperKeys}
+      onRenderStatus={available=>webglUnavailable=!available}
       onSimplify={importedGeometry && onGeometryChange ? simplifyImportedLines : undefined}
       onUndoSimplify={canUndoSimplify ? undoSimplify : undefined}
       {simplifyNotice}

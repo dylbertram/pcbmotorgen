@@ -15,24 +15,48 @@
   import QualifiedCoilFieldControls from "./QualifiedCoilFieldControls.svelte";
   import { combineVisualizationFields } from "../../combineVisualizationFields";
   import { placedCopperGeometry } from "../../copperLayerPlacement";
+  import { pcbBody } from "../../pcbBody";
+  import type { SpatialMeasure } from "../../spatialMeasure.svelte";
+  import ZoomWindowOverlay from "./ZoomWindowOverlay.svelte";
+  import type { PcbStackupMm } from "../../pcbStackup";
+  import type { TopCameraTransform } from "../../fitCoilCamera";
 
-  let { geometry: sourceGeometry, pcbThicknessMm, view, isVisible = () => true, showTerminals = true, simulation = null }: {
+  let { geometry: sourceGeometry, pcbThicknessMm, pcbStackup = null, copperThicknessMm = { outer: .035, inner: .035 }, viaSizeMm = {diameter:.4,drill:.2}, view, isVisible = () => true, showTerminals = true, simulation = null, measure = null, topCamera = null, visibleCopperKeys = null, onRenderStatus }: {
     geometry: CadGeometry | null;
     pcbThicknessMm: number;
+    pcbStackup?: PcbStackupMm | null;
+    viaSizeMm?: {diameter:number;drill:number};
+    topCamera?: TopCameraTransform | null;
+    visibleCopperKeys?: Set<string> | null;
+    onRenderStatus?: (available:boolean)=>void;
+    copperThicknessMm?: { outer: number; inner: number };
     view: CoilPreviewViewState;
     isVisible?: (coil: string, layer: number) => boolean;
     showTerminals?: boolean;
     simulation?: VisualizationInput | null;
+    measure?: SpatialMeasure | null;
   } = $props();
 
-  const geometry = $derived(sourceGeometry ? placedCopperGeometry(sourceGeometry, pcbThicknessMm) : null);
-  let scene = $derived(buildCoilScene(geometry));
-  let paths = $derived(scene?.paths.filter(p => view.isLayerVisible(p.layer) && isVisible(p.net, p.layer)) ?? []);
+  const placement = $derived.by(() => {
+    try { return { geometry: sourceGeometry ? placedCopperGeometry(sourceGeometry, pcbThicknessMm, pcbStackup) : null, error: "" }; }
+    catch (error) { return { geometry: null, error: error instanceof Error ? error.message : String(error) }; }
+  });
+  const geometry = $derived(placement.geometry);
+  let scene = $derived(buildCoilScene(geometry, { ...copperThicknessMm, layers: pcbStackup?.copper_mm }));
+  const board = $derived(geometry && scene ? pcbBody(geometry, scene, pcbThicknessMm, view.zScale, pcbStackup ? 0 : undefined) : null);
+  $effect(() => { void geometry; untrack(() => measure?.clear()); });
+  let paths = $derived(scene?.paths.filter(p => view.isLayerVisible(p.layer) && isVisible(p.net, p.layer) && (!visibleCopperKeys || visibleCopperKeys.has(p.key))) ?? []);
   let vias = $derived(view.showVias ? scene?.vias.filter(v =>
     isViaVisible(v, layer => view.isLayerVisible(layer), isVisible)) ?? [] : []);
+  const pads=$derived(scene?vias.flatMap(v=>Array.from({length:Math.abs(v.to_layer-v.from_layer)+1},(_,i)=>Math.min(v.from_layer,v.to_layer)+i)
+    .filter(layer=>view.isLayerVisible(layer)&&isVisible(v.net,layer))
+    .map(layer=>v.points[0].clone().setY(scene!.layerY[layer]))):[]);
   let terminals = $derived(showTerminals && view.showTerminals ? scene?.terminals.filter(t => view.isLayerVisible(t.layer) && isVisible(t.net, t.layer)) ?? [] : []);
   let reset = $state(0);
   let command = $state({ id: 0, zoom: 1 });
+  let windowCommand = $state<{ id: number; a: [number, number]; b: [number, number] }>({ id: 0, a: [0, 0], b: [1, 1] });
+  let cameraSnapshot = $state<{ position: number[]; target: number[]; zoom: number } | null>(null);
+  let glAvailable = $state<boolean | null>(null);
   let mode = $state<VisualizationMode>("fields");
   let density = $state("sparse");
   let opacity = $state(.8);
@@ -52,7 +76,7 @@
   let visualization = $state<VisualizationView>({ phase: "idle", report: null, error: null });
   const controller = new SimulationVisualizationController(sampleSimulationVisualization, next => { visualization = next; });
   const field = $derived.by(() => {
-    if (!simulation) return null;
+    if (!simulation || view.viewMode === "top") return null;
     if (fieldSource === "pm") return includeMagnets ? visualization.report?.field ?? null : null;
     if (!coilField) return null;
     if (!includeMagnets) return coilField.field;
@@ -60,7 +84,7 @@
     return pm ? combineVisualizationFields(coilField.field, pm) : null;
   });
   // Visible solids are independent of the selected field and its availability.
-  const visibleMagnets = $derived(simulation && showMagnets ? Array.from({ length: simulation.config.magnet_count }, (_, i) => ({
+  const visibleMagnets = $derived(simulation && showMagnets && view.viewMode !== "top" ? Array.from({ length: simulation.config.magnet_count }, (_, i) => ({
     center_m: [simulation.moverPositionM + i * simulation.config.magnet_pitch_m, simulation.config.board_width_m / 2,
       simulation.config.air_gap_m + simulation.config.magnet_height_m / 2] as [number, number, number],
     size_m: [simulation.config.magnet_width_m, simulation.config.magnet_cross_width_m, simulation.config.magnet_height_m] as [number, number, number], positive_z: i % 2 === 0,
@@ -125,26 +149,32 @@
   onDestroy(() => { controller.invalidate(); magnetController.invalidate(); });
 </script>
 
-<div class="coil-3d relative h-full w-full bg-slate-950" bind:clientWidth={viewerWidth} role="img" aria-label="Coil preview — isometric"
-  data-testid="coil-iso" data-layers={geometry?.layer_z_mm.filter((_, i) => view.isLayerVisible(i)).length ?? 0}
-  data-segments={paths.length} data-vias={vias.length} data-terminals={terminals.length} data-trace-mode={view.traceMode} data-z-scale={view.zScale}
+<div class="coil-3d relative h-full w-full bg-slate-900" bind:clientWidth={viewerWidth} role="img" aria-label={`Coil preview — ${view.viewMode}`}
+  data-testid={`coil-${view.viewMode}`} data-renderer={glAvailable === false ? "canvas2d-fallback" : "shared-three"} data-layers={geometry?.layer_z_mm.filter((_, i) => view.isLayerVisible(i)).length ?? 0}
+  data-layer-z-mm={JSON.stringify(geometry?.layer_z_mm ?? [])} data-pcb-thickness-mm={pcbThicknessMm}
+  data-trace-width-mm={scene ? scene.width / scene.scale : 0} data-trace-width-px={view.traceMode === "centerlines" ? 1 : (scene?.width ?? 0) * (cameraSnapshot?.zoom ?? 0)} data-via-diameter-mm={viaSizeMm.diameter} data-via-drill-mm={viaSizeMm.drill}
+  data-segments={paths.length} data-vias={vias.length} data-terminals={terminals.length} data-trace-mode={view.traceMode} data-z-scale={view.zScale} data-pcb-visible={view.showPcb} data-copper-section="rectangular" data-measure-points={measure?.p2 ? 2 : measure?.p1 ? 1 : 0} data-measure-mm={measure?.distanceMm ?? ""} data-camera={cameraSnapshot ? JSON.stringify(cameraSnapshot) : ""}
   data-field-samples={field?.samples.length ?? 0} data-visible-magnets={visibleMagnets.length} data-include-magnets={includeMagnets} data-field-source={fieldSource} data-field-style={fieldStyle} data-field-slice={sliceFraction} data-heat-unit="W/m" data-settings-open={settingsExpanded} data-legends-open={legendsOpen} data-heat-paths={heatMapping.values?.size ?? 0} data-visualization-state={visualization.phase}>
   {#if scene}
-    <svelte:boundary>
+    <svelte:boundary onerror={() => { glAvailable=false; onRenderStatus?.(false); }}>
       <Canvas renderMode="on-demand">
-        <CoilPreviewScene {scene} {paths} {vias} {terminals} {reset} {command} zScale={view.zScale} traceMode={view.traceMode}
+         <CoilPreviewScene {scene} {paths} {vias} {pads} viaSize={{diameter:viaSizeMm.diameter*scene.scale,drill:viaSizeMm.drill*scene.scale}} {terminals} {reset} {command} {windowCommand} {board} {measure} {topCamera} viewMode={view.viewMode} onCamera={snapshot => {cameraSnapshot = snapshot; glAvailable=true; onRenderStatus?.(true);}} showPcb={view.showPcb} zScale={view.zScale} traceMode={view.traceMode}
            {field} heat={heatMapping.values} {opacity} {fieldStyle} {sliceFraction} {sectionView} magnets={visibleMagnets} />
       </Canvas>
       {#snippet failed()}
-        <div class="flex h-full items-center justify-center p-4 text-sm text-slate-400" role="status">
-          3D rendering is unavailable. Switch to Top-down to view this geometry.
+        <div class="pointer-events-none absolute bottom-2 left-2 right-2 text-xs text-slate-400" role="status">
+          {view.viewMode === "top" ? "WebGL unavailable. Using the 2D fallback." : "3D rendering is unavailable. Switch to Top-down to view this geometry."}
         </div>
       {/snippet}
     </svelte:boundary>
+    {#if view.zoomWindow && view.viewMode !== "top"}
+      <ZoomWindowOverlay onCancel={() => view.zoomWindow = false} onFit={(a, b) => { windowCommand = { id: windowCommand.id + 1, a, b }; view.zoomWindow = false; }} />
+    {/if}
+    {#if view.viewMode !== "top"}
     <div class="absolute left-2 top-2 flex gap-1 rounded border border-slate-700 bg-slate-900/95 p-1" role="group" aria-label="3D camera controls">
       <button class="text-slate-300 hover:bg-slate-800 hover:text-emerald-300" type="button" aria-label="Zoom in 3D" onclick={() => command = { id: command.id + 1, zoom: 1.25 }}>+</button>
       <button class="text-slate-300 hover:bg-slate-800 hover:text-emerald-300" type="button" aria-label="Zoom out 3D" onclick={() => command = { id: command.id + 1, zoom: 0.8 }}>−</button>
-      <button class="text-slate-300 hover:bg-slate-800 hover:text-emerald-300" type="button" onclick={() => reset++}>Reset 3D view</button>
+      <button class="text-slate-300 hover:bg-slate-800 hover:text-emerald-300" type="button" onclick={() => reset++}>{view.viewMode === "iso" ? "Reset 3D view" : "Reset view"}</button>
     </div>
     {#if simulation}
       <div class="simulation-controls absolute right-2 top-2 z-20 rounded border border-slate-700 bg-slate-900/95 text-xs text-slate-300" role="group" aria-label="3D simulation overlays">
@@ -232,15 +262,16 @@
       <output class="font-mono text-[10px] text-emerald-300" aria-label="Z height multiplier">{view.zScale}×</output>
     </div>
     <div class="pointer-events-none absolute bottom-2 left-16 right-12 text-[10px] text-slate-400">
-      Drag to orbit · Right-drag to pan · Scroll or pinch to zoom · Z × {view.zScale}
+      {view.viewMode === "iso" ? "Drag to orbit" : "Drag to pan"} · Right-drag to pan · Scroll or pinch to zoom · Z × {view.zScale}
     </div>
     <div class="layer-depths pointer-events-none absolute right-12 top-2 text-right font-mono text-[10px] text-slate-400" class:simulation-depths={simulation !== null}>
       {#each geometry?.layer_z_mm ?? [] as z, idx (idx)}
         {#if view.isLayerVisible(idx)}<div>L{idx + 1} · {z.toFixed(2)} mm</div>{/if}
       {/each}
     </div>
+    {/if}
   {:else}
-    <div class="flex h-full items-center justify-center text-sm text-slate-500">Awaiting coil generation…</div>
+    <div class="flex h-full items-center justify-center p-4 text-sm text-slate-500" role="status">{placement.error || "Awaiting coil generation…"}</div>
   {/if}
 </div>
 
