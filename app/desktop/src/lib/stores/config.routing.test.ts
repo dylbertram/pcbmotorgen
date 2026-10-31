@@ -1,8 +1,19 @@
 import { describe, expect, it } from "vitest";
 import { ConfigStore } from "./config.svelte";
-import { listRoutingPatterns } from "../ipc/routing";
+import { listRoutingPatterns, routingPatternParameters } from "../ipc/routing";
 
 describe("routing source connection metadata", () => {
+  it("keeps an explicit legacy zero when loading parameter definitions", async () => {
+    const store = new ConfigStore();
+    store.routing_patterns = await listRoutingPatterns();
+    store.routing_params = { connection: 0, num_strands: 3 };
+    await store.loadRoutingParams("infinity-braid");
+    expect(store.generatorConnection).toBe("closed");
+    expect(store.toIpc().routing_params.connection).toBe(0);
+    const connection = (await routingPatternParameters("infinity-braid")).find(def => def.key === "connection")!;
+    expect(connection.min).toBe(0);
+    expect(connection.options).toContainEqual({ value: 0, label: "Closed (legacy)" });
+  });
   it("keeps fresh projects star while old absent parameters remain closed", async () => {
     const store = new ConfigStore();
     store.routing_patterns = await listRoutingPatterns();

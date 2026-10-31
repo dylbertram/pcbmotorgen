@@ -186,11 +186,13 @@ impl RoutingPattern for InfinityBraidPattern {
         vec![
             PatternParameter::int("num_strands", "Strands per period", 5.0, 2.0, 99.0)
                 .with_description("Number of parallel braided paths in each period."),
+            // Saved legacy closed windings explicitly use 0. The source picker
+            // hides that choice for new designs, but validation must accept it.
             PatternParameter::int(
                 "connection",
                 "Winding connection",
                 Connection::DELTA,
-                Connection::DELTA,
+                Connection::CLOSED,
                 Connection::STAR,
             )
             .with_description(
@@ -199,6 +201,7 @@ impl RoutingPattern for InfinityBraidPattern {
             .with_options(vec![
                 ParamOption::new(Connection::DELTA, "Delta"),
                 ParamOption::new(Connection::STAR, "Star (wye)"),
+                ParamOption::new(Connection::CLOSED, "Closed (legacy)"),
             ]),
         ]
     }
@@ -950,6 +953,24 @@ mod tests {
             magnet_pitch_mm: Some(6.0),
             magnet_array_span_mm: Some(30.0),
             ..RoutingContext::default()
+        }
+    }
+
+    #[test]
+    fn explicit_legacy_closed_connection_matches_absent_connection_through_public_dispatch() {
+        for layers in [2, 4, 6, 8] {
+            let mut explicit = fader_ctx(Connection::CLOSED);
+            explicit.num_layers = layers;
+            let mut missing = explicit.clone();
+            missing.params.remove("connection");
+            let expected = crate::generate_routing_report(&missing, "infinity-braid").unwrap();
+            let actual = crate::generate_routing_report(&explicit, "infinity-braid").unwrap();
+            assert_eq!(actual, expected, "explicit legacy 0 must not be rejected or rewired");
+            assert_eq!(explicit.params["connection"], Connection::CLOSED);
+        }
+        for invalid in [-1., 0.5, 3., f64::NAN, f64::INFINITY] {
+            let context = fader_ctx(invalid);
+            assert!(crate::generate_routing_report(&context, "infinity-braid").is_err());
         }
     }
 

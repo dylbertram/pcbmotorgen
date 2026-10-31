@@ -51,12 +51,13 @@ const MOCK_BRAID_PARAMS: RoutingParamDef[] = [
     description: "How each phase winding terminates.",
     param_type: "int",
     default: 1,
-    min: 1,
+    min: 0,
     max: 2,
     step: 1,
     options: [
       { value: 1, label: "Delta" },
       { value: 2, label: "Star (wye)" },
+      { value: 0, label: "Closed (legacy)" },
     ],
   },
 ];
