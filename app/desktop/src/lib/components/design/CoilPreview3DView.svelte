@@ -1,7 +1,7 @@
 <script lang="ts">
   import { Canvas } from "@threlte/core";
   import type { CadGeometry } from "../../types";
-  import { buildCoilScene } from "../../coilScene";
+  import { buildCoilScene, isViaVisible } from "../../coilScene";
   import type { CoilPreviewViewState } from "./coilPreviewViewState.svelte";
   import CoilPreviewScene from "./CoilPreviewScene.svelte";
   import Slider from "../ui/Slider.svelte";
@@ -29,8 +29,7 @@
   let scene = $derived(buildCoilScene(geometry));
   let paths = $derived(scene?.paths.filter(p => view.isLayerVisible(p.layer) && isVisible(p.net, p.layer)) ?? []);
   let vias = $derived(view.showVias ? scene?.vias.filter(v =>
-    (view.isLayerVisible(v.from_layer) && isVisible(v.net, v.from_layer)) ||
-    (view.isLayerVisible(v.to_layer) && isVisible(v.net, v.to_layer))) ?? [] : []);
+    isViaVisible(v, layer => view.isLayerVisible(layer), isVisible)) ?? [] : []);
   let terminals = $derived(showTerminals && view.showTerminals ? scene?.terminals.filter(t => view.isLayerVisible(t.layer) && isVisible(t.net, t.layer)) ?? [] : []);
   let reset = $state(0);
   let command = $state({ id: 0, zoom: 1 });

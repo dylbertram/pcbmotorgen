@@ -5,6 +5,7 @@ import { generatedTerminalGeometry } from "./generatedTerminalGeometry";
 import { cadTerminalCandidates, sameTerminal, withAutomaticCadTerminals } from "./cadTerminals";
 import type { CoilPathDto } from "./types";
 import { CoilTerminalTool } from "./utils/coilTerminalTool.svelte";
+import { buildCoilScene } from "./coilScene";
 
 // Exported by the real generate_coils command in the supplied-reference test.
 // Keep the user's project/DXF inputs out of the repository and test directly
@@ -18,6 +19,12 @@ describe.skipIf(!fixtureDirectory)("native generated braid terminal handoff", ()
       const coils = JSON.parse(readFileSync(join(fixtureDirectory!, filename), "utf8")) as CoilPathDto;
       const before = JSON.stringify(coils);
       const geometry = generatedTerminalGeometry(coils, layers, 1.6, .2, 2);
+      const scene = buildCoilScene(geometry)!;
+      const fullStackVias = scene.vias.filter(via => Math.abs(via.to_layer - via.from_layer) === layers - 1);
+      expect(fullStackVias.length).toBeGreaterThan(0);
+      for (const via of fullStackVias) {
+        expect(Math.abs(via.points[0].y - via.points[1].y) / scene.scale).toBeCloseTo(1.6, 12);
+      }
       const revealed: [string, number][] = [];
       const tool = new CoilTerminalTool({ getGeometry: () => geometry, onChange: () => {},
         onReveal: (net, layer) => revealed.push([net, layer]) });

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildCoilScene, sampleCopperArc } from "./coilScene";
+import { buildCoilScene, isViaVisible, sampleCopperArc } from "./coilScene";
 import type { CadGeometry } from "./types";
 
 function fixture(): CadGeometry {
@@ -13,6 +13,32 @@ function fixture(): CadGeometry {
 }
 
 describe("Threlte coil geometry", () => {
+  it("keeps a through-via visible through inner layers without revealing hidden coils", () => {
+    const via = { net: "A", from_layer: 0, to_layer: 7 };
+    const innerOnly = (layer: number) => layer === 3;
+    expect(isViaVisible(via, innerOnly, () => true)).toBe(true);
+    expect(isViaVisible({ ...via, from_layer: 7, to_layer: 0 }, innerOnly, () => true)).toBe(true);
+    expect(isViaVisible(via, innerOnly, net => net !== "A")).toBe(false);
+    expect(isViaVisible(via, innerOnly, (_net, layer) => layer !== 3)).toBe(false);
+    expect(isViaVisible(via, () => false, () => true)).toBe(false);
+    expect(isViaVisible({ ...via, to_layer: 1 }, innerOnly, () => true)).toBe(false);
+  });
+
+  for (const layers of [4, 6, 8]) {
+    it(`places a ${layers}-layer through-via across the entire board, not the first pair`, () => {
+      const g = fixture();
+      g.layer_z_mm = Array.from({ length: layers }, (_, i) => -1.6 * i / (layers - 1));
+      g.routing.vias[0].to_layer = layers - 1;
+      g.routing.segments[1].layer = layers - 1;
+      const before = JSON.stringify(g);
+      const scene = buildCoilScene(g)!;
+      const [top, bottom] = scene.vias[0].points;
+      expect(top).toEqual(scene.paths[0].points[1]);
+      expect(bottom).toEqual(scene.paths[1].points[1]);
+      expect(Math.abs(top.y - bottom.y) / scene.scale).toBeCloseTo(1.6, 12);
+      expect(JSON.stringify(g)).toBe(before);
+    });
+  }
   it("centers copper and places via endpoints on the matching layers without changing CAD data", () => {
     const g = fixture();
     const original = JSON.stringify(g);
