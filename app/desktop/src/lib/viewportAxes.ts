@@ -15,5 +15,8 @@ export function viewportAxes(view: AxisView, camera: AxisCamera | null) {
     { name: "Y", vector: new Vector3(0, 0, -1), color: "#34d399" },
     { name: "Z", vector: new Vector3(0, 1, 0), color: "#60a5fa" },
   ].map(axis => ({ name: axis.name, color: axis.color, x: axis.vector.dot(right), y: -axis.vector.dot(up), depth: axis.vector.dot(backward) }))
+    // End-on axes have no useful screen direction. Hide them instead of
+    // drawing a dot and label over the remaining axes.
+    .filter(axis => Math.hypot(axis.x, axis.y) >= .08)
     .sort((a, b) => a.depth - b.depth);
 }

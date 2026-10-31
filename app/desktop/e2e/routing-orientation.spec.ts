@@ -79,7 +79,10 @@ test("XYZ indicator is camera-aligned, passive and inside every desktop/mobile v
       const viewer = workspace.getByTestId(`coil-${id}`);
       const axes = viewer.getByRole("img", { name: "Viewport axes: X travel, Y across board, Z up", exact: true });
       await expect(axes).toBeVisible();
-      await expect(axes.locator("[data-axis]")).toHaveCount(3);
+      await expect(axes.locator("[data-axis]")).toHaveCount(id === "iso" ? 3 : 2);
+      const hiddenAxis = id === "top" ? "Z" : id === "front" ? "Y" : id === "left" ? "X" : null;
+      if (hiddenAxis) await expect(axes.locator(`[data-axis="${hiddenAxis}"]`)).toHaveCount(0);
+      await expect(axes.locator("circle")).toHaveCount(0);
       await expect(axes).toHaveCSS("pointer-events", "none");
       const box = (await axes.boundingBox())!, frame = (await viewer.boundingBox())!;
       const navigation = (await workspace.getByRole("group", { name: "Zoom controls", exact: true }).boundingBox())!;
