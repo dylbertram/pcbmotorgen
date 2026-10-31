@@ -50,6 +50,7 @@ def main():
         root/'crates/pcbmotorgen-routing/src/patterns/infinity/stacked.rs',
         root/'crates/pcbmotorgen-routing/src/context.rs',
         root/'app/desktop/src-tauri/src/config/bridges.rs',
+        root/'crates/pcbmotorgen-dfm/src/series_vias.rs',
         Path(__file__).parent/'prescribed_pm_oracle.py',
         root/'crates/pcbmotorgen-simulation/src/magnetic/force_eval/commutation.rs'])
     report={'scope':__doc__,'status':'running','project':str(project) if project else None,'version_index':args.version,

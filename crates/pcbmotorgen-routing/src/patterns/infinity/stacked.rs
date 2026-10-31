@@ -9,7 +9,6 @@ pub(super) fn stack_and_terminate(
     geometry: &mut BraidGeometry,
     ends: &[(String, Point, Point)],
     connection: Connection,
-    pitch: f64,
     period: f64,
     periods: i64,
     ctx: &RoutingContext,
@@ -64,32 +63,24 @@ pub(super) fn stack_and_terminate(
         return Err(RoutingError::new(0, "via_pad_diameter_mm", RoutingErrorKind::Generation,
             "via pad diameter must be finite and positive when supplied"));
     }
-    let clearance = ctx.min_space_mm.max(ctx.phase_clearance_mm.unwrap_or(ctx.min_space_mm));
-    let required = pad / 2.0 + ctx.trace_width() / 2.0 + clearance;
-    // Widen the phase rows for finite pads. Cap the fan-out's horizontal
-    // step at phase_pitch/(2*phases), balancing the barrel's clearance from
-    // its own mirrored driver riser and the next phase's driver riser.
-    // This steepens only the external leads when the original diamond slope
-    // would run through a neighbouring phase's pad. Two-layer leads have no
-    // series barrels and retain the reference slope/pitch regardless of pad.
-    let row_pitch = if pairs == 1 { pitch } else {
-        ends.iter().map(|(_, _, d)| {
-            let k = (d.x / d.y).abs();
-            required * k.hypot(1.0) / (2.0 * k)
-        }).fold(pitch.max(required).max(pad + clearance), f64::max)
-    };
-    let phase_pitch = ends.windows(2).map(|w| (w[1].1.x - w[0].1.x).abs())
-        .fold(f64::INFINITY, f64::min);
-    let max_step = phase_pitch / (2.0 * ends.len() as f64);
-    let slope = |d: Point| {
-        let k = (d.x / d.y).abs();
-        if pairs == 1 { k } else { k.min(max_step / row_pitch) }
-    };
+    // Continue the projected braid edge angle without capping its slope.
+    // Match the actual via-row Y interval, not trace/pad DFM sizes. Use the
+    // shortest consecutive interval because the two-strand braid has no
+    // intermediate upper crossing row, only lower crossing rows and distant
+    // end-turn vias at the board centre.
+    // The user chose exact geometry plus DFM warnings, never an automatic
+    // change of angle or row pitch to hide a clearance violation.
+    let mut via_ys: Vec<_> = geometry.vias.iter().map(|v| v.position.y).collect();
+    via_ys.sort_by(f64::total_cmp);
+    via_ys.dedup_by(|a, b| (*a - *b).abs() < 1e-9);
+    let row_pitch = via_ys.windows(2).map(|w| w[1] - w[0])
+        .filter(|d| *d > 1e-9).min_by(f64::total_cmp)
+        .ok_or_else(|| RoutingError::new(0, "lead_pitch", RoutingErrorKind::Generation,
+            "cannot resolve the braid's top-to-next-via Y pitch"))?;
     let extend = |p: Point, dx_dy: f64, y: f64| Point::new(p.x + dx_dy * (y - p.y), y);
     let last = ctx.num_layers - 1;
-    let mut joins = Vec::new();
     for (i, (net, brk, outward)) in ends.iter().enumerate() {
-        let k = slope(*outward);
+        let k = (outward.x / outward.y).abs();
         let y = brk.y + (i + 1) as f64 * row_pitch;
         // Driver trace bends left on the top layer. Each series step bends
         // right on the outgoing even layer, then reaches the next opening
@@ -111,7 +102,6 @@ pub(super) fn stack_and_terminate(
             trace(geometry, net, layer - 1, to, corner);
             trace(geometry, net, layer - 1, corner, join);
             geometry.vias.push(Via { position: join, from_layer: 0, to_layer: last, net: net.clone() });
-            joins.push((join, net.clone(), layer - 1, layer));
         }
         let end = shifted(*brk, pairs - 1);
         let neutral = Point::new(end.x, end.y + row_pitch);
@@ -122,31 +112,9 @@ pub(super) fn stack_and_terminate(
             trace(geometry, owner, 0, neutral, Point::new(next.x, neutral.y));
         }
     }
-    // A barrel may land only on its two intended layers. Even same-phase
-    // copper on another layer would bypass part of the series winding.
-    for (join, net, lo, hi) in joins {
-        let blocked_trace = geometry.segments.iter()
-            .filter(|s| s.net != net || (s.layer != lo && s.layer != hi)
-                || (s.start != join && s.end != join))
-            .find(|s| point_segment_distance(join, s.start, s.end) + 1e-9 < required);
-        let blocked_via = geometry.vias.iter().any(|v| v.position != join
-            && v.position.distance_to(join) + 1e-9 < pad + clearance);
-        if blocked_trace.is_some() || blocked_via {
-            let conflict = blocked_trace.map(|s| format!("trace on layer {} phase {}", s.layer, s.net))
-                .unwrap_or_else(|| "another via pad".into());
-            return Err(RoutingError::new(0, "series_via", RoutingErrorKind::Generation,
-                format!("series via {net} at ({:.4}, {:.4}) cannot clear {conflict}; reduce via/trace size or increase pole pitch", join.x, join.y)));
-        }
-    }
     Ok(())
 }
 
 fn trace(g: &mut BraidGeometry, net: &str, layer: u32, start: Point, end: Point) {
     g.segments.push(RouteSegment { start, end, layer, net: net.into(), is_active: false });
-}
-
-fn point_segment_distance(p: Point, a: Point, b: Point) -> f64 {
-    let (dx, dy) = (b.x - a.x, b.y - a.y);
-    let t = (((p.x - a.x) * dx + (p.y - a.y) * dy) / (dx * dx + dy * dy)).clamp(0.0, 1.0);
-    p.distance_to(Point::new(a.x + t * dx, a.y + t * dy))
 }
