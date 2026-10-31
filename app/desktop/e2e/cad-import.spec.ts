@@ -233,7 +233,7 @@ test("overlapping endpoints are disambiguated by copper layer and support keyboa
   expect(cards).toHaveLength(4);
   for (const [i, a] of cards.entries()) for (const b of cards.slice(i + 1)) expect(a.x + a.width <= b.x || b.x + b.width <= a.x || a.y + a.height <= b.y || b.y + b.height <= a.y).toBe(true);
   await page.screenshot({ path: testInfo.outputPath("offset-terminal-arrows.png") });
-  await expect(command.getByRole("combobox")).toHaveCount(0);
+  await expect(command.getByRole("combobox", { name: "Winding connection", exact: true })).toHaveValue("star");
   await command.getByRole("button", { name: "Select driver end for coil A", exact: true }).click();
   const slider = page.getByRole("slider", { name: "Preview layer", exact: true });
   await slider.focus(); await page.keyboard.press("End");
@@ -269,8 +269,8 @@ test("terminal panel configures multiple phases, switches topology and temporari
   const modal = coilWorkspace(page);
   await expect(modal.getByRole("slider", { name: "Preview layer" })).toBeVisible();
   await expect(modal.getByRole("dialog", { name: "Phase waveform", exact: true })).toHaveCount(0);
-  await expect(command.getByRole("radio", { name: "Star (wye)", exact: true })).toBeChecked();
-  await command.getByRole("radio", { name: "Delta", exact: true }).check();
+  await expect(command.getByRole("combobox", { name: "Winding connection", exact: true })).toHaveValue("star");
+  await command.getByRole("combobox", { name: "Winding connection", exact: true }).selectOption("delta");
   await expect(command).toContainText("next coil's driver end");
   await expect(command).toContainText("Delta end");
   await expect(command.getByRole("button", { name: "Select delta end for coil A", exact: true })).toHaveCount(0);

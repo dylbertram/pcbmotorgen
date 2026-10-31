@@ -30,7 +30,7 @@
     onGeometryChange,
     backplaneAnalysis = null,
     driveBackplane = null,
-    section = "constraints",
+    section = "routing",
   }: {
     config: ConfigStore;
     motion: MotionStore;
@@ -55,7 +55,7 @@
 >
   <div class="design-settings space-y-3">
     <!-- Travel inputs, live assembly geometry and derived sizing readouts. -->
-    {#if section === "constraints"}
+    {#snippet constraints()}
     <section
       id="design-constraints-heading"
       aria-label="Design constraints"
@@ -136,7 +136,8 @@
       <ConstraintReadouts {config} measuredTraceLengthMm={measuredTrace?.traceLengthMm ?? null} {routingDimensions} />
     </section>
     <ValidationWarning {config} />
-    {:else if section === "stackup"}
+    {/snippet}
+    {#if section === "stackup"}
 
     <BackplanePanel {config} {backplaneAnalysis} {driveBackplane} {cadGeometry} />
     {:else if section === "routing"}
@@ -150,6 +151,7 @@
     >
       <div class="space-y-3">
         <TopologySelector {config} cadGeometryActive={cadGeometry !== null} cadSourceFileName={cadGeometry?.source_file_name} {onImportCad} {onUseGenerated} />
+        {@render constraints()}
         {#if cadGeometry}
           <div
             class="rounded-md border border-sky-500/30 bg-sky-500/5 px-3 py-3"

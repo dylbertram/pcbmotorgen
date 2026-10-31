@@ -40,6 +40,11 @@ describe.skipIf(!fixtureDirectory)("native generated braid terminal handoff", ()
         expect(tool.input).toEqual(pair!.input);
         expect(tool.output).toEqual(pair!.output);
         expect(revealed).toEqual([[net, layers - 1], [net, 0]]);
+        tool.autoSelect();
+        expect(tool.canApply).toBe(true);
+        expect(tool.input).toEqual(pair!.input);
+        expect(tool.output).toEqual(pair!.output);
+        expect(tool.error).toBe("");
       }
       const manual = { input: geometry.coil_terminals!.A.output, output: geometry.coil_terminals!.A.input };
       const chosen = { ...geometry, coil_terminals: { ...geometry.coil_terminals, A: manual } };

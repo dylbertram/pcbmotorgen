@@ -102,7 +102,11 @@
   }: { config: ConfigStore; coils: CoilPathDto | null; motion: MotionStore; expanded?: boolean; workspace?: boolean; active?: boolean; simulationActive?: boolean; designSettings?: Snippet<[DesignPanelId]>; sidePanel?: PreviewPanelId | null; drive?: DriveAnalysis | null; driveError?: string | null; drivePending?: boolean; importedGeometry?: CadGeometry | null; onGeometryChange?: (geometry: CadGeometry) => void; camera?: PreviewCamera; view?: CoilPreviewViewState } =
     $props();
 
-  export function showDesignSettings(section: DesignPanelId = "constraints"): void { sidePanel = section; }
+  export function showDesignSettings(section: DesignPanelId = "routing"): void {
+    terminalTool.cancel();
+    view.setTerminalPanelOpen(false);
+    sidePanel = section;
+  }
 
   const simplifyTool = new CadSimplifyTool({ getGeometry: () => importedGeometry, onChange: (geometry) => onGeometryChange?.(geometry) });
   let canUndoSimplify = $derived(simplifyTool.canUndo);
@@ -142,7 +146,9 @@
   // views. The toggles live in the lightbox UI; the draw effect below
   // reads the same instance, so a flip there repaints the schematic.
   // -------------------------------------------------------------------
-  let terminalGeometry = $derived(importedGeometry ? withAutomaticCadTerminals(importedGeometry) : coils ? generatedTerminalGeometry(coils, config.num_layers, config.pcb_thickness_mm, config.trace_width_mm, config.routing_pattern === "infinity-braid" ? config.routing_params.connection : undefined) : null);
+  // Older catalogs omit end_type; retain the existing braid parameter contract.
+  const generatedConnection = $derived(config.generatorConnection ?? (!config.generatorEndType && config.routing_pattern === "infinity-braid" ? config.routing_params.connection : undefined));
+  let terminalGeometry = $derived(importedGeometry ? withAutomaticCadTerminals(importedGeometry) : coils ? generatedTerminalGeometry(coils, config.num_layers, config.pcb_thickness_mm, config.trace_width_mm, generatedConnection) : null);
   const terminalTool = new CoilTerminalTool({
     getGeometry: () => terminalGeometry,
     onChange: (geometry) => onGeometryChange?.(geometry),
@@ -217,7 +223,10 @@
     const inset = interactive ? leftInset + 44 + (sidePanel && !isLeftPanel(sidePanel) ? Math.min(drawerWidth, Math.max(0, viewportWidth - 132)) : 0) : 0;
     const fitWidth = W * Math.max(0.15, 1 - inset / Math.max(viewportWidth, 1));
     const fit = (bounds: typeof overlayFitBounds) => {
-      const transform = fitWorldToView(bounds, fitWidth, H, PAD, zoom);
+      // The layer/position controls must never sit on a pickable endpoint.
+      const bottomInset = terminalTool.active ? (view.positionBarHeight + 24) * W / Math.max(viewportWidth, 1) : 0;
+      const fitHeight = Math.max(PAD * 2 + 1, H - bottomInset);
+      const transform = fitWorldToView(bounds, fitWidth, fitHeight, PAD, zoom);
       return { ...transform, tx: transform.tx + W * leftInset / Math.max(viewportWidth, 1) };
     };
     // A command focuses the selected coil, not the unrelated magnet array.

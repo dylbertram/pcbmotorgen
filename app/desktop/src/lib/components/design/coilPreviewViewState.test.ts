@@ -2,6 +2,19 @@ import { describe, expect, it } from "vitest";
 import { CoilPreviewViewState } from "./coilPreviewViewState.svelte";
 
 describe("nested coil/layer visibility", () => {
+  it("defaults to layers on entering coil ends but preserves a manual switch while picking", () => {
+    const view = new CoilPreviewViewState();
+    expect(view.positionBarMode).toBe("position");
+    view.setTerminalPanelOpen(true);
+    expect(view.positionBarMode).toBe("layers");
+    view.positionBarMode = "position";
+    view.setTerminalPanelOpen(true);
+    view.requestTerminals("A");
+    expect(view.positionBarMode).toBe("position");
+    view.setTerminalPanelOpen(false);
+    view.setTerminalPanelOpen(true);
+    expect(view.positionBarMode).toBe("layers");
+  });
   it("defaults to physical Z height and keeps its display scale independent of visibility", () => {
     const view = new CoilPreviewViewState();
     expect(view.zScale).toBe(1);

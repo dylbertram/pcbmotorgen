@@ -1,11 +1,8 @@
 import { test, expect, type Page } from "@playwright/test";
-import { gotoDesignApp as gotoWorkspace } from "./helpers";
+import { gotoDesignApp as gotoWorkspace, selectRoutingConnection } from "./helpers";
 
 async function gotoDesignApp(page: Page) {
   await gotoWorkspace(page);
-  await page.getByRole("button", { name: "Routing", exact: true }).click();
-  const connection = page.getByRole("combobox", { name: "Winding connection", exact: true });
-  if (await connection.count()) await connection.selectOption("2");
 }
 
 async function simulation(page: Page, plot: "driver" | "thrust", settings: "driver" | "drive" | "none" = "none") {
@@ -24,7 +21,6 @@ async function simulation(page: Page, plot: "driver" | "thrust", settings: "driv
 
 test("workspace driver inductor stays synchronized with simulation results", async ({ page }) => {
   await gotoDesignApp(page);
-  await page.getByRole("combobox", { name: "Winding connection", exact: true }).selectOption("2");
   await simulation(page, "driver", "driver");
   const preview = page.getByRole("region", { name: "Coil design workspace", exact: true });
   const panel = page.getByRole("dialog", { name: "Preview driver settings", exact: true });
@@ -66,7 +62,6 @@ test("workspace driver inductor stays synchronized with simulation results", asy
 
 test("a defined series inductor tames the PWM ripple estimate", async ({ page }) => {
   await gotoDesignApp(page);
-  await page.getByRole("combobox", { name: "Winding connection", exact: true }).selectOption("2");
   await simulation(page, "driver", "driver");
   const results = page.locator('section[aria-labelledby="driver-suitability-heading"]');
   await expect(results).not.toContainText("series per phase");
@@ -84,7 +79,6 @@ test("voltage updates driver results even when the force sweep fails", async ({ 
       export async function evaluateForceSweep() { throw new Error('Test sweep failure'); }`,
   }));
   await gotoDesignApp(page);
-  await page.getByRole("combobox", { name: "Winding connection", exact: true }).selectOption("2");
   await simulation(page, "driver", "drive");
   const results = page.locator('section[aria-labelledby="driver-suitability-heading"]');
   await expect(page.getByRole("alert").filter({ hasText: "Computation error: Test sweep failure" })).toBeVisible();
@@ -158,7 +152,6 @@ test("a rejected new model clears the previous sweep and driver Kf", async ({ pa
       }`,
   }));
   await gotoDesignApp(page);
-  await page.getByRole("combobox", { name: "Winding connection", exact: true }).selectOption("2");
   await simulation(page, "thrust", "drive");
   const plot = page.getByRole("img", { name: "Thrust sweep plot", exact: true });
   await expect(plot.locator("polyline")).toHaveCount(1);
@@ -191,7 +184,6 @@ test("backplane-only edits invalidate an active simulation, including nested mat
       }`,
   }));
   await gotoDesignApp(page);
-  await page.getByRole("combobox", { name: "Winding connection", exact: true }).selectOption("2");
   await simulation(page, "thrust");
   await expect(page.getByRole("img", { name: "Thrust sweep plot", exact: true }).locator("polyline")).toHaveCount(1);
   await page.evaluate(() => {
@@ -227,7 +219,6 @@ test("pending replacement sweeps never send an old Kf with new settings", async 
       }`,
   }));
   await gotoDesignApp(page);
-  await page.getByRole("combobox", { name: "Winding connection", exact: true }).selectOption("2");
   await simulation(page, "thrust", "drive");
   await expect.poll(() => page.evaluate(() => (window as any).__pendingDriverInputs?.some((input: any) => input.kf != null))).toBe(true);
   const voltage = page.getByRole("spinbutton", { name: "Bus voltage (V)", exact: true });
@@ -272,38 +263,26 @@ test("select drivers and add validated custom parameters in a modal", async ({ p
   await page.reload();
   await page.getByRole("button", { name: "New coil file", exact: true }).first().click();
   await page.getByRole("dialog", { name: "New coil file", exact: true }).getByRole("button", { name: /^Motor coil/ }).click();
-  await page.getByRole("button", { name: "Routing", exact: true }).click();
-  await page.getByRole("combobox", { name: "Winding connection", exact: true }).selectOption("2");
   await simulation(page, "driver", "driver");
   await page.getByRole("combobox", { name: "Driver to evaluate" }).selectOption("My driver");
   await expect(results).toContainText("My driver");
 });
 
 test("delta compatibility blocks stale results and returns to the connection control", async ({ page }) => {
-  // Supply only the connection contract from motor-coil-generator-add-inputs,
-  // without modifying or depending on that checkout's in-progress work.
-  await page.route(/\/src\/lib\/ipc\/routing\.ts(?:\?t=\d+)?$/, (route) => route.fulfill({
-    contentType: "application/javascript",
-    body: `export * from '/src/lib/ipc/routing.ts?original';
-      export async function routingPatternParameters() {
-        return [{ key: 'connection', label: 'Winding connection', param_type: 'int', default: 0, min: 0, max: 2 }];
-      }`,
-  }));
   await gotoDesignApp(page);
   await simulation(page, "driver");
   const results = page.locator('section[aria-labelledby="driver-suitability-heading"]');
   await expect(results).toContainText("at 5.0 V");
   await page.getByRole("tab", { name: /^Design/i }).click();
-  const connection = page.getByRole("spinbutton", { name: "Winding connection", exact: true });
-  await connection.fill("1");
-  await connection.press("Enter");
+  await selectRoutingConnection(page, "delta");
+  await page.getByRole("button", { name: "Set coil terminals", exact: true }).click();
+  await expect(page.getByRole("dialog", { name: "Coil terminals", exact: true })).toBeVisible();
   await simulation(page, "driver");
   await expect(results.getByRole("alert")).toContainText("Star (wye) configuration is required");
   await expect(results).not.toContainText("at 5.0 V");
   await results.getByRole("button", { name: "Change winding connection" }).click();
   await expect(page.getByRole("dialog", { name: "Routing", exact: true })).toBeVisible();
-  await connection.fill("2");
-  await connection.press("Enter");
+  await selectRoutingConnection(page, "star");
   await simulation(page, "driver");
   await expect(results.getByRole("alert")).toHaveCount(0);
   await expect(results).toContainText("at 5.0 V");

@@ -46,7 +46,7 @@ test("assembly and dimension stay inside the drawing for tall magnets and both t
   const height = page.getByRole("spinbutton", { name: "Z Thickness (mm), magnetisation-axis thickness", exact: true });
   await height.fill("20");
   await height.press("Enter");
-  await selectDesignPanel(page, "Constraints");
+  await selectDesignPanel(page, "Routing");
   const constraints = designConstraintsPanel(page);
   const diagram = constraints.getByRole("img", { name: "Three-quarter isometric view of the assembly" });
   const slider = page.locator("#panel-design").getByRole("slider", { name: "Mover position slider (mm)" });

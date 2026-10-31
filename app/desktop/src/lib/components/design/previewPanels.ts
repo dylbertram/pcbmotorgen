@@ -1,7 +1,6 @@
 export const DESIGN_PANELS = [
-  { id: "constraints", label: "Constraints" },
-  { id: "stackup", label: "Stackup" },
   { id: "routing", label: "Routing" },
+  { id: "stackup", label: "Stackup" },
   { id: "magnets", label: "Magnets" },
   { id: "drive", label: "Drive & force targets" },
 ] as const;

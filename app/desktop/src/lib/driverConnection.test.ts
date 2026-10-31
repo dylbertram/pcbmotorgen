@@ -19,7 +19,8 @@ describe("winding connection compatibility", () => {
     for (const driver of [...DRIVER_PRESETS, { ...DRIVER_PRESETS[0], supports_delta: undefined }]) {
       expect(driverConnectionError(driver, false)).toBeNull();
       expect(driverConnectionError(driver, true)).toContain("Star (wye) configuration is required");
-      expect(driverConnectionError(driver, true)).toContain("Design > Topology & Board > Winding connection");
+      expect(driverConnectionError(driver, true)).toContain("Star (Wye) routing source in Routing");
+      expect(driverConnectionError(driver, true)).toContain("Winding connection in Coil ends");
     }
   });
 

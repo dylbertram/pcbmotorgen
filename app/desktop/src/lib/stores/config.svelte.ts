@@ -24,6 +24,7 @@ import {
 } from "../layerConstraints";
 import { mm, listRoutingPatterns, routingPatternParameters, loadInstalledPlugins, fetchMagnetGrades } from "../ipc";
 import { readPreferences } from "../preferences";
+import { generatorConnection } from "../routingSources";
 import { MAX_PCB_LAYERS } from "../types/simulationLimits";
 import type { RoutedMoveRequest } from "../types/movePower";
 import { magnetMass } from "../carriageMass";
@@ -87,6 +88,8 @@ export class ConfigStore {
   /** Declared user-editable parameter definitions for the currently
    *  selected routing pattern (`routing_pattern_parameters`). */
   routing_param_defs = $state<RoutingParamDef[]>([]);
+  generatorEndType = $derived(this.routing_patterns.find((pattern) => pattern.id === this.routing_pattern)?.end_type ?? null);
+  generatorConnection = $derived(generatorConnection(this.generatorEndType, this.routing_params));
   /** Monotonic bump counter for `routing_params` edits. `$state` proxies
    *  only track the exact property read, so mutating `routing_params[key]`
    *  in place would NOT re-trigger dependent scheduling `$effect`s. Bumping
@@ -325,7 +328,9 @@ export class ConfigStore {
     // pattern's declared range before (and regardless of) the IPC fetch.
     this.constrainLayersToPattern();
     try {
-      this.routing_param_defs = await routingPatternParameters(patternId);
+      const defs = await routingPatternParameters(patternId);
+      if (this.routing_pattern !== patternId) return;
+      this.routing_param_defs = defs;
     } catch {
       // backend unavailable or errored — leave current defs in place
       this.routing_param_defs = [];
@@ -333,6 +338,10 @@ export class ConfigStore {
     }
     const userSet = new Set(Object.keys(this.routing_params));
     for (const def of this.routing_param_defs) {
+      // An absent termination parameter can mean legacy closed copper, even
+      // when the editable schema's default is Delta. Leave it absent so the
+      // generator's declared missing-value behavior remains authoritative.
+      if (this.generatorEndType?.kind === "parameter" && def.key === this.generatorEndType.key) continue;
       if (!userSet.has(def.key)) {
         this.routing_params[def.key] = def.default;
       }

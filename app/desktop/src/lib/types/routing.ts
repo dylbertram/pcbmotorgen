@@ -3,6 +3,13 @@
  * parameter definitions, installed plugins, and DRC interference results.
  */
 
+export type WindingConnection = "star" | "delta" | "closed";
+
+/** Optional generator contract. The default matches absent legacy parameters. */
+export type GeneratorEndType =
+  | { kind: "fixed"; connection: WindingConnection }
+  | { kind: "parameter"; key: string; default: number; options: { value: number; connection: WindingConnection }[] };
+
 /** One selectable coil routing pattern offered by the backend. */
 export interface RoutingPatternInfo {
   /** Stable machine id, e.g. `"infinity-braid"`. Stored on the config as
@@ -19,6 +26,7 @@ export interface RoutingPatternInfo {
   max_layers?: number | null;
   /** Layer count must be a multiple of this (e.g. 2 = even-only stacks). */
   layers_multiple_of?: number | null;
+  end_type?: GeneratorEndType | null;
 }
 
 /** Routing-pattern parameter value type (int = whole number, float = real). */

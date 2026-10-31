@@ -6,8 +6,8 @@ import { gotoDesignApp, selectDesignPanel } from "./helpers";
  * migrated to Bits UI Select/Dialog primitives in kata 1hx7).
  *
  * The routing-pattern "dropdown" is a Bits UI Select (trigger button +
- * listbox, not a native <select>): the mock catalog offers exactly one
- * pattern ("Infinity Braid (pcbBraid)"), rendered above a visual separator
+ * listbox, not a native <select>): the mock catalog offers star/wye and delta
+ * variants of Infinity Braid, rendered above a visual separator
  * and the "+ Load new generator…" sentinel ACTION — picking the sentinel
  * opens the upload dialog and must NOT change the selection.
  *
@@ -25,7 +25,7 @@ import { gotoDesignApp, selectDesignPanel } from "./helpers";
  */
 
 const PATTERN_TRIGGER = "#routing-pattern";
-const MOCK_PATTERN_LABEL = "Infinity Braid (pcbBraid)";
+const MOCK_PATTERN_LABEL = "Infinity Braid - Star (Wye)";
 const SENTINEL_LABEL = "+ Load new generator…";
 const UPLOAD_DIALOG = "[role='dialog'][aria-label='Load new generator']";
 const HELP_BUTTON = "button[aria-haspopup='dialog']:has-text('How to write a plugin?')";

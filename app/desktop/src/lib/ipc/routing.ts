@@ -25,7 +25,10 @@ import { isTauriAvailable } from "./core";
  */
 export async function listRoutingPatterns(): Promise<RoutingPatternInfo[]> {
   if (!isTauriAvailable()) {
-    return [{ id: "infinity-braid", display_name: "Infinity Braid (pcbBraid)" }];
+    return [{ id: "infinity-braid", display_name: "Infinity Braid", min_layers: 2, layers_multiple_of: 2,
+      end_type: { kind: "parameter", key: "connection", default: 0, options: [
+        { value: 2, connection: "star" }, { value: 1, connection: "delta" }, { value: 0, connection: "closed" },
+      ] } }];
   }
   return await invoke<RoutingPatternInfo[]>("list_routing_patterns");
 }

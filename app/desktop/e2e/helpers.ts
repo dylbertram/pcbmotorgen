@@ -38,6 +38,16 @@ export async function selectDesignPanel(page: Page, name: string): Promise<void>
   await expect(coilWorkspace(page).locator("#design-settings-scroll")).toHaveCount(1);
 }
 
+/** Connection is now selected as a routing source, not a generator field. */
+export async function selectRoutingConnection(page: Page, connection: "star" | "delta"): Promise<void> {
+  await selectDesignPanel(page, "Routing");
+  const label = `Infinity Braid - ${connection === "star" ? "Star (Wye)" : "Delta"}`;
+  const source = page.getByRole("button", { name: "Routing source", exact: true });
+  await source.click();
+  await page.getByRole("option", { name: label, exact: true }).click();
+  await expect(source).toHaveText(label);
+}
+
 /**
  * Geometry of an element relative to the viewport, as integers.
  * Returns null when the element is hidden/not attached.

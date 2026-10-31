@@ -72,7 +72,6 @@ test("driver inductance help explains the circuit without crowding the panel", a
   await page.emulateMedia({ colorScheme: "dark" });
   await gotoDesignApp(page);
   await selectDesignPanel(page, "Routing");
-  await page.getByRole("combobox", { name: "Winding connection", exact: true }).selectOption("2");
   await openCoilPreview(page);
   const modal = coilWorkspace(page);
   await modal.getByRole("button", { name: "Driver settings", exact: true }).click();

@@ -53,6 +53,7 @@ pub struct PythonRunnerPattern {
     min_layers: Option<u32>,
     max_layers: Option<u32>,
     layers_multiple_of: Option<u32>,
+    end_type: Option<crate::pattern::GeneratorEndType>,
 }
 
 impl PythonRunnerPattern {
@@ -72,6 +73,7 @@ impl PythonRunnerPattern {
             min_layers: None,
             max_layers: None,
             layers_multiple_of: None,
+            end_type: None,
         }
     }
 
@@ -102,6 +104,7 @@ impl PythonRunnerPattern {
         self.min_layers = m.min_layers;
         self.max_layers = m.max_layers;
         self.layers_multiple_of = m.layers_multiple_of;
+        self.end_type = m.end_type.clone();
     }
 
     /// Populate the declared parameter schema.
@@ -111,6 +114,20 @@ impl PythonRunnerPattern {
 }
 
 impl RoutingPattern for PythonRunnerPattern {
+    fn metadata(&self) -> PluginMetadata {
+        PluginMetadata {
+            id: self.id.clone(),
+            display_name: self.display_name.clone(),
+            author: self.author.clone(),
+            version: self.version.clone(),
+            description: self.description.clone(),
+            min_layers: self.min_layers,
+            max_layers: self.max_layers,
+            layers_multiple_of: self.layers_multiple_of,
+            end_type: self.end_type.clone(),
+        }
+    }
+
     fn id(&self) -> &str {
         &self.id
     }

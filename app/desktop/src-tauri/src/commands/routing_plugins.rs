@@ -20,6 +20,7 @@ pub struct RoutingPatternInfo {
     pub min_layers: Option<u32>,
     pub max_layers: Option<u32>,
     pub layers_multiple_of: Option<u32>,
+    pub end_type: Option<pcbmotorgen_routing::pattern::GeneratorEndType>,
 }
 
 /// List the loadable routing-pattern plugins for the frontend selector, with
@@ -34,8 +35,28 @@ pub async fn list_routing_patterns() -> Vec<RoutingPatternInfo> {
             min_layers: m.min_layers,
             max_layers: m.max_layers,
             layers_multiple_of: m.layers_multiple_of,
+            end_type: m.end_type,
         })
         .collect()
+}
+
+#[cfg(test)]
+mod catalog_tests {
+    #[test]
+    fn catalog_serializes_declared_end_types_without_changing_pattern_identity() {
+        let patterns = tauri::async_runtime::block_on(super::list_routing_patterns());
+        let braid = patterns.iter().find(|pattern| pattern.id == "infinity-braid").unwrap();
+        let payload = serde_json::to_value(braid).unwrap();
+        assert_eq!(payload["id"], "infinity-braid");
+        assert_eq!(payload["display_name"], "Infinity Braid");
+        assert_eq!(payload["end_type"]["key"], "connection");
+        assert_eq!(payload["end_type"]["default"], 0.0);
+        assert_eq!(payload["end_type"]["options"], serde_json::json!([
+            { "value": 2.0, "connection": "star" },
+            { "value": 1.0, "connection": "delta" },
+            { "value": 0.0, "connection": "closed" },
+        ]));
+    }
 }
 
 /// Load and register a routing-pattern plugin (native `cdylib` or Python

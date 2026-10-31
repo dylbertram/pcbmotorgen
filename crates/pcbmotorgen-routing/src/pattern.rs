@@ -133,6 +133,30 @@ impl PatternParameter {
     }
 }
 
+/// Physical winding termination declared by a generator, not inferred by the UI.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum WindingConnection {
+    Star,
+    Delta,
+    Closed,
+}
+
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct EndTypeOption {
+    pub value: f64,
+    pub connection: WindingConnection,
+}
+
+/// A fixed termination, or the exact parameter values that select one.
+/// `default` must match generation when that parameter is absent in an old file.
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum GeneratorEndType {
+    Fixed { connection: WindingConnection },
+    Parameter { key: String, default: f64, options: Vec<EndTypeOption> },
+}
+
 /// Optional structured metadata a plugin author may attach to a pattern.
 #[derive(Debug, Clone, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct PluginMetadata {
@@ -156,6 +180,8 @@ pub struct PluginMetadata {
     /// even-only stacks). `None` = unconstrained.
     #[serde(default)]
     pub layers_multiple_of: Option<u32>,
+    #[serde(default)]
+    pub end_type: Option<GeneratorEndType>,
 }
 
 impl PluginMetadata {
@@ -233,6 +259,7 @@ pub trait RoutingPattern: Send + Sync {
             min_layers: self.min_layers(),
             max_layers: self.max_layers(),
             layers_multiple_of: self.layers_multiple_of(),
+            end_type: None,
         }
     }
 
@@ -249,6 +276,25 @@ pub trait RoutingPattern: Send + Sync {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn generator_end_type_metadata_is_optional_and_survives_python_loader() {
+        let legacy: PluginMetadata = serde_json::from_value(serde_json::json!({
+            "id": "legacy", "display_name": "Legacy", "author": "", "version": "", "description": ""
+        })).unwrap();
+        assert_eq!(legacy.end_type, None);
+        let metadata = crate::patterns::infinity::InfinityBraidPattern.metadata();
+        let encoded = serde_json::to_value(&metadata).unwrap();
+        assert_eq!(encoded["end_type"]["kind"], "parameter");
+        assert_eq!(encoded["end_type"]["default"], 0.0);
+        assert_eq!(encoded["end_type"]["options"][0]["connection"], "star");
+        let runner_meta: crate::loaders::python::RunnerMeta = serde_json::from_value(encoded).unwrap();
+        assert_eq!(runner_meta.end_type, metadata.end_type);
+        let mut runner = crate::loaders::python::PythonRunnerPattern::new("infinity-braid", "", "unused.py");
+        runner.set_metadata(&metadata);
+        assert_eq!(runner.metadata(), metadata);
+        let fixed = GeneratorEndType::Fixed { connection: WindingConnection::Delta };
+        assert_eq!(serde_json::from_value::<GeneratorEndType>(serde_json::to_value(&fixed).unwrap()).unwrap(), fixed);
+    }
     use crate::context::RoutingContext;
     use crate::model::RoutingResult;
 
