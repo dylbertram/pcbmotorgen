@@ -25,9 +25,11 @@
     DriveAnalysis,
     SensorConfig,
     CadGeometry,
+    TravelEnvelopeDto,
   } from "./lib/types";
   import { TABS, type TabId } from "./lib/ui";
   import { DrcController } from "./lib/stores/drc.svelte";
+  import { LatestAsyncTask } from "./lib/utils/latestAsyncTask";
   import { measureTrace, computePreviewSummary } from "./lib/previewGeometry";
   import PreviewStatus from "./lib/components/design/PreviewStatus.svelte";
   import { cadGeometryToPreview } from "./lib/cadPreview";
@@ -167,14 +169,28 @@
   // config from replacing a newer preview. The preview keeps its last good
   // result while a new request is pending or fails.
   let previewGeneration = 0;
+  // Equilibrium is a slow background solve, not part of drawing the copper.
+  // Keep at most one native solve and replace queued edits with the latest.
+  const scheduleTravelEnvelope = new LatestAsyncTask<
+    { generation: number; ipc: ReturnType<typeof config.toIpc> }, TravelEnvelopeDto
+  >({
+    delayMs: 300,
+    run: ({ ipc }) => fetchTravelEnvelope(ipc),
+    onResult: (envelope, { generation }) => {
+      if (generation === previewGeneration) motion.setEnvelope(envelope);
+    },
+    // Failure retains the previous envelope or the flagged placeholder.
+  });
   const scheduleCoilPreview = debounce((generation: number) => {
     if (generation !== previewGeneration) return;
     if (!valid) {
       coils = null;
       return;
     }
-    void updateCoilPreview(generation, config.toIpc());
-  }, 150);
+    const ipc = config.toIpc();
+    void updateCoilPreview(generation, ipc);
+    scheduleTravelEnvelope.request({ generation, ipc });
+  }, 0);
 
   let sensorGeneration = 0;
   const scheduleSensorGeometry = debounce(
@@ -234,22 +250,13 @@
       // Keep the previous preview visible. A transient generation failure
       // must not make the design reflection depend on simulation state.
     }
-    // Equilibrium travel envelope (stable rest positions of the mover
-    // centre). Fetched on the same debounced/generation-guarded stream; a
-    // failure keeps the previous envelope (or the flagged placeholder —
-    // MotionStore raises "travel envelope unavailable", kata ab30).
-    try {
-      const env = await fetchTravelEnvelope(ipc);
-      if (generation === previewGeneration) motion.setEnvelope(env);
-    } catch {
-      // Keep the previous envelope — bounds stay at their last good values.
-    }
   }
 
   // Generate the Design-tab reflection when geometry or routing inputs change.
   // This effect intentionally runs regardless of the active workflow tab.
   $effect(() => {
     const generation = ++previewGeneration;
+    scheduleTravelEnvelope.cancel();
     if (!active || designType !== "motor") {
       scheduleCoilPreview.cancel();
       return;
@@ -560,10 +567,13 @@
   });
 
   // A layout change invalidates the previous DRC result immediately. The
-  // request id and layout key together prevent stale responses from opening
+  // request generation and layout key prevent stale responses from opening
   // the export gate for a newer config.
   $effect(() => {
-    if (!active || designType !== "motor") return;
+    if (!active || designType !== "motor") {
+      drc.cancel();
+      return;
+    }
     void drc.currentLayoutKey;
     drc.request();
   });
@@ -602,6 +612,8 @@
     ++sensorGeneration;
     ++simulationGeneration;
     scheduleCoilPreview.cancel();
+    scheduleTravelEnvelope.cancel();
+    drc.cancel();
     scheduleSensorGeometry.cancel();
     scheduleSimulation.cancel();
     ++driveGeneration;

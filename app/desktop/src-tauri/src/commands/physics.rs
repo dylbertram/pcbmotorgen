@@ -150,7 +150,7 @@ pub async fn periodic_backplane_reference(
 #[tauri::command]
 pub async fn generate_coils(config: LinearMotorConfigIpc) -> Result<CoilPathIpc, String> {
     let core = config.to_core();
-    core.validate_for_simulation().map_err(|e| e.to_string())?;
+    core.validate_for_preview().map_err(|e| e.to_string())?;
     let num_layers = config.num_layers;
     tauri::async_runtime::spawn_blocking(move || {
         let ctx = core.routing_context();
@@ -490,6 +490,34 @@ pub async fn travel_envelope(config: LinearMotorConfigIpc) -> Result<TravelEnvel
 #[cfg(test)]
 mod coreless_envelope_tests {
     use super::*;
+
+    #[test]
+    fn preview_updates_below_the_manufacturing_width_floor_without_approving_export_or_physics() {
+        let mut config = crate::ipc::ProjectConfigStateIpc::default().to_linear_motor_ipc();
+        let mut previous = None;
+        for width in [0.0001, 0.00011] {
+            config.trace_width_m = width;
+            // Braid centerline spacing can stay at the rule floor when copper
+            // gets thinner. A routing flip must still propagate with DRC failing.
+            config.routing_orientation.mirror_x = width == 0.00011;
+            let core = config.to_core();
+            assert!(core.validate_for_simulation().unwrap_err().to_string().contains("minimum trace width"));
+            assert!(core.design_rules().validate_trace_width().is_err());
+            assert!(tauri::async_runtime::block_on(super::super::routing_plugins::check_coil_interference(config.clone(), None)).is_err());
+            assert!(tauri::async_runtime::block_on(super::super::dxf::export_coils_dxf(config.clone())).is_err());
+            let preview = tauri::async_runtime::block_on(generate_coils(config.clone())).unwrap();
+            let report = pcbmotorgen_routing::generate_routing_report(&core.routing_context(), &core.routing_pattern_id()).unwrap();
+            let coils = pcbmotorgen_routing::routing_result_to_phase_coils(&report.result, &core.routing_pattern_id());
+            let expected = CoilPathIpc::from_core_with_dimensions(&coils, config.num_layers, &report.dimensions);
+            let actual = serde_json::to_value(preview).unwrap();
+            assert_eq!(actual, serde_json::to_value(expected).unwrap());
+            if let Some(old) = previous { assert!(actual["phases"] != old, "routing flip must update while DRC fails"); }
+            previous = Some(actual["phases"].clone());
+            assert_eq!(config.trace_width_m, width, "preview must not clamp copper to the DRC floor");
+        }
+        config.trace_width_m = 0.;
+        assert!(tauri::async_runtime::block_on(generate_coils(config.clone())).unwrap_err().contains("positive"));
+    }
 
     #[test]
     fn every_public_motor_calculation_rejects_out_of_envelope_inputs_before_work() {

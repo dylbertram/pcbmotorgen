@@ -19,21 +19,27 @@ impl LinearMotorConfig {
 
     /// Validate all fields (mirrors Python `_validate_base` + `_validate_linear`).
     pub fn validate(&self) -> Result<(), ConfigError> {
-        self.validate_with_design_goals(true)
+        self.validate_fields(true, true)
     }
 
     /// Imposed-move physics does not depend on force or acceleration goals.
     pub fn validate_for_move(&self) -> Result<(), ConfigError> {
-        self.validate_with_design_goals(false)
+        self.validate_fields(false, true)
     }
 
     /// Physics commands must not reject a design for missing its performance goals.
     /// Static force/heat still consume the configured current as excitation.
     pub fn validate_for_simulation(&self) -> Result<(), ConfigError> {
-        self.validate_with_design_goals(false)
+        self.validate_fields(false, true)
     }
 
-    fn validate_with_design_goals(&self, check_goals: bool) -> Result<(), ConfigError> {
+    /// Draw the requested copper even below the manufacturing width floor.
+    /// Positive dimensions, supported limits and routing-shape validation still apply.
+    pub fn validate_for_preview(&self) -> Result<(), ConfigError> {
+        self.validate_fields(false, false)
+    }
+
+    fn validate_fields(&self, check_goals: bool, enforce_trace_floor: bool) -> Result<(), ConfigError> {
         if let Some(stack) = &self.pcb_stackup {
             stack.validate(self.num_layers, self.pcb_thickness_m).map_err(ConfigError)?;
         }
@@ -119,7 +125,7 @@ impl LinearMotorConfig {
                 self.trace_width_m
             )));
         }
-        if self.trace_width_m < self.min_trace_m {
+        if enforce_trace_floor && self.trace_width_m < self.min_trace_m {
             return Err(ConfigError(format!(
                 "trace_width_m ({}) must be at least the minimum trace width ({})",
                 self.trace_width_m, self.min_trace_m
