@@ -1,12 +1,13 @@
 //! The "infinity" diamond braid routing pattern.
 //!
 //! Faithful Rust port of `docs/reference/pcbBraid` (after Verbeek & Dehez).
-//! Produces a two-layer braid on 0/1, or a four-layer series stack on
-//! 0/1 and 2/3 with matching active XY geometry on each pair.
+//! Produces matching active XY braid geometry on every adjacent layer pair.
 //!
 //! Pattern-owned layer semantics: the repeating braid uses two layers and
-//! vias at crossing points. The four-layer termination connects the pairs in
-//! series, with line leads on layer 3 and star neutral on layer 0.
+//! vias at crossing points. Star/wye connects any even-layer stack in series,
+//! with driver leads on the last layer and neutral on layer 0. Each pair opens
+//! one full braid period farther right toward the neutral. Delta retains its
+//! legacy two/four-layer termination; higher-layer delta is not defined.
 //!
 //! ## Magnet-aware period count
 //!
@@ -82,16 +83,17 @@
 //! Leads are inactive (non-thrust) conductors and are the only copper the
 //! braid places outside the board width.
 //!
-//! Those lead details describe the unchanged two-layer layout. Four-layer
-//! star/delta repeats the braid on 2/3, joins the opened 1/2 ends at raised
-//! barrels and brings the line leads out on layer 3. Layer-0 outer ends make
-//! the neutral or delta connection. Closed mode retains separate closed
+//! Those lead details describe legacy delta routing. Star/wye uses the
+//! staggered openings and mirrored fan-outs in [`stacked`], following the
+//! supplied 2/4/6/8-layer examples without changing the main XY braid.
+//! Closed mode retains separate closed
 //! rings in each pair, without inventing external terminals or series links.
 
 mod diamonds;
 mod four_layer;
 mod peaks_valleys;
 mod segments;
+mod stacked;
 
 use crate::context::RoutingContext;
 use crate::error::{RoutingError, RoutingErrorKind};
@@ -144,7 +146,7 @@ impl RoutingPattern for InfinityBraidPattern {
     }
 
     fn description(&self) -> &str {
-        "Two- or four-layer diamond braid after Verbeek & Dehez; four-layer star/delta connects two braid pairs in series."
+        "Even-layer diamond braid after Verbeek & Dehez; star/wye connects staggered braid pairs in series. Delta supports two or four layers."
     }
 
     fn author(&self) -> &str {
@@ -188,9 +190,7 @@ impl RoutingPattern for InfinityBraidPattern {
     }
 
     fn max_layers(&self) -> Option<u32> {
-        // Only the two-layer braid and the reference four-layer series stack
-        // have defined terminations. Never silently leave extra layers empty.
-        Some(4)
+        None
     }
 
     fn layers_multiple_of(&self) -> Option<u32> {
@@ -267,9 +267,13 @@ fn validated_braid_context(ctx: &RoutingContext) -> Result<Option<f64>, RoutingE
             ),
         ));
     }
-    if !matches!(ctx.num_layers, 2 | 4) {
+    if ctx.num_layers % 2 != 0 {
         return Err(RoutingError::new(0, "num_layers", RoutingErrorKind::BadLayer,
-            "the infinity braid supports 2 or 4 copper layers"));
+            "the infinity braid requires an even number of copper layers"));
+    }
+    if ctx.num_layers > 4 && Connection::from_param(ctx.param("connection", Connection::CLOSED)) == Connection::Delta {
+        return Err(RoutingError::new(0, "num_layers", RoutingErrorKind::BadLayer,
+            "delta braid terminations support only 2 or 4 copper layers; use star/wye for larger even-layer stacks"));
     }
     if !ctx.active_area_length_mm.is_finite() || ctx.active_area_length_mm <= 0.0 {
         return Err(RoutingError::new(
@@ -515,7 +519,10 @@ fn braid_geometry(
         }
     }
 
-    if ctx.num_layers == 4 {
+    if connection != Connection::Delta {
+        stacked::stack_and_terminate(&mut geometry, &ends, connection, lead_pitch,
+            layout.d_phase / layout.n_periods as f64, layout.n_periods, ctx)?;
+    } else if ctx.num_layers == 4 {
         four_layer::stack_and_terminate(&mut geometry, &ends, connection, lead_pitch, ctx)?;
     } else if connection != Connection::Closed {
         add_leads(&mut geometry, &ends, connection, lead_pitch);
@@ -993,7 +1000,7 @@ mod tests {
         })
     }
 
-    /// Layer-1 lead of every phase, shared by delta and star: up from the
+    /// Legacy delta layer-1 lead of every phase: up from the
     /// break to its lead height, then left to x = 0.
     fn assert_layer_one_leads(r: &RoutingResult) {
         for (i, net) in ["A", "B", "C"].into_iter().enumerate() {
@@ -1035,10 +1042,14 @@ mod tests {
 
     #[test]
     fn star_matches_the_fader_example() {
-        // Reference: motor-coils_3s_0-4mm_star.dxf. Each layer-0 end rises
-        // one lead pitch onto a layer-0 neutral bar.
+        // Revised star-wye_2-layer.dxf: driver risers bend left along the
+        // mirrored braid slope; the neutral remains on layer zero.
         let r = InfinityBraidPattern.generate(&fader_ctx(2.0)).unwrap();
-        assert_layer_one_leads(&r);
+        for (i, net) in ["A", "B", "C"].into_iter().enumerate() {
+            let x = BREAK_X[i] - (i + 1) as f64 / 3.0;
+            assert!(has_lead(&r, net, 1, (BREAK_X[i], 8.0), (x, LEAD[i])));
+            assert!(has_lead(&r, net, 1, (x, LEAD[i]), (0.0, LEAD[i])));
+        }
 
         let n = LEAD[0];
         for (i, net) in ["A", "B", "C"].into_iter().enumerate() {
@@ -1168,7 +1179,7 @@ mod tests {
     }
 
     #[test]
-    fn four_layer_series_pads_are_centered_in_the_triangle_with_real_clearance() {
+    fn staggered_series_pads_clear_every_unintended_layer_and_phase() {
         let distance = |p: Point, a: Point, b: Point| {
             let (dx, dy) = (b.x - a.x, b.y - a.y);
             let t = (((p.x - a.x) * dx + (p.y - a.y) * dy) / (dx * dx + dy * dy)).clamp(0.0, 1.0);
@@ -1176,42 +1187,28 @@ mod tests {
         };
         for width in [8.0, 20.0] {
             for strands in [2, 3, 5] {
-                for (pad, trace) in [(0.4, 0.127), (0.5, 0.2), (0.7, 0.5)] {
+                for (pad, trace) in [(0.4, 0.127), (0.5, 0.2), (0.7, 0.127)] {
+                  for layers in [4, 6, 8, 10] {
                     let mut context = fader_ctx(2.0);
-                    context.num_layers = 4;
+                    context.num_layers = layers;
                     context.board_width_mm = width;
                     context.via_pad_diameter_mm = Some(pad);
                     context.trace_width_mm = trace;
                     context.params.insert("num_strands".into(), strands as f64);
                     let result = InfinityBraidPattern.generate(&context).unwrap();
-                    let layout = resolve_braid_layout(&context, context.active_area_length_mm, context.magnet_pitch_mm, 3, strands).unwrap();
-                    let old_pitch = lead_pitch_mm(layout, width / 2.0, &context);
-                    let top = result.segments.iter().filter(|s| !s.is_active && s.layer == 0
-                        && (s.start.y - width).abs() < 1e-9 && s.end.y > width)
-                        .map(|s| s.end.y).next().unwrap();
-                    assert!(top > width + 2.0 * old_pitch, "upper traces must move outward");
-                    for via in result.vias.iter().filter(|v| (v.from_layer, v.to_layer) == (0, 3)) {
-                        let side = result.segments.iter().find(|s| !s.is_active && s.layer == 0 && s.net == via.net
-                            && (s.start.y - width).abs() < 1e-9 && s.end.y > width).unwrap();
-                        let apex = side.start;
-                        let left = side.end;
-                        let right = Point::new(2.0 * apex.x - left.x, top);
-                        // Independent barycentric construction of the incenter.
-                        let opposite_apex = left.distance_to(right);
-                        let opposite_left = apex.distance_to(right);
-                        let opposite_right = apex.distance_to(left);
-                        let perimeter = opposite_apex + opposite_left + opposite_right;
-                        let expected = Point::new(
-                            (opposite_apex * apex.x + opposite_left * left.x + opposite_right * right.x) / perimeter,
-                            (opposite_apex * apex.y + opposite_left * left.y + opposite_right * right.y) / perimeter,
-                        );
-                        assert!(via.position.distance_to(expected) < 1e-9);
-                        let radius = distance(via.position, apex, left);
-                        assert!((distance(via.position, apex, right) - radius).abs() < 1e-9);
-                        assert!((top - via.position.y - radius).abs() < 1e-9);
-                        for s in result.segments.iter().filter(|s| s.layer == 0 || s.layer == 3 || s.net != via.net) {
+                    let joins: Vec<_> = result.vias.iter().filter(|v| (v.from_layer, v.to_layer) == (0, layers - 1)).collect();
+                    assert_eq!(joins.len(), (3 * (layers / 2 - 1)) as usize);
+                    for via in joins {
+                        let mut landing: Vec<_> = result.segments.iter().filter(|s| s.net == via.net
+                            && (s.start == via.position || s.end == via.position)).map(|s| s.layer).collect();
+                        landing.sort(); landing.dedup();
+                        assert_eq!(landing.len(), 2, "each barrel lands on exactly two inner layers");
+                        assert_eq!(landing[0] % 2, 1);
+                        assert_eq!(landing[1], landing[0] + 1);
+                        for s in result.segments.iter().filter(|s| s.net != via.net || !landing.contains(&s.layer)
+                            || (s.start != via.position && s.end != via.position)) {
                             assert!(distance(via.position, s.start, s.end) - pad / 2.0 - context.trace_width() / 2.0
-                                >= context.min_space_mm - 1e-9, "pad must clear outer-layer traces and other-phase copper on every layer");
+                                >= context.min_space_mm - 1e-9, "pad must clear every unintended layer, including its own phase");
                         }
                         for other in result.vias.iter().filter(|v| v.position != via.position) {
                             assert!(other.position.distance_to(via.position) - pad >= context.min_space_mm - 1e-9);
@@ -1222,11 +1219,11 @@ mod tests {
                     let two_with_size = InfinityBraidPattern.generate(&two).unwrap();
                     two.via_pad_diameter_mm = None;
                     assert_eq!(two_with_size, InfinityBraidPattern.generate(&two).unwrap(), "two-layer copper must not change");
+                  }
                 }
             }
         }
-        // The screenshot's old half-height placement is neither centered nor
-        // clear of the sloping sides for the supplied 0.5 mm pad/0.2 mm trace.
+        // Keep the former overlapping-pad layout as a negative distance control.
         let apex = Point::new(0.0, 0.0);
         let left = Point::new(-2.0 / 3.0, 8.0 / 9.0);
         let old_join = Point::new(0.0, 4.0 / 9.0);
@@ -1234,7 +1231,7 @@ mod tests {
     }
 
     #[test]
-    fn centered_four_layer_star_and_delta_keep_their_series_topology() {
+    fn four_layer_star_and_delta_keep_their_series_topology() {
         for connection in [1.0, 2.0] {
             let mut context = fader_ctx(connection);
             context.num_layers = 4;
@@ -1256,6 +1253,11 @@ mod tests {
             context.via_pad_diameter_mm = Some(size);
             assert!(InfinityBraidPattern.generate(&context).is_err(), "invalid/unfittable pad {size}");
         }
+        // A pack accepted by the former triangle termination does not fit
+        // this staggered fan-out. Reject it rather than dropping the case.
+        context.via_pad_diameter_mm = Some(0.7);
+        context.trace_width_mm = 0.5;
+        assert_eq!(InfinityBraidPattern.generate(&context).unwrap_err().field, "series_via");
     }
 
     #[test]
@@ -1300,15 +1302,64 @@ mod tests {
     }
 
     #[test]
+    fn staggered_star_opens_exactly_one_period_per_pair_without_changing_the_body() {
+        for layers in [2, 4, 6, 8, 10] {
+            let mut context = fader_ctx(2.0);
+            context.num_layers = layers;
+            let result = InfinityBraidPattern.generate(&context).unwrap();
+            assert!(Validator::validate(&result, &context, false).is_ok());
+            let mut closed_context = context.clone();
+            closed_context.params.insert("connection".into(), 0.0);
+            let closed = InfinityBraidPattern.generate(&closed_context).unwrap();
+            assert!(closed.segments.iter().all(|s| s.is_active));
+            assert!(closed.vias.iter().all(|v| v.to_layer == v.from_layer + 1 && v.from_layer % 2 == 0));
+            assert_eq!(result.phase_bands.len(), (3 * layers) as usize);
+            for layer in 0..layers {
+                let active = |r: &RoutingResult, l| r.segments.iter().filter(|s| s.is_active && s.layer == l)
+                    .map(|s| (s.net.clone(), s.start, s.end)).collect::<Vec<_>>();
+                assert_eq!(active(&result, layer), active(&closed, layer));
+                assert_eq!(active(&result, layer), active(&result, layer % 2));
+            }
+            for pair in 0..layers / 2 {
+                let cut_x = 4.0 + T + (layers / 2 - 1 - pair) as f64 * 6.0;
+                for (i, net) in ["A", "B", "C"].into_iter().enumerate() {
+                    let removed: Vec<_> = closed.vias.iter().filter(|v| v.net == net && v.from_layer == 2 * pair
+                        && !result.vias.contains(v)).collect();
+                    assert_eq!(removed.len(), 1, "never leave the old cut open as well");
+                    assert!(approx(removed[0].position, cut_x + 2.0 * i as f64, 8.0));
+                    assert!(connected(&net_graph(&result, net)));
+                }
+            }
+            assert!(result.segments.iter().filter(|s| !s.is_active && (s.start.x == 0.0 || s.end.x == 0.0))
+                .all(|s| s.layer == layers - 1));
+        }
+        let mut short = fader_ctx(2.0);
+        short.active_area_length_mm = 20.0;
+        short.num_layers = 8;
+        assert!(InfinityBraidPattern.generate(&short).unwrap_err().message.contains("one braid period per layer pair"));
+        let mut large = magnet_ctx();
+        large.num_layers = 64;
+        large.params.insert("connection".into(), 2.0);
+        let result = InfinityBraidPattern.generate(&large).unwrap();
+        assert_eq!(result.phase_bands.len(), 3 * 64);
+        assert_eq!(result.vias.iter().filter(|v| v.from_layer == 0 && v.to_layer == 63).count(), 3 * 31);
+    }
+
+    #[test]
     fn rejects_undefined_braid_stack_counts_instead_of_leaving_layers_empty() {
-        for layers in [1, 3, 5, 6, 8] {
+        for layers in [0, 1, 3, 5, 7, 9] {
             let mut context = fader_ctx(2.0);
             context.num_layers = layers;
             assert_eq!(InfinityBraidPattern.generate(&context).unwrap_err().kind, RoutingErrorKind::BadLayer);
             assert!(crate::generate_routing_result(&context, "infinity-braid").is_err());
         }
         assert_eq!(InfinityBraidPattern.layers_multiple_of(), Some(2));
-        assert_eq!(InfinityBraidPattern.max_layers(), Some(4));
+        assert_eq!(InfinityBraidPattern.max_layers(), None);
+        for layers in [6, 8, 10] {
+            let mut context = fader_ctx(1.0);
+            context.num_layers = layers;
+            assert!(InfinityBraidPattern.generate(&context).unwrap_err().message.contains("delta"));
+        }
     }
 
     #[test]

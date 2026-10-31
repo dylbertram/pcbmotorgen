@@ -1,4 +1,5 @@
-//! Four-layer series stack following the supplied star_4-layer copper.
+//! Legacy four-layer termination, retained for delta only. Revised star/wye
+//! stacks use `stacked.rs`; do not extend this same-opening layout to N pairs.
 //!
 //! Layers 2/3 repeat the active XY braid on 0/1. The open ends on 1 and 2
 //! join at a raised via row. The outer ends on 0 and 3 fan away from that

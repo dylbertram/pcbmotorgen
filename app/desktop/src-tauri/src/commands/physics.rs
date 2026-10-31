@@ -886,11 +886,12 @@ mod analyze_drive_tests {
             let sweep = tauri::async_runtime::block_on(evaluate_force_sweep(ipc.clone(), None, Some(force_settings))).unwrap();
             let kf = sweep.mean_thrust_n.abs() / sweep.current_a;
             eprintln!("width={width_mm} computed Kf={kf} N/A");
-            // Full four-layer compact braid, physical spans and signed via force.
+            // Four-layer compact braid with staggered openings, physical spans
+            // and signed via force. Moving an opening changes mesh currents.
             // This legacy excitation reference does not qualify a star controller.
             // Magpylib + independent R/current/dL reconstruction verifies this
             // fixture with its exported excitation; controller PWM is unqualified.
-            assert!((kf - 0.9262415028).abs() < 1e-8, "DRV8311 Kf changed: {kf}");
+            assert!((kf - 0.2621775517).abs() < 1e-8, "DRV8311 Kf changed: {kf}");
             for copper in [3.0] {
                 for voltage in [5.0] {
                     for current in [1.1] {
@@ -903,8 +904,8 @@ mod analyze_drive_tests {
                         settings.ripple_limit_fraction = 0.35;
                         settings.voltage_headroom = 0.95;
                         let a = tauri::async_runtime::block_on(analyze_drive(ipc.clone(), settings.clone(), Some(kf), None)).unwrap();
-                        assert!((a.thrust_n.unwrap() - 1.0188656531).abs() < 1e-8);
-                        assert!((a.speed_voltage_v.unwrap() - 7.8071363716).abs() < 1e-8);
+                        assert!((a.thrust_n.unwrap() - 0.2883953068).abs() < 1e-8);
+                        assert!((a.speed_voltage_v.unwrap() - 7.4250579907).abs() < 1e-8);
                         let mut goals = ipc.clone();
                         goals.target_force_n = 100.0;
                         goals.peak_force_n = 0.001;

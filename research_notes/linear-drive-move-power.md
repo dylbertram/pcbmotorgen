@@ -7,6 +7,110 @@ remain as a record of what was implemented and tested, not current requirements.
 
 ## Supported model
 
+### Even-layer star/wye terminations, 2026-10-31
+
+The user supplied revised `star-wye_{2,4,6,8}-layer.dxf` examples and confirmed
+that this revision covers **star/wye only**. It supersedes the previous star
+lead positions and same-opening four-layer topology, including the incenter
+layout below. Legacy two/four-layer delta geometry remains unchanged; delta
+above four layers is explicitly rejected, not silently converted to star.
+
+`patterns/infinity/stacked.rs` copies the same active XY braid onto each
+adjacent pair. From the driver end toward neutral, each pair opens one complete
+braid period farther right. The old first-period via is restored before opening
+a later period. The final generated layer carries the driver leads, bent left;
+layer zero carries the neutral at the last opening. Each neighbouring pair
+connects through its own full-stack barrel with exactly two intended inner-layer
+landings. Closed mode retains independent closed rings per pair.
+
+The pattern declares a minimum of two layers and an even-count constraint, with
+no pattern-specific maximum. Star needs at least one existing braid period per
+pair. If that does not fit, generation rejects the configuration without changing
+the active winding. The application's board-layer maximum still applies.
+Checks cover 2/4/6/8/10 layers and a 64-layer generation case with enough repeats.
+
+The new DXFs are reference drawings, not electrically validated input. Their
+full-stack barrels are named net `0`; their first two C-phase outgoing leads
+have 0.054348 mm endpoint gaps, and the 6/8-layer drawings retain three extra
+missing first-period vias on one pair. Import warns rather than silently repairing
+these. The supplied-reference regression explicitly asserts the raw failures,
+then labels the unambiguous barrel phases and repairs the listed gaps/missing
+vias **only on an in-memory test copy** to check intended series topology.
+Generated routing does not inherit those defects. No importer behavior or user
+file was changed. Active copper matches all corresponding reference layers at
+1e-5 mm rounding, and all braid via sites match after the explicitly listed
+test-copy repairs. Reference lead shapes are not an exact-shape golden: the
+external rows and slopes also have to clear actual finite copper.
+
+The configured DFM pad size still controls the external spacing. Row pitch
+clears both a pad-to-trace gap and a pad-to-pad gap from existing braid vias;
+fan-out horizontal step is capped at phase pitch divided by twice the phase
+count, steepening only external leads to clear neighbouring phase risers.
+Each series pad is checked against every trace except its intended same-net
+endpoint contacts, and against every other pad. Unfittable sizes reject without
+moving the braid. This is not a whole-board DRC/fabrication qualification.
+
+For the saved two-layer config generated as 4/6/8 layers, 0.5 mm pads, 0.2 mm
+traces and 0.127 mm required clearance produce 0.627 mm external row spacing.
+Independent native-geometry measurements give minimum series-pad-to-unintended-
+trace clearance 0.238651 mm and series-pad-to-other-pad clearance 0.210099 mm.
+Two-layer driver leads use the revised reference slope; varying the pad size
+does not change that two-layer geometry. The active body is unchanged for every
+layer count. Exact pair-specific and full-stack via spans survive CAD and DXF
+round-trip for 2/4/6/8/10 layers, with the existing generated/imported layer-index
+reversal explicitly accounted for. The through-only KiCad writer guard remains.
+
+Moving the openings changes currents in the braid mesh. The old equal-current-
+on-every-copied-edge assertion applied to the old same-opening layout, not this
+one. Its replacement verifies signed currents against separately solved copies
+of **each actual pair with its own opening**, one terminal amp through each
+series link in the driver-to-neutral direction, and disconnection when any
+individual link is removed. No phase labels, terminal polarity or force-target
+geometry fitting changed. Clearance coverage includes 72 width/strand/pad/trace/
+layer-count cases, plus the invalid-size controls and
+independent pair/current/topology checks.
+The former 0.7 mm pad / 0.5 mm trace case is retained as an explicit rejection:
+it cannot clear this fan-out at the existing phase pitch.
+
+Final affected Rust suites pass 723 tests, with 24 unit and three doc tests
+ignored, in approved temp `even-braid-all-rust-final-20261031.log`. The ignored
+supplied-reference regression passes separately in
+`even-braid-references-final-20261031.log`. Frontend: 555 pass, four skipped,
+`even-braid-frontend-20261031.log`; no frontend source changed. Generated
+2/4/6/8-layer projects/routing are in `even-braid-generated-20261031`; actual
+lead copper and full-stack barrels were plotted and visually inspected in
+`even-braid-{2,4,6,8}-layers-20261031.png` and the eight-layer per-plane detail.
+These are layer-index exploded views, not a new physical stackup convention.
+
+Reproduce the supplied-reference check with
+`PCB_MOTOR_SUPPLIED_DESIGN_DIR="$PWD" cargo test -p pcbmotorgen supplied_even_layer_copper_matches_generated_active_stack -- --ignored --nocapture`.
+Optional `PCB_MOTOR_BRAID_OUTPUT` must name a fresh artifact directory.
+
+Independent R/current/dL/prescribed-PM free-space force checks at meshes 20/40
+pass for each of the four generated layer counts and the driver fixture in
+approved temp `even-braid-{two,four,six,eight,driver}-oracle-20261031`.
+Source snapshots include `stacked.rs`. The driver fixture's mesh-20 legacy
+excitation gives Kf=0.26217755167309104 N/A, thrust=0.28839530684040016 N and
+speed voltage=7.425057990651583 V. This supersedes its old same-opening values,
+including 0.9262415028 N/A. Regression constants changed only after independent
+verification; no numerical tolerance was loosened. These values are not a
+hardware measurement, controller qualification or force-improvement claim.
+
+Model version is `linear-move-demand-v10`. No replacement move-power result is
+accepted. The existing terminal/controller applicability limits and retracted
+power-improvement claim remain unresolved under #7744. Routing work is tracked
+separately as #3cw8. Nothing is pushed.
+
+The user replaced the earlier 2/4-layer DXFs with revised examples. The baseline
+hashes for **this request**, preserved unchanged, are:
+
+- 2-layer DXF: `d2957c805e330421d434031d5a33b141f7fa02ad811e682bf2e09ab18b81cc25`
+- 4-layer DXF: `f548be36c01fd32d7e7befd20f2035278bd9ea9d52d3809436358c8715690d52`
+- 6-layer DXF: `3ce4b6a1b52f16415e2552b4bedf6e6a6b4d8c352ec1fe4a8049d3860e288718`
+- 8-layer DXF: `e567aa3dbe2ede61d68c21c9cb0d1300132c0f599f8755749fdb925c67669b65`
+
+The three supplied PMMOTOR hashes remain unchanged from the earlier checkpoints.
+
 ### Centered full-stack vias and pad clearance, 2026-10-30
 
 The user's next screenshot exposed a finite-pad clearance defect in
