@@ -5,7 +5,7 @@
   import type { CadSelectionTool } from "../../utils/cadSelectionTool.svelte";
 
   let { view, uniquePhases, uniqueLayers, hasPolePitchData, hasBandWidthData,
-    hasPoleRegionData, poleRegionPhases, showMotorControls = true,
+    hasPoleRegionData, poleRegionPhases, showMotorControls = true, viewControlsInMenu = false,
     coils = [], isCoilVisible, onToggleCoil, geometry, selection, assignmentDisabled = false }: {
     view: CoilPreviewViewState;
     uniquePhases: { idx: number; name: string; colorIdx: number }[];
@@ -15,6 +15,7 @@
     hasPoleRegionData: boolean;
     poleRegionPhases: string[];
     showMotorControls?: boolean;
+    viewControlsInMenu?: boolean;
     coils?: { name: string; colorIdx: number }[];
     isCoilVisible?: (name: string) => boolean;
     onToggleCoil?: (name: string) => void;
@@ -47,6 +48,7 @@
     </fieldset>
   {/if}
 
+  {#if !viewControlsInMenu && (hasPolePitchData || hasBandWidthData || hasPoleRegionData)}
   <fieldset>
     <legend>Overlays</legend>
     {#if hasPolePitchData}
@@ -66,14 +68,21 @@
         <input type="checkbox" bind:checked={view.showPoleRegions} aria-label="Show pole regions" />
         <span class="swatch regions"></span><span>Pole regions</span>
       </label>
+    {/if}
+  </fieldset>
+  {/if}
+
+  {#if hasPoleRegionData}
+    <fieldset>
+      <legend>Pole region phase</legend>
       <select aria-label="Pole regions phase" bind:value={view.poleRegionPhase} disabled={!view.showPoleRegions}>
         <option value="">All phases</option>
         {#each poleRegionPhases as phase (phase)}<option value={phase}>{phase}</option>{/each}
       </select>
-    {/if}
-  </fieldset>
+    </fieldset>
+  {/if}
 
-  {#if showMotorControls}
+  {#if showMotorControls && !viewControlsInMenu}
     <fieldset>
       <legend>Waveform</legend>
       <label class="layer-row" class:hidden-row={!view.showWaveform} title="Show or hide the phase holding-force waves below the mover slider.">
@@ -103,6 +112,6 @@
   .regions { background: linear-gradient(90deg, #f87171 50%, #60a5fa 50%); }
   input { accent-color: #34d399; }
   input:focus-visible, select:focus-visible { outline: 2px solid #34d399; outline-offset: 3px; }
-  select { width: calc(100% - 2rem); margin: 0.5rem 0 0 2rem; padding: 0.25rem; border: 1px solid rgb(var(--slate-600)); border-radius: 4px; background: rgb(var(--slate-800)); color: rgb(var(--slate-200)); font-size: 0.75rem; }
+  select { width: 100%; padding: 0.25rem; border: 1px solid rgb(var(--slate-600)); border-radius: 4px; background: rgb(var(--slate-800)); color: rgb(var(--slate-200)); font-size: 0.75rem; }
   select:disabled { opacity: 0.4; }
 </style>

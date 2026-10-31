@@ -1,5 +1,8 @@
 import { test, expect, type Page } from "@playwright/test";
 import { gotoDesignApp } from "./helpers";
+import { installViewMenu, nativeViewAction, setViewMenuChecked, viewMenuChecked } from "./view-menu-helpers";
+
+test.beforeEach(async ({ page }) => { await installViewMenu(page); });
 
 // Migrated from the retired modal to the persistent workspace. Modal margins,
 // header styling and the embedded waveform popover were intentionally removed
@@ -32,7 +35,7 @@ test("zoom controls clear every open side panel", async ({ page }, testInfo) => 
         }).toBe(true);
         await view.getByRole("button", { name: "Zoom in", exact: true }).click();
       }
-      const last = panel.locator("button, input").last();
+      const last = panel.locator("button:enabled, input:enabled, select:enabled").last();
       await last.scrollIntoViewIfNeeded();
       await last.click({ trial: true });
       if (trigger === "Layers") await page.screenshot({ path: testInfo.outputPath(`panel-clearance-${size.width}.png`) });
@@ -84,7 +87,7 @@ test("copper width is zoom-independent in world units; centerlines remain thin",
   await expect.poll(async () => Number(await canvas.getAttribute("data-test-pixel-width"))).toBeGreaterThan(pixels);
   await view.getByRole("button", { name: "Display", exact: true }).click();
   const panel = view.getByRole("dialog", { name: "Coil preview display", exact: true });
-  await panel.getByRole("radio", { name: "Centerlines" }).check();
+  await setViewMenuChecked(page, "view:centerlines", true);
   await panel.getByRole("button", { name: "Close display panel" }).click();
   await expect(canvas).toHaveAttribute("data-trace-mode", "centerlines");
   const thin = Number(await canvas.getAttribute("data-test-pixel-width"));
@@ -104,14 +107,14 @@ test("side rail panels do not resize the drawing and keep display choices", asyn
   await view.getByRole("button", { name: "Display", exact: true }).click();
   await expect(layers).toHaveCount(0);
   const display = view.getByRole("dialog", { name: "Coil preview display", exact: true });
-  await display.getByRole("checkbox", { name: "Show vias", exact: true }).uncheck();
+  await setViewMenuChecked(page, "view:vias", false);
   await expect(canvas).toHaveAttribute("data-vias", "0");
-  await display.getByRole("radio", { name: "Centerlines" }).check();
+  await setViewMenuChecked(page, "view:centerlines", true);
   await display.getByRole("button", { name: "Close display panel" }).click();
   await page.getByRole("tab", { name: /^Simulate/i }).click();
   await view.getByRole("button", { name: "Display", exact: true }).click();
-  await expect(display.getByRole("checkbox", { name: "Show vias", exact: true })).not.toBeChecked();
-  await expect(display.getByRole("radio", { name: "Centerlines" })).toBeChecked();
+  await expect.poll(() => viewMenuChecked(page, "view:vias")).toBe(false);
+  await expect.poll(() => viewMenuChecked(page, "view:centerlines")).toBe(true);
 });
 
 test("outside drawing clicks keep panels open; toggles close them", async ({ page }) => {
@@ -152,10 +155,10 @@ test("Threlte renders copper and supports orbit, zoom, pan and visibility", asyn
   await display.getByRole("checkbox", { name: "Show layer 0", exact: true }).uncheck();
   await expect.poll(async () => Number(await iso.getAttribute("data-segments"))).toBeLessThan(segments);
   await display.getByRole("checkbox", { name: "Show layer 0", exact: true }).check();
-  await display.getByRole("checkbox", { name: "Show vias", exact: true }).uncheck();
+  await setViewMenuChecked(page, "view:vias", false);
   await expect(iso).toHaveAttribute("data-vias", "0");
-  await display.getByRole("checkbox", { name: "Show vias", exact: true }).check();
-  await display.getByRole("radio", { name: "Centerlines" }).check();
+  await setViewMenuChecked(page, "view:vias", true);
+  await setViewMenuChecked(page, "view:centerlines", true);
   await expect(iso).toHaveAttribute("data-trace-mode", "centerlines");
   await display.getByRole("button", { name: "Close display panel" }).click();
   const before = await canvas.screenshot(), box = (await canvas.boundingBox())!;
@@ -196,14 +199,14 @@ test("overlay visibility and phase selection preserve camera", async ({ page }) 
   await view.getByRole("button", { name: "Zoom in", exact: true }).click();
   await view.getByRole("button", { name: "Layers", exact: true }).click();
   const panel = view.getByRole("dialog", { name: "Coil preview layers", exact: true });
-  await panel.getByRole("checkbox", { name: "Show pole regions", exact: true }).check();
+  await setViewMenuChecked(page, "view:pole-regions", true);
   await expect(canvas).toHaveAttribute("data-pole-regions", /[1-9]/);
   const camera = (await canvas.getAttribute("data-test-camera"))!;
   await panel.getByRole("combobox", { name: "Pole regions phase" }).selectOption({ index: 1 });
   await expect(canvas).toHaveAttribute("data-test-camera", camera);
-  for (const name of ["Show pole-pitch dimension ruler", "Show band-width diagnostics", "Show pole regions"]) {
+  for (const id of ["view:pole-pitch", "view:band-widths", "view:pole-regions"]) {
     const revision = await canvas.getAttribute("data-revision");
-    await panel.getByRole("checkbox", { name, exact: true }).click();
+    await nativeViewAction(page, id);
     await expect(canvas).not.toHaveAttribute("data-revision", revision!);
     await expect(canvas).toHaveAttribute("data-test-camera", camera);
   }

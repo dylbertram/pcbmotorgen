@@ -1,5 +1,8 @@
 import { test, expect } from "@playwright/test";
 import { ASIDE, eventually, gotoDesignApp, openCoilPreview, coilWorkspace, selectDesignPanel } from "./helpers";
+import { installViewMenu, setViewMenuChecked, viewMenuChecked } from "./view-menu-helpers";
+
+test.beforeEach(async ({ page }) => { await installViewMenu(page); });
 
 /**
  * Guards the frontend plumbing of the "traces follow the magnet pattern"
@@ -71,27 +74,20 @@ test.describe("routing dimensions -> preview overlays", () => {
     const dialog = coilWorkspace(page);
     const modalCanvas = dialog.locator("canvas[data-pole-pitch]");
     await dialog.getByRole("button", { name: "Layers", exact: true }).click();
-    const panel = page.getByRole("dialog", { name: "Coil preview layers", exact: true });
-    const polePitch = panel.getByRole("checkbox", {
-      name: "Show pole-pitch dimension ruler",
-    });
-    const bandWidths = panel.getByRole("checkbox", {
-      name: "Show band-width diagnostics",
-    });
 
     await expect(modalCanvas).toBeVisible();
     await expect(modalCanvas).toHaveAttribute("data-pole-pitch", "1");
-    await expect(polePitch).toBeChecked();
-    await expect(bandWidths).not.toBeChecked();
-    await bandWidths.check();
+    await expect.poll(() => viewMenuChecked(page, "view:pole-pitch")).toBe(true);
+    await expect.poll(() => viewMenuChecked(page, "view:band-widths")).toBe(false);
+    await setViewMenuChecked(page, "view:band-widths", true);
 
-    await polePitch.uncheck();
+    await setViewMenuChecked(page, "view:pole-pitch", false);
     await eventually(async () => {
       expect(await modalCanvas.getAttribute("data-pole-pitch")).toBe("0");
       expect(Number(await modalCanvas.getAttribute("data-band-widths"))).toBeGreaterThan(0);
     });
 
-    await bandWidths.uncheck();
+    await setViewMenuChecked(page, "view:band-widths", false);
     await eventually(async () => {
       expect(await modalCanvas.getAttribute("data-pole-pitch")).toBe("0");
       expect(await modalCanvas.getAttribute("data-band-widths")).toBe("0");
@@ -115,13 +111,12 @@ test.describe("routing dimensions -> preview overlays", () => {
     const modalCanvas = dialog.locator("canvas[data-pole-regions]");
     await dialog.getByRole("button", { name: "Layers", exact: true }).click();
     const panel = page.getByRole("dialog", { name: "Coil preview layers", exact: true });
-    const regionsToggle = panel.getByRole("checkbox", { name: "Show pole regions" });
     const phaseSelect = panel.getByRole("combobox", { name: "Pole regions phase" });
     const phaseB = panel.getByRole("checkbox", { name: "Show phase B" });
 
     await expect(modalCanvas).toBeVisible();
-    await expect(regionsToggle).not.toBeChecked();
-    await regionsToggle.check();
+    await expect.poll(() => viewMenuChecked(page, "view:pole-regions")).toBe(false);
+    await setViewMenuChecked(page, "view:pole-regions", true);
     await expect(phaseSelect).toBeEnabled();
     await expect(phaseB).toBeChecked();
 
@@ -135,7 +130,7 @@ test.describe("routing dimensions -> preview overlays", () => {
       await expect(phaseB).toBeChecked();
     });
 
-    await regionsToggle.uncheck();
+    await setViewMenuChecked(page, "view:pole-regions", false);
     await eventually(async () => {
       expect(await modalCanvas.getAttribute("data-pole-regions")).toBe("0");
       await expect(phaseSelect).toBeDisabled();
