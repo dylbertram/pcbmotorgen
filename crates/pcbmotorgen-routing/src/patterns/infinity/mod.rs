@@ -376,7 +376,8 @@ fn resolve_braid_layout(
     }
 }
 
-/// Centre-to-centre spacing of the lead runs above the board [mm].
+/// Legacy delta lead-run spacing above the board [mm]. Star/wye takes its
+/// exact row pitch from the braid vias, without this manufacturing clamp.
 ///
 /// Matches the depth of the braid's first crossing below its peaks (the
 /// interleave step times the diamond edge slope), so the first lead sits at
@@ -520,7 +521,7 @@ fn braid_geometry(
     }
 
     if connection != Connection::Delta {
-        stacked::stack_and_terminate(&mut geometry, &ends, connection, lead_pitch,
+        stacked::stack_and_terminate(&mut geometry, &ends, connection,
             layout.d_phase / layout.n_periods as f64, layout.n_periods, ctx)?;
     } else if ctx.num_layers == 4 {
         four_layer::stack_and_terminate(&mut geometry, &ends, connection, lead_pitch, ctx)?;
@@ -1136,7 +1137,7 @@ mod tests {
     }
 
     #[test]
-    fn leads_never_tighter_than_trace_plus_space() {
+    fn legacy_delta_leads_never_tighter_than_trace_plus_space() {
         let mut c = fader_ctx(1.0);
         c.min_trace_mm = 0.4;
         c.min_space_mm = 0.4;
@@ -1179,15 +1180,10 @@ mod tests {
     }
 
     #[test]
-    fn staggered_series_pads_clear_every_unintended_layer_and_phase() {
-        let distance = |p: Point, a: Point, b: Point| {
-            let (dx, dy) = (b.x - a.x, b.y - a.y);
-            let t = (((p.x - a.x) * dx + (p.y - a.y) * dy) / (dx * dx + dy * dy)).clamp(0.0, 1.0);
-            p.distance_to(Point::new(a.x + t * dx, a.y + t * dy))
-        };
+    fn staggered_legs_keep_the_projected_braid_angle_and_actual_via_y_pitch() {
         for width in [8.0, 20.0] {
             for strands in [2, 3, 5] {
-                for (pad, trace) in [(0.4, 0.127), (0.5, 0.2), (0.7, 0.127)] {
+                for (pad, trace) in [(0.4, 0.127), (0.5, 0.2), (0.7, 0.5)] {
                   for layers in [4, 6, 8, 10] {
                     let mut context = fader_ctx(2.0);
                     context.num_layers = layers;
@@ -1196,6 +1192,28 @@ mod tests {
                     context.trace_width_mm = trace;
                     context.params.insert("num_strands".into(), strands as f64);
                     let result = InfinityBraidPattern.generate(&context).unwrap();
+                    let mut ys: Vec<_> = result.vias.iter().filter(|v| v.position.y <= width + 1e-9)
+                        .map(|v| v.position.y).collect();
+                    ys.sort_by(|a, b| b.total_cmp(a));
+                    ys.dedup_by(|a, b| (*a - *b).abs() < 1e-9);
+                    // Two strands have only lower intermediate crossing
+                    // rows. The centre-height end vias are not a row pitch.
+                    let pitch = if strands == 2 { ys[ys.len() - 2] - ys[ys.len() - 1] } else { ys[0] - ys[1] };
+                    for s in result.segments.iter().filter(|s| !s.is_active && (s.start.y - width).abs() < 1e-9) {
+                        let phase = PHASE_NAMES.iter().position(|n| *n == s.net).unwrap();
+                        let expected_row = if s.layer == 0 { 1 } else { phase + 1 };
+                        assert!((s.end.y - width - expected_row as f64 * pitch).abs() < 1e-9);
+                        if s.layer == 0 { continue; } // Neutral bar risers remain vertical.
+                        let matches_projected_braid = result.segments.iter().filter(|a| a.is_active && a.net == s.net)
+                            .filter_map(|a| if a.start.distance_to(s.start) < 1e-9 { Some(a.end) }
+                                else if a.end.distance_to(s.start) < 1e-9 { Some(a.start) } else { None })
+                            .any(|other| {
+                                let (ax, ay) = (s.start.x - other.x, s.start.y - other.y);
+                                let (bx, by) = (s.end.x - s.start.x, s.end.y - s.start.y);
+                                (ax * by - ay * bx).abs() < 1e-9 && ax * bx + ay * by > 0.0
+                            });
+                        assert!(matches_projected_braid, "end leg must be collinear with the projected braid edge, not a capped slope");
+                    }
                     let joins: Vec<_> = result.vias.iter().filter(|v| (v.from_layer, v.to_layer) == (0, layers - 1)).collect();
                     assert_eq!(joins.len(), (3 * (layers / 2 - 1)) as usize);
                     for via in joins {
@@ -1205,29 +1223,29 @@ mod tests {
                         assert_eq!(landing.len(), 2, "each barrel lands on exactly two inner layers");
                         assert_eq!(landing[0] % 2, 1);
                         assert_eq!(landing[1], landing[0] + 1);
-                        for s in result.segments.iter().filter(|s| s.net != via.net || !landing.contains(&s.layer)
-                            || (s.start != via.position && s.end != via.position)) {
-                            assert!(distance(via.position, s.start, s.end) - pad / 2.0 - context.trace_width() / 2.0
-                                >= context.min_space_mm - 1e-9, "pad must clear every unintended layer, including its own phase");
-                        }
-                        for other in result.vias.iter().filter(|v| v.position != via.position) {
-                            assert!(other.position.distance_to(via.position) - pad >= context.min_space_mm - 1e-9);
-                        }
                     }
                     let mut two = context.clone();
                     two.num_layers = 2;
                     let two_with_size = InfinityBraidPattern.generate(&two).unwrap();
                     two.via_pad_diameter_mm = None;
                     assert_eq!(two_with_size, InfinityBraidPattern.generate(&two).unwrap(), "two-layer copper must not change");
+                    let mut changed_rules = context.clone();
+                    changed_rules.via_pad_diameter_mm = Some(pad + 0.3);
+                    changed_rules.trace_width_mm = trace + 0.1;
+                    changed_rules.min_space_mm += 0.2;
+                    assert_eq!(result, InfinityBraidPattern.generate(&changed_rules).unwrap(),
+                        "manufacturing rules must not change the requested angle or Y spacing");
                   }
                 }
             }
         }
-        // Keep the former overlapping-pad layout as a negative distance control.
-        let apex = Point::new(0.0, 0.0);
-        let left = Point::new(-2.0 / 3.0, 8.0 / 9.0);
-        let old_join = Point::new(0.0, 4.0 / 9.0);
-        assert!(distance(old_join, apex, left) - 0.5 / 2.0 - 0.2 / 2.0 < 0.127);
+        // Negative controls reproduce 11e2fcc's baseline slope cap and row
+        // widening. Neither is allowed to follow DFM size changes again.
+        let expected_pitch = 4.0_f64 / 9.0;
+        let old_pitch = 0.5 + 0.127;
+        let old_slope = (1.0 / 3.0) / old_pitch;
+        assert!((old_pitch - expected_pitch).abs() > 0.1);
+        assert!((old_slope - 0.75_f64).abs() > 0.1);
     }
 
     #[test]
@@ -1246,18 +1264,19 @@ mod tests {
     }
 
     #[test]
-    fn four_layer_rejects_invalid_or_unfittable_series_pad_sizes() {
+    fn four_layer_rejects_invalid_pad_sizes_but_leaves_clearance_to_dfm() {
         let mut context = fader_ctx(2.0);
         context.num_layers = 4;
-        for size in [0.0, -0.4, f64::NAN, f64::INFINITY, 4.0] {
+        for size in [0.0, -0.4, f64::NAN, f64::INFINITY] {
             context.via_pad_diameter_mm = Some(size);
             assert!(InfinityBraidPattern.generate(&context).is_err(), "invalid/unfittable pad {size}");
         }
-        // A pack accepted by the former triangle termination does not fit
-        // this staggered fan-out. Reject it rather than dropping the case.
+        // The user selected geometry plus warnings, not generation rejection.
         context.via_pad_diameter_mm = Some(0.7);
         context.trace_width_mm = 0.5;
-        assert_eq!(InfinityBraidPattern.generate(&context).unwrap_err().field, "series_via");
+        assert!(InfinityBraidPattern.generate(&context).is_ok());
+        context.via_pad_diameter_mm = Some(4.0);
+        assert!(InfinityBraidPattern.generate(&context).is_ok());
     }
 
     #[test]
@@ -1282,10 +1301,11 @@ mod tests {
             for net in ["A", "B", "C"] {
                 assert!(connected(&net_graph(&result, net)));
                 let bridge = bridges.iter().find(|v| v.net == net).unwrap();
-                // Only layers 1 and 2 land on the through barrel. No outer
-                // lead or neutral trace may touch it and bypass a braid pair.
+                // Same-phase outer copper must not bypass a winding pair.
+                // Cross-phase collisions are now reported by DFM, as chosen
+                // by the user, rather than changing the angle or row pitch.
                 for layer in [0, 3] {
-                    assert!(!result.segments.iter().filter(|s| s.layer == layer).any(|s| {
+                    assert!(!result.segments.iter().filter(|s| s.layer == layer && s.net == net).any(|s| {
                         let p = bridge.position;
                         let cross = (p.x-s.start.x)*(s.end.y-s.start.y) - (p.y-s.start.y)*(s.end.x-s.start.x);
                         cross.abs() < 1e-8 && p.x >= s.start.x.min(s.end.x)-1e-8 && p.x <= s.start.x.max(s.end.x)+1e-8

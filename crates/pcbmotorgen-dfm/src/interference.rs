@@ -14,6 +14,10 @@
 //! declare (`io_pads[i].layers`; a pad relying on the exporter's implicit
 //! default layer set cannot be layer-resolved here and is skipped — the host
 //! IO generator always declares its layers explicitly).
+//!
+//! Series barrels with adjacent inner-layer taps additionally check copper
+//! across their whole span, including same-phase bypasses, and other via pads.
+//! These checks report the drawn geometry; they never widen or reroute it.
 
 use std::collections::BTreeMap;
 
@@ -74,6 +78,8 @@ impl<'a> CopperRun<'a> {
 /// - Via pad (drill + 2×annular) to different-net traces (segments and IO
 ///   traces) on the via's from/to layers closer than
 ///   `via_pad_radius + trace_width/2 + min_space`.
+/// - Inner-tapped series barrels against unintended copper throughout their
+///   span and all other pads on overlapping spans, including same-phase copper.
 /// - IO pads (on each explicitly declared copper layer) closer than
 ///   `pad_radius + trace_width/2 + min_space` to different-net copper, or
 ///   closer than `pad_radius_a + pad_radius_b + min_space` to a different-net
@@ -199,9 +205,13 @@ pub fn check_interference(
         }
     }
 
+    // Series barrels need all-layer and same-phase no-bypass diagnostics.
+    // Ordinary vias retain the existing endpoint-layer checks below.
+    let series_vias = crate::series_vias::indices(result);
     // --- Via-pad to different-net trace clearance on from/to layers ---
     let via_min_distance = via_pad_radius + trace_width / 2.0 + min_space;
     for (vi, v) in result.vias.iter().enumerate() {
+        if series_vias.contains(&vi) { continue; }
         for (layer, runs) in &runs_by_layer {
             if *layer != v.from_layer && *layer != v.to_layer {
                 continue;
@@ -237,6 +247,7 @@ pub fn check_interference(
 
     // --- IO pad clearance on the layers the pads declare ---
     check_io_pad_clearance(rules, result, &runs_by_layer, &mut violations);
+    violations.extend(crate::series_vias::check(rules, result, &series_vias));
 
     violations
 }

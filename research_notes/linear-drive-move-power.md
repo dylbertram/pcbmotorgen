@@ -7,6 +7,83 @@ remain as a record of what was implemented and tested, not current requirements.
 
 ## Supported model
 
+### Exact braid angle and via-row lead pitch, 2026-10-31
+
+The user's next screenshot rejected `11e2fcc`'s steeper end legs and enlarged
+Y spacing. Star/wye diagonal output/connecting legs now use the uncapped braid
+edge slope, collinear with the projected braid edge through the open vertex.
+The first external row is one native via-row Y pitch above the pattern, then
+two pitches, three pitches, etc. Pair openings, phase labels, lead directions,
+main active copper, exact barrel spans and existing delta geometry do not change.
+The neutral risers retain their existing vertical shape and use the first row.
+
+Pitch is derived from the smallest positive interval between unique native
+via Y levels. In the normal three/five-strand braid this is the top-to-next-via
+interval. The two-strand braid has no intermediate upper crossing row, so the
+lower crossing rows supply that interval; distant centre-height end vias must
+not be mistaken for a four-millimetre lead pitch. No pad diameter, trace width
+or clearance override may change the star/wye lead angle or Y pitch.
+
+For the supplied three-strand case, the previous 0.627 mm rows and 62.003454
+degree diagonal become 0.444444 mm rows and the braid's 53.130102 degree diagonal.
+Rows are y=8.444444, 8.888889 and 9.333333 mm above an 8 mm body. The pink guide
+in approved temp `braid-collinear-closeup-after-20261031.png` is extended from an
+actual unchanged active braid segment, not a hand-picked display angle. Native
+2/4/6/8-layer plots and the eight-layer per-plane view were inspected.
+
+The exact geometry conflicts with the saved manufacturing clearance. With
+0.5 mm pads and 0.2 mm traces, the supplied 4/6/8-layer case has minimum series
+pad-to-unintended-trace edge gap 0.094444 mm and pad-to-other-pad gap 0.055556 mm,
+both below 0.127 mm. **The user explicitly selected generation with warnings**,
+not silent spacing/angle changes or generation failure. Invalid non-finite,
+negative or zero pad dimensions still reject as invalid input.
+
+Finite-pad checks therefore live downstream in DFM again, as non-mutating
+diagnostics. `pcbmotorgen-dfm/src/series_vias.rs` identifies barrels with two
+adjacent inner-layer taps, checks every trace/IO run throughout their physical
+span except intended same-net endpoint contacts, and checks all other pads with
+an overlapping physical span. Same-phase outer copper, including an unintended
+endpoint exactly on the barrel, is reported rather than hidden by net equality.
+The existing `check_coil_interference` IPC returns the new
+`series_via_clearance` and `series_via_pad_clearance` warnings with edge gaps in
+millimetres. The saved-reference test verifies both warnings pass through that
+real command while generation/preview still succeeds. Ordinary via checks are
+unchanged. This is not a complete-board DRC or fabrication qualification.
+
+Some other exact-spacing packs have actual copper overlap, not just a small
+positive clearance. The two-strand four-layer negative control has a B barrel
+on the C driver trace on layer 3; its -0.35 mm pad-to-trace edge gap is explicitly
+reported. Assigned-net resistance/current checks do not model a physical short
+between differently named nets. Such diagnostics must be resolved before using
+that geometry as a real winding; generation success is not electrical safety.
+
+Coverage retains 72 width/strand/pad/trace/layer cases, now asserting exact
+projected collinearity, via-derived Y pitch and geometry invariance under DFM
+size/clearance changes. Prior slope-cap/row-widening values are negative controls.
+The earlier 0.7 mm pad / 0.5 mm trace and oversized-pad packs generate and report
+DFM problems rather than being removed from coverage. Three new DFM tests cover
+same-net bypass, cross-phase inner/outer copper, pad gaps, the real three-strand
+case, actual two-strand overlap and non-mutation. Existing assigned-net series
+current, cut-each-link, copper-reference and exact DXF round-trip tests still pass.
+
+Final affected Rust suites: 726 pass, 24 unit and three doc tests ignored,
+`braid-collinear-all-rust-final-20261031.log`. Supplied references pass separately
+in `braid-collinear-references-verified-20261031.log`; the final same-phase
+outer-endpoint bypass control also passes in
+`braid-collinear-routing-dfm-final-20261031.log`. Frontend: 555 pass, four skipped,
+`braid-collinear-frontend-20261031.log`. All evidence is in the approved temp
+directory; supplied files are unchanged and untracked, nothing pushed.
+
+Independent R/current/dL/prescribed-PM free-space force checks at meshes 20/40
+pass for generated 2/4/6/8 and the legacy driver fixture in
+`braid-collinear-{two,four,six,eight,driver}-oracle-20261031`. Snapshots include the
+stacked termination and new DFM diagnostic source. The verified mesh-20 driver
+fixture is Kf=0.2621774339553868 N/A, thrust=0.2883951773509255 N and speed
+voltage=7.423082452263505 V. Regression constants changed only after the independent
+check, without loosening tolerances. Numerical agreement does not qualify a
+controller or resolve physical DRC warnings. Version is `linear-move-demand-v11`;
+no new move-power result or improvement claim. #7744 remains open.
+
 ### Even-layer star/wye terminations, 2026-10-31
 
 The user supplied revised `star-wye_{2,4,6,8}-layer.dxf` examples and confirmed

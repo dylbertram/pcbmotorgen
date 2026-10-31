@@ -111,6 +111,11 @@ fn supplied_even_layer_copper_matches_generated_active_stack() {
         let ipc = state.to_linear_motor_ipc();
         let core = ipc.to_core();
         let routing = pcbmotorgen_routing::generate_routing_result(&core.routing_context(), "infinity-braid").unwrap();
+        if layers > 2 {
+            let warnings = tauri::async_runtime::block_on(super::routing_plugins::check_coil_interference(ipc.clone(), None)).unwrap();
+            assert!(warnings.iter().any(|w| w.kind == "series_via_clearance" && (w.gap_mm - 0.0944444444).abs() < 1e-8));
+            assert!(warnings.iter().any(|w| w.kind == "series_via_pad_clearance" && (w.gap_mm - 0.0555555556).abs() < 1e-8));
+        }
         let preview = tauri::async_runtime::block_on(super::physics::generate_coils(ipc)).unwrap();
         assert_eq!(preview.layer_count, layers);
         assert_eq!(preview.phases.len(), (layers * 3) as usize);
