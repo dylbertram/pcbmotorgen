@@ -72,6 +72,15 @@
             onCommit={(value) => config[field.key] = value} />
         </label>
       {/each}
+      <label class="min-w-0 flex items-center justify-between gap-2">
+        <span class="min-w-0 text-xs text-slate-300">
+          Via plating (µm)
+          <HelpTag label="About via plating" tip="Barrel plating thickness. 25 µm is the IPC class 2 minimum average." />
+        </span>
+        <NumberField value={Math.round(config.drive.via_plating_m * 1e6)} min={5} max={100} step={5}
+          ariaLabel="Via plating thickness (µm)" class="w-24 shrink-0 px-2 py-1 text-xs font-mono text-emerald-200"
+          onCommit={(value) => config.drive = { ...config.drive, via_plating_m: value * 1e-6 }} />
+      </label>
     </ViaSizingGuide>
   </div>
 </div>
