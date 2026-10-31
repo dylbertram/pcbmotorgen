@@ -141,7 +141,7 @@ test("Threlte renders copper and supports orbit, zoom, pan and visibility", asyn
   const view = await workspace(page);
   await view.getByRole("button", { name: "Display", exact: true }).click();
   const modes = view.getByRole("dialog", { name: "Coil preview display", exact: true });
-  await modes.getByRole("radio", { name: "3D", exact: true }).check();
+  await view.getByRole("button", { name: "3D fields and heat", exact: true }).click();
   await modes.getByRole("button", { name: "Close display panel" }).click();
   const iso = view.getByTestId("coil-iso"), canvas = iso.locator("canvas");
   await expect.poll(async () => Number(await canvas.getAttribute("data-draws"))).toBeGreaterThan(0);
@@ -178,7 +178,7 @@ test("Threlte renders copper and supports orbit, zoom, pan and visibility", asyn
   await iso.getByRole("button", { name: "Reset 3D view", exact: true }).click();
   await page.screenshot({ path: testInfo.outputPath("coil-iso.png") });
   await view.getByRole("button", { name: "Display", exact: true }).click();
-  await modes.getByRole("radio", { name: "Top-down", exact: true }).check();
+  await view.getByRole("button", { name: "Top-down", exact: true }).click();
   await expect(iso).toHaveCount(0);
   await expect(view.getByRole("img", { name: "Coil preview", exact: true })).toBeVisible();
   expect(errors).toEqual([]);

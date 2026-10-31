@@ -152,7 +152,7 @@ test("imported geometry renders in the isometric view", async ({ page }) => {
   const modal = coilWorkspace(page);
   await modal.getByRole("button", { name: "Display", exact: true }).click();
   const display = page.getByRole("dialog", { name: "Coil preview display", exact: true });
-  await display.getByRole("radio", { name: "3D", exact: true }).check();
+  await page.getByRole("button", { name: "3D fields and heat", exact: true }).click();
   const iso = modal.getByTestId("coil-iso");
   await expect(iso).toBeVisible();
   await expect(iso).toHaveAttribute("data-layers", /[1-9]/);

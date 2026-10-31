@@ -722,7 +722,6 @@
                   if (projects.cadGeometry || !config.generatorEndType) session.previewView.requestTerminals();
                   else coilPreview?.showDesignSettings("routing");
                 }}
-                onShow3D={() => { session.previewView.viewMode = "iso"; previewPanel = null; }}
                 {config}
                 active={active && activeTab === "simulate"}
                 {sweep}
