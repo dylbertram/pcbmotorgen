@@ -4,7 +4,7 @@
   import { untrack, tick } from "svelte";
   import { Box3, Vector3, MOUSE, TOUCH, type Group, type OrthographicCamera } from "three";
   import type { OrbitControls as OrbitController } from "three/examples/jsm/controls/OrbitControls.js";
-  import { fitCoilCamera, fitCoilWindow, alignTopCamera, type TopCameraTransform } from "../../fitCoilCamera";
+  import { fitCoilCamera, fitCoilWindow, coilWindowFocus, stopCoilCameraMotion, alignTopCamera, type TopCameraTransform } from "../../fitCoilCamera";
   import type { CoilScene, CopperPath } from "../../coilScene";
   import { PHASE_COLORS } from "./coilPreviewCanvas";
   import CoilCopperBatch from "./CoilCopperBatch.svelte";
@@ -20,7 +20,7 @@
   import CoilTerminalMarkers from "./CoilTerminalMarkers.svelte";
   import type { CopperPad } from "../../viaCopperMesh";
 
-  let { scene, paths, vias, pads = [], viaSize = {diameter:.04,drill:.02}, terminals, traceMode, reset, command, windowCommand = {id:0,a:[0,0],b:[1,1]}, zScale, onCamera, viewMode = "iso", topCamera = null, board = null, showPcb = false, measure = null, field = null, heat = null, opacity = .8, fieldStyle = "lines-slice", sliceFraction = .5, sectionView = false, magnets = [] }: {
+  let { scene, paths, vias, pads = [], viaSize = {diameter:.04,drill:.02}, terminals, traceMode, reset, fit = 0, command, windowCommand = {id:0,a:[0,0],b:[1,1]}, zScale, onCamera, viewMode = "iso", topCamera = null, board = null, showPcb = false, measure = null, field = null, heat = null, opacity = .8, fieldStyle = "lines-slice", sliceFraction = .5, sectionView = false, magnets = [] }: {
     scene: CoilScene;
     paths: CopperPath[];
     vias: CoilScene["vias"];
@@ -29,9 +29,10 @@
     terminals: CoilScene["terminals"];
     traceMode: "traces" | "centerlines";
     reset: number;
+    fit?: number;
     command: { id: number; zoom: number };
     windowCommand?: { id: number; a: [number, number]; b: [number, number] };
-    onCamera?: (snapshot: { position: number[]; target: number[]; zoom: number }) => void;
+    onCamera?: (snapshot: { position: number[]; target: number[]; zoom: number; fitZoom: number }) => void;
     viewMode?: "top" | "front" | "left" | "iso";
     topCamera?: TopCameraTransform | null;
     zScale: number;
@@ -46,7 +47,7 @@
     sectionView?: boolean;
     magnets?: FieldPreview["magnets"];
   } = $props();
-  const { size, invalidate } = useThrelte();
+  const { size, invalidate, dom } = useThrelte();
   let camera = $state.raw<OrthographicCamera>();
   let zoom = $derived(Math.max(1, Math.min($size.width, $size.height) / 14));
   const maximumLoss = $derived(heat ? Math.max(0, ...heat.values()) : 0);
@@ -62,46 +63,53 @@
   let fittedView = "";
   let lastMode = "";
   let lastReset = 0;
+  let lastFit = 0;
+  let fitZoom = 1;
   let lastScene: CoilScene | null = null;
   let lastZScale = 1;
   let lastField: FieldPreview | null = null;
   let lastSectionView = false;
   // Camera snapshots are imperative navigation state, not reactive geometry.
-  const cameras = new Map<string,{position:Vector3;up:Vector3;target:Vector3;zoom:number}>();
+  const cameras = new Map<string,{position:Vector3;up:Vector3;target:Vector3;zoom:number;fitZoom:number}>();
+  function reportCamera() {
+    if (camera && controls) onCamera?.({position:camera.position.toArray(),target:controls.target.toArray(),zoom:camera.zoom,fitZoom});
+  }
   function rememberPrevious(mode:string) {
     if (camera && controls && lastMode && lastMode !== mode && lastMode !== "top")
-      cameras.set(lastMode,{position:camera.position.clone(),up:camera.up.clone(),target:controls.target.clone(),zoom:camera.zoom});
+      cameras.set(lastMode,{position:camera.position.clone(),up:camera.up.clone(),target:controls.target.clone(),zoom:camera.zoom,fitZoom});
   }
   $effect(() => {
     if (!controls || !camera) return;
     const current = controls, cam = camera;
-    const report = () => onCamera?.({ position: cam.position.toArray(), target: current.target.toArray(), zoom: cam.zoom });
+    const report = () => onCamera?.({ position: cam.position.toArray(), target: current.target.toArray(), zoom: cam.zoom, fitZoom });
     current.addEventListener("change", report);
     return () => current.removeEventListener("change", report);
   });
   // One controller owns the camera. A separate Bounds controller retains old
   // angles and can silently restore isometric view after selecting XZ.
   $effect(() => {
-    const physicalScene=scene, physicalZScale=zScale, currentField=field, sectional=sectionView, currentReset=reset;
+    const physicalScene=scene, physicalZScale=zScale, currentField=field, sectional=sectionView, currentReset=reset, currentFit=fit;
     const mode = viewMode;
     if (mode === "top" && topCamera) return;
-    const viewKey = `${currentReset}:${mode}:${sectional}`, width = $size.width, height = $size.height;
+    const viewKey = `${currentReset}:${mode}:${sectional}`;
+    // Track resize notifications, but measure after Svelte applies the view's
+    // insets. ResizeObserver can still contain the previous view's dimensions.
+    void $size.width; void $size.height;
     if (!camera || !controls || !content) return;
     let cancelled = false;
     void tick().then(() => {
       if (cancelled || !camera || !controls || !content) return;
-      // Flush residual orbit damping before a programmatic view change.
-      const damping = controls.enableDamping;
-      controls.enableDamping = false; controls.update(); controls.enableDamping = damping;
+      const width = dom.clientWidth, height = dom.clientHeight;
+      stopCoilCameraMotion(camera, controls);
       const physicalChanged=lastScene!==physicalScene || lastZScale!==physicalZScale || lastReset!==currentReset;
       if (physicalChanged) cameras.clear(); else rememberPrevious(mode);
       const modeChanged=lastMode!==mode;
-      const needsFit=!lastMode || physicalChanged
+      const needsFit=!lastMode || physicalChanged || lastFit!==currentFit
         || lastSectionView!==sectional || (!modeChanged && lastField!==currentField);
       // A toolbar or dock resize changes the frustum, not the user's pan/zoom.
       // Threlte's automatic camera updates are off so nothing else overwrites it.
       const saved = needsFit ? undefined : modeChanged ? cameras.get(mode) : {
-        position:camera.position.clone(),up:camera.up.clone(),target:controls.target.clone(),zoom:camera.zoom,
+        position:camera.position.clone(),up:camera.up.clone(),target:controls.target.clone(),zoom:camera.zoom,fitZoom,
       };
       const direction = fittedView === viewKey ? camera.position.clone().sub(controls.target)
         : mode === "top" ? new Vector3(0,1,0) : mode === "front" || mode === "iso" && sectional ? new Vector3(0,0,1) : mode === "left" ? new Vector3(-1,0,0) : new Vector3(12,10,14);
@@ -111,14 +119,22 @@
       if (saved) {
         camera.position.copy(saved.position);camera.up.copy(saved.up);camera.lookAt(saved.target);
         camera.left=-width/2;camera.right=width/2;camera.top=height/2;camera.bottom=-height/2;
-        camera.zoom=saved.zoom;camera.updateProjectionMatrix();camera.updateMatrixWorld(true);
+        camera.zoom=saved.zoom;fitZoom=saved.fitZoom;camera.updateProjectionMatrix();camera.updateMatrixWorld(true);
         center=saved.target.clone();
-      } else center = fitCoilCamera(camera, new Box3().setFromObject(content, true), width, height, direction);
+      } else {
+        // Invisible PCB/hidden solids must not expand the extents.
+        const bounds = new Box3();
+        content.traverseVisible(object => {
+          if (object.type === "Mesh" || object.type === "LineSegments") bounds.union(new Box3().setFromObject(object, true));
+        });
+        center = fitCoilCamera(camera, bounds, width, height, direction);
+        if (center) fitZoom=camera.zoom;
+      }
       if (center) {
         controls.target.copy(center); controls.update(); fittedView = viewKey; invalidate();
-        onCamera?.({position:camera.position.toArray(),target:controls.target.toArray(),zoom:camera.zoom});
+        reportCamera();
       }
-      lastMode=mode;lastReset=currentReset;lastScene=physicalScene;lastZScale=physicalZScale;lastField=currentField;lastSectionView=sectional;
+      lastMode=mode;lastReset=currentReset;lastFit=currentFit;lastScene=physicalScene;lastZScale=physicalZScale;lastField=currentField;lastSectionView=sectional;
     });
     return () => { cancelled = true; };
   });
@@ -135,7 +151,7 @@
       const target=alignTopCamera(camera,physicalScene,top,width,height);
       if (!target) return;
       controls.target.copy(target);
-      onCamera?.({position:camera.position.toArray(),target:target.toArray(),zoom:camera.zoom});
+      reportCamera();
       lastMode="top";lastReset=currentReset;lastScene=physicalScene;lastZScale=physicalZScale;invalidate();
     });
     return()=>{cancelled=true;};
@@ -146,22 +162,22 @@
     const { id, zoom: factor } = command;
     // Camera replacement/reset and resizing must not replay the last command.
     untrack(() => {
-      if (!id || !camera) return;
-      camera.zoom = Math.max(zoom / 20, Math.min(zoom * 50, camera.zoom * factor));
+      if (!id || !camera || viewMode === "top") return;
+      if (controls) stopCoilCameraMotion(camera, controls);
+      camera.zoom = Math.max(zoom / 20, camera.zoom * factor);
       camera.updateProjectionMatrix();
-      if (controls) onCamera?.({position:camera.position.toArray(),target:controls.target.toArray(),zoom:camera.zoom});
+      reportCamera();
       invalidate();
     });
   });
   $effect(() => {
     const { id, a, b } = windowCommand;
     untrack(() => {
-      if (!id || !camera || !controls) return;
-      const damping = controls.enableDamping;
-      controls.enableDamping = false; controls.update();
-      const center = fitCoilWindow(camera, controls.target, a, b);
-      if (center) { controls.target.copy(center); controls.update(); invalidate(); }
-      controls.enableDamping = damping;
+      if (!id || !camera || !controls || !content || viewMode === "top") return;
+      stopCoilCameraMotion(camera, controls);
+      const focus = coilWindowFocus(camera, content, a, b) ?? controls.target;
+      const center = fitCoilWindow(camera, controls.target, a, b, focus);
+      if (center) { controls.target.copy(center); controls.update(); reportCamera(); invalidate(); }
     });
   });
 </script>

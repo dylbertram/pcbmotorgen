@@ -137,13 +137,13 @@ test("sensor preview supports layer visibility, zoom, pan and reset", async ({ p
       expect(anchor.x).toBeCloseTo(originalAnchor.x, 6);
       expect(anchor.y).toBeCloseTo(originalAnchor.y, 6);
     }
-    await preview.getByRole("button", { name: "Reset zoom and pan" }).click();
+    await preview.getByRole("button", { name: "Reset view" }).click();
     await expect(transform).toHaveAttribute("transform", initial!);
   }
   await preview.getByRole("button", { name: "Zoom in", exact: true }).click();
   await expect(preview.getByRole("button", { name: "Reset zoom", exact: true })).toHaveText("1.5×");
   await expect(transform).not.toHaveAttribute("transform", initial!);
-  await preview.getByRole("button", { name: "Reset zoom and pan" }).click();
+  await preview.getByRole("button", { name: "Reset view" }).click();
   await expect(transform).toHaveAttribute("transform", initial!);
   const frame = preview.getByRole("img");
   const bounds = (await frame.boundingBox())!;
@@ -152,7 +152,7 @@ test("sensor preview supports layer visibility, zoom, pan and reset", async ({ p
   await page.mouse.move(bounds.x + bounds.width / 2 + 40, bounds.y + bounds.height / 2 + 20, { steps: 5 });
   await page.mouse.up();
   await expect(transform).not.toHaveAttribute("transform", initial!);
-  await preview.getByRole("button", { name: "Reset zoom and pan" }).click();
+  await preview.getByRole("button", { name: "Reset view" }).click();
   await expect(transform).toHaveAttribute("transform", initial!);
 });
 

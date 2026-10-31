@@ -20,6 +20,11 @@ export class CoilPreviewViewState {
   /** Display-only Z magnification, shared by the inline and expanded viewer. */
   zScale = $state(1);
   zoomWindow = $state(false);
+  /** Shared viewport controls dispatch to the spatial camera when not in Top. */
+  cameraCommand = $state({ id: 0, zoom: 1 });
+  cameraReset = $state(0);
+  cameraFit = $state(0);
+  spatialZoom = $state(1);
   /** Copper uses physical widths; centerlines use a thin screen-width stroke. */
   traceMode = $state<"traces" | "centerlines">("traces");
   /** Phase waveform below the mover slider in the expanded preview. */

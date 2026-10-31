@@ -28,7 +28,7 @@ test("Top, Front, Left and 3D share one canvas, retain display state and restore
       const d=s.position.map((v:number,i:number)=>v-s.target[i]);return Math.abs(d[axis])/Math.hypot(...d);
     }).toBeCloseTo(1,8);
     if(id==="iso") {
-      await viewer.getByRole("button",{name:"Zoom in 3D",exact:true}).click();
+      await page.getByRole("button",{name:"Zoom in",exact:true}).click();
       await page.screenshot({path:info.outputPath("shared-isometric.png")});
     }
   }
@@ -60,7 +60,7 @@ test("each view restores its own pan and zoom after visiting every other view",a
     const viewer=page.getByTestId(`coil-${id}`);
     await expect(viewer).toHaveAttribute("data-camera",/position/);
     const before=JSON.parse((await viewer.getAttribute("data-camera"))!) as Snapshot;
-    await page.getByRole("button",{name:id==="top"?"Zoom in":"Zoom in 3D",exact:true}).click();
+    await page.getByRole("button",{name:"Zoom in",exact:true}).click();
     await expect.poll(async()=>JSON.parse((await viewer.getAttribute("data-camera"))!).zoom).toBeGreaterThan(before.zoom);
     const box=(await viewer.boundingBox())!;
     await page.mouse.move(box.x+box.width*.5,box.y+box.height*.5);

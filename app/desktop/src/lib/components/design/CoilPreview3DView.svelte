@@ -52,8 +52,6 @@
     .filter(layer=>view.isLayerVisible(layer)&&isVisible(v.net,layer))
     .map(layer=>({point:v.points[0].clone().setY(scene!.layerY[layer]),thickness:scene!.thicknessByLayer[layer],layer,net:v.net}))):[]);
   let terminals = $derived(showTerminals && view.showTerminals ? scene?.terminals.filter(t => view.isLayerVisible(t.layer) && isVisible(t.net, t.layer)) ?? [] : []);
-  let reset = $state(0);
-  let command = $state({ id: 0, zoom: 1 });
   let windowCommand = $state<{ id: number; a: [number, number]; b: [number, number] }>({ id: 0, a: [0, 0], b: [1, 1] });
   let cameraSnapshot = $state<{ position: number[]; target: number[]; zoom: number } | null>(null);
   let glAvailable = $state<boolean | null>(null);
@@ -158,7 +156,7 @@
   {#if scene}
     <svelte:boundary onerror={() => { glAvailable=false; onRenderStatus?.(false); }}>
       <Canvas renderMode="on-demand">
-         <CoilPreviewScene {scene} {paths} {vias} {pads} viaSize={{diameter:viaSizeMm.diameter*scene.scale,drill:viaSizeMm.drill*scene.scale,plating:(viaSizeMm.plating ?? .025)*scene.scale}} {terminals} {reset} {command} {windowCommand} {board} {measure} {topCamera} viewMode={view.viewMode} onCamera={snapshot => {cameraSnapshot = snapshot; glAvailable=true; onRenderStatus?.(true);}} showPcb={view.showPcb} zScale={view.zScale} traceMode={view.traceMode}
+         <CoilPreviewScene {scene} {paths} {vias} {pads} viaSize={{diameter:viaSizeMm.diameter*scene.scale,drill:viaSizeMm.drill*scene.scale,plating:(viaSizeMm.plating ?? .025)*scene.scale}} {terminals} reset={view.cameraReset} fit={view.cameraFit} command={view.cameraCommand} {windowCommand} {board} {measure} {topCamera} viewMode={view.viewMode} onCamera={snapshot => {cameraSnapshot = snapshot; if(view.viewMode !== "top") view.spatialZoom=snapshot.zoom/snapshot.fitZoom; glAvailable=true; onRenderStatus?.(true);}} showPcb={view.showPcb} zScale={view.zScale} traceMode={view.traceMode}
            {field} heat={heatMapping.values} {opacity} {fieldStyle} {sliceFraction} {sectionView} magnets={visibleMagnets} />
       </Canvas>
       {#snippet failed()}
@@ -171,11 +169,6 @@
       <ZoomWindowOverlay onCancel={() => view.zoomWindow = false} onFit={(a, b) => { windowCommand = { id: windowCommand.id + 1, a, b }; view.zoomWindow = false; }} />
     {/if}
     {#if view.viewMode !== "top"}
-    <div class="absolute left-2 top-2 flex gap-1 rounded border border-slate-700 bg-slate-900/95 p-1" role="group" aria-label="3D camera controls">
-      <button class="text-slate-300 hover:bg-slate-800 hover:text-emerald-300" type="button" aria-label="Zoom in 3D" onclick={() => command = { id: command.id + 1, zoom: 1.25 }}>+</button>
-      <button class="text-slate-300 hover:bg-slate-800 hover:text-emerald-300" type="button" aria-label="Zoom out 3D" onclick={() => command = { id: command.id + 1, zoom: 0.8 }}>−</button>
-      <button class="text-slate-300 hover:bg-slate-800 hover:text-emerald-300" type="button" onclick={() => reset++}>{view.viewMode === "iso" ? "Reset 3D view" : "Reset view"}</button>
-    </div>
     {#if simulation}
       <div class="simulation-controls absolute right-2 top-2 z-20 rounded border border-slate-700 bg-slate-900/95 text-xs text-slate-300" role="group" aria-label="3D simulation overlays">
         <button type="button" class="inspector-toggle" aria-expanded={settingsExpanded} onclick={() => settingsOpen = !settingsExpanded}>

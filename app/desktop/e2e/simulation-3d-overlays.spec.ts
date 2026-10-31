@@ -218,7 +218,7 @@ test("real WebGL draws both scoped overlays and Z scale never resamples physics"
   await expect.poll(async () => (await canvas.screenshot()).equals(before)).toBe(false);
   expect(await page.evaluate(() => (window as any).vizCalls.length)).toBe(calls);
   await page.screenshot({ path: info.outputPath("ui-fixture-3d-fields-and-loss.png") });
-  await viewer.getByRole("button", { name: "Reset 3D view", exact: true }).click();
+  await page.getByRole("button", { name: "Reset view", exact: true }).click();
   await expect(viewer).toHaveAttribute("data-field-samples", "700");
   await viewer.getByRole("combobox", { name: "3D simulation overlay", exact: true }).selectOption("off");
   await expect(viewer).toHaveAttribute("data-field-samples", "0"); await expect(viewer).toHaveAttribute("data-heat-paths", "0");
@@ -313,9 +313,7 @@ test("mobile overlays stay inside the viewer and use scrollable explicit legends
   await expect(viewer.getByLabel("Copper loss legend")).toBeHidden();
   const box = (await viewer.boundingBox())!, controls = (await viewer.getByRole("group", { name: "3D simulation overlays" }).boundingBox())!;
   const viewSwitch = (await page.getByRole("group", { name: "Viewport view", exact: true }).boundingBox())!;
-  // The view switch is a local overlay, not a full-width canvas exclusion.
-  expect(box.y + box.height).toBeGreaterThan(viewSwitch.y);
-  expect(box.y + box.height).toBeGreaterThanOrEqual(viewSwitch.y + viewSwitch.height);
+  expect(box.y).toBeGreaterThanOrEqual(viewSwitch.y + viewSwitch.height);
   expect(controls.x).toBeGreaterThanOrEqual(box.x); expect(controls.x + controls.width).toBeLessThanOrEqual(box.x + box.width + 1);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   const legend = (await viewer.getByLabel("Simulation overlay legend").boundingBox())!;
@@ -396,12 +394,11 @@ test("field inspector aligns inputs and stays clear of the camera and Z rail", a
   await expect(viewer).toHaveAttribute("data-field-samples", "240");
   const panel = viewer.getByRole("group", { name: "3D simulation overlays", exact: true });
   const bounds = (await viewer.boundingBox())!, box = (await panel.boundingBox())!;
-  const camera = (await viewer.getByRole("group", { name: "3D camera controls", exact: true }).boundingBox())!;
+  const camera = (await page.getByRole("group", { name: "Zoom controls", exact: true }).boundingBox())!;
   const zRail = (await viewer.getByRole("group", { name: "Z height", exact: true }).boundingBox())!;
-  const viewSwitch = (await page.getByRole("group", { name: "Viewport view", exact: true }).boundingBox())!;
   expect(box.x).toBeGreaterThanOrEqual(bounds.x); expect(box.x + box.width).toBeLessThanOrEqual(bounds.x + bounds.width);
-  expect(box.x).toBeGreaterThan(camera.x + camera.width); expect(box.x).toBeGreaterThan(zRail.x + zRail.width);
-  expect(box.y + box.height).toBeLessThanOrEqual(viewSwitch.y);
+  expect(box.x).toBeGreaterThan(zRail.x + zRail.width);
+  expect(box.y + box.height).toBeLessThanOrEqual(camera.y);
   const selects = await panel.getByRole("combobox").all();
   const boxes = await Promise.all(selects.map(select => select.boundingBox()));
   for (const other of boxes.slice(1)) { expect(other!.x).toBeCloseTo(boxes[0]!.x, 0); expect(other!.width).toBeCloseTo(boxes[0]!.width, 0); }
@@ -424,7 +421,7 @@ test("XZ section changes the actual camera view, not just the selected button", 
   const canvas = viewer.locator("canvas");
   // An element screenshot includes HTML controls layered over the canvas.
   // Mask those so slider accents cannot masquerade as copper geometry.
-  const masks = [viewer.getByRole("group", { name: "3D camera controls", exact: true }),
+  const masks = [page.getByRole("group", { name: "Zoom controls", exact: true }),
     viewer.getByRole("group", { name: "3D simulation overlays", exact: true }),
     viewer.getByRole("group", { name: "Z height", exact: true }), viewer.getByLabel("Simulation overlay legend")];
   const bitmap = () => canvas.screenshot({ mask: masks, maskColor: "#ffffff" });
