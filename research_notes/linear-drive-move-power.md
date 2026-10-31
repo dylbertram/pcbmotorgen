@@ -7,6 +7,63 @@ remain as a record of what was implemented and tested, not current requirements.
 
 ## Supported model
 
+### Routing sources and coil-end controls, 2026-10-31
+
+UI work tracked as pcbmotorgen#nstw:
+
+- Routing is the first/default left drawer and includes all former Constraints
+  inputs, assembly view, sizing readouts and validation warnings.
+- Routing sources offer `Infinity Braid - Star (Wye)` and `Infinity Braid - Delta`.
+  These are UI variants of the existing `infinity-braid` ID and numeric
+  `connection` values, not new persisted pattern IDs or new copper generators.
+- Optional `end_type` metadata declares a fixed connection or a parameter's
+  values and missing-value default. It passes through Rust/Python loaders and
+  catalog IPC. Coil ends shows declared types read-only. Uploaded/frozen copper
+  and undeclared generators retain editable winding controls in that panel.
+- Legacy absent connection parameters stay absent, so parameter-schema loading
+  cannot silently replace closed copper with Delta. Legacy/unknown values stay
+  visible rather than being silently changed to Star.
+- Auto-select ends retries inference for the current coil, or starts with the
+  first coil. It proposes a reviewable draft; Apply is still required. Failure
+  leaves manual choices intact and offers manual picking. A cancelled proposal
+  does not freeze live generated copper into imported geometry.
+- The highlighted `position | layers` text toggle switches the bottom controls
+  independently of endpoint picking. Entering Coil ends defaults to layers.
+  Both modes remain accessible on narrow screens. Camera fit reserves the
+  measured bar height so it cannot cover a pickable endpoint at reset zoom.
+- Winding-warning shortcuts and help text follow the relocated controls:
+  declared generators open Routing; uploaded copper and undeclared generators
+  open Coil ends. Opening a design drawer clears the terminal-panel request so
+  it cannot immediately reopen Coil ends over the requested drawer.
+
+No routing geometry, terminal heuristic, phase/polarity convention, DFM policy,
+or physics model changed. Fresh 2/4/6/8-layer native routing JSON and all eight
+3/5-strand preview payloads are byte-identical to
+`auto-terminals-matrix-20261031`. The seven supplied files remain untracked and
+untouched. Native plugin API is now 3 because the returned metadata structure
+changed; old binaries are rejected before pattern creation and must be rebuilt.
+Python metadata remains optional and backward compatible.
+
+Verification: 730 Rust tests passed with `cargo test --workspace`; 576 frontend
+tests passed, four skipped, with `PCB_MOTOR_TERMINAL_FIXTURES` set to fresh
+`routing-controls-native-20261031` exports. This includes auto-selection at all
+four layer counts and both strand counts. Svelte check has zero errors/warnings;
+build passes with the existing bundle-size warning. The complete 216-case
+affected browser suite passes at desktop widths and with mobile subcases,
+including uploaded files, manual endpoint choices, plugin dialogs, settings and
+simulation navigation. A driver-layout test now retries its full assertion
+because an asynchronous result replacement can invalidate an earlier bounds
+read; no layout coverage was removed. Earlier failed/timed-out runs are retained
+separately. Artifacts live in the approved temp directory under
+`routing-controls-browser-verified-20261031`,
+`routing-controls-targeted-final-20261031` and `routing-controls-native-20261031`.
+After the warning-shortcut integration, all 52 routing/driver/dock browser checks
+pass in `routing-controls-navigation-verified-20261031`, including new uploaded
+Delta navigation and generated-source navigation with Coil ends already open.
+The imported case also exposed a missing action: it previously checked only the
+generated connection before offering the shortcut. It now checks the active
+import's connection, without changing any electrical calculations.
+
 ### Automatic winding terminals retain exact via spans, 2026-10-31
 
 The user reported failed automatic star/end-point selection after the even-layer

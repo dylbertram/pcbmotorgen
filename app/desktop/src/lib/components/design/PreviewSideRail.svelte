@@ -15,7 +15,7 @@
    */
   import { fly } from "svelte/transition";
   import { onDestroy } from "svelte";
-  import { Layers, SlidersHorizontal, X, Plug, CircuitBoard, Ruler, Route, Magnet, Gauge } from "@lucide/svelte";
+  import { Layers, SlidersHorizontal, X, Plug, CircuitBoard, Route, Magnet, Gauge } from "@lucide/svelte";
   import type { Snippet } from "svelte";
   import { DESIGN_PANELS, isDesignPanel, isLeftPanel, type DesignPanelId, type PreviewPanelId } from "./previewPanels";
   import CoilTerminalPanel from "./CoilTerminalPanel.svelte";
@@ -36,7 +36,7 @@
     phases = [], showMotorControls = false, hasPolePitchData = false,
     hasBandWidthData = false, hasPoleRegionData = false, poleRegionPhases = [],
     geometry, selection, assignmentDisabled = false, terminalTool, onStartTerminals,
-    terminalsDisabled = false, dismissOnOutsideClick = true, showViewMode = false, config,
+    terminalsDisabled = false, dismissOnOutsideClick = true, showViewMode = false, config, generated = false,
     drive = null, driveError = null, drivePending = false,
     designSettings, designOnly = false, drawingOnly = false, open = $bindable<PreviewPanelId | null>(null), active = true }: {
     designOnly?: boolean;
@@ -46,6 +46,7 @@
     open?: PreviewPanelId | null;
     /** Shared motor settings, supplied by the expanded coil preview. */
     config?: ConfigStore;
+    generated?: boolean;
     drive?: DriveAnalysis | null;
     driveError?: string | null;
     drivePending?: boolean;
@@ -82,11 +83,11 @@
 
   const rippleCheck = $derived(drive?.checks.find((check) => check.id === "ripple"));
   let railEl: HTMLDivElement | null = $state(null);
-  const triggers: Partial<Record<PreviewPanelId, HTMLButtonElement | null>> = {};
+  const triggers = $state<Partial<Record<PreviewPanelId, HTMLButtonElement | null>>>({});
   const panelClass = $derived(`absolute bottom-0 top-0 z-30 flex w-60 flex-col overflow-hidden border-slate-700 bg-slate-900 text-slate-200 ${designOnly ? 'left-full max-w-[calc(100vw-8.25rem)] border-r shadow-[12px_0_20px_-8px_rgba(0,0,0,0.4)] [clip-path:inset(0_-32px_0_0)]' : 'right-full max-w-[calc(100vw-6rem)] border-l shadow-xl shadow-black/40'}`);
-  const designIcons = { constraints: Ruler, stackup: Layers, routing: Route, magnets: Magnet, drive: Gauge };
+  const designIcons = { stackup: Layers, routing: Route, magnets: Magnet, drive: Gauge };
   const activeDesignPanel = $derived(DESIGN_PANELS.find(({ id }) => id === open));
-  onDestroy(() => { if (!drawingOnly) { terminalTool?.cancel(); view.terminalPanelOpen = false; } });
+  onDestroy(() => { if (!drawingOnly) { terminalTool?.cancel(); view.setTerminalPanelOpen(false); } });
   // An outside request (the Simulation tab's ends alert) sets
   // `view.terminalPanelOpen`; mirror it into the local panel state.
   $effect(() => {
@@ -96,12 +97,12 @@
   function toggle(panel: PreviewPanelId) {
     if (open === "terminals") terminalTool?.cancel();
     open = open === panel ? null : panel;
-    view.terminalPanelOpen = open === "terminals";
+    view.setTerminalPanelOpen(open === "terminals");
   }
   function close() {
     const panel = open;
     open = null;
-    view.terminalPanelOpen = false;
+    view.setTerminalPanelOpen(false);
     if (panel === "terminals") terminalTool?.cancel();
     if (panel) triggers[panel]?.focus();
   }
@@ -183,13 +184,16 @@
 
   {#if !drawingOnly}
   {#if open === "terminals" && geometry && terminalTool && onStartTerminals}
-    <div role="dialog" aria-label="Coil terminals" aria-modal="false" class={`${panelClass} ${showMotorControls ? 'max-sm:bottom-20' : ''}`} transition:fly={{ x: designOnly ? -16 : 16, duration: 140 }}>
+    <div role="dialog" aria-label="Coil terminals" aria-modal="false" class={`${panelClass} ${showMotorControls ? 'max-lg:bottom-32' : ''}`} transition:fly={{ x: designOnly ? -16 : 16, duration: 140 }}>
       <header class="flex shrink-0 items-center justify-between border-b border-slate-700 px-3 py-2">
         <h3 class="text-sm font-semibold">Coil ends</h3>
         <button type="button" aria-label="Close terminals panel" onclick={close} class="rounded p-1 text-slate-400 hover:bg-slate-800"><X size={16} aria-hidden="true" /></button>
       </header>
       <div class="min-h-0 overflow-y-auto overscroll-contain p-3">
-        <CoilTerminalPanel tool={terminalTool} {geometry} onStart={(coil) => { selection?.setMode("pan"); onStartTerminals(coil); }} disabled={terminalsDisabled} />
+        <CoilTerminalPanel tool={terminalTool} {geometry} declaredConnection={generated ? config?.generatorConnection : null} connectionLocked={generated && !!config?.generatorEndType}
+          connectionParam={generated && !config?.generatorEndType ? config?.routing_param_defs.find((def) => def.key === "connection") : undefined}
+          connectionValue={config?.routing_params.connection} onConnectionParamChange={generated && config ? (value) => config?.setRoutingParam("connection", value) : undefined}
+          onStart={(coil) => { selection?.setMode("pan"); onStartTerminals(coil); }} disabled={terminalsDisabled} />
       </div>
     </div>
   {/if}

@@ -40,6 +40,15 @@ export class CoilPreviewViewState {
   showVias = $state(true);
   showTerminals = $state(true);
   terminalPanelOpen = $state(false);
+  positionBarMode = $state<"position" | "layers">("position");
+  /** Measured overlay height, reserved by the endpoint-picking camera fit. */
+  positionBarHeight = $state(0);
+
+  setTerminalPanelOpen(open: boolean): void {
+    if (open && !this.terminalPanelOpen) this.positionBarMode = "layers";
+    if (!open && this.terminalPanelOpen) this.positionBarMode = "position";
+    this.terminalPanelOpen = open;
+  }
 
   // --- outside requests -----------------------------------------------------
   /** Incremented by an outside prompt (the Simulation tab's ends alert) to
@@ -50,7 +59,7 @@ export class CoilPreviewViewState {
 
   requestTerminals(coil?: string): void {
     this.requestedTerminalCoil = coil;
-    this.terminalPanelOpen = true;
+    this.setTerminalPanelOpen(true);
     this.terminalRequest += 1;
   }
 

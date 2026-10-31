@@ -254,7 +254,7 @@
         {#if designSettings}
           <div class="absolute bottom-0 left-0 z-20 w-11" style:top={`${toolbarHeight}px`}>
             <PreviewSideRail designOnly {designSettings} bind:open={sidePanel} {active} {view} {config} {drive} {driveError} {drivePending}
-              {terminalTool} {onStartTerminals} terminalsDisabled={!onGeometryChange || view.viewMode === "iso"}
+              {terminalTool} {onStartTerminals} generated={!importedGeometry} terminalsDisabled={!onGeometryChange || view.viewMode === "iso"}
               geometry={terminalGeometry ?? importedGeometry} selection={importedGeometry ? selection : undefined}
               showMotorControls={true} layers={[]} label="Design settings" displayLabel="Design settings" dismissOnOutsideClick={false} />
           </div>
@@ -263,7 +263,7 @@
         <!-- Right rail: hangs from the bottom of the top toolbar down to the
              status bar, so the Layers and Display panels pull out under it. -->
         <div class="absolute bottom-0 right-0 z-20 w-11" style:top={`${toolbarHeight}px`}>
-          <PreviewSideRail drawingOnly={!!designSettings} {config} {drive} {driveError} {drivePending} {view} bind:open={sidePanel} {active} layers={importedGeometry ? importedGeometry.layer_z_mm.map((_, idx) => ({ idx })) : uniqueLayers} phases={importedGeometry ? [] : uniquePhases}
+            <PreviewSideRail drawingOnly={!!designSettings} generated={!importedGeometry} {config} {drive} {driveError} {drivePending} {view} bind:open={sidePanel} {active} layers={importedGeometry ? importedGeometry.layer_z_mm.map((_, idx) => ({ idx })) : uniqueLayers} phases={importedGeometry ? [] : uniquePhases}
             {terminalTool} {onStartTerminals} terminalsDisabled={!onGeometryChange || view.viewMode === "iso"}
            geometry={terminalGeometry ?? importedGeometry} selection={importedGeometry ? selection : undefined} assignmentDisabled={view.viewMode === "iso" || !importedGeometry || !onGeometryChange || measure.mode || !!terminalTool?.active || view.oneSection}
           coils={importedGeometry ? uniquePhases.map((phase) => ({ name: phase.name, colorIdx: phase.colorIdx })) : []}
@@ -293,15 +293,9 @@
              moves inside the lightbox. The phase-waveform popover is anchored
              directly above this box at the same width, so it cannot be moved. -->
         {#if view.viewMode === "top"}
-        <div class="absolute bottom-3 z-20 flex w-[min(420px,calc(100%-4rem))] flex-col gap-2 {sidePanel ? 'max-lg:hidden' : ''}" style:left={`${leftDockWidth + 8}px`} style:max-width={`calc(100% - ${leftDockWidth + dockWidth + 60}px)`}>
-          {#if terminalPanelOpen}
-            <div class="rounded-md border border-slate-700 bg-slate-900/95 p-3">
-              <PreviewLayerSlider {view} layers={importedGeometry ? importedGeometry.layer_z_mm.map((_, idx) => ({ idx })) : uniqueLayers} onSelect={(layer) => { if (layer !== null && terminalTool?.active) terminalTool.chooseLayer(layer); view.phaseVisibility = []; }} />
-            </div>
-          {:else}
-          {#if !embedded && view.showWaveform}
-            <div role="dialog" aria-label="Phase waveform"
-              class="relative">
+        <div bind:clientHeight={view.positionBarHeight} class="position-bar absolute bottom-3 z-20 flex w-[min(420px,calc(100%-4rem))] flex-col gap-2 {sidePanel && !terminalPanelOpen ? 'max-lg:hidden' : ''}" class:terminal-position-bar={terminalPanelOpen} style:left={`${leftDockWidth + 8}px`} style:max-width={`calc(100% - ${leftDockWidth + dockWidth + 60}px)`}>
+          {#if view.positionBarMode === "position" && !embedded && view.showWaveform}
+            <div role="dialog" aria-label="Phase waveform" class="relative">
               <button type="button" aria-label="Close phase waveform"
                 class="absolute right-1 top-1 z-10 rounded p-1 text-slate-400 hover:bg-slate-800 hover:text-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
                 onclick={() => { view.showWaveform = false; }}><X size={16} aria-hidden="true" /></button>
@@ -309,9 +303,17 @@
             </div>
           {/if}
           <div class="rounded-md border border-slate-700 bg-slate-900/95 p-3">
+            <div role="group" aria-label="Position bar mode" class="mb-2 flex items-center gap-2 text-xs text-slate-500">
+              <button type="button" aria-pressed={view.positionBarMode === "position"} onclick={() => { view.positionBarMode = "position"; }} class="rounded text-slate-400 hover:text-slate-100 aria-pressed:font-semibold aria-pressed:text-emerald-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500">position</button>
+              <span aria-hidden="true">|</span>
+              <button type="button" aria-pressed={view.positionBarMode === "layers"} onclick={() => { view.positionBarMode = "layers"; }} class="rounded text-slate-400 hover:text-slate-100 aria-pressed:font-semibold aria-pressed:text-emerald-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500">layers</button>
+            </div>
+          {#if view.positionBarMode === "layers"}
+              <PreviewLayerSlider {view} layers={importedGeometry ? importedGeometry.layer_z_mm.map((_, idx) => ({ idx })) : uniqueLayers} onSelect={(layer) => { if (layer !== null && terminalTool?.active) terminalTool.chooseLayer(layer); view.phaseVisibility = []; }} />
+          {:else}
             <MoverPositionControls {config} {motion} showWaveform={false} compact />
-          </div>
           {/if}
+          </div>
         </div>
         {/if}
       </div>
@@ -328,3 +330,12 @@
       {/if}
 
 {/snippet}
+
+<style>
+  @media (max-width: 1023px) {
+    .terminal-position-bar {
+      left: 3.25rem !important;
+      max-width: calc(100% - 6.5rem) !important;
+    }
+  }
+</style>

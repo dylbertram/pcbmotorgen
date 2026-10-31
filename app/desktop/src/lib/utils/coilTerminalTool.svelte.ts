@@ -95,6 +95,29 @@ export class CoilTerminalTool {
     this.#options.onReveal(this.coil, layer);
   };
 
+  /** Retry inference into a draft. Saved/manual choices change only on Apply. */
+  autoSelect = () => {
+    if (!this.active) this.begin();
+    if (!this.active || !this.#base || !this.coil) {
+      this.error = "No trace endpoints available. Load or generate a winding first.";
+      return;
+    }
+    const pair = defaultCadTerminals(this.#base, this.coil);
+    if (!pair) {
+      this.error = `Couldn't identify both ends for ${this.coil}. Select them manually.`;
+      return;
+    }
+    this.input = pair.input;
+    this.output = pair.output;
+    this.defaultKind = "open";
+    this.step = "review";
+    this.error = "";
+    this.notice = `Automatic ends found for ${this.coil}. Review them, then apply.`;
+    this.#options.onReveal(this.coil, pair.input.layer);
+    this.#options.onReveal(this.coil, pair.output.layer);
+    this.#options.onFit?.();
+  };
+
   change = (role: "input" | "output") => {
     if (!this.active || !this.coil) return;
     this.step = role;

@@ -94,7 +94,7 @@
   let coilPreviewExpanded = $state(false);
   let motorWorkspaceHeight = $state(0);
   let motorStatusHeight = $state(0);
-  let previewPanel = $state<PreviewPanelId | null>("constraints");
+  let previewPanel = $state<PreviewPanelId | null>("routing");
   let coilPreview: CoilPreview | undefined = $state();
   let drivePending = $state(false);
   let loading = $state(false);
@@ -718,7 +718,10 @@
                 powerInput={{ config: config.toIpc(), driveSettings: config.drive, desiredTravelMm: config.desired_travel_mm, topology: config.topology, cadGeometry: projects.cadGeometry, sweep: powerSweep, drive: powerDrive, native: isTauriAvailable() }}
                 open={activeTab === "simulate"}
                 availableHeight={Math.max(0, motorWorkspaceHeight - motorStatusHeight)}
-                onConfigureWinding={() => coilPreview?.showDesignSettings("routing")}
+                onConfigureWinding={() => {
+                  if (projects.cadGeometry || !config.generatorEndType) session.previewView.requestTerminals();
+                  else coilPreview?.showDesignSettings("routing");
+                }}
                 onShow3D={() => { session.previewView.viewMode = "iso"; previewPanel = null; }}
                 {config}
                 active={active && activeTab === "simulate"}

@@ -6,7 +6,6 @@
   import { ChevronDown, ChevronUp } from "@lucide/svelte";
   import type { ConfigStore } from "../../stores/config.svelte";
   import type { ForceSweepResult, FrictionBudgetDto, HeightStackResultDto, DriveAnalysis, CadGeometry } from "../../types";
-  import { unmappedCoils } from "../../cadPhases";
   import { cadMappingProblems } from "../../cadMapping";
   import { inferMissingCoilEnds } from "../../cadTerminals";
   import { usesDeltaConnection } from "../../driverConnection";
@@ -166,7 +165,7 @@
     </Tabs.Content>
     <Tabs.Content value="driver" data-dock-panel="driver" class="min-h-0 flex-1 overflow-auto p-3">
       {@render warnings()}
-      <DriverSuitability embedded analysis={drive} error={driveError} onConfigureWinding={usesDeltaConnection(config.toIpc(), !!cadGeometry && !unmappedCoils(cadGeometry).length) ? onConfigureWinding : undefined} />
+      <DriverSuitability embedded analysis={drive} error={driveError} onConfigureWinding={(cadGeometry ? cadGeometry.terminal_connection === "delta" : config.generatorConnection === "delta" || (!config.generatorEndType && usesDeltaConnection(config.toIpc()))) ? onConfigureWinding : undefined} />
     </Tabs.Content>
     <Tabs.Content value="summary" data-dock-panel="summary" class="min-h-0 flex-1 overflow-auto p-3">
       {@render warnings()}

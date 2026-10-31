@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { gotoDesignApp } from "./helpers";
+import { gotoDesignApp, selectRoutingConnection } from "./helpers";
 
 async function selectPanel(page: import("@playwright/test").Page, name: string) {
   const trigger = page.getByRole("toolbar", { name: "Design side tools", exact: true }).getByRole("button", { name, exact: true });
@@ -91,7 +91,6 @@ test("Simulate opens four result tabs below the same live coil workspace", async
 test("driver results use bounded meters and horizontal subsections", async ({ page }, testInfo) => {
   await gotoDesignApp(page);
   await selectPanel(page, "Routing");
-  await page.getByRole("combobox", { name: "Winding connection", exact: true }).selectOption("2");
   await page.getByRole("tab", { name: /^Simulate/i }).click();
   const dock = page.getByRole("region", { name: "Simulation results", exact: true });
   await dock.getByRole("tab", { name: "Driver suitability", exact: true }).click();
@@ -99,14 +98,26 @@ test("driver results use bounded meters and horizontal subsections", async ({ pa
   const checks = dock.getByRole("region", { name: "Driver checks", exact: true });
   await expect(voltage).toBeVisible();
   await expect(checks).toBeVisible();
-  const voltageBounds = (await voltage.boundingBox())!;
-  const checkBounds = (await checks.boundingBox())!;
-  expect(checkBounds.x).toBeGreaterThan(voltageBounds.x);
-  expect(Math.abs(checkBounds.y - voltageBounds.y)).toBeLessThanOrEqual(1);
-  expect((await voltage.getByLabel("Voltage budget", { exact: true }).boundingBox())!.width).toBeLessThanOrEqual(384);
-  for (const meter of await checks.locator(".check-meter").all()) {
-    expect((await meter.boundingBox())!.width).toBeLessThanOrEqual(320);
-  }
+  // Sweep completion can replace the driver result between these reads.
+  // Retry the whole layout assertion rather than dereferencing stale bounds.
+  await expect(async () => {
+    const voltageBounds = await voltage.boundingBox();
+    const checkBounds = await checks.boundingBox();
+    expect(voltageBounds).not.toBeNull();
+    expect(checkBounds).not.toBeNull();
+    expect(checkBounds!.x).toBeGreaterThan(voltageBounds!.x);
+    expect(Math.abs(checkBounds!.y - voltageBounds!.y)).toBeLessThanOrEqual(1);
+    const budget = await voltage.getByLabel("Voltage budget", { exact: true }).boundingBox();
+    expect(budget).not.toBeNull();
+    expect(budget!.width).toBeLessThanOrEqual(384);
+    const meters = await checks.locator(".check-meter").all();
+    expect(meters.length).toBeGreaterThan(0);
+    for (const meter of meters) {
+      const bounds = await meter.boundingBox();
+      expect(bounds).not.toBeNull();
+      expect(bounds!.width).toBeLessThanOrEqual(320);
+    }
+  }).toPass({ timeout: 5000 });
   await expect(dock.getByRole("region", { name: "Operating limits", exact: true })).toBeVisible();
   await expect(dock.getByRole("region", { name: "Routed copper measurements", exact: true })).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath("simulation-driver.png") });
@@ -207,7 +218,6 @@ test("driver results update from the target panel even when the thrust sweep fai
   }));
   await gotoDesignApp(page);
   await selectPanel(page, "Routing");
-  await page.getByRole("combobox", { name: "Winding connection", exact: true }).selectOption("2");
   await page.getByRole("tab", { name: /^Simulate/i }).click();
   const dock = page.getByRole("region", { name: "Simulation results", exact: true });
   await dock.getByRole("tab", { name: "Driver suitability", exact: true }).click();
@@ -242,14 +252,14 @@ test("touch dragging the resize handle changes the dock height", async ({ page }
 
 test("winding connection warnings open Routing without hiding the results dock", async ({ page }) => {
   await gotoDesignApp(page);
+  await selectRoutingConnection(page, "delta");
   await page.getByRole("tab", { name: /^Simulate/i }).click();
   const dock = page.getByRole("region", { name: "Simulation results", exact: true });
   await dock.getByRole("tab", { name: "Driver suitability", exact: true }).click();
   await dock.getByRole("button", { name: "Change winding connection", exact: true }).click();
   await expect(dock).toBeVisible();
   await expect(page.getByRole("tab", { name: /^Simulate/i })).toHaveAttribute("aria-selected", "true");
-  const routing = page.getByRole("dialog", { name: "Routing", exact: true });
-  await routing.getByRole("combobox", { name: "Winding connection", exact: true }).selectOption("2");
+  await selectRoutingConnection(page, "star");
   await expect(dock.getByRole("list", { name: "Driver checks", exact: true })).toBeVisible();
   await expect(dock.getByText(/Driver analysis failed:/)).toHaveCount(0);
 });

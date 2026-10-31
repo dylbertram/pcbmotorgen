@@ -12,7 +12,7 @@ export function usesDeltaConnection(config: Pick<LinearMotorConfig, "routing_pat
 
 export function driverConnectionError(driver: DriverSpec, delta: boolean): string | null {
   if (!delta) return null;
-  const location = "Go to Design > Topology & Board > Winding connection and select Star (wye).";
+  const location = "Choose a Star (Wye) routing source in Routing. For uploaded copper, set Winding connection in Coil ends.";
   if (!driver.supports_delta) {
     return `${driver.name} has no declared built-in delta handling. Star (wye) configuration is required. ${location}`;
   }

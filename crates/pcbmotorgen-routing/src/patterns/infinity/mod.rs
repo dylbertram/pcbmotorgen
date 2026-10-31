@@ -142,7 +142,28 @@ impl RoutingPattern for InfinityBraidPattern {
     }
 
     fn display_name(&self) -> &str {
-        "Infinity Braid (pcbBraid)"
+        "Infinity Braid"
+    }
+
+    fn metadata(&self) -> crate::PluginMetadata {
+        use crate::pattern::{EndTypeOption, GeneratorEndType, WindingConnection};
+        crate::PluginMetadata {
+            display_name: self.display_name().to_string(),
+            description: self.description().to_string(),
+            min_layers: self.min_layers(),
+            max_layers: self.max_layers(),
+            layers_multiple_of: self.layers_multiple_of(),
+            end_type: Some(GeneratorEndType::Parameter {
+                key: "connection".to_string(),
+                default: Connection::CLOSED,
+                options: vec![
+                    EndTypeOption { value: Connection::STAR, connection: WindingConnection::Star },
+                    EndTypeOption { value: Connection::DELTA, connection: WindingConnection::Delta },
+                    EndTypeOption { value: Connection::CLOSED, connection: WindingConnection::Closed },
+                ],
+            }),
+            ..crate::PluginMetadata::new(self.id())
+        }
     }
 
     fn description(&self) -> &str {

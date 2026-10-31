@@ -234,6 +234,7 @@ pub fn register_python_runner(
             min_layers: meta.min_layers,
             max_layers: meta.max_layers,
             layers_multiple_of: meta.layers_multiple_of,
+            end_type: meta.end_type,
         });
         pattern.set_parameters(meta.parameters);
     } else if let Some(id) = custom_id {

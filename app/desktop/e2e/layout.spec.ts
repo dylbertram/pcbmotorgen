@@ -35,7 +35,6 @@ test.describe("Workspace layout geometry", () => {
   test("simulation dock scrolls results without moving the workspace", async ({ page }, testInfo) => {
     await gotoDesignApp(page);
     await selectDesignPanel(page, "Routing");
-    await page.getByRole("combobox", { name: "Winding connection", exact: true }).selectOption("2");
     await page.getByRole("tab", { name: /^Simulate/i }).click();
     const dock = page.getByRole("region", { name: "Simulation results", exact: true });
     await dock.getByRole("tab", { name: "Driver suitability", exact: true }).click();
@@ -78,7 +77,6 @@ test.describe("Workspace layout geometry", () => {
   test("switching workflow tabs preserves the selected drawer and simulation scroll", async ({ page }) => {
     await gotoDesignApp(page);
     await selectDesignPanel(page, "Routing");
-    await page.getByRole("combobox", { name: "Winding connection", exact: true }).selectOption("2");
     await page.getByRole("button", { name: "Display", exact: true }).click();
     await page.getByRole("tab", { name: /^Simulate/i }).click();
     const dock = page.getByRole("region", { name: "Simulation results", exact: true });

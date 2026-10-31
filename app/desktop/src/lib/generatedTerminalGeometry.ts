@@ -2,14 +2,14 @@ import type { CadGeometry, CoilPathDto } from "./types";
 import { withAutomaticCadTerminals } from "./cadTerminals";
 
 /** Generated preview coordinates are metres; terminal editing uses millimetres. */
-export function generatedTerminalGeometry(coils: CoilPathDto, layerCount: number, thickness: number, traceWidth: number, connection?: number): CadGeometry {
+export function generatedTerminalGeometry(coils: CoilPathDto, layerCount: number, thickness: number, traceWidth: number, connection?: number | "star" | "delta" | "closed"): CadGeometry {
   const point = ([x, y]: [number, number]) => ({ x: x * 1000, y: y * 1000 });
   const geometry: CadGeometry = {
     // Match DriveGeometryHints::layer_z and the actual generated host export:
     // layer0 is PCB top z=0; increasing layer indices run down into the board.
     layer_z_mm: Array.from({ length: layerCount }, (_, i) => i === 0 ? 0 : -thickness * i / (layerCount - 1)),
     trace_width_mm: traceWidth,
-    ...(connection === 1 ? { terminal_connection: "delta" as const } : connection === 2 ? { terminal_connection: "star" as const } : {}),
+    ...(connection === 1 || connection === "delta" ? { terminal_connection: "delta" as const } : connection === 2 || connection === "star" ? { terminal_connection: "star" as const } : {}),
     routing: {
       format_version: 2,
       segments: coils.phases.flatMap((phase) => phase.segments.map((segment) => ({ ...segment, start: point(segment.start), end: point(segment.end), layer: phase.layer_idx, net: phase.phase_name }))),

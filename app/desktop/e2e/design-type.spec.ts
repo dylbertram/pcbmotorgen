@@ -25,7 +25,7 @@ test("file tabs replace the type toggle and support keyboard switching", async (
   await page.keyboard.press("ArrowLeft");
   await expect(motor).toHaveAttribute("aria-selected", "true");
   await expect(sensor).toHaveAttribute("aria-selected", "false");
-  await expect(page.getByRole("dialog", { name: "Constraints", exact: true })).toBeVisible();
+  await expect(page.getByRole("dialog", { name: "Routing", exact: true })).toBeVisible();
 });
 
 test("motor magnet settings stay visible when clicking the section heading", async ({ page }) => {

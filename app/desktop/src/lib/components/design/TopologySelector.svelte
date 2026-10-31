@@ -5,6 +5,7 @@
   import Separator from "../ui/Separator.svelte";
   import RoutingParamsPanel from "./RoutingParamsPanel.svelte";
   import GeneratorUploadPanel from "../plugins/GeneratorUploadPanel.svelte";
+  import { routingSources } from "../../routingSources";
 
   let { config, cadGeometryActive = false, cadSourceFileName, onImportCad, onUseGenerated }: {
     config: ConfigStore;
@@ -21,6 +22,7 @@
   const importedLabel = $derived(cadSourceFileName?.trim() || "Imported DXF design");
 
   let modalOpen = $state(false);
+  const sources = $derived(routingSources(config.routing_patterns, config.routing_pattern, config.routing_params));
 
   /** Pattern-declared layer range, shown beside the layer selector. */
   const layerRangeLabel = $derived(formatLayerRange(config.patternLayerRange));
@@ -32,6 +34,8 @@
   $effect(() => {
     if (cadGeometryActive) return;
     const id = config.routing_pattern;
+    // Wait for the catalog's missing-value contract before seeding parameters.
+    if (!config.routing_patterns.some((pattern) => pattern.id === id)) return;
     void config.loadRoutingParams(id);
   });
 
@@ -39,7 +43,9 @@
   // Function binding keeps the active source selected when either dialog closes.
   function patternBindingGet(): string {
     if (cadGeometryActive) return IMPORTED_VALUE;
-    return config.routing_patterns.length === 0 ? "" : config.routing_pattern;
+    const metadata = config.generatorEndType;
+    const current = metadata?.kind === "parameter" ? config.routing_params[metadata.key] ?? metadata.default : undefined;
+    return sources.find((source) => source.patternId === config.routing_pattern && (!source.parameter || source.parameter.value === current))?.value ?? "";
   }
 
   function patternBindingSet(v: string): void {
@@ -52,7 +58,12 @@
       modalOpen = true;
       return;
     }
-    config.routing_pattern = v;
+    const source = sources.find((source) => source.value === v);
+    if (!source) return;
+    config.routing_pattern = source.patternId;
+    const metadata = config.generatorEndType;
+    const current = source.parameter ? config.routing_params[source.parameter.key] ?? (metadata?.kind === "parameter" ? metadata.default : undefined) : undefined;
+    if (source.parameter && source.parameter.value !== current) config.setRoutingParam(source.parameter.key, source.parameter.value);
     onUseGenerated();
   }
 
@@ -62,9 +73,9 @@
   const patternItems = $derived(
     [
           ...(cadGeometryActive ? [{ value: IMPORTED_VALUE, label: importedLabel }] : []),
-          ...config.routing_patterns.map((p) => ({
-            value: p.id,
-            label: p.display_name,
+           ...sources.map((source) => ({
+             value: source.value,
+             label: source.label,
           })),
           { value: LOAD_VALUE, label: "+ Load new generator…" },
           { value: FILE_VALUE, label: "Load design from file…" },
@@ -126,13 +137,13 @@
           {#if cadGeometryActive}
             <Select.Item value={IMPORTED_VALUE} label={importedLabel} class="px-2.5 py-1.5 text-xs text-sky-200 outline-none data-[highlighted]:bg-slate-700/60">{importedLabel}</Select.Item>
           {/if}
-          {#each config.routing_patterns as pattern (pattern.id)}
+           {#each sources as source (source.value)}
             <Select.Item
-              value={pattern.id}
-              label={pattern.display_name}
+               value={source.value}
+               label={source.label}
               class="flex cursor-pointer items-center justify-between gap-2 px-2.5 py-1.5 text-xs text-slate-100 outline-none data-[selected]:bg-slate-700 data-[highlighted]:bg-slate-700/60 data-[highlighted]:text-emerald-200 data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50"
             >
-              {pattern.display_name}
+               {source.label}
             </Select.Item>
           {/each}
           {#if config.routing_patterns.length > 0}
