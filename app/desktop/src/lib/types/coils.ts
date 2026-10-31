@@ -18,6 +18,13 @@ export interface CoilArcDto {
   is_active?: boolean;
 }
 
+/** Exact inter-layer barrel span; position is in metres. */
+export interface CoilViaDto {
+  position: [number, number];
+  from_layer: number;
+  to_layer: number;
+}
+
 export interface PhaseCoilDto {
   phase_idx: number;
   layer_idx: number;
@@ -38,6 +45,8 @@ export interface PhaseCoilDto {
   splines?: CadRouteSpline[];
   /** Center positions of inter-layer vias, (x, y) [m]. */
   via_positions?: [number, number][];
+  /** Exact spans, authoritative even when empty; absent/null on older payloads. */
+  routed_vias?: CoilViaDto[] | null;
 }
 
 /**

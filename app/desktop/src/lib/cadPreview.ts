@@ -220,7 +220,7 @@ export function cadGeometryToPreview(geometry: CadGeometry): CoilPathDto {
       if (!netOrder.has(net)) netOrder.set(net, netOrder.size);
       coil = {
         phase_idx: netOrder.get(net)!, layer_idx: layer, phase_name: net,
-        pattern_id: "imported-cad", segments: [], corner_arcs: [], via_positions: [],
+        pattern_id: "imported-cad", segments: [], corner_arcs: [], via_positions: [], routed_vias: [],
         total_length_m: 0, active_length_m: 0, end_turn_length_m: 0,
         active_conductor_count: 0, bounding_box: [0, 0, 0, 0],
         terminal_start: [0, 0], terminal_end: [0, 0],
@@ -270,6 +270,9 @@ export function cadGeometryToPreview(geometry: CadGeometry): CoilPathDto {
     else coil.end_turn_length_m += length;
   }
   for (const via of geometry.routing.vias) {
+    getGroup(via.from_layer, via.net).routed_vias!.push({
+      position: [via.position.x * M, via.position.y * M], from_layer: via.from_layer, to_layer: via.to_layer,
+    });
     getGroup(via.from_layer, via.net).via_positions!.push([via.position.x * M, via.position.y * M]);
     getGroup(via.to_layer, via.net).via_positions!.push([via.position.x * M, via.position.y * M]);
   }

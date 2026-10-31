@@ -184,6 +184,17 @@ fn supplied_even_layer_copper_matches_generated_active_stack() {
             let mut file = std::fs::OpenOptions::new().write(true).create_new(true)
                 .open(output.join(format!("reference-{layers}-layer.json"))).unwrap();
             serde_json::to_writer(&mut file, raw).unwrap();
+            let mut preview_file = std::fs::OpenOptions::new().write(true).create_new(true)
+                .open(output.join(format!("generated-{layers}-preview.json"))).unwrap();
+            serde_json::to_writer(&mut preview_file, &preview).unwrap();
+            // Also exercise the application's usual five-strand setting through
+            // the real command, not a hand-written frontend braid fixture.
+            let mut five_strand_ipc = state.to_linear_motor_ipc();
+            five_strand_ipc.routing_params.insert("num_strands".into(), 5.0);
+            let five_strand_preview = tauri::async_runtime::block_on(super::physics::generate_coils(five_strand_ipc)).unwrap();
+            let mut five_file = std::fs::OpenOptions::new().write(true).create_new(true)
+                .open(output.join(format!("generated-{layers}-five-strand-preview.json"))).unwrap();
+            serde_json::to_writer(&mut five_file, &five_strand_preview).unwrap();
         }
     }
     assert_eq!(std::fs::read(root.join("star_2-layer.pmmotor")).unwrap(), two_bytes);

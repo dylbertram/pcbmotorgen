@@ -7,6 +7,76 @@ remain as a record of what was implemented and tested, not current requirements.
 
 ## Supported model
 
+### Automatic winding terminals retain exact via spans, 2026-10-31
+
+The user reported failed automatic star/end-point selection after the even-layer
+work. Fresh `generate_coils` IPC payloads reproduced it: two layers selected
+correctly, while 4/6/8 layers returned no automatic pair. Native geometry and
+electrical extraction were still connected. The presentation boundary was losing
+the `PhaseCoil.routed_vias` spans and sending only XY `via_positions`; frontend
+`generatedTerminalGeometry` then guessed an adjacent pair from each presentation
+layer. That replaced full-stack series barrels with false 0/1 connections and
+made the terminal graph disconnected/dangling.
+
+`PhaseCoilIpc` now carries optional `routed_vias`, with SI-metre positions and
+exact layer indices. The frontend uses those spans when present, including an
+authoritative empty list. Missing/null metadata keeps the position-only legacy
+fallback. Native position-only legacy coils omit the new field; serde still
+accepts older payloads without it. The CAD-to-preview adapter also preserves
+spans instead of forcing its consumers to reconstruct them from duplicate XY
+positions. Existing point markers and legacy preview fields are unchanged.
+
+No terminal-inference heuristic, routing geometry, explicit manual choice,
+polarity, DFM rule, solver or power model was changed. Existing disconnected,
+closed/ambiguous-chain and dangling-via refusal tests still pass. Saved/imported
+CAD and known defective raw DXFs are not silently repaired. A previously cached
+native preview must be regenerated with the rebuilt native app to receive the
+new metadata; this does not rewrite saved editable geometry.
+
+The supplied-reference exporter now writes real native preview JSON artifacts.
+`generatedBraidTerminals.native.test.ts` consumes those payloads through the
+actual frontend conversion and `CoilTerminalTool`. It verifies driver ends at
+x=0 on the last layer, the shared neutral endpoint on layer zero, real candidate
+membership, automatic review/apply readiness, revealing both correct layers and
+preserving manual reversal. All eight 2/4/6/8-layer by 3/5-strand combinations
+pass. Removing the exact metadata reproduces the larger-stack failure as a
+negative control. Separate always-on tests cover mixed pair/full-stack spans,
+cut-series disconnection, authoritative emptiness and legacy fallback. Rust
+tests verify SI conversion, backward-compatible serde and every generated via
+surviving the preview boundary at all four layer counts.
+
+Before/after three-strand routing JSON artifacts are byte-identical at each
+layer count. Preview JSON is also identical after removing the additive
+`routed_vias` field. Those payloads retain 393/789/1185/1581 physical vias for
+2/4/6/8 layers respectively. All seven supplied files remain unchanged and
+untracked. No new physics campaign was needed for a presentation-only handoff
+fix; the model remains `linear-move-demand-v11` with its existing limitations.
+
+Evidence in approved temp:
+
+- `auto-terminals-before-20261031` and
+  `auto-terminals-frontend-before-20261031.log`: real pre-fix payloads and the
+  reproduced 4/6/8-layer failures, with two-layer success.
+- `auto-terminals-matrix-20261031` and
+  `auto-terminals-native-matrix-20261031.log`: fresh native 3/5-strand payloads
+  plus separately passing supplied-reference check.
+- `auto-terminals-all-frontend-final-20261031.log`: 568 frontend tests pass,
+  four skip, including all eight native payload/tool cases.
+- `auto-terminals-all-rust-20261031.log`: 728 Rust tests pass, 24 unit and
+  three doc tests ignored. `auto-terminals-ipc-20261031.log` covers the targeted
+  native handoff tests separately.
+- `auto-terminals-check-final-20261031.log`: Svelte check has zero errors/warnings.
+  `auto-terminals-build-20261031.log`: build passes with the existing bundle-size
+  warning.
+
+Reproduce with a fresh output directory:
+`PCB_MOTOR_SUPPLIED_DESIGN_DIR="$PWD" PCB_MOTOR_BRAID_OUTPUT=<fresh-dir> cargo test -p pcbmotorgen supplied_even_layer_copper_matches_generated_active_stack -- --ignored --nocapture`,
+then run frontend tests from `app/desktop` with
+`PCB_MOTOR_TERMINAL_FIXTURES=<fresh-dir> pnpm test`. Without that environment
+variable only the eight native-payload cases skip; the synthetic handoff and
+native serialization regressions remain always-on. Work is tracked as #graf.
+Nothing is pushed.
+
 ### Exact braid angle and via-row lead pitch, 2026-10-31
 
 The user's next screenshot rejected `11e2fcc`'s steeper end legs and enlarged
