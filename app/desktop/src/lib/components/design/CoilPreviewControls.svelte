@@ -59,7 +59,7 @@
   ><Plus size={16} aria-hidden="true" /></button>
   {#if onToggleZoomWindow}
     <button type="button" class="nav-action" aria-label="Zoom window" aria-pressed={zoomWindow}
-      title="Zoom window: click two opposite corners. Escape cancels." onclick={onToggleZoomWindow}><ZoomWindowIcon /></button>
+      title="Zoom window: drag a rectangle or click two opposite corners. Escape cancels." onclick={onToggleZoomWindow}><ZoomWindowIcon /></button>
   {/if}
   {#if onFitExtents}
     <button type="button" class="nav-action" aria-label="Zoom extents" title="Zoom extents" onclick={onFitExtents}><Scan size={16} aria-hidden="true" /></button>
