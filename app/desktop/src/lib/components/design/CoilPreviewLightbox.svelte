@@ -197,7 +197,7 @@
 </script>
 
 {#if embedded || expanded}
-  <NativeViewMenuBridge {view} {active} {hasPolePitchData} {hasBandWidthData} {hasPoleRegionData} />
+  <NativeViewMenuBridge {view} {active} {hasPolePitchData} {hasBandWidthData} {hasPoleRegionData} onFitExtents={fitExtents} onToggleZoomWindow={toggleZoomWindow} />
 {/if}
 
 {#if embedded}
@@ -308,12 +308,12 @@
             <PreviewSideRail designOnly {designSettings} bind:open={sidePanel} {active} {view} {config} {drive} {driveError} {drivePending}
               {terminalTool} {onStartTerminals} generated={!importedGeometry} terminalsDisabled={!onGeometryChange || view.viewMode !== "top"}
               geometry={terminalGeometry ?? importedGeometry} selection={importedGeometry ? selection : undefined}
-              showMotorControls={true} layers={[]} label="Design settings" displayLabel="Design settings" dismissOnOutsideClick={false} />
+              showMotorControls={true} layers={[]} label="Design settings" dismissOnOutsideClick={false} />
           </div>
         {/if}
 
         <!-- Right rail: hangs from the bottom of the top toolbar down to the
-             status bar, so the Layers and Display panels pull out under it. -->
+              status bar, so the Layers panel pulls out under it. -->
         <div class="absolute bottom-0 right-0 z-20 w-11" style:top={`${toolbarHeight}px`}>
              <PreviewSideRail viewControlsInMenu drawingOnly={!!designSettings} generated={!importedGeometry} {config} {drive} {driveError} {drivePending} {view} bind:open={sidePanel} {active} layers={importedGeometry ? importedGeometry.layer_z_mm.map((_, idx) => ({ idx })) : uniqueLayers} phases={importedGeometry ? [] : uniquePhases}
             {terminalTool} {onStartTerminals} terminalsDisabled={!onGeometryChange || view.viewMode !== "top"}
@@ -321,7 +321,7 @@
           coils={importedGeometry ? uniquePhases.map((phase) => ({ name: phase.name, colorIdx: phase.colorIdx })) : []}
           isCoilVisible={(name) => view.isPhaseVisible(uniquePhases.find((phase) => phase.name === name)?.idx ?? -1)}
           onToggleCoil={(name) => { const phase = uniquePhases.find((phase) => phase.name === name); if (phase) view.phaseVisibility[phase.idx] = !view.isPhaseVisible(phase.idx); }} showMotorControls={true}
-            label="Coil preview layers" displayLabel="Coil preview display" {hasPolePitchData} {hasBandWidthData} {hasPoleRegionData} {poleRegionPhases} dismissOnOutsideClick={false} />
+            label="Coil preview layers" {hasPolePitchData} {hasBandWidthData} {hasPoleRegionData} {poleRegionPhases} dismissOnOutsideClick={false} />
         </div>
 
         <!-- Bare zoom buttons: no background, with the same 12px gap on the
@@ -336,7 +336,6 @@
             onZoomOut={() => view.viewMode === "top" ? gestures.zoomOut() : zoomCamera(.8)}
             onResetZoom={() => view.viewMode === "top" ? gestures.zoomReset() : zoomCamera(1 / view.spatialZoom)}
             onResetView={resetView}
-            onFitExtents={fitExtents}
             onToggleZoomWindow={toggleZoomWindow}
             zoomWindow={view.zoomWindow}
           />

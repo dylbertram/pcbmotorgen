@@ -11,7 +11,7 @@ test("3D reports unavailable WebGL and can return to top-down", async ({ page })
   });
   await gotoDesignApp(page);
   const dialog = page.getByRole("region", { name: "Coil design workspace", exact: true });
-  await dialog.getByRole("button", { name: "Display", exact: true }).click();
+  await dialog.getByRole("button", { name: "Layers", exact: true }).click();
   await dialog.getByRole("button", { name: "3D fields and heat", exact: true }).click();
   await expect(dialog.getByRole("status").filter({ hasText: "3D rendering is unavailable" })).toBeVisible();
   await dialog.getByRole("button", { name: "Top-down", exact: true }).click();

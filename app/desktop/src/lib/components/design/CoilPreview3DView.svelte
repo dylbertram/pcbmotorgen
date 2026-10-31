@@ -255,7 +255,7 @@
       <output class="font-mono text-[10px] text-emerald-300" aria-label="Z height multiplier">{view.zScale}×</output>
     </div>
     <div class="navigation-hint pointer-events-none absolute bottom-2 left-16 right-12 text-[10px] text-slate-400">
-      {view.viewMode === "iso" ? "Drag to orbit" : "Drag to pan"} · Right-drag to pan · Scroll or pinch to zoom · Z × {view.zScale}
+      {view.viewMode === "iso" ? "Drag to orbit" : "Drag to pan"} · Two-finger scroll to pan · Pinch to zoom · Z × {view.zScale}
     </div>
     <div class="layer-depths pointer-events-none absolute right-12 top-2 text-right font-mono text-[10px] text-slate-400" class:simulation-depths={simulation !== null}>
       {#each geometry?.layer_z_mm ?? [] as z, idx (idx)}

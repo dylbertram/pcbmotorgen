@@ -24,5 +24,9 @@
   ],
   [
     { "id": "view:one-period", "label": "One electrical period", "property": "oneSection" }
+  ],
+  [
+    { "id": "view:zoom-extents", "label": "Zoom extents", "action": "fitExtents", "submenu": "Zoom" },
+    { "id": "view:zoom-window", "label": "Zoom window", "property": "zoomWindow", "submenu": "Zoom" }
   ]
 ]

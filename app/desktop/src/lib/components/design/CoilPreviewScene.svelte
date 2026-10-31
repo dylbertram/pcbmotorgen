@@ -85,6 +85,26 @@
     current.addEventListener("change", report);
     return () => current.removeEventListener("change", report);
   });
+  $effect(() => {
+    if (viewMode === "top" || !controls || !camera) return;
+    const current = controls, cam = camera;
+    const panScroll = (event: WheelEvent) => {
+      // Trackpad translation is a normal wheel event. Pinch is ctrl+wheel
+      // and stays with OrbitControls' cursor-centered zoom handler.
+      if (event.ctrlKey || !current.enabled) return;
+      event.preventDefault(); event.stopImmediatePropagation();
+      stopCoilCameraMotion(cam, current);
+      const unit = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? dom.clientHeight : 1;
+      const damping = current.enableDamping;
+      // The trackpad already supplies inertia; do not add orbit damping to it.
+      current.enableDamping = false;
+      current.pan(-event.deltaX * unit, -event.deltaY * unit);
+      current.enableDamping = damping;
+      reportCamera(); invalidate();
+    };
+    dom.addEventListener("wheel", panScroll, { capture: true, passive: false });
+    return () => dom.removeEventListener("wheel", panScroll, true);
+  });
   // One controller owns the camera. A separate Bounds controller retains old
   // angles and can silently restore isometric view after selecting XZ.
   $effect(() => {
@@ -183,7 +203,7 @@
 </script>
 
   <T.OrthographicCamera bind:ref={camera} makeDefault manual position={[12, 10, 14]} zoom={1} near={0.01} far={1000}>
-    <OrbitControls bind:ref={controls} enabled={viewMode !== "top"} enableRotate={viewMode === "iso"} enableDamping={viewMode === "iso"} minZoom={zoom / 20} maxZoom={Infinity}
+    <OrbitControls bind:ref={controls} enabled={viewMode !== "top"} enableRotate={viewMode === "iso"} enableDamping={viewMode === "iso"} zoomToCursor minZoom={zoom / 20} maxZoom={Infinity}
       mouseButtons={{LEFT:viewMode === "iso" ? MOUSE.ROTATE : MOUSE.PAN,MIDDLE:MOUSE.DOLLY,RIGHT:MOUSE.PAN}}
       touches={{ONE:viewMode === "iso" ? TOUCH.ROTATE : TOUCH.PAN,TWO:TOUCH.DOLLY_PAN}} />
   </T.OrthographicCamera>
