@@ -313,7 +313,9 @@ test("mobile overlays stay inside the viewer and use scrollable explicit legends
   await expect(viewer.getByLabel("Copper loss legend")).toBeHidden();
   const box = (await viewer.boundingBox())!, controls = (await viewer.getByRole("group", { name: "3D simulation overlays" }).boundingBox())!;
   const viewSwitch = (await page.getByRole("group", { name: "Viewport view", exact: true }).boundingBox())!;
-  expect(box.y + box.height).toBeLessThanOrEqual(viewSwitch.y);
+  // The view switch is a local overlay, not a full-width canvas exclusion.
+  expect(box.y + box.height).toBeGreaterThan(viewSwitch.y);
+  expect(box.y + box.height).toBeGreaterThanOrEqual(viewSwitch.y + viewSwitch.height);
   expect(controls.x).toBeGreaterThanOrEqual(box.x); expect(controls.x + controls.width).toBeLessThanOrEqual(box.x + box.width + 1);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   const legend = (await viewer.getByLabel("Simulation overlay legend").boundingBox())!;
@@ -396,8 +398,10 @@ test("field inspector aligns inputs and stays clear of the camera and Z rail", a
   const bounds = (await viewer.boundingBox())!, box = (await panel.boundingBox())!;
   const camera = (await viewer.getByRole("group", { name: "3D camera controls", exact: true }).boundingBox())!;
   const zRail = (await viewer.getByRole("group", { name: "Z height", exact: true }).boundingBox())!;
+  const viewSwitch = (await page.getByRole("group", { name: "Viewport view", exact: true }).boundingBox())!;
   expect(box.x).toBeGreaterThanOrEqual(bounds.x); expect(box.x + box.width).toBeLessThanOrEqual(bounds.x + bounds.width);
   expect(box.x).toBeGreaterThan(camera.x + camera.width); expect(box.x).toBeGreaterThan(zRail.x + zRail.width);
+  expect(box.y + box.height).toBeLessThanOrEqual(viewSwitch.y);
   const selects = await panel.getByRole("combobox").all();
   const boxes = await Promise.all(selects.map(select => select.boundingBox()));
   for (const other of boxes.slice(1)) { expect(other!.x).toBeCloseTo(boxes[0]!.x, 0); expect(other!.width).toBeCloseTo(boxes[0]!.width, 0); }

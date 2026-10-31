@@ -26,7 +26,8 @@ test("view choices live at the viewport bottom-right and survive both views", as
   await expect(workspace.getByTestId("coil-iso")).toBeVisible();
   const viewer = (await workspace.getByTestId("coil-iso").boundingBox())!;
   const viewSwitch = (await modes.boundingBox())!;
-  expect(viewer.y + viewer.height).toBeLessThanOrEqual(viewSwitch.y);
+  expect(viewer.y + viewer.height).toBeGreaterThan(viewSwitch.y);
+  expect(viewer.y + viewer.height).toBeGreaterThanOrEqual(viewSwitch.y + viewSwitch.height);
   await expect.poll(() => checked(page, "view:3d")).toBe(true);
   await page.screenshot({ path: testInfo.outputPath("viewport-3d-switch.png") });
   await top.click();

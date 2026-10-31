@@ -147,6 +147,7 @@
   // Height of the floating top toolbar, so the right rail can start under it
   // instead of reaching the modal's top edge.
   let toolbarHeight = $state(0);
+  let viewDockHeight = $state(0);
   let terminalPanelOpen = $derived(view.terminalPanelOpen);
   const panelWidth = $derived(sidePanel && !isLeftPanel(sidePanel) ? 240 : 0);
   let frameWidth = $state(PREVIEW_W);
@@ -240,8 +241,9 @@
         <div class="absolute inset-0">
           <PreviewFrame bind:frame={modalFrameRef} bind:width={frameWidth} {gestures} {measure} navigationEnabled={view.viewMode === "top"} interactive={view.viewMode === "top" && (terminalTool?.active ?? false)}
             label={embedded ? "Coil preview" : "Coil preview — expanded"}>
-            <div class="absolute" class:spatial-viewport={view.viewMode !== "top"}
-              style:top={`${view.viewMode === "top" ? 0 : toolbarHeight}px`} style:bottom={view.viewMode === "top" ? "0" : undefined}
+            <!-- Controls reserve overlay space, never a full-width drawing gap. -->
+            <div class="absolute bottom-0" style:--coil-overlay-inset={`${view.viewMode === "top" ? 0 : viewDockHeight + 12}px`}
+              style:top={`${view.viewMode === "top" ? 0 : toolbarHeight}px`}
               style:left={`${view.viewMode === "top" ? 0 : leftDockWidth}px`} style:right={`${view.viewMode === "top" ? 0 : dockWidth + 44}px`}>
               <CoilPreviewIsoView geometry={terminalGeometry ?? importedGeometry} pcbThicknessMm={config.pcb_thickness_mm} pcbStackup={config.pcb_stackup_mm} copperThicknessMm={{ outer: config.drive.outer_copper_oz * .035, inner: config.drive.inner_copper_oz * .035 }} viaSizeMm={{diameter:config.min_via_drill_mm + 2 * config.min_via_annular_ring_mm,drill:config.min_via_drill_mm,plating:config.drive.via_plating_m * 1000}} {view} {visibleCopperKeys} {onRenderStatus}
                 topCamera={{transform:worldTransform,panX:gestures.panX,panY:gestures.panY,width:W,height:H}} isVisible={isTerminalVisible} showTerminals={view.viewMode !== "top"} {simulation} measure={view.viewMode === "top" ? null : measure3d} />
@@ -301,7 +303,7 @@
 
         <!-- Bare zoom buttons: no background, with the same 12px gap on the
              right as the position box has at the bottom. -->
-         <div class="viewport-view-dock absolute bottom-3 z-40 flex max-w-[calc(100%-7rem)] flex-col items-end gap-2" style:right={`calc(${dockWidth}px + 3.5rem)`}>
+         <div class="viewport-view-dock absolute bottom-3 z-40 flex max-w-[calc(100%-7rem)] flex-col items-end gap-2" bind:clientHeight={viewDockHeight} style:right={`calc(${dockWidth}px + 3.5rem)`}>
           {#if view.viewMode === "top"}
           <div class="viewport-zoom {sidePanel ? 'max-sm:hidden' : ''}" style:--panel-offset={`${dockWidth}px`}>
           <CoilPreviewControls
@@ -362,7 +364,6 @@
 {/snippet}
 
 <style>
-  .spatial-viewport { bottom: 3.5rem; }
   @media (max-width: 1023px) {
     .viewport-view-dock { right: 3.5rem !important; }
     .viewport-zoom { transform: translateX(calc(-1 * var(--panel-offset))); }
