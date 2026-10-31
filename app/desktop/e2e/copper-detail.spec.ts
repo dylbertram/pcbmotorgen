@@ -36,10 +36,19 @@ test("coil-end markers stay small through zoom while solid annuli and trace cuto
   const fixture=page.getByTestId("physical-copper-detail"),viewer=fixture.getByTestId("coil-iso"),canvas=viewer.locator("canvas");
   await expect(viewer).toHaveAttribute("data-camera",/position/);
   await expect(viewer).toHaveAttribute("data-terminals","2");
-  const masks=[viewer.getByRole("group",{name:"Z height",exact:true}),viewer.getByRole("group",{name:"3D camera controls",exact:true})];
+  const masks=[viewer.getByRole("group",{name:"Z height",exact:true}),fixture.getByRole("group",{name:"Zoom controls",exact:true})];
   const sizes=()=>canvas.screenshot({mask:masks,maskColor:"#ffffff"}).then(image=>markerPixels(page,image));
-  for(const direction of ["initial","Zoom in 3D","Zoom out 3D"]){
-    if(direction!=="initial")for(let i=0;i<3;i++)await viewer.getByRole("button",{name:direction,exact:true}).click();
+  await expect.poll(async()=> (await sizes()).length).toBe(2);
+  // Center the end annotations before magnifying them. Correct extents no
+  // longer include the hidden PCB body, so a zoom can otherwise crop the ends.
+  const markers=await sizes(),rect=(await canvas.boundingBox())!;
+  const center=markers.reduce((p,m)=>({x:p.x+m.x/markers.length,y:p.y+m.y/markers.length}),{x:0,y:0});
+  await page.mouse.move(rect.x+rect.width*.5,rect.y+rect.height*.5);
+  await page.mouse.down({button:"right"});
+  await page.mouse.move(rect.x+rect.width-center.x,rect.y+rect.height-center.y,{steps:10});
+  await page.mouse.up({button:"right"});
+  for(const direction of ["initial","Zoom in","Zoom out"]){
+    if(direction!=="initial")for(let i=0;i<3;i++)await fixture.getByRole("button",{name:direction,exact:true}).click();
     await expect.poll(async()=> (await sizes()).length).toBe(2);
     for(const {size} of await sizes()){expect(size).toBeGreaterThanOrEqual(6);expect(size).toBeLessThanOrEqual(9);}
   }

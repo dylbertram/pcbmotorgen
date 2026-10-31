@@ -167,7 +167,7 @@ test("Threlte renders copper and supports orbit, zoom, pan and visibility", asyn
   await page.mouse.up();
   await expect.poll(async () => (await canvas.screenshot()).equals(before)).toBe(false);
   const orbited = await canvas.screenshot();
-  await iso.getByRole("button", { name: "Zoom in 3D", exact: true }).click();
+  await page.getByRole("button", { name: "Zoom in", exact: true }).click();
   await expect.poll(async () => (await canvas.screenshot()).equals(orbited)).toBe(false);
   const zoomed = await canvas.screenshot();
   await page.mouse.move(box.x + box.width * .4, box.y + box.height * .45); await page.mouse.wheel(0, -160);
@@ -177,7 +177,7 @@ test("Threlte renders copper and supports orbit, zoom, pan and visibility", asyn
   await page.mouse.move(box.x + box.width * .45, box.y + box.height * .5, { steps: 5 });
   await page.mouse.up({ button: "right" });
   await expect.poll(async () => (await canvas.screenshot()).equals(scrolled)).toBe(false);
-  await iso.getByRole("button", { name: "Reset 3D view", exact: true }).click();
+  await page.getByRole("button", { name: "Reset view", exact: true }).click();
   await page.screenshot({ path: testInfo.outputPath("coil-iso.png") });
   await view.getByRole("button", { name: "Display", exact: true }).click();
   await view.getByRole("button", { name: "Top-down", exact: true }).click();

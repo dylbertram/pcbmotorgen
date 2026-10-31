@@ -7,7 +7,7 @@ const groups = JSON.parse(readFileSync(new URL("../src/lib/viewMenu.json", impor
 // Exercise the real state/ownership bridge at its native IPC boundary.
 test.beforeEach(async ({ page }) => { await installViewMenu(page); });
 
-test("view choices live at the viewport bottom-right and survive both views", async ({ page }, testInfo) => {
+test("view choices live at the viewport top-left and survive both views", async ({ page }, testInfo) => {
   await gotoDesignApp(page);
   const workspace = page.getByRole("region", { name: "Coil design workspace", exact: true });
   const modes = workspace.getByRole("group", { name: "Viewport view", exact: true });
@@ -15,8 +15,8 @@ test("view choices live at the viewport bottom-right and survive both views", as
   const iso = modes.getByRole("button", { name: "3D fields and heat", exact: true });
   const frame = await workspace.getByRole("img", { name: "Coil preview", exact: true }).boundingBox();
   const box = (await modes.boundingBox())!;
-  expect(box.x).toBeGreaterThan(frame!.x + frame!.width / 2);
-  expect(box.y).toBeGreaterThan(frame!.y + frame!.height - 80);
+  expect(box.x).toBeLessThan(frame!.x + 24);
+  expect(box.y).toBeLessThan(frame!.y + 12);
   await workspace.getByRole("button", { name: "Display", exact: true }).click();
   const display = workspace.getByRole("dialog", { name: "Coil preview display", exact: true });
   await expect(display.getByRole("radio", { name: "Top-down", exact: true })).toHaveCount(0);
@@ -26,8 +26,7 @@ test("view choices live at the viewport bottom-right and survive both views", as
   await expect(workspace.getByTestId("coil-iso")).toBeVisible();
   const viewer = (await workspace.getByTestId("coil-iso").boundingBox())!;
   const viewSwitch = (await modes.boundingBox())!;
-  expect(viewer.y + viewer.height).toBeGreaterThan(viewSwitch.y);
-  expect(viewer.y + viewer.height).toBeGreaterThanOrEqual(viewSwitch.y + viewSwitch.height);
+  expect(viewer.y).toBeGreaterThanOrEqual(viewSwitch.y + viewSwitch.height);
   await expect.poll(() => checked(page, "view:3d")).toBe(true);
   await page.screenshot({ path: testInfo.outputPath("viewport-3d-switch.png") });
   await top.click();
@@ -111,8 +110,8 @@ test("mobile view switches remain accessible beside the position/layers controls
   await page.getByRole("button", { name: "Set coil terminals", exact: true }).click();
   const bar = page.getByRole("group", { name: "Position bar mode", exact: true });
   const a = (await bar.boundingBox())!, b = (await modes.boundingBox())!;
-  expect(a.y + a.height).toBeLessThan(b.y);
-  expect(b.x).toBeGreaterThanOrEqual(44);
+  expect(b.y + b.height).toBeLessThan(a.y);
+  expect(b.x).toBeGreaterThanOrEqual(0);
   expect(b.x + b.width).toBeLessThanOrEqual(346);
   await modes.getByRole("button", { name: "3D fields and heat", exact: true }).click();
   await expect(modes.getByRole("button", { name: "3D fields and heat", exact: true })).toHaveAttribute("aria-pressed", "true");

@@ -139,6 +139,19 @@
     measure.mode = false; measure3d.mode = false; terminalTool?.cancel(); selection.setMode("pan");
     view.zoomWindow = !view.zoomWindow;
   }
+  function resetView() {
+    view.zoomWindow = false;
+    if (view.viewMode === "top") gestures.resetView();
+    else view.cameraReset++;
+  }
+  function fitExtents() {
+    view.zoomWindow = false;
+    if (view.viewMode === "top") gestures.resetView();
+    else view.cameraFit++;
+  }
+  function zoomCamera(factor: number) {
+    view.cameraCommand = { id: view.cameraCommand.id + 1, zoom: factor };
+  }
   function activateSelection() { terminalTool?.cancel(); measure.mode = false; view.oneSection = false; }
   onDestroy(() => terminalTool?.cancel());
 
@@ -275,9 +288,11 @@
           <GeometryEditingToolbar label="Coil preview tools" geometry={onGeometryChange ? importedGeometry : null}
             {selection} {measure} {terminalTool} {onSimplify} {onUndoSimplify} {simplifyNotice} borderless
             spatialMeasure={view.viewMode !== "top" ? measure3d : null}
-            zoomWindow={view.zoomWindow} onToggleZoomWindow={toggleZoomWindow}
+            zoomWindow={view.zoomWindow} onToggleZoomWindow={toggleZoomWindow} showZoomWindowControl={false}
             disabled={!active}
-            onActivateSelection={activateSelection} onPrepareGeometry={onStartSegmentEditing} />
+            onActivateSelection={activateSelection} onPrepareGeometry={onStartSegmentEditing}>
+            {#snippet leading()}<ViewportViewControls {view} />{/snippet}
+          </GeometryEditingToolbar>
         </div>
 
         {#if designSettings}
@@ -304,20 +319,20 @@
         <!-- Bare zoom buttons: no background, with the same 12px gap on the
              right as the position box has at the bottom. -->
          <div class="viewport-view-dock absolute bottom-3 z-40 flex max-w-[calc(100%-7rem)] flex-col items-end gap-2" bind:clientHeight={viewDockHeight} style:right={`calc(${dockWidth}px + 3.5rem)`}>
-          {#if view.viewMode === "top"}
           <div class="viewport-zoom {sidePanel ? 'max-sm:hidden' : ''}" style:--panel-offset={`${dockWidth}px`}>
           <CoilPreviewControls
-            zoomLabel={gestures.zoomLabel}
-            canZoomIn={gestures.canZoomIn}
-            canZoomOut={gestures.canZoomOut}
-            onZoomIn={gestures.zoomIn}
-            onZoomOut={gestures.zoomOut}
-            onResetZoom={gestures.zoomReset}
-            onResetView={gestures.resetView}
+            zoomLabel={view.viewMode === "top" ? gestures.zoomLabel : String(Math.round(view.spatialZoom * 1000) / 1000)}
+            canZoomIn={view.viewMode === "top" && gestures.canZoomIn}
+            canZoomOut={view.viewMode === "top" && gestures.canZoomOut}
+            onZoomIn={() => view.viewMode === "top" ? gestures.zoomIn() : zoomCamera(1.25)}
+            onZoomOut={() => view.viewMode === "top" ? gestures.zoomOut() : zoomCamera(.8)}
+            onResetZoom={() => view.viewMode === "top" ? gestures.zoomReset() : zoomCamera(1 / view.spatialZoom)}
+            onResetView={resetView}
+            onFitExtents={fitExtents}
+            onToggleZoomWindow={toggleZoomWindow}
+            zoomWindow={view.zoomWindow}
           />
           </div>
-          {/if}
-          <ViewportViewControls {view} />
          </div>
 
         <!-- Mover position: same controls as the Design reflection on the

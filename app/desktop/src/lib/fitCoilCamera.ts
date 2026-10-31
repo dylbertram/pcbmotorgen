@@ -1,8 +1,19 @@
-import { Box3, OrthographicCamera, Vector3 } from "three";
+import { Box3, OrthographicCamera, Plane, Raycaster, Vector2, Vector3, type Object3D } from "three";
 import type { CoilScene } from "./coilScene";
 import type { WorldTransform } from "./chart";
+import type { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 
 export interface TopCameraTransform { transform: WorldTransform; panX: number; panY: number; width: number; height: number }
+
+/** Clear pending orbit/pan damping without applying its remaining motion to
+ * the displayed camera. Programmatic fits start from what the user sees. */
+export function stopCoilCameraMotion(camera: OrthographicCamera, controls: OrbitControls): void {
+  const position = camera.position.clone(), target = controls.target.clone(), zoom = camera.zoom;
+  const damping = controls.enableDamping;
+  controls.enableDamping = false; controls.update();
+  camera.position.copy(position); controls.target.copy(target); camera.zoom = zoom;
+  camera.updateProjectionMatrix(); controls.update(); controls.enableDamping = damping;
+}
 
 /** Project the shared orthographic camera onto the editor's existing metric
  * transform. Selection, terminal and annotation overlays use this same mapping. */
@@ -42,13 +53,41 @@ export function fitCoilCamera(camera: OrthographicCamera, box: Box3, width: numb
   return center;
 }
 
-/** Normalized screen corners, projected onto the current orbit-target plane.
+/** Focus on the visible surface under the window center, or the copper's
+ * layer plane when the center falls in a gap between traces. Hidden objects
+ * and annotation geometry never supply the depth of the orbit pivot. */
+export function coilWindowFocus(camera: OrthographicCamera, content: Object3D, a: [number, number], b: [number, number]): Vector3 | null {
+  if (!a.concat(b).every(Number.isFinite)) return null;
+  camera.updateMatrixWorld(true); content.updateWorldMatrix(true, true);
+  const ray = new Raycaster();
+  ray.params.Line.threshold = 2 / camera.zoom;
+  ray.setFromCamera(new Vector2(a[0] + b[0] - 1, 1 - a[1] - b[1]), camera);
+  const objects: Object3D[] = [], copper = new Box3();
+  content.traverseVisible(object => {
+    if (!object.userData.measureable) return;
+    objects.push(object);
+    if (typeof object.userData.copperLayerY === "number") copper.union(new Box3().setFromObject(object, true));
+  });
+  const hit = ray.intersectObjects(objects, false)[0];
+  if (hit) {
+    // Thin centerlines have a screen-space hit tolerance, not a solid surface.
+    if (hit.object.type === "LineSegments" && Math.abs(ray.ray.direction.y) >= 1e-6)
+      return ray.ray.intersectPlane(new Plane(new Vector3(0, 1, 0), -hit.point.y), new Vector3());
+    return hit.point;
+  }
+  // An edge-on ray may lie in the copper plane. Its origin is near the
+  // camera, not a useful focus point; keep the current depth in that case.
+  if (copper.isEmpty() || Math.abs(ray.ray.direction.y) < 1e-6) return null;
+  return ray.ray.intersectPlane(new Plane(new Vector3(0, 1, 0), -copper.getCenter(new Vector3()).y), new Vector3());
+}
+
+/** Normalized screen corners, projected at the selected geometry's depth.
  * Recenter both camera and orbit pivot without changing the viewing angle. */
-export function fitCoilWindow(camera: OrthographicCamera, target: Vector3, a: [number, number], b: [number, number]): Vector3 | null {
+export function fitCoilWindow(camera: OrthographicCamera, target: Vector3, a: [number, number], b: [number, number], focus: Vector3 = target): Vector3 | null {
   const width = Math.abs(a[0] - b[0]), height = Math.abs(a[1] - b[1]);
   if (!a.concat(b).every(Number.isFinite) || width < 1e-6 || height < 1e-6) return null;
   camera.updateMatrixWorld(true);
-  const depth = target.clone().project(camera).z;
+  const depth = focus.clone().project(camera).z;
   const center = new Vector3(a[0] + b[0] - 1, 1 - a[1] - b[1], depth).unproject(camera);
   camera.position.add(center.clone().sub(target));
   camera.zoom *= Math.min(1 / width, 1 / height);

@@ -26,7 +26,7 @@ test("3D copper draws into the bottom control row instead of clipping above it",
     return Math.abs(drawing.y+drawing.height-workspace.y-workspace.height);
   }).toBeLessThanOrEqual(1);
   const rect=(await canvas.boundingBox())!;
-  const masks=[viewer.getByRole("group",{name:"Z height",exact:true}),viewer.getByRole("group",{name:"3D camera controls",exact:true}),
+  const masks=[viewer.getByRole("group",{name:"Z height",exact:true}),page.getByRole("group",{name:"Zoom controls",exact:true}),
     page.getByRole("group",{name:"Viewport view",exact:true}),viewer.getByLabel("Simulation overlay legend")];
   const bottom=()=>canvas.screenshot({mask:masks,maskColor:"#ffffff"}).then(image=>copperBottom(page,image));
   const initial=await bottom();expect(initial).toBeGreaterThan(0);
@@ -52,7 +52,7 @@ test("mobile spatial views keep the full drawing height with controls layered ab
       const c=(await canvas.boundingBox())!,f=(await frame.boundingBox())!;
       return Math.abs(c.y+c.height-f.y-f.height);
     }).toBeLessThanOrEqual(1);
-    const menu=page.getByRole("group",{name:"Viewport view",exact:true});
+    const menu=page.getByRole("group",{name:"Zoom controls",exact:true});
     await expect(menu).toBeVisible();
     const c=(await canvas.boundingBox())!,m=(await menu.boundingBox())!;
     expect(m.y+m.height).toBeLessThanOrEqual(c.y+c.height);
