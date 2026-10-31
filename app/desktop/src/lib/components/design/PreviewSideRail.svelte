@@ -36,7 +36,7 @@
     phases = [], showMotorControls = false, hasPolePitchData = false,
     hasBandWidthData = false, hasPoleRegionData = false, poleRegionPhases = [],
     geometry, selection, assignmentDisabled = false, terminalTool, onStartTerminals,
-    terminalsDisabled = false, dismissOnOutsideClick = true, showViewMode = false, config, generated = false,
+    terminalsDisabled = false, dismissOnOutsideClick = true, config, generated = false,
     drive = null, driveError = null, drivePending = false,
     designSettings, designOnly = false, drawingOnly = false, open = $bindable<PreviewPanelId | null>(null), active = true }: {
     designOnly?: boolean;
@@ -77,8 +77,6 @@
      * so an outside click never surprises the user (kata qfdz).
      */
     dismissOnOutsideClick?: boolean;
-    /** Offer the Top-down / 3D switch in the Display panel (coil preview). */
-    showViewMode?: boolean;
   } = $props();
 
   const rippleCheck = $derived(drive?.checks.find((check) => check.id === "ripple"));
@@ -173,7 +171,7 @@
   </div>
 
   {#if activeDesignPanel && designSettings}
-    <div role="dialog" aria-label={activeDesignPanel.label} aria-modal="false" class="absolute bottom-0 left-full top-0 z-30 flex w-[400px] max-w-[calc(100vw-8.25rem)] flex-col overflow-hidden border-r border-slate-700 bg-slate-900 text-slate-200 shadow-[12px_0_20px_-8px_rgba(0,0,0,0.4)] [clip-path:inset(0_-32px_0_0)]" transition:fly={{ x: -16, duration: 140 }}>
+    <div role="dialog" aria-label={activeDesignPanel.label} aria-modal="false" class="absolute bottom-14 lg:bottom-0 left-full top-0 z-30 flex w-[400px] max-w-[calc(100vw-8.25rem)] flex-col overflow-hidden border-r border-slate-700 bg-slate-900 text-slate-200 shadow-[12px_0_20px_-8px_rgba(0,0,0,0.4)] [clip-path:inset(0_-32px_0_0)]" transition:fly={{ x: -16, duration: 140 }}>
       <header class="flex shrink-0 items-center justify-between border-b border-slate-700 px-3 py-2">
         <div class="flex items-center"><h3 class="text-sm font-semibold">{activeDesignPanel.label}</h3>{#if activeDesignPanel.id === "stackup"}<HelpTag label="About the backplane model" tip="Fundamental-field model with saturation and eddy currents. Infinite layers; ignores edges, hysteresis and core losses." />{/if}</div>
         <button type="button" aria-label={`Close ${activeDesignPanel.label.toLowerCase()} panel`} onclick={close} class="rounded p-1 text-slate-400 hover:bg-slate-800"><X size={16} aria-hidden="true" /></button>
@@ -184,7 +182,7 @@
 
   {#if !drawingOnly}
   {#if open === "terminals" && geometry && terminalTool && onStartTerminals}
-    <div role="dialog" aria-label="Coil terminals" aria-modal="false" class={`${panelClass} ${showMotorControls ? 'max-lg:bottom-32' : ''}`} transition:fly={{ x: designOnly ? -16 : 16, duration: 140 }}>
+    <div role="dialog" aria-label="Coil terminals" aria-modal="false" class={`${panelClass} ${showMotorControls ? 'max-lg:bottom-44' : ''}`} transition:fly={{ x: designOnly ? -16 : 16, duration: 140 }}>
       <header class="flex shrink-0 items-center justify-between border-b border-slate-700 px-3 py-2">
         <h3 class="text-sm font-semibold">Coil ends</h3>
         <button type="button" aria-label="Close terminals panel" onclick={close} class="rounded p-1 text-slate-400 hover:bg-slate-800"><X size={16} aria-hidden="true" /></button>
@@ -199,7 +197,7 @@
   {/if}
 
   {#if open === "driver" && config}
-    <div role="dialog" aria-label="Preview driver settings" aria-modal="false" class={panelClass} transition:fly={{ x: designOnly ? -16 : 16, duration: 140 }}>
+    <div role="dialog" aria-label="Preview driver settings" aria-modal="false" class={`${panelClass} ${showMotorControls ? 'max-lg:bottom-14' : ''}`} transition:fly={{ x: designOnly ? -16 : 16, duration: 140 }}>
       <header class="flex shrink-0 items-center justify-between border-b border-slate-700 px-3 py-2">
         <h3 class="text-sm font-semibold">Driver</h3>
         <button type="button" aria-label="Close driver panel" onclick={close} class="rounded p-1 text-slate-400 hover:bg-slate-800"><X size={16} aria-hidden="true" /></button>
@@ -245,7 +243,7 @@
   {/if}
   {#if !designOnly}
   {#if open === "layers"}
-    <div role="dialog" aria-label={label} aria-modal="false" class={panelClass} transition:fly={{ x: 16, duration: 140 }}>
+    <div role="dialog" aria-label={label} aria-modal="false" class={`${panelClass} ${showMotorControls ? 'max-lg:bottom-14' : ''}`} transition:fly={{ x: 16, duration: 140 }}>
       <header class="flex shrink-0 items-center justify-between border-b border-slate-700 px-3 py-2">
         <h3 class="text-sm font-semibold">Layers</h3>
         <button type="button" aria-label="Close layers panel" onclick={close} class="rounded p-1 text-slate-400 hover:bg-slate-800 hover:text-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500">
@@ -260,7 +258,7 @@
   {/if}
 
   {#if open === "display"}
-    <div role="dialog" aria-label={displayLabel} aria-modal="false" class={panelClass} transition:fly={{ x: 16, duration: 140 }}>
+    <div role="dialog" aria-label={displayLabel} aria-modal="false" class={`${panelClass} ${showMotorControls ? 'max-lg:bottom-14' : ''}`} transition:fly={{ x: 16, duration: 140 }}>
       <header class="flex shrink-0 items-center justify-between border-b border-slate-700 px-3 py-2">
         <h3 class="text-sm font-semibold">Display</h3>
         <button type="button" aria-label="Close display panel" onclick={close} class="rounded p-1 text-slate-400 hover:bg-slate-800 hover:text-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500">
@@ -268,7 +266,7 @@
         </button>
       </header>
       <div class="min-h-0 overflow-y-auto overscroll-contain p-3">
-        <CoilPreviewDisplayPanel {view} uniqueLayers={layers} {showViewMode} />
+        <CoilPreviewDisplayPanel {view} uniqueLayers={layers} />
       </div>
     </div>
   {/if}

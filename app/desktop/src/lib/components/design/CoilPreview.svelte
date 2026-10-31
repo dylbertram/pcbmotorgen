@@ -224,7 +224,7 @@
     const fitWidth = W * Math.max(0.15, 1 - inset / Math.max(viewportWidth, 1));
     const fit = (bounds: typeof overlayFitBounds) => {
       // The layer/position controls must never sit on a pickable endpoint.
-      const bottomInset = terminalTool.active ? (view.positionBarHeight + 24) * W / Math.max(viewportWidth, 1) : 0;
+      const bottomInset = terminalTool.active ? (view.positionBarHeight + 24 + (viewportWidth < 1024 ? 52 : 0)) * W / Math.max(viewportWidth, 1) : 0;
       const fitHeight = Math.max(PAD * 2 + 1, H - bottomInset);
       const transform = fitWorldToView(bounds, fitWidth, fitHeight, PAD, zoom);
       return { ...transform, tx: transform.tx + W * leftInset / Math.max(viewportWidth, 1) };

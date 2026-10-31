@@ -1,5 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
-import { gotoDesignApp, selectDesignPanel } from "./helpers";
+import { gotoDesignApp, selectDesignPanel, openCoilPreview } from "./helpers";
 import { readFileSync } from "node:fs";
 
 /** UI fixtures exercise rendering/lifecycle only, not magnetic/thermal validation. */
@@ -10,6 +10,7 @@ async function nativeFixture(page: Page) {
     const { generatedTerminalGeometry } = await import(/* @vite-ignore */ "/src/lib/generatedTerminalGeometry.ts");
     w.vizCalls = []; w.vizMode = "ready";
     w.__TAURI_INTERNALS__ = { invoke: async (command: string, args: any) => {
+      if (command === "set_view_menu_state") return;
       if (command === "generate_coils") return mocks.mockCoils(args.config);
       if (command === "evaluate_force_sweep") return mocks.mockForceSweep(args.config);
       if (command === "compute_height_stack") return mocks.mockHeightStack(args.config);
@@ -50,7 +51,8 @@ async function nativeFixture(page: Page) {
 
 async function show3D(page: Page, pm = true) {
   await page.getByRole("tab", { name: /^Simulate/i }).click();
-  await page.getByRole("button", { name: "Show 3D fields and heat", exact: true }).click();
+  await openCoilPreview(page);
+  await page.getByRole("button", { name: "3D fields and heat", exact: true }).click();
   const viewer = page.getByTestId("coil-iso");
   await expect(viewer.getByRole("group", { name: "3D simulation overlays", exact: true })).toBeVisible();
   if (pm) {
@@ -310,6 +312,8 @@ test("mobile overlays stay inside the viewer and use scrollable explicit legends
   await viewer.getByRole("button", { name: "Legends and model limits", exact: true }).click();
   await expect(viewer.getByLabel("Copper loss legend")).toBeHidden();
   const box = (await viewer.boundingBox())!, controls = (await viewer.getByRole("group", { name: "3D simulation overlays" }).boundingBox())!;
+  const viewSwitch = (await page.getByRole("group", { name: "Viewport view", exact: true }).boundingBox())!;
+  expect(box.y + box.height).toBeLessThanOrEqual(viewSwitch.y);
   expect(controls.x).toBeGreaterThanOrEqual(box.x); expect(controls.x + controls.width).toBeLessThanOrEqual(box.x + box.width + 1);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   const legend = (await viewer.getByLabel("Simulation overlay legend").boundingBox())!;

@@ -28,6 +28,8 @@
     lockPageScroll,
   } from "../../utils/pageScrollLock";
   import CoilPreviewControls from "./CoilPreviewControls.svelte";
+  import ViewportViewControls from "./ViewportViewControls.svelte";
+  import NativeViewMenuBridge from "./NativeViewMenuBridge.svelte";
   import GeometryEditingToolbar from "./GeometryEditingToolbar.svelte";
   import GeometryEditingOverlay from "./GeometryEditingOverlay.svelte";
   import PreviewFrame from "./PreviewFrame.svelte";
@@ -167,6 +169,10 @@
   });
 </script>
 
+{#if embedded || expanded}
+  <NativeViewMenuBridge {view} {active} {hasPolePitchData} {hasBandWidthData} {hasPoleRegionData} />
+{/if}
+
 {#if embedded}
   <section aria-label="Coil design workspace" inert={!active} aria-hidden={!active || undefined} class="flex h-full min-h-0 flex-col overflow-hidden bg-slate-900">
     {@render workspace()}
@@ -223,7 +229,9 @@
           <PreviewFrame bind:frame={modalFrameRef} bind:width={frameWidth} {gestures} {measure} navigationEnabled={view.viewMode === "top"} interactive={view.viewMode === "top" && (terminalTool?.active ?? false)}
             label={embedded ? "Coil preview" : "Coil preview — expanded"}>
             {#if view.viewMode === "iso"}
-              <div class="absolute inset-y-0" style:left={`${leftDockWidth}px`} style:right={`${dockWidth + 44}px`}>
+              <!-- Reserve a bottom lane so the view switch cannot cover 3D
+                   legends, field settings, or the rendered canvas. -->
+              <div class="absolute top-0 bottom-14" style:left={`${leftDockWidth}px`} style:right={`${dockWidth + 44}px`}>
                 <CoilPreviewIsoView geometry={terminalGeometry ?? importedGeometry} pcbThicknessMm={config.pcb_thickness_mm} {view} isVisible={isTerminalVisible} {simulation} />
               </div>
             {:else}
@@ -269,13 +277,14 @@
           coils={importedGeometry ? uniquePhases.map((phase) => ({ name: phase.name, colorIdx: phase.colorIdx })) : []}
           isCoilVisible={(name) => view.isPhaseVisible(uniquePhases.find((phase) => phase.name === name)?.idx ?? -1)}
           onToggleCoil={(name) => { const phase = uniquePhases.find((phase) => phase.name === name); if (phase) view.phaseVisibility[phase.idx] = !view.isPhaseVisible(phase.idx); }} showMotorControls={true}
-            label="Coil preview layers" displayLabel="Coil preview display" {hasPolePitchData} {hasBandWidthData} {hasPoleRegionData} {poleRegionPhases} dismissOnOutsideClick={false} showViewMode={true} />
+            label="Coil preview layers" displayLabel="Coil preview display" {hasPolePitchData} {hasBandWidthData} {hasPoleRegionData} {poleRegionPhases} dismissOnOutsideClick={false} />
         </div>
 
         <!-- Bare zoom buttons: no background, with the same 12px gap on the
              right as the position box has at the bottom. -->
-        {#if view.viewMode === "top"}
-        <div class="absolute z-20 top-[32%] sm:top-auto sm:bottom-3 {sidePanel ? 'max-sm:hidden' : ''}" style:right={`calc(${dockWidth}px + 3.5rem)`}>
+         <div class="viewport-view-dock absolute bottom-3 z-40 flex max-w-[calc(100%-7rem)] flex-col items-end gap-2" style:right={`calc(${dockWidth}px + 3.5rem)`}>
+          {#if view.viewMode === "top"}
+          <div class="viewport-zoom {sidePanel ? 'max-sm:hidden' : ''}" style:--panel-offset={`${dockWidth}px`}>
           <CoilPreviewControls
             zoomLabel={gestures.zoomLabel}
             canZoomIn={gestures.canZoomIn}
@@ -285,15 +294,17 @@
             onResetZoom={gestures.zoomReset}
             onResetView={gestures.resetView}
           />
-        </div>
-        {/if}
+          </div>
+          {/if}
+          <ViewportViewControls {view} />
+         </div>
 
         <!-- Mover position: same controls as the Design reflection on the
              shared MotionStore, so the slider lives next to the strip it
              moves inside the lightbox. The phase-waveform popover is anchored
              directly above this box at the same width, so it cannot be moved. -->
         {#if view.viewMode === "top"}
-        <div bind:clientHeight={view.positionBarHeight} class="position-bar absolute bottom-3 z-20 flex w-[min(420px,calc(100%-4rem))] flex-col gap-2 {sidePanel && !terminalPanelOpen ? 'max-lg:hidden' : ''}" class:terminal-position-bar={terminalPanelOpen} style:left={`${leftDockWidth + 8}px`} style:max-width={`calc(100% - ${leftDockWidth + dockWidth + 60}px)`}>
+        <div bind:clientHeight={view.positionBarHeight} class="position-bar absolute bottom-16 lg:bottom-3 z-20 flex w-[min(420px,calc(100%-4rem))] flex-col gap-2 {sidePanel && !terminalPanelOpen ? 'max-lg:hidden' : ''}" class:terminal-position-bar={terminalPanelOpen} style:left={`${leftDockWidth + 8}px`} style:max-width={`calc(100% - ${leftDockWidth + dockWidth + 60}px)`}>
           {#if view.positionBarMode === "position" && !embedded && view.showWaveform}
             <div role="dialog" aria-label="Phase waveform" class="relative">
               <button type="button" aria-label="Close phase waveform"
@@ -333,6 +344,8 @@
 
 <style>
   @media (max-width: 1023px) {
+    .viewport-view-dock { right: 3.5rem !important; }
+    .viewport-zoom { transform: translateX(calc(-1 * var(--panel-offset))); }
     .terminal-position-bar {
       left: 3.25rem !important;
       max-width: calc(100% - 6.5rem) !important;

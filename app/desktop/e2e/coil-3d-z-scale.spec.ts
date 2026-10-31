@@ -6,7 +6,7 @@ test("Z height defaults to 1× and persists across workflow changes", async ({ p
   const dialog = page.getByRole("region", { name: "Coil design workspace", exact: true });
   await dialog.getByRole("button", { name: "Display", exact: true }).click();
   const display = page.getByRole("dialog", { name: "Coil preview display", exact: true });
-  await display.getByRole("radio", { name: "3D", exact: true }).check();
+  await dialog.getByRole("button", { name: "3D fields and heat", exact: true }).click();
   await display.getByRole("button", { name: "Close display panel" }).click();
   const viewer = dialog.getByTestId("coil-iso");
   const slider = viewer.getByRole("slider", { name: "Z height scale", exact: true });

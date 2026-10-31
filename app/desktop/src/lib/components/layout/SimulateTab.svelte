@@ -17,7 +17,7 @@
 
   let { config, active, open, availableHeight, sweep, friction, height, drive,
     driveError = null, error, cadGeometry = null, onConfigureWinding,
-    onSelectEnds, onUseInferredEnds, onShow3D, powerInput }: {
+    onSelectEnds, onUseInferredEnds, powerInput }: {
     config: ConfigStore;
     active: boolean;
     open: boolean;
@@ -33,7 +33,6 @@
     onSelectEnds?: () => void;
     onUseInferredEnds?: () => void;
     powerInput: PowerRequirementsInput;
-    onShow3D?: () => void;
   } = $props();
 
   const results = [
@@ -147,9 +146,6 @@
           <Tabs.Trigger value={result.id} onclick={() => { selected = result.id; collapsed = false; }} class="relative flex h-full shrink-0 items-center justify-center whitespace-nowrap px-3 text-xs text-slate-400 after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 after:bg-transparent hover:text-slate-100 data-[state=active]:text-emerald-300 data-[state=active]:after:bg-emerald-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400"><span class="block leading-none">{result.label}</span></Tabs.Trigger>
         {/each}
       </Tabs.List>
-      {#if onShow3D}
-        <button type="button" onclick={onShow3D} class="shrink-0 border-l border-slate-700 px-3 text-xs text-emerald-300 hover:bg-slate-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400" aria-label="Show 3D fields and heat">3D fields &amp; heat</button>
-      {/if}
       <button type="button" aria-label={collapsed ? "Expand simulation panel" : "Collapse simulation panel"} aria-expanded={!collapsed} aria-controls={`${dockId}-content`} onclick={() => (collapsed = !collapsed)} class="flex w-11 shrink-0 items-center justify-center self-stretch text-slate-400 hover:bg-slate-800 hover:text-slate-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400">
         {#if collapsed}<ChevronUp size={16} aria-hidden="true" />{:else}<ChevronDown size={16} aria-hidden="true" />{/if}
       </button>

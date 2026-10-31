@@ -190,7 +190,7 @@
   {#if workspace.active}
     {#key workspace.active.id}
       <div id="active-document" role="tabpanel" aria-labelledby={`file-tab-${workspace.active.id}`} inert={workspace.busy} aria-busy={workspace.busy} class="flex min-h-0 flex-1 flex-col">
-        <DocumentEditor session={workspace.active} active bind:this={editor} />
+        <DocumentEditor session={workspace.active} active={!newFileOpen && !unsaved && !renameTarget && !preferencesConfig && !workspace.busy} bind:this={editor} />
       </div>
     {/key}
   {:else}

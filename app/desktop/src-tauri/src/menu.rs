@@ -91,17 +91,18 @@ fn file_label(path: &str) -> String {
 pub fn install(app: &tauri::AppHandle) -> tauri::Result<()> {
     let file = file_submenu(app)?;
     let edit = edit_submenu(app)?;
+    let view = crate::view_menu::submenu(app)?;
 
     #[cfg(target_os = "macos")]
     let menu = {
         let app_menu = app_submenu(app)?;
-        Menu::with_items(app, &[&app_menu, &file, &edit])?
+        Menu::with_items(app, &[&app_menu, &file, &edit, &view])?
     };
     #[cfg(not(target_os = "macos"))]
     let menu = {
         let settings = MenuItem::with_id(app, SETTINGS_ID, "Settings…", true, Some("CmdOrCtrl+,"))?;
         let app_menu = Submenu::with_id_and_items(app, "app", "pcbmotorgen", true, &[&settings])?;
-        Menu::with_items(app, &[&app_menu, &file, &edit])?
+        Menu::with_items(app, &[&app_menu, &file, &edit, &view])?
     };
 
     app.set_menu(menu)?;
