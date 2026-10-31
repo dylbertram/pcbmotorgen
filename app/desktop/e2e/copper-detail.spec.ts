@@ -36,7 +36,7 @@ test("coil-end markers stay small through zoom while solid annuli and trace cuto
   const fixture=page.getByTestId("physical-copper-detail"),viewer=fixture.getByTestId("coil-iso"),canvas=viewer.locator("canvas");
   await expect(viewer).toHaveAttribute("data-camera",/position/);
   await expect(viewer).toHaveAttribute("data-terminals","2");
-  const masks=[viewer.getByRole("group",{name:"Z height",exact:true}),fixture.getByRole("group",{name:"Zoom controls",exact:true})];
+  const masks=[viewer.getByRole("group",{name:"Z height",exact:true}),fixture.getByRole("group",{name:"Zoom controls",exact:true}),viewer.getByRole("img",{name:"Viewport axes: X travel, Y across board, Z up",exact:true})];
   const sizes=()=>canvas.screenshot({mask:masks,maskColor:"#ffffff"}).then(image=>markerPixels(page,image));
   await expect.poll(async()=> (await sizes()).length).toBe(2);
   // Center the end annotations before magnifying them. Correct extents no
@@ -69,7 +69,7 @@ test("small terminal annotations still pick exact physical centers rather than c
   const fixture=page.getByTestId("physical-copper-detail"),viewer=fixture.getByTestId("coil-iso"),canvas=viewer.locator("canvas");
   await expect(viewer).toHaveAttribute("data-camera",/position/);
   await fixture.getByRole("button",{name:"Measure terminal centers",exact:true}).click();
-  const masks=[viewer.getByRole("group",{name:"Z height",exact:true})];
+  const masks=[viewer.getByRole("group",{name:"Z height",exact:true}),viewer.getByRole("img",{name:"Viewport axes: X travel, Y across board, Z up",exact:true})];
   const markers=await markerPixels(page,await canvas.screenshot({mask:masks,maskColor:"#ffffff"}));
   expect(markers).toHaveLength(2);
   const rect=(await canvas.boundingBox())!;

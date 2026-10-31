@@ -100,3 +100,5 @@ pub use project::*;
 pub use routing_plugins::*;
 #[cfg(test)]
 mod pcb_stackup_tests;
+#[cfg(test)]
+mod routing_orientation_tests;

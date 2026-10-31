@@ -5,6 +5,7 @@
 import type { BackplaneStack } from "./backplane";
 import type { CommutationMode } from "./enums";
 import type { PcbStackupSi } from "../pcbStackup";
+import type { RoutingOrientation } from "../routingOrientation";
 
 /** The full design configuration sent to the Tauri backend on every call. */
 export interface LinearMotorConfig {
@@ -35,6 +36,7 @@ export interface LinearMotorConfig {
    *  `num_strands`). Amplitude / total-length and magnet-aligned period count are derived
    *  from the active area and are NOT user-settable. Empty = defaults. */
   routing_params: Record<string, number>;
+  routing_orientation?: RoutingOrientation;
   phases: number;
   spacing_ratio: number;
 

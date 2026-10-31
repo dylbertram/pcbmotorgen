@@ -55,6 +55,7 @@ export interface ProjectConfigState {
   // --- Coil / routing (generation settings) ---
   routing_pattern: string;
   routing_params: Record<string, number>;
+  routing_orientation?: import("../routingOrientation").RoutingOrientation;
   phases: number;
   num_layers: number;
 

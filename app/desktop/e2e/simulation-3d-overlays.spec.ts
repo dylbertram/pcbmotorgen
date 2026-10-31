@@ -319,6 +319,8 @@ test("mobile overlays stay inside the viewer and use scrollable explicit legends
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   const legend = (await viewer.getByLabel("Simulation overlay legend").boundingBox())!;
   expect(legend.y - (controls.y + controls.height)).toBeGreaterThan(100);
+  const axes = (await viewer.getByRole("img", { name: "Viewport axes: X travel, Y across board, Z up", exact: true }).boundingBox())!;
+  expect(legend.x + legend.width).toBeLessThanOrEqual(axes.x);
   for (const colorScheme of ["light", "dark"] as const) {
     await page.emulateMedia({ colorScheme });
     await expect(page.locator("html")).toHaveAttribute("data-theme", colorScheme);

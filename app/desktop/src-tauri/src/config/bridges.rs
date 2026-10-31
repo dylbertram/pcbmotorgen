@@ -36,6 +36,7 @@ impl LinearMotorConfig {
             min_space_mm: self.min_space_m * 1e3,
             expects_continuous: false,
             params: self.routing_params.clone(),
+            orientation: self.routing_orientation,
             // Magnet layout: lets patterns align their repeating unit to the
             // pole pitch so the traces regenerate when the magnets change.
             magnet_pitch_mm: Some(self.magnet_pitch_m * 1e3),

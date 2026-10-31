@@ -54,6 +54,9 @@ pub struct RoutingContext {
     pub expects_continuous: bool,
     /// Pattern-specific numeric parameters (e.g. `num_strands`, `angle_deg`).
     pub params: HashMap<String, f64>,
+    /// Applied by the host after generation and validation, not by plugins.
+    #[serde(default)]
+    pub orientation: crate::RoutingOrientation,
     /// Magnetic pole pitch [mm] (`magnet_width + magnet_gap`) of the mover the
     /// stator serves. This is the centre-to-centre distance between adjacent
     /// north and south poles (`tau_p` in the phase-band width equations).

@@ -20,8 +20,9 @@
   import ZoomWindowOverlay from "./ZoomWindowOverlay.svelte";
   import type { PcbStackupMm } from "../../pcbStackup";
   import type { TopCameraTransform } from "../../fitCoilCamera";
+  import ViewportAxes from "./ViewportAxes.svelte";
 
-  let { geometry: sourceGeometry, pcbThicknessMm, pcbStackup = null, copperThicknessMm = { outer: .035, inner: .035 }, viaSizeMm = {diameter:.4,drill:.2}, view, isVisible = () => true, showTerminals = true, simulation = null, measure = null, topCamera = null, visibleCopperKeys = null, onRenderStatus }: {
+  let { geometry: sourceGeometry, pcbThicknessMm, pcbStackup = null, copperThicknessMm = { outer: .035, inner: .035 }, viaSizeMm = {diameter:.4,drill:.2}, view, isVisible = () => true, showTerminals = true, simulation = null, measure = null, topCamera = null, visibleCopperKeys = null, onRenderStatus, axisRightInset = 0 }: {
     geometry: CadGeometry | null;
     pcbThicknessMm: number;
     pcbStackup?: PcbStackupMm | null;
@@ -29,6 +30,7 @@
     topCamera?: TopCameraTransform | null;
     visibleCopperKeys?: Set<string> | null;
     onRenderStatus?: (available:boolean)=>void;
+    axisRightInset?: number;
     copperThicknessMm?: { outer: number; inner: number };
     view: CoilPreviewViewState;
     isVisible?: (coil: string, layer: number) => boolean;
@@ -51,7 +53,7 @@
   const pads = $derived(scene ? connectedViaPads(scene, paths, viaSizeMm.diameter * scene.scale) : []);
   let terminals = $derived(showTerminals && view.showTerminals ? scene?.terminals.filter(t => view.isLayerVisible(t.layer) && isVisible(t.net, t.layer)) ?? [] : []);
   let windowCommand = $state<{ id: number; a: [number, number]; b: [number, number] }>({ id: 0, a: [0, 0], b: [1, 1] });
-  let cameraSnapshot = $state<{ position: number[]; target: number[]; zoom: number } | null>(null);
+  let cameraSnapshot = $state<{ position: number[]; target: number[]; up: number[]; zoom: number } | null>(null);
   let glAvailable = $state<boolean | null>(null);
   let mode = $state<VisualizationMode>("fields");
   let density = $state("sparse");
@@ -163,6 +165,9 @@
         </div>
       {/snippet}
     </svelte:boundary>
+    <div class="axis-indicator pointer-events-none absolute z-10" style:right={`calc(.75rem + ${axisRightInset}px)`}>
+      <ViewportAxes view={view.viewMode} camera={glAvailable === false ? null : cameraSnapshot} />
+    </div>
     {#if view.zoomWindow && view.viewMode !== "top"}
       <ZoomWindowOverlay onCancel={() => view.zoomWindow = false} onFit={(a, b) => { windowCommand = { id: windowCommand.id + 1, a, b }; view.zoomWindow = false; }} />
     {/if}
@@ -265,7 +270,8 @@
 
 <style>
   .coil-3d { container-type: size; }
-  .overlay-legends { bottom: calc(2rem + var(--coil-overlay-inset, 0px)); max-height: 40cqh; right: auto; max-width: min(26rem, calc(100% - 4.75rem)); }
+  .axis-indicator { bottom: calc(3.5rem + var(--coil-overlay-inset, 0px)); }
+  .overlay-legends { bottom: calc(2rem + var(--coil-overlay-inset, 0px)); max-height: 40cqh; right: auto; max-width: min(26rem, calc(100% - 10rem)); }
   .z-height { top: var(--coil-preset-inset, 3rem); bottom: calc(2rem + var(--coil-overlay-inset, 0px)); }
   .simulation-controls { width: 22rem; max-width: calc(100% - 4.5rem); }
   .inspector-toggle { display: flex; justify-content: space-between; align-items: center; width: 100%; min-height: 2rem; text-align: left; padding: 0.5rem 0.75rem; }
@@ -285,7 +291,8 @@
   .section-button { min-height: 2rem; }
   .section-button[aria-pressed="true"] { border-color: #10b981; color: #10b981; }
   .simulation-depths { display: none; }
-  .compact-overlay-toggle { display: none; }
+  .compact-overlay-toggle { display: none; line-height: 1.4; }
+  .compact-overlay-toggle button { padding: .25rem; font-size: inherit; line-height: 1.2; }
   @container (max-width: 760px) {
     .simulation-controls { top: max(3rem, var(--coil-preset-inset, 0px)); }
     .overlay-control-fields { max-height: min(calc(65cqh - 4rem), calc(100cqh - 5rem - var(--coil-overlay-inset, 0px))); }

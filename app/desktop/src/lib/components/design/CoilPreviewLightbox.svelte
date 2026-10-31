@@ -261,6 +261,7 @@
               style:top={`${view.viewMode === "top" ? 0 : toolbarHeight}px`}
               style:left={`${view.viewMode === "top" ? 0 : leftDockWidth}px`} style:right={`${view.viewMode === "top" ? 0 : dockWidth + 44}px`}>
               <CoilPreviewIsoView geometry={terminalGeometry ?? importedGeometry} pcbThicknessMm={config.pcb_thickness_mm} pcbStackup={config.pcb_stackup_mm} copperThicknessMm={{ outer: config.drive.outer_copper_oz * .035, inner: config.drive.inner_copper_oz * .035 }} viaSizeMm={{diameter:config.min_via_drill_mm + 2 * config.min_via_annular_ring_mm,drill:config.min_via_drill_mm,plating:config.drive.via_plating_m * 1000}} {view} {visibleCopperKeys} {onRenderStatus}
+                axisRightInset={view.viewMode === "top" ? dockWidth + 44 : 0}
                 topCamera={{transform:worldTransform,panX:gestures.panX,panY:gestures.panY,width:W,height:H}} isVisible={isTerminalVisible} showTerminals={view.viewMode !== "top"} {simulation} measure={view.viewMode === "top" ? null : measure3d} />
             </div>
             {#if view.viewMode === "top"}

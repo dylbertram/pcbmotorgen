@@ -158,6 +158,8 @@ pub struct ProjectConfigStateIpc {
     // Do not apply the new-project termination to old files with no params.
     #[serde(default)]
     pub routing_params: HashMap<String, f64>,
+    #[serde(default)]
+    pub routing_orientation: pcbmotorgen_routing::RoutingOrientation,
     pub phases: u32,
     pub num_layers: u32,
 
@@ -238,6 +240,7 @@ impl Default for ProjectConfigStateIpc {
             // New driver-ready projects use terminated star windings. Bare
             // routing contexts can still explicitly request closed rings.
             routing_params: HashMap::from([("connection".into(), 2.0)]),
+            routing_orientation: Default::default(),
             phases: 3,
             num_layers: 4,
             max_current_a: 1.0,
@@ -314,6 +317,7 @@ impl ProjectConfigStateIpc {
             air_gap_m: m(self.air_gap_mm),
             routing_pattern: self.routing_pattern.clone(),
             routing_params: self.routing_params.clone(),
+            routing_orientation: self.routing_orientation,
             phases: self.phases,
             spacing_ratio: 1.0,
             max_current_a: self.max_current_a,

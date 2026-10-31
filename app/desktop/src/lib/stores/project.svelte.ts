@@ -150,6 +150,7 @@ export class ProjectStore {
         electrical_pitch_mm: this.config.electrical_pitch_mm,
         routing_pattern: this.config.routing_pattern,
         routing_params: Object.fromEntries(params.map((p) => [p.key, p.value])),
+        routing_orientation: { ...this.config.routing_orientation },
         phases: this.config.phases,
         num_layers: this.config.num_layers,
         max_current_a: this.config.max_current_a,
@@ -209,6 +210,7 @@ export class ProjectStore {
     this.config.electrical_pitch_mm = c.electrical_pitch_mm;
     this.config.routing_pattern = c.routing_pattern;
     this.config.routing_params = { ...c.routing_params };
+    this.config.routing_orientation = { mirror_x: false, mirror_y: false, reverse_layers: false, ...c.routing_orientation };
     this.config.routing_params_version += 1;
     this.config.phases = c.phases;
     this.config.num_layers = c.num_layers;

@@ -264,6 +264,7 @@
       config.electrical_pitch_mm,
       config.routing_pattern,
       config.routing_params_version,
+      JSON.stringify(config.routing_orientation),
       geometryKey(projects.cadGeometry),
       config.phases,
       config.num_layers,
@@ -409,6 +410,7 @@
       config.air_gap_mm,
       config.routing_pattern,
       config.routing_params_version,
+      JSON.stringify(config.routing_orientation),
       config.phases,
       config.num_layers,
       config.strands_per_phase,
@@ -531,6 +533,7 @@
     return JSON.stringify([
       config.routing_pattern,
       config.routing_params_version,
+      config.routing_orientation,
       config.num_layers,
       config.min_trace_mm,
       config.trace_width_mm,

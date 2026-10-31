@@ -482,6 +482,28 @@ test("shared editing tools measure and edit CAD drafts, then keep those edits in
   await page.screenshot({ path: testInfo.outputPath("shared-motor-editor.png") });
 });
 
+test("Routing mirrors imported copper and its picked endpoints without reassigning their roles", async ({ page }) => {
+  const { command } = await openTerminalTool(page);
+  await command.getByRole("button", { name: "Apply terminals", exact: true }).click();
+  const motor = coilWorkspace(page);
+  await expect(motor.getByRole("img", { name: "Coil A Driver end, L0, X 0 mm, Y 0 mm", exact: true })).toBeVisible();
+  await selectDesignPanel(page, "Routing");
+  const panel = motor.getByRole("dialog", { name: "Routing", exact: true });
+  for (const [label, marker] of [
+    ["Mirror left/right (X)", "Coil A Driver end, L0, X 2 mm, Y 0 mm"],
+    ["Mirror up/down (Y)", "Coil A Driver end, L0, X 2 mm, Y 2 mm"],
+    ["Reverse layers (Z)", "Coil A Driver end, L1, X 2 mm, Y 2 mm"],
+  ]) {
+    await panel.getByRole("button", { name: label, exact: true }).click();
+    await expect(motor.getByRole("img", { name: marker, exact: true })).toBeVisible();
+  }
+  await expect(panel.getByRole("group", { name: "Imported CAD pattern", exact: true })).toBeVisible();
+  for (const label of ["Mirror left/right (X)", "Mirror up/down (Y)", "Reverse layers (Z)"]) {
+    await panel.getByRole("button", { name: label, exact: true }).click();
+  }
+  await expect(motor.getByRole("img", { name: "Coil A Driver end, L0, X 0 mm, Y 0 mm", exact: true })).toBeVisible();
+});
+
 test("motor tool feedback stays inside the toolbar instead of behind viewport presets", async ({ page }, testInfo) => {
   const dialog = await openImport(page);
   await dialog.getByRole("button", { name: "Open with this geometry" }).click();

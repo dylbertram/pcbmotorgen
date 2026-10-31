@@ -76,6 +76,8 @@ pub struct LinearMotorConfigIpc {
     /// (e.g. `num_strands`). Empty = pattern defaults.
     #[serde(default)]
     pub routing_params: std::collections::HashMap<String, f64>,
+    #[serde(default)]
+    pub routing_orientation: pcbmotorgen_routing::RoutingOrientation,
     pub phases: u32,
     /// Vernier spacing ratio as a raw f64 (1.0, 0.8, 0.8333…).
     pub spacing_ratio: f64,
@@ -144,6 +146,7 @@ impl LinearMotorConfigIpc {
             air_gap_m: self.air_gap_m,
             routing_pattern: self.routing_pattern.clone(),
             routing_params: self.routing_params.clone(),
+            routing_orientation: self.routing_orientation,
             phases: self.phases,
             spacing_ratio: self.spacing_ratio,
             max_current_a: self.max_current_a,
@@ -192,6 +195,7 @@ impl From<&CoreConfig> for LinearMotorConfigIpc {
             air_gap_m: c.air_gap_m,
             routing_pattern: c.routing_pattern.clone(),
             routing_params: c.routing_params.clone(),
+            routing_orientation: c.routing_orientation,
             phases: c.phases,
             spacing_ratio: c.spacing_ratio,
             max_current_a: c.max_current_a,
