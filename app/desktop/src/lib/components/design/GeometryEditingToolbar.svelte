@@ -1,6 +1,5 @@
 <script lang="ts">
   import { GitMerge, Undo2 } from "@lucide/svelte";
-  import type { Snippet } from "svelte";
   import ZoomWindowIcon from "./ZoomWindowIcon.svelte";
   import type { CadGeometry } from "../../types";
   import type { CadSelectionTool } from "../../utils/cadSelectionTool.svelte";
@@ -12,7 +11,7 @@
 
   let { label, geometry, selection, measure, terminalTool, disabled = false,
     onActivateSelection, onSimplify, onUndoSimplify,
-    simplifyNotice = "", onPrepareGeometry, borderless = false, spatialMeasure = null, zoomWindow = false, onToggleZoomWindow, showZoomWindowControl = true, leading }: {
+    simplifyNotice = "", onPrepareGeometry, borderless = false, spatialMeasure = null, zoomWindow = false, onToggleZoomWindow, showZoomWindowControl = true }: {
     label: string;
     geometry: CadGeometry | null;
     selection: CadSelectionTool;
@@ -29,7 +28,6 @@
     zoomWindow?: boolean;
     onToggleZoomWindow?: () => void;
     showZoomWindowControl?: boolean;
-    leading?: Snippet;
   } = $props();
   let preparing = $state(false);
   let error = $state("");
@@ -83,7 +81,6 @@
   <!-- The bottom rule stays after the editing boxes were removed; it is the
        line between the toolbar and the viewer. -->
   <div class="flex flex-wrap items-start gap-2 border-b border-slate-700 {borderless ? 'bg-slate-900 py-1.5 pl-3 pr-1.5' : 'border-t p-2'}">
-  {@render leading?.()}
   {#if onToggleZoomWindow && showZoomWindowControl}
     <button type="button" class="icon-tool" aria-label="Zoom window" aria-pressed={zoomWindow} {disabled} title="Zoom window: click two opposite corners. Escape cancels." onclick={onToggleZoomWindow}><ZoomWindowIcon /></button>
   {/if}

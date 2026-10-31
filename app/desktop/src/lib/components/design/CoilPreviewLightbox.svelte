@@ -161,6 +161,7 @@
   // instead of reaching the modal's top edge.
   let toolbarHeight = $state(0);
   let viewDockHeight = $state(0);
+  let viewPresetHeight = $state(32);
   let terminalPanelOpen = $derived(view.terminalPanelOpen);
   const panelWidth = $derived(sidePanel && !isLeftPanel(sidePanel) ? 240 : 0);
   let frameWidth = $state(PREVIEW_W);
@@ -256,6 +257,7 @@
             label={embedded ? "Coil preview" : "Coil preview — expanded"}>
             <!-- Controls reserve overlay space, never a full-width drawing gap. -->
             <div class="absolute bottom-0" style:--coil-overlay-inset={`${view.viewMode === "top" ? 0 : viewDockHeight + 12}px`}
+              style:--coil-preset-inset={`${viewPresetHeight + 16}px`}
               style:top={`${view.viewMode === "top" ? 0 : toolbarHeight}px`}
               style:left={`${view.viewMode === "top" ? 0 : leftDockWidth}px`} style:right={`${view.viewMode === "top" ? 0 : dockWidth + 44}px`}>
               <CoilPreviewIsoView geometry={terminalGeometry ?? importedGeometry} pcbThicknessMm={config.pcb_thickness_mm} pcbStackup={config.pcb_stackup_mm} copperThicknessMm={{ outer: config.drive.outer_copper_oz * .035, inner: config.drive.inner_copper_oz * .035 }} viaSizeMm={{diameter:config.min_via_drill_mm + 2 * config.min_via_annular_ring_mm,drill:config.min_via_drill_mm,plating:config.drive.via_plating_m * 1000}} {view} {visibleCopperKeys} {onRenderStatus}
@@ -290,9 +292,15 @@
             spatialMeasure={view.viewMode !== "top" ? measure3d : null}
             zoomWindow={view.zoomWindow} onToggleZoomWindow={toggleZoomWindow} showZoomWindowControl={false}
             disabled={!active}
-            onActivateSelection={activateSelection} onPrepareGeometry={onStartSegmentEditing}>
-            {#snippet leading()}<ViewportViewControls {view} />{/snippet}
-          </GeometryEditingToolbar>
+            onActivateSelection={activateSelection} onPrepareGeometry={onStartSegmentEditing} />
+        </div>
+
+        <!-- View presets float inside the drawing, below the editing toolbar. -->
+        <div class="pointer-events-none absolute z-20 flex justify-start" style:top={`${toolbarHeight + 8}px`}
+          style:left={`${leftDockWidth + 8}px`} style:right={`${dockWidth + 56}px`}>
+          <div class="pointer-events-auto max-w-full" bind:clientHeight={viewPresetHeight}>
+            <ViewportViewControls {view} />
+          </div>
         </div>
 
         {#if designSettings}

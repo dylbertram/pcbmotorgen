@@ -19,7 +19,18 @@ test("all views share bottom-right navigation and top-left view presets", async 
       const frame=(await page.getByRole("img",{name:"Coil preview",exact:true}).boundingBox())!;
       const presets=(await page.getByRole("group",{name:"Viewport view",exact:true}).boundingBox())!;
       const box=(await controls.boundingBox())!;
-      expect(presets.x).toBeLessThan(frame.x+24); expect(presets.y).toBeLessThan(frame.y+12);
+      const toolbar=page.getByRole("toolbar",{name:"Coil preview tools",exact:true});
+      const tools=(await toolbar.boundingBox())!;
+      await expect(toolbar.getByRole("group",{name:"Viewport view",exact:true})).toHaveCount(0);
+      expect(presets.x).toBeCloseTo(frame.x+52,0);
+      expect(presets.y).toBeCloseTo(tools.y+tools.height+8,0);
+      const drawing=(await viewer.boundingBox())!;
+      expect(presets.y+presets.height).toBeLessThan(drawing.y+drawing.height);
+      if(id!=="top") {
+        expect(presets.x).toBeCloseTo(drawing.x+8,0); expect(presets.y).toBeCloseTo(drawing.y+8,0);
+        const zRail=(await viewer.getByRole("group",{name:"Z height",exact:true}).boundingBox())!;
+        expect(zRail.y).toBeGreaterThanOrEqual(presets.y+presets.height+6);
+      }
       expect(box.x+box.width).toBeCloseTo(frame.x+frame.width-56,0);
       expect(box.y+box.height).toBeCloseTo(frame.y+frame.height-12,0);
       if(previous) {
