@@ -9,6 +9,18 @@ export interface CopperPath {
   points: Vector3[];
 }
 
+/** A barrel crosses every layer in its declared span, not only its end layers. */
+export function isViaVisible(
+  via: { from_layer: number; to_layer: number; net: string },
+  isLayerVisible: (layer: number) => boolean,
+  isCoilVisible: (net: string, layer: number) => boolean,
+): boolean {
+  for (let layer = Math.min(via.from_layer, via.to_layer); layer <= Math.max(via.from_layer, via.to_layer); layer++) {
+    if (isLayerVisible(layer) && isCoilVisible(via.net, layer)) return true;
+  }
+  return false;
+}
+
 /** Sample the original circular arc, including major arcs through the midpoint. */
 export function sampleCopperArc({ start: a, mid: b, end: c }: CadRouteCurve): CadPoint[] {
   const d = 2 * (a.x * (b.y - c.y) + b.x * (c.y - a.y) + c.x * (a.y - b.y));
