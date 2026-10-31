@@ -270,10 +270,11 @@
 
 <style>
   .coil-3d { container-type: size; }
-  .axis-indicator { bottom: calc(3.5rem + var(--coil-overlay-inset, 0px)); }
-  .overlay-legends { bottom: calc(2rem + var(--coil-overlay-inset, 0px)); max-height: 40cqh; right: auto; max-width: min(26rem, calc(100% - 10rem)); }
+  .axis-indicator { top: var(--coil-axis-top, .5rem); }
+  .overlay-legends { bottom: calc(2rem + var(--coil-overlay-inset, 0px)); max-height: 40cqh; right: auto; max-width: min(26rem, calc(100% - 4.75rem)); }
   .z-height { top: var(--coil-preset-inset, 3rem); bottom: calc(2rem + var(--coil-overlay-inset, 0px)); }
-  .simulation-controls { width: 22rem; max-width: calc(100% - 4.5rem); }
+  .simulation-controls { right: 6.25rem; width: 22rem; max-width: calc(100% - 4.5rem); }
+  .layer-depths { right: 6.25rem; }
   .inspector-toggle { display: flex; justify-content: space-between; align-items: center; width: 100%; min-height: 2rem; text-align: left; padding: 0.5rem 0.75rem; }
   .inspector-toggle:hover { background: rgb(var(--slate-800)); }
   .overlay-control-fields { display: grid; gap: 0.625rem; padding: 0.625rem; max-height: calc(100cqh - 5rem - var(--coil-overlay-inset, 0px)); overflow-y: auto; border-top: 1px solid rgb(var(--slate-700)); }
@@ -294,10 +295,11 @@
   .compact-overlay-toggle { display: none; line-height: 1.4; }
   .compact-overlay-toggle button { padding: .25rem; font-size: inherit; line-height: 1.2; }
   @container (max-width: 760px) {
-    .simulation-controls { top: max(3rem, var(--coil-preset-inset, 0px)); }
-    .overlay-control-fields { max-height: min(calc(65cqh - 4rem), calc(100cqh - 5rem - var(--coil-overlay-inset, 0px))); }
+    .simulation-controls { right: .5rem; top: max(calc(var(--coil-axis-top, .5rem) + 5.5rem), var(--coil-preset-inset, 0px)); }
+    .overlay-control-fields { max-height: min(calc(65cqh - 4rem), calc(100cqh - var(--coil-axis-top, .5rem) - 8rem - var(--coil-overlay-inset, 0px))); }
   }
   @container (max-width: 520px) {
+    .overlay-legends { bottom: calc(.5rem + var(--coil-overlay-inset, 0px)); }
     .compact-overlay-toggle { display: block; }
     .overlay-legends-body { display: none; }
     .coil-3d[data-legends-open="true"] .overlay-legends-body { display: flex; }

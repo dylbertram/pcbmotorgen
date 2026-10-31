@@ -72,7 +72,7 @@ for (const width of [1280, 390]) test(`Star generator keeps flip checkboxes visi
 test("XYZ indicator is camera-aligned, passive and inside every desktop/mobile viewport", async ({ page }, info) => {
   await gotoDesignApp(page); await openCoilPreview(page);
   const workspace = coilWorkspace(page);
-  for (const width of [1280, 390]) {
+  for (const width of [1280, 390, 360]) {
     await page.setViewportSize({ width, height: 844 });
     for (const [label, id] of [["Top-down", "top"], ["Front", "front"], ["Left", "left"], ["3D fields and heat", "iso"]]) {
       await workspace.getByRole("button", { name: label, exact: true }).click();
@@ -87,8 +87,12 @@ test("XYZ indicator is camera-aligned, passive and inside every desktop/mobile v
       const box = (await axes.boundingBox())!, frame = (await viewer.boundingBox())!;
       const navigation = (await workspace.getByRole("group", { name: "Zoom controls", exact: true }).boundingBox())!;
       expect(box.x).toBeGreaterThanOrEqual(frame.x); expect(box.x + box.width).toBeLessThanOrEqual(frame.x + frame.width);
-      expect(box.y).toBeGreaterThanOrEqual(frame.y); expect(box.y + box.height).toBeLessThan(navigation.y);
+      const presets = (await workspace.getByRole("group", { name: "Viewport view", exact: true }).boundingBox())!;
+      const sharesPresetRow = box.x >= presets.x + presets.width;
+      expect(box.y).toBeCloseTo(sharesPresetRow ? presets.y : presets.y + presets.height + 8, 0);
+      expect(box.y + box.height).toBeLessThan(navigation.y);
       expect(box.x + box.width).toBeLessThanOrEqual(navigation.x + navigation.width + 1);
+      expect(box.x >= presets.x + presets.width || box.y >= presets.y + presets.height).toBe(true);
       const direction = async (axis: string) => JSON.parse((await axes.locator(`[data-axis="${axis}"]`).getAttribute("data-direction"))!) as number[];
       if (id === "top") { await expect.poll(async () => (await direction("X"))[0]).toBeCloseTo(1); expect((await direction("Y"))[1]).toBeCloseTo(-1); }
       if (id === "front") { await expect.poll(async () => (await direction("Z"))[1]).toBeCloseTo(-1); expect((await direction("X"))[0]).toBeCloseTo(1); }
