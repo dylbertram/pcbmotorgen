@@ -51,7 +51,7 @@ test("zoom controls clear every open side panel", async ({ page }, testInfo) => 
 test("persistent workspace edits and middle-drag panning survive workflow changes", async ({ page }) => {
   const view = await workspace(page);
   const frame = view.getByRole("img", { name: "Coil preview", exact: true });
-  const canvas = frame.locator("canvas");
+  const canvas = frame.getByTestId("coil-annotations");
   await expect(view.getByRole("button", { name: "Edit segments", exact: true })).toBeVisible();
   const revision = await canvas.getAttribute("data-revision");
   const box = (await frame.boundingBox())!;
@@ -68,35 +68,27 @@ test("persistent workspace edits and middle-drag panning survive workflow change
 });
 
 test("copper width is zoom-independent in world units; centerlines remain thin", async ({ page }) => {
-  await page.addInitScript(() => {
-    const original = CanvasRenderingContext2D.prototype.stroke;
-    CanvasRenderingContext2D.prototype.stroke = function (...args: [Path2D?]) {
-      if (this.strokeStyle === "#10b981") {
-        this.canvas.dataset.testWorldWidth = String(this.lineWidth);
-        this.canvas.dataset.testPixelWidth = String(this.lineWidth * Math.abs(this.getTransform().a));
-      }
-      if (args[0]) original.call(this, args[0]); else original.call(this);
-    };
-  });
-  const view = await workspace(page), canvas = view.getByRole("img", { name: "Coil preview", exact: true }).locator("canvas");
-  await expect(canvas).toHaveAttribute("data-test-world-width", /\d/);
-  const width = (await canvas.getAttribute("data-test-world-width"))!;
-  const pixels = Number(await canvas.getAttribute("data-test-pixel-width"));
+  // Physical mesh dimensions are covered by copperMesh.test.ts. Here verify
+  // the shared renderer's width and camera projection, not Canvas2D strokes.
+  const view = await workspace(page), canvas = view.getByTestId("coil-top");
+  await expect.poll(async()=>Number(await canvas.getAttribute("data-trace-width-px"))).toBeGreaterThan(0);
+  const width = (await canvas.getAttribute("data-trace-width-mm"))!;
+  const pixels = Number(await canvas.getAttribute("data-trace-width-px"));
   await view.getByRole("button", { name: "Zoom in", exact: true }).click();
-  await expect(canvas).toHaveAttribute("data-test-world-width", width);
-  await expect.poll(async () => Number(await canvas.getAttribute("data-test-pixel-width"))).toBeGreaterThan(pixels);
+  await expect(canvas).toHaveAttribute("data-trace-width-mm", width);
+  await expect.poll(async () => Number(await canvas.getAttribute("data-trace-width-px"))).toBeGreaterThan(pixels);
   await view.getByRole("button", { name: "Display", exact: true }).click();
   const panel = view.getByRole("dialog", { name: "Coil preview display", exact: true });
   await setViewMenuChecked(page, "view:centerlines", true);
   await panel.getByRole("button", { name: "Close display panel" }).click();
   await expect(canvas).toHaveAttribute("data-trace-mode", "centerlines");
-  const thin = Number(await canvas.getAttribute("data-test-pixel-width"));
+  const thin = Number(await canvas.getAttribute("data-trace-width-px"));
   await view.getByRole("button", { name: "Zoom in", exact: true }).click();
-  await expect.poll(async () => Number(await canvas.getAttribute("data-test-pixel-width"))).toBeCloseTo(thin);
+  await expect.poll(async () => Number(await canvas.getAttribute("data-trace-width-px"))).toBeCloseTo(thin);
 });
 
 test("side rail panels do not resize the drawing and keep display choices", async ({ page }) => {
-  const view = await workspace(page), canvas = view.getByRole("img", { name: "Coil preview", exact: true }).locator("canvas");
+  const view = await workspace(page), canvas = view.getByTestId("coil-annotations");
   const bounds = await canvas.boundingBox();
   const rail = view.getByRole("toolbar", { name: "Preview side tools" });
   await expect(rail).toHaveAttribute("aria-orientation", "vertical");
@@ -195,7 +187,7 @@ test("overlay visibility and phase selection preserve camera", async ({ page }) 
       const t = this.getTransform(); this.canvas.dataset.testCamera = JSON.stringify([t.a, t.d, t.e, t.f]);
     };
   });
-  const view = await workspace(page), canvas = view.getByRole("img", { name: "Coil preview", exact: true }).locator("canvas");
+  const view = await workspace(page), canvas = view.getByTestId("coil-annotations");
   await view.getByRole("button", { name: "Zoom in", exact: true }).click();
   await view.getByRole("button", { name: "Layers", exact: true }).click();
   const panel = view.getByRole("dialog", { name: "Coil preview layers", exact: true });
@@ -245,7 +237,7 @@ test("workflow changes preserve mover position and keep the preview mounted", as
   const view = await workspace(page);
   const position = view.getByRole("spinbutton", { name: "Mover position (mm)", exact: true });
   const value = await position.inputValue();
-  const canvas = view.getByRole("img", { name: "Coil preview", exact: true }).locator("canvas");
+  const canvas = view.getByTestId("coil-annotations");
   await canvas.evaluate(el => el.setAttribute("data-mount-witness", "retained"));
   await page.getByRole("tab", { name: /^Simulate/i }).click();
   await page.getByRole("tab", { name: /^Design/i }).click();

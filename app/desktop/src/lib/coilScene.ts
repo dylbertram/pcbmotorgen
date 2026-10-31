@@ -38,7 +38,7 @@ export function sampleCopperArc({ start: a, mid: b, end: c }: CadRouteCurve): Ca
 }
 
 /** Convert mm into a centered, Y-up scene. Bounds include hidden copper and vias. */
-export function buildCoilScene(geometry: CadGeometry | null) {
+export function buildCoilScene(geometry: CadGeometry | null, copperThicknessMm: { outer: number; inner: number; layers?: number[] } = { outer: .035, inner: .035 }) {
   if (!geometry || geometry.layer_z_mm.length === 0) return null;
   const g = geometry;
   const at = (p: CadPoint, layer: number) => new Vector3(p.x, g.layer_z_mm[layer] ?? 0, -p.y);
@@ -60,6 +60,8 @@ export function buildCoilScene(geometry: CadGeometry | null) {
   for (const path of [...paths, ...vias]) for (const p of path.points) p.sub(center).multiplyScalar(scale);
   for (const t of terminals) t.point.sub(center).multiplyScalar(scale);
   return { paths, vias, terminals, width: Math.max(g.trace_width_mm, 0.01) * scale,
+    thicknessByLayer: g.layer_z_mm.map((_, layer) => (copperThicknessMm.layers?.[layer] ?? (layer === 0 || layer === g.layer_z_mm.length - 1 ? copperThicknessMm.outer : copperThicknessMm.inner)) * scale),
+    layerY: g.layer_z_mm.map(z=>(z-center.y)*scale),
     centerMm: center.toArray() as [number, number, number], scale,
     nets: [...new Set([...paths, ...vias].map(p => p.net))].sort() };
 }

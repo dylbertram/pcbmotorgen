@@ -49,6 +49,10 @@
       <input type="checkbox" bind:checked={view.showVias} aria-label="Show vias" />
       <span class="swatch" style:background-color="#fbbf24"></span><span>Vias</span>
     </label>
+    <label class="layer-row" class:hidden-row={!view.showPcb}>
+      <input type="checkbox" bind:checked={view.showPcb} aria-label="Show PCB body preview" />
+      <span class="swatch" style:background-color="#166534"></span><span>PCB body preview</span>
+    </label>
   </fieldset>
   {/if}
 </div>

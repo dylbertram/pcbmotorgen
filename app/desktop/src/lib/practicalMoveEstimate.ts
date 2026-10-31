@@ -12,7 +12,7 @@ export function practicalMoveEstimate(config: LinearMotorConfig, settings: Drive
       || config.backplane && (config.backplane.layers.length > 0 || config.backplane.housing != null)) {
     throw new Error("The estimate requires current native DRV8311 analysis at 12 V and 100 kHz, 0.21 Ω driver path, three connected phases, 0 or 47 µH per phase, and no backplane or housing.");
   }
-  const thickness = Math.max(drive.outer_copper_m, drive.inner_copper_m);
+  const thickness = config.pcb_stackup ? Math.max(...config.pcb_stackup.copper_m) : Math.max(drive.outer_copper_m, drive.inner_copper_m);
   const period = 2 * config.magnet_pitch_m;
   const rho = 1.724e-8 * (1 + 0.00393 * (settings.winding_temp_c - 20));
   const resistances = drive.phases.map(p => p.resistance_hot_ohm) as PhaseValues;

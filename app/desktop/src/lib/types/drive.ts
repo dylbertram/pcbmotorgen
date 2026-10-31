@@ -135,6 +135,7 @@ export interface DriveAnalysis {
   trace_width_m: number;
   outer_copper_m: number;
   inner_copper_m: number;
+  layer_copper_m?: number[] | null;
   via_resistance_each_ohm: number;
   phase_resistance_ohm: number;
   phase_inductance_h: number;

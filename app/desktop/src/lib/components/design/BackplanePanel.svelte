@@ -29,6 +29,7 @@
   import NumberField from "../ui/NumberField.svelte";
   import HelpTag from "../ui/HelpTag.svelte";
   import TravelStackupView from "./TravelStackupView.svelte";
+  import PcbStackupEditor from "./PcbStackupEditor.svelte";
   import PeriodicReferencePanel from "./PeriodicReferencePanel.svelte";
   import HousingMotionPanel from "./HousingMotionPanel.svelte";
 
@@ -161,11 +162,17 @@
       </label>
       <label class="flex items-center justify-between gap-2 text-xs text-slate-300">
         <span>PCB thickness (mm)</span>
-        <NumberField id="pcb-thickness" value={config.pcb_thickness_mm} min={0.1} step={0.1} ariaLabel="PCB thickness (mm)" class={fieldClass} onCommit={(value) => (config.pcb_thickness_mm = value)} />
+        {#if config.pcb_stackup_mm}
+          <output aria-label="PCB thickness (mm)" class="font-mono text-emerald-200">{Number(config.pcb_thickness_mm.toPrecision(6))} mm</output>
+        {:else}
+          <NumberField id="pcb-thickness" value={config.pcb_thickness_mm} min={0.1} step={0.1} ariaLabel="PCB thickness (mm)" class={fieldClass} onCommit={(value) => (config.pcb_thickness_mm = value)} />
+        {/if}
       </label>
     </div>
     <div class="mx-auto w-full max-w-[160px]"><TravelStackupView {config} /></div>
   </div>
+
+  <PcbStackupEditor {config} />
 
   {#if !backplane}
     <button type="button" class={buttonClass} onclick={addBackplane}>Add backplane</button>

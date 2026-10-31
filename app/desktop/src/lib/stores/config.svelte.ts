@@ -28,6 +28,7 @@ import { generatorConnection } from "../routingSources";
 import { MAX_PCB_LAYERS } from "../types/simulationLimits";
 import type { RoutedMoveRequest } from "../types/movePower";
 import { magnetMass } from "../carriageMass";
+import { pcbStackupThicknessMm, pcbStackupToSi, type PcbStackupMm } from "../pcbStackup";
 
 export class ConfigStore {
   constructor() {
@@ -134,7 +135,10 @@ export class ConfigStore {
   min_space_mm = $state(0.127);
   min_via_drill_mm = $state(0.2);
   min_via_annular_ring_mm = $state(0.1);
-  pcb_thickness_mm = $state(1.6);
+  private legacy_pcb_thickness_mm = $state(1.6);
+  pcb_stackup_mm = $state<PcbStackupMm | null>(null);
+  get pcb_thickness_mm(): number { return this.pcb_stackup_mm ? pcbStackupThicknessMm(this.pcb_stackup_mm) : this.legacy_pcb_thickness_mm; }
+  set pcb_thickness_mm(value: number) { this.legacy_pcb_thickness_mm = value; }
   max_layers = $state<number>(MAX_PCB_LAYERS);
   drive_frequency_hz = $state(500);
   max_temperature_rise_c = $state(20);
@@ -366,6 +370,7 @@ export class ConfigStore {
       active_area_length_m: mm(this.active_area_length_mm),
       board_width_m: mm(this.active_area_width_mm),
       pcb_thickness_m: mm(this.pcb_thickness_mm),
+      ...(this.pcb_stackup_mm ? { pcb_stackup: pcbStackupToSi(this.pcb_stackup_mm) } : {}),
       strands_per_phase: this.strands_per_phase,
 
       magnet_count: this.magnet_count,

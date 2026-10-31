@@ -71,6 +71,7 @@ impl LinearMotorConfig {
             active_area_length_m: self.active_area_length_m,
             board_width_m: self.board_width_m,
             pcb_thickness_m: self.pcb_thickness_m,
+            pcb_stackup: self.pcb_stackup.clone(),
             air_gap_m: self.air_gap_m,
             strands_per_phase: self.strands_per_phase,
             phases: self.phases,

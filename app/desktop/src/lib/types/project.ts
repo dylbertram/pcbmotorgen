@@ -17,6 +17,7 @@ import type { SensorConfig } from "./sensor";
 import type { DriveSettings } from "./drive";
 import type { BackplaneStack } from "./backplane";
 import type { RoutedMoveRequest } from "./movePower";
+import type { PcbStackupMm } from "../pcbStackup";
 
 export type DocumentKind = "motor" | "sensor";
 
@@ -84,6 +85,7 @@ export interface ProjectConfigState {
   min_via_drill_mm: number;
   min_via_annular_ring_mm: number;
   pcb_thickness_mm: number;
+  pcb_stackup_mm?: PcbStackupMm | null;
   max_layers: number;
   drive_frequency_hz: number;
   max_temperature_rise_c: number;

@@ -38,11 +38,11 @@ test("view choices live at the viewport bottom-right and survive both views", as
 
 test("View owns global controls while the side panels retain phase and layer filters", async ({ page }, info) => {
   await gotoDesignApp(page);
-  await expect.poll(async () => (await snapshot(page))?.items.length).toBe(11);
+  await expect.poll(async () => (await snapshot(page))?.items.length).toBe(groups.flat().length);
   expect((await snapshot(page)).items.map(item => item.id)).toEqual(groups.flat().map(item => item.id));
   expect(groups[3].map(item => item.label)).toEqual(["Pole pitch", "Conductor band widths", "Pole regions"]);
   const workspace = page.getByRole("region", { name: "Coil design workspace", exact: true });
-  const canvas = workspace.getByRole("img", { name: "Coil preview", exact: true }).locator("canvas");
+  const canvas = workspace.getByTestId("coil-annotations");
   await workspace.getByRole("button", { name: "Display", exact: true }).click();
   const display = workspace.getByRole("dialog", { name: "Coil preview display", exact: true });
   await expect(display.getByRole("radio")).toHaveCount(0);

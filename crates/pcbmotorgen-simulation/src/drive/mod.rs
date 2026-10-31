@@ -253,6 +253,8 @@ pub struct DriveAnalysis {
     pub trace_width_m: f64,
     pub outer_copper_m: f64,
     pub inner_copper_m: f64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub layer_copper_m: Option<Vec<f64>>,
     pub via_resistance_each_ohm: f64,
     // --- Electrical summary (worst / mean phase) ---
     /// Worst (highest) hot phase resistance [Ω].
@@ -401,12 +403,20 @@ fn is_inner(layer: u32, num_layers: u32) -> bool {
     num_layers > 2 && layer != 0 && layer + 1 != num_layers
 }
 
-fn copper_m(layer: u32, num_layers: u32, settings: &DriveSettings) -> f64 {
-    if is_inner(layer, num_layers) {
+pub fn copper_thickness_m(layer: u32, sim: &SimulationInput, settings: &DriveSettings) -> f64 {
+    if let Some(stack) = &sim.pcb_stackup {
+        return stack.copper_m.get(layer as usize).copied().unwrap_or(f64::NAN);
+    }
+    if is_inner(layer, sim.num_layers) {
         oz_to_m(settings.inner_copper_oz)
     } else {
         oz_to_m(settings.outer_copper_oz)
     }
+}
+
+pub fn maximum_copper_thickness_m(sim: &SimulationInput, settings: &DriveSettings) -> f64 {
+    sim.pcb_stackup.as_ref().map(|s| s.copper_m.iter().copied().fold(0., f64::max))
+        .unwrap_or_else(|| oz_to_m(settings.outer_copper_oz.max(settings.inner_copper_oz)))
 }
 
 /// Run the driver suitability analysis.
@@ -425,8 +435,8 @@ pub fn analyze_drive(
 /// Extra geometry known for imported copper.
 #[derive(Debug, Clone, Default)]
 pub struct DriveGeometryHints {
-    /// Copper plane heights per layer index [m]; evenly spaced through
-    /// `pcb_thickness_m` when empty.
+    /// Copper center heights per layer index [m]. When empty, use the custom
+    /// stackup or the legacy uniform placement through `pcb_thickness_m`.
     pub layer_z_m: Vec<f64>,
     /// Picked IN/OUT terminals per phase net.
     pub terminals: std::collections::BTreeMap<String, Vec<TerminalPair>>,
@@ -437,6 +447,7 @@ impl DriveGeometryHints {
     /// negative depths; imported copper retains its explicit layer heights.
     pub fn layer_z(&self, sim: &SimulationInput, layer: u32) -> f64 {
         self.layer_z_m.get(layer as usize).copied().unwrap_or_else(|| {
+            if let Some(stack) = &sim.pcb_stackup { return stack.layer_z_m(layer); }
             -(layer as f64) * sim.pcb_thickness_m / sim.num_layers.saturating_sub(1).max(1) as f64
         })
     }
@@ -452,6 +463,7 @@ impl DriveGeometryHints {
 /// or finite geometry model; never flatten it or silently relocate the stack.
 pub fn validate_copper_placement(sim: &SimulationInput, routing: &RoutingResult, hints: &DriveGeometryHints) -> Result<(), crate::params::SimulationError> {
     use crate::params::SimulationError;
+    if let Some(stack) = &sim.pcb_stackup { stack.validate(sim.num_layers, sim.pcb_thickness_m).map_err(SimulationError)?; }
     let Some(stack) = &sim.backplane else { return Ok(()) };
     stack.validate().map_err(SimulationError)?;
     let mut depth = sim.pcb_thickness_m;
@@ -502,7 +514,7 @@ pub fn analyze_drive_with(
     let width = sim.min_trace_m;
     let rho_hot = rho_cu_at(settings.winding_temp_c);
     let rho_20 = rho_cu_at(RHO_REF_C);
-    let via_len = sim.pcb_thickness_m;
+    let via_len = sim.pcb_stackup.as_ref().map(|s| (s.layer_z_m(0) - s.layer_z_m(sim.num_layers - 1)).abs()).unwrap_or(sim.pcb_thickness_m);
     let r_via_hot = via_resistance_ohm(sim.min_via_drill_m, settings.via_plating_m, via_len, rho_hot);
     let networks = extract_phase_networks_with_terminals(routing, &hints.terminals);
     let layer_z = |l: u32| hints.layer_z(sim, l);
@@ -520,7 +532,7 @@ pub fn analyze_drive_with(
             .iter()
             .map(|e| match &e.kind {
                 EdgeKind::Trace { layer, length_m, .. } => {
-                    rho_hot * length_m / (width * copper_m(*layer, num_layers, settings))
+                    rho_hot * length_m / (width * copper_thickness_m(*layer, sim, settings))
                 }
                 EdgeKind::Via { layers, .. } => via_resistance_ohm(sim.min_via_drill_m, settings.via_plating_m, hints.via_length_m(sim, *layers), rho_hot),
             })
@@ -567,7 +579,7 @@ pub fn analyze_drive_with(
                         max_share = max_share.max(share);
                         ipc2221_ampacity_a(
                             width,
-                            copper_m(*layer, num_layers, settings),
+                            copper_thickness_m(*layer, sim, settings),
                             settings.allowed_rise_c,
                             is_inner(*layer, num_layers),
                         )
@@ -604,7 +616,7 @@ pub fn analyze_drive_with(
     }
 
     // --- Inductance -----------------------------------------------------
-    let thickness_for_gmd = oz_to_m(settings.outer_copper_oz.max(settings.inner_copper_oz));
+    let thickness_for_gmd = maximum_copper_thickness_m(sim, settings);
     let filaments: Vec<Vec<inductance::Filament>> = networks
         .iter()
         .zip(solutions.iter())
@@ -1086,6 +1098,7 @@ pub fn analyze_drive_with(
         trace_width_m: width,
         outer_copper_m: oz_to_m(settings.outer_copper_oz),
         inner_copper_m: oz_to_m(settings.inner_copper_oz),
+        layer_copper_m: sim.pcb_stackup.as_ref().map(|s| s.copper_m.clone()),
         via_resistance_each_ohm: r_via_hot,
         phase_resistance_ohm: r_phase,
         phase_inductance_h: l_self,

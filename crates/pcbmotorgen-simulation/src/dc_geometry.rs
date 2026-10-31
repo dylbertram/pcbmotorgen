@@ -57,10 +57,8 @@ fn snapshot_with_scope(sim: &SimulationInput, routing: &RoutingResult, drive: &D
         return Err("Invalid or zero-length actual copper geometry; no repair was applied".into());
     }
     let layers: Vec<_> = (0..sim.num_layers).map(|layer| {
-        let inner = sim.num_layers > 2 && layer != 0 && layer + 1 != sim.num_layers;
-        let weight = if inner { drive.inner_copper_oz } else { drive.outer_copper_oz };
         json!({"layer":layer,"centre_z_m":hints.layer_z(sim,layer),
-            "thickness_m":crate::units::oz_to_m(weight),"trace_width_m":sim.min_trace_m})
+            "thickness_m":crate::drive::copper_thickness_m(layer,sim,drive),"trace_width_m":sim.min_trace_m})
     }).collect();
     let phase_networks = extract_phase_networks_with_terminals(routing, &hints.terminals);
     if phase_networks.is_empty() { return Err("No physical winding networks were supplied".into()); }
@@ -71,9 +69,7 @@ fn snapshot_with_scope(sim: &SimulationInput, routing: &RoutingResult, drive: &D
         }
         let resistance: Vec<_> = network.edges.iter().map(|edge| match &edge.kind {
             EdgeKind::Trace {layer, length_m, ..} => {
-                let inner = sim.num_layers > 2 && *layer != 0 && *layer + 1 != sim.num_layers;
-                let weight = if inner {drive.inner_copper_oz} else {drive.outer_copper_oz};
-                rho * length_m / (sim.min_trace_m * crate::units::oz_to_m(weight))
+                rho * length_m / (sim.min_trace_m * crate::drive::copper_thickness_m(*layer,sim,drive))
             }
             EdgeKind::Via {layers, ..} => via_resistance_ohm(sim.min_via_drill_m, drive.via_plating_m,
                 hints.via_length_m(sim, *layers), rho),

@@ -236,6 +236,11 @@ describe("mockFriction", () => {
 });
 
 describe("mockHeightStack", () => {
+  it("does not add copper twice to an explicit stackup", () => {
+    const h = mockHeightStack(makeConfig({ pcb_thickness_m:.0008, pcb_stackup:{copper_m:[35e-6,35e-6],dielectric_m:[.00073]} }));
+    expect(h.cu_protrusion_m).toBe(0);
+    expect(h.total_height_m).toBeCloseTo(h.pcb_thickness_m+h.solder_mask_m+h.air_gap_m+h.magnet_height_m+h.tolerance_m);
+  });
   it("sums the full stack including tolerance", () => {
     const c = makeConfig();
     const h = mockHeightStack(c);

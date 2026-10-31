@@ -8,7 +8,7 @@ async function selectPanel(page: import("@playwright/test").Page, name: string) 
 
 test("Simulate opens four result tabs below the same live coil workspace", async ({ page }, testInfo) => {
   await gotoDesignApp(page);
-  const canvas = page.getByRole("region", { name: "Coil design workspace", exact: true }).locator("canvas");
+  const canvas = page.getByRole("region", { name: "Coil design workspace", exact: true }).getByTestId("coil-annotations");
   await expect.poll(async () => Number(await canvas.getAttribute("data-segments"))).toBeGreaterThan(0);
   await canvas.evaluate((el) => el.setAttribute("data-test-instance", "retained"));
   const before = (await canvas.boundingBox())!;

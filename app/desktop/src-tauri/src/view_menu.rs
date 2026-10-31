@@ -78,7 +78,8 @@ mod tests {
         assert_eq!(groups[3].iter().map(|item| item.id.as_str()).collect::<Vec<_>>(),
             ["view:pole-pitch", "view:band-widths", "view:pole-regions"]);
         let ids: Vec<_> = groups.iter().flatten().map(|item| item.id.as_str()).collect();
-        assert_eq!(ids.len(), 11);
+        assert_eq!(ids.len(), 14);
+        assert!(ids.contains(&"view:pcb"));
         assert!(!ids.iter().any(|id| id.contains("layer") || id.contains("phase")));
         assert!(validate(&snapshot()).is_ok());
     }

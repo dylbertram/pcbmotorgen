@@ -98,3 +98,5 @@ pub use physics::*;
 pub use project::*;
 #[allow(unused_imports)]
 pub use routing_plugins::*;
+#[cfg(test)]
+mod pcb_stackup_tests;

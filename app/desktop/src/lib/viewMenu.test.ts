@@ -20,6 +20,10 @@ describe("shared View menu", () => {
     applyViewMenuAction(view, "view:centerlines");
     expect(checked()).toContain("view:3d");
     expect(checked()).not.toContain("view:top");
+    const visibility = JSON.stringify([view.layerVisibility, view.coilLayerVisibility, view.phaseVisibility]);
+    applyViewMenuAction(view, "view:pcb");
+    expect(view.showPcb).toBe(true);
+    expect(JSON.stringify([view.layerVisibility, view.coilLayerVisibility, view.phaseVisibility])).toBe(visibility);
     expect(checked()).toContain("view:centerlines");
     expect(checked()).not.toContain("view:traces");
     applyViewMenuAction(view, "view:pole-pitch");
@@ -32,6 +36,9 @@ describe("shared View menu", () => {
   });
   it("disables unavailable overlays and inactive/no-document menus", () => {
     const view = new CoilPreviewViewState();
+    expect(viewMenuItems(view, capabilities).find(item => item.id === "view:pcb")?.enabled).toBe(true);
+    view.viewMode = "iso";
+    expect(viewMenuItems(view, capabilities).find(item => item.id === "view:pcb")?.enabled).toBe(true);
     expect(viewMenuItems(view, { ...capabilities, polePitch: false }).find((item) => item.id === "view:pole-pitch")?.enabled).toBe(false);
     expect(viewMenuItems(view, { ...capabilities, active: false }).every((item) => !item.enabled)).toBe(true);
     expect(viewMenuItems(null, capabilities).every((item) => !item.enabled && !item.checked)).toBe(true);

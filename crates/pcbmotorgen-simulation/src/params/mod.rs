@@ -32,6 +32,8 @@ pub(crate) const SAFETY_MARGIN: f64 = 1.3;
 /// Supported coreless screening input envelope, not an accuracy guarantee.
 pub const MAX_MAGNET_COUNT: u32 = 12;
 pub const MAX_PCB_LAYERS: u32 = 16;
+mod pcb_stackup;
+pub use pcb_stackup::PcbStackup;
 
 /// Default value for `num_layers` when the field is absent during serde
 /// deserialisation (e.g. legacy JSON payloads from before the field was
@@ -91,6 +93,8 @@ pub struct SimulationInput {
     pub board_width_m: f64,
     /// PCB substrate thickness [m].
     pub pcb_thickness_m: f64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pcb_stackup: Option<PcbStackup>,
     /// Magnet face to PCB copper clearance [m].
     pub air_gap_m: f64,
     /// Number of parallel strands (serpentine paths) per phase on the same
@@ -174,6 +178,7 @@ impl Default for SimulationInput {
             active_area_length_m: mm(195.0),
             board_width_m: mm(20.0),
             pcb_thickness_m: 0.0016,
+            pcb_stackup: None,
             air_gap_m: mm(0.5),
             strands_per_phase: 2,
             phases: 3,

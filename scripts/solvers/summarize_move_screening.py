@@ -11,13 +11,16 @@ def sha(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def summarize(baselines, models, results, sensitivity=None, engineering_estimate=False, builder=None, winding_sensitivity=None):
+def summarize(baselines, models, results, sensitivity=None, engineering_estimate=False, builder=None, winding_sensitivity=None, designs=('fader', 'star2')):
     cases = {}
-    for design in ('fader', 'star2'):
+    for design in designs:
         for move in ('full-forward', 'short-forward', 'short-return'):
             name = f'{design}-{move}.json'
             baseline_path, model_path, result_path = (p / name for p in (baselines, models, results))
             baseline = json.loads(baseline_path.read_text())
+            if design == 'generated4' and (baseline.get('archive_role') != 'configuration_reference_only'
+                    or baseline['native']['inputs'].get('cad_geometry') is not None):
+                raise ValueError('Generated audit must not reuse or claim saved imported copper')
             model = json.loads(model_path.read_text())
             run = json.loads(result_path.read_text())
             if len(run) != 3 or not model['omitted_losses']:
@@ -58,6 +61,8 @@ def summarize(baselines, models, results, sensitivity=None, engineering_estimate
                     accounted_loss_energy_j=demand['accounted_loss_energy_j']))
             cases[name.removesuffix('.json')] = dict(
                 archive=baseline['archive'], archive_sha256=baseline['archive_sha256'],
+                archive_role=baseline.get('archive_role', 'saved_design'),
+                geometry_source=baseline.get('geometry_source', 'saved_design'),
                 version=baseline['version'], baseline_sha256=sha(baseline_path),
                 model_sha256=sha(model_path), native_receipt_sha256=sha(result_path),
                 baseline_input_sha256=baseline['native']['input_sha256'],
@@ -67,7 +72,10 @@ def summarize(baselines, models, results, sensitivity=None, engineering_estimate
                 pcb_thickness_m=baseline['native']['inputs'].get('config', {}).get('pcb_thickness_m'),
                 scenario_overrides=baseline.get('scenario_overrides', {}),
                 geometry=model['domain'].get('geometry'), refinements=levels)
-    summary = dict(schema='engineering-saved-design-estimate-v1' if engineering_estimate else 'partial-saved-design-screening-v1',
+    schema = 'engineering-saved-design-estimate-v1' if engineering_estimate else 'partial-saved-design-screening-v1'
+    if designs == ('generated4',):
+        schema = 'engineering-generated-design-estimate-v1' if engineering_estimate else 'partial-generated-design-screening-v1'
+    summary = dict(schema=schema,
                 scope=('Engineering estimate with named exclusions' if engineering_estimate else 'Partial modeled demand') + ', NOT a complete supply total, measured hardware demand, a guaranteed maximum, or achieved tracking',
                 source_boundary='12 V stiff DC link, explicit regeneration sink accepted; no upstream or capacitor transient model',
                 generator_sha256=sha(builder or Path(__file__).with_name('practical_move_assumptions.py')),
@@ -110,8 +118,10 @@ if __name__ == '__main__':
     parser.add_argument('--engineering-estimate', action='store_true')
     parser.add_argument('--builder', type=Path, help='actual model builder; defaults to the Python reference')
     parser.add_argument('--winding-sensitivity', type=Path)
+    parser.add_argument('--generated-braid-audit', action='store_true', help='summarize explicitly generated four-layer cases, not saved copper')
     args = parser.parse_args()
-    value = summarize(args.baselines, args.models, args.results, args.sensitivity, args.engineering_estimate, args.builder, args.winding_sensitivity)
+    value = summarize(args.baselines, args.models, args.results, args.sensitivity, args.engineering_estimate, args.builder, args.winding_sensitivity,
+                      ('generated4',) if args.generated_braid_audit else ('fader', 'star2'))
     with args.output.open('x') as stream:
         json.dump(value, stream, indent=2, allow_nan=False)
         stream.write('\n')

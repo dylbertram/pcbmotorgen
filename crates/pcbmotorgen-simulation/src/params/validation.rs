@@ -25,6 +25,9 @@ impl SimulationInput {
     }
 
     fn validate_with_design_goals(&self, check_goals: bool) -> Result<(), SimulationError> {
+        if let Some(stack) = &self.pcb_stackup {
+            stack.validate(self.num_layers, self.pcb_thickness_m).map_err(SimulationError)?;
+        }
         if let Some(stack) = &self.backplane {
             stack.validate().map_err(SimulationError)?;
         }

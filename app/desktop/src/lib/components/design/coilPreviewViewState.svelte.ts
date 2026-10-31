@@ -15,10 +15,11 @@
  */
 
 export class CoilPreviewViewState {
-  /** Top-down canvas or the layer-aware isometric view (kata zje4). */
-  viewMode = $state<"top" | "iso">("top");
+  /** Shared copper renderer with orthographic presets and an orbitable 3D view. */
+  viewMode = $state<"top" | "front" | "left" | "iso">("top");
   /** Display-only Z magnification, shared by the inline and expanded viewer. */
   zScale = $state(1);
+  zoomWindow = $state(false);
   /** Copper uses physical widths; centerlines use a thin screen-width stroke. */
   traceMode = $state<"traces" | "centerlines">("traces");
   /** Phase waveform below the mover slider in the expanded preview. */
@@ -38,6 +39,7 @@ export class CoilPreviewViewState {
   poleRegionPhase = $state("");
   /** Inter-layer via markers. Toggle lives in the expanded lightbox only. */
   showVias = $state(true);
+  showPcb = $state(false);
   showTerminals = $state(true);
   terminalPanelOpen = $state(false);
   positionBarMode = $state<"position" | "layers">("position");

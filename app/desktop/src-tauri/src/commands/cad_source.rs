@@ -247,11 +247,16 @@ impl CadBoard {
             placement_length_mm,
             width_mm: y[1] - y[0],
             layer_z_m: {
+                if let Some(stack) = &core.pcb_stackup {
+                    stack.validate(cad.layer_z_mm.len() as u32, core.pcb_thickness_m)?;
+                    (0..cad.layer_z_mm.len()).map(|layer| stack.layer_z_m(layer as u32)).collect()
+                } else {
                 let low = cad.layer_z_mm.iter().copied().fold(f64::INFINITY, f64::min);
                 let high = cad.layer_z_mm.iter().copied().fold(f64::NEG_INFINITY, f64::max);
                 cad.layer_z_mm.iter().map(|z| if high == low { 0.0 } else {
                     ((z - high) / (high - low)) * core.pcb_thickness_m
                 }).collect()
+                }
             },
         })
     }

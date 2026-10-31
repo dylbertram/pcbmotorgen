@@ -192,6 +192,9 @@ pub struct ProjectConfigStateIpc {
     pub min_via_drill_mm: f64,
     pub min_via_annular_ring_mm: f64,
     pub pcb_thickness_mm: f64,
+    /// Explicit layer thicknesses in saved UI units.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pcb_stackup_mm: Option<PcbStackupMm>,
     pub max_layers: u32,
     pub drive_frequency_hz: f64,
     pub max_temperature_rise_c: f64,
@@ -255,6 +258,7 @@ impl Default for ProjectConfigStateIpc {
             min_via_drill_mm: 0.2,
             min_via_annular_ring_mm: 0.1,
             pcb_thickness_mm: 1.6,
+            pcb_stackup_mm: None,
             max_layers: pcbmotorgen_simulation::params::MAX_PCB_LAYERS,
             drive_frequency_hz: 500.0,
             max_temperature_rise_c: 20.0,
@@ -263,6 +267,13 @@ impl Default for ProjectConfigStateIpc {
             backplane: None,
         }
     }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PcbStackupMm {
+    pub copper_mm: Vec<f64>,
+    pub dielectric_mm: Vec<f64>,
 }
 
 impl ProjectConfigStateIpc {
@@ -287,6 +298,10 @@ impl ProjectConfigStateIpc {
             active_area_length_m: m(active_len_mm),
             board_width_m: m(self.active_area_width_mm),
             pcb_thickness_m: m(self.pcb_thickness_mm),
+            pcb_stackup: self.pcb_stackup_mm.as_ref().map(|s| pcbmotorgen_simulation::params::PcbStackup {
+                copper_m: s.copper_mm.iter().map(|t| m(*t)).collect(),
+                dielectric_m: s.dielectric_mm.iter().map(|t| m(*t)).collect(),
+            }),
             strands_per_phase: self.strands_per_phase,
             magnet_count: self.magnet_count,
             magnet_width_m: m(self.magnet_width_mm),

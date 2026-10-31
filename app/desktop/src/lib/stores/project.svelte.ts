@@ -170,6 +170,7 @@ export class ProjectStore {
         min_via_drill_mm: this.config.min_via_drill_mm,
         min_via_annular_ring_mm: this.config.min_via_annular_ring_mm,
         pcb_thickness_mm: this.config.pcb_thickness_mm,
+        ...(this.config.pcb_stackup_mm ? { pcb_stackup_mm: $state.snapshot(this.config.pcb_stackup_mm) } : {}),
         max_layers: this.config.max_layers,
         drive_frequency_hz: this.config.drive_frequency_hz,
         max_temperature_rise_c: this.config.max_temperature_rise_c,
@@ -231,6 +232,7 @@ export class ProjectStore {
     this.config.min_via_drill_mm = c.min_via_drill_mm;
     this.config.min_via_annular_ring_mm = c.min_via_annular_ring_mm;
     this.config.pcb_thickness_mm = c.pcb_thickness_mm;
+    this.config.pcb_stackup_mm = c.pcb_stackup_mm ? structuredClone(c.pcb_stackup_mm) : null;
     this.config.max_layers = c.max_layers;
     this.config.drive_frequency_hz = c.drive_frequency_hz;
     this.config.max_temperature_rise_c = c.max_temperature_rise_c;

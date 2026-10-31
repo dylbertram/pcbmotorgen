@@ -41,6 +41,20 @@ class SummaryValidationTest(unittest.TestCase):
             self.assertEqual(len(summary['cases']), 6)
             self.assertEqual(summary['cases']['fader-full-forward']['pcb_thickness_m'], .0008)
             self.assertEqual(summary['cases']['fader-full-forward']['scenario_overrides'], {'pcb_thickness_m': .0008})
+            for move in ('full-forward', 'short-forward', 'short-return'):
+                name = f'generated4-{move}.json'
+                generated = {**baseline, 'archive_role': 'configuration_reference_only',
+                             'geometry_source': 'current_generated_braid'}
+                for directory, value in ((baseline_dir, generated), (model_dir, model),
+                                         (result_dir, [record, record, record])):
+                    (directory / name).write_text(json.dumps(value))
+            generated_summary = summarize(baseline_dir, model_dir, result_dir, designs=('generated4',), **kwargs)
+            self.assertEqual(generated_summary['schema'], 'engineering-generated-design-estimate-v1')
+            self.assertEqual(len(generated_summary['cases']), 3)
+            generated['native']['inputs']['cad_geometry'] = {'imported': True}
+            (baseline_dir / 'generated4-full-forward.json').write_text(json.dumps(generated))
+            with self.assertRaisesRegex(ValueError, 'saved imported copper'):
+                summarize(baseline_dir, model_dir, result_dir, designs=('generated4',), **kwargs)
             path = result_dir / 'fader-full-forward.json'
             records = json.loads(path.read_text())
             records[0]['result']['demand']['electrical']['loss_model']['reference'] = 'wrong'

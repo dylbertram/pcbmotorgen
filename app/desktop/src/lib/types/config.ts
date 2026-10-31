@@ -4,12 +4,14 @@
 
 import type { BackplaneStack } from "./backplane";
 import type { CommutationMode } from "./enums";
+import type { PcbStackupSi } from "../pcbStackup";
 
 /** The full design configuration sent to the Tauri backend on every call. */
 export interface LinearMotorConfig {
   active_area_length_m: number;
   board_width_m: number;
   pcb_thickness_m: number;
+  pcb_stackup?: PcbStackupSi | null;
   /** Number of parallel serpentine paths (strands) per phase on the same
    *  layer, stacked in y. 1 = single-strand. Distinct from a winding: a
    *  winding (coil) is one complete conductive loop. */
@@ -66,4 +68,3 @@ export interface LinearMotorConfig {
 
   name: string | null;
 }
-

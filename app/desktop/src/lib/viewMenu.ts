@@ -1,7 +1,7 @@
 import definitions from "./viewMenu.json";
 import type { CoilPreviewViewState } from "./components/design/coilPreviewViewState.svelte";
 
-type View = Pick<CoilPreviewViewState, "viewMode" | "traceMode" | "showTerminals" | "showVias" | "showPolePitch" | "showBandWidths" | "showPoleRegions" | "showWaveform" | "oneSection">;
+type View = Pick<CoilPreviewViewState, "viewMode" | "traceMode" | "showTerminals" | "showVias" | "showPcb" | "showPolePitch" | "showBandWidths" | "showPoleRegions" | "showWaveform" | "oneSection">;
 export interface ViewCapabilities { active: boolean; polePitch: boolean; bandWidths: boolean; poleRegions: boolean }
 interface Definition { id: string; label: string; property: keyof View; value?: string; capability?: Exclude<keyof ViewCapabilities, "active"> }
 /** Shared with Rust: group boundaries are native separators, never layer filters. */
@@ -21,7 +21,9 @@ export function viewMenuItems(view: View | null, capabilities: ViewCapabilities)
 export function applyViewMenuAction(view: View, id: string): void {
   const item = VIEW_MENU_GROUPS.flat().find((item) => item.id === id);
   if (!item) return;
-  if (item.property === "viewMode") view.viewMode = item.value === "iso" ? "iso" : "top";
+  if (item.property === "viewMode") {
+    if (item.value === "top" || item.value === "front" || item.value === "left" || item.value === "iso") view.viewMode = item.value;
+  }
   else if (item.property === "traceMode") view.traceMode = item.value === "centerlines" ? "centerlines" : "traces";
   else view[item.property] = !view[item.property];
 }
