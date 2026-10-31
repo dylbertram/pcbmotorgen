@@ -63,6 +63,8 @@ export interface CadGeometry {
   routing: CadRoutingResult;
   /** Imported CAD basename, retained with saved geometry. Absent in older projects. */
   source_file_name?: string;
+  /** Checkbox state only. These reflections are already baked into the saved copper. */
+  applied_orientation?: import("../routingOrientation").RoutingOrientation;
   /** Copper plane heights ordered bottom-to-top. */
   layer_z_mm: number[];
   trace_width_mm: number;

@@ -28,14 +28,12 @@
   <legend class="mb-2 pr-2 text-xs font-medium text-slate-300">Orientation</legend>
   <div class="grid gap-1.5">
     {#each flips as flip (flip.key)}
-      {#if geometry}
-        <button type="button" class="min-h-8 rounded border border-slate-700 bg-slate-800 px-2 py-1 text-left text-xs text-slate-200 hover:text-emerald-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 disabled:opacity-40" title={flip.help} disabled={!onGeometryChange} onclick={() => toggle(flip.key)}>{flip.label}</button>
-      {:else}
       <label class="flex min-h-8 items-center gap-2 text-xs text-slate-200" title={flip.help}>
-        <input type="checkbox" class="accent-emerald-400" checked={config.routing_orientation[flip.key]} onchange={() => toggle(flip.key)} />
+        <input type="checkbox" class="accent-emerald-400"
+          checked={geometry ? geometry.applied_orientation?.[flip.key] ?? false : config.routing_orientation[flip.key]}
+          disabled={!!geometry && !onGeometryChange} onchange={() => toggle(flip.key)} />
         {flip.label}
       </label>
-      {/if}
     {/each}
   </div>
 </fieldset>

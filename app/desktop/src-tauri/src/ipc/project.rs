@@ -515,6 +515,7 @@ mod tests {
                 layer_z_mm: vec![-0.8, 0.8],
                 trace_width_mm: 0.2,
                 source_file_name: Some("motor-coils.dxf".into()),
+                applied_orientation: Some(pcbmotorgen_routing::RoutingOrientation { mirror_x: true, mirror_y: false, reverse_layers: true }),
                 source_layer_coils: std::collections::BTreeMap::from([(
                     "Bottom winding".into(),
                     "A".into(),

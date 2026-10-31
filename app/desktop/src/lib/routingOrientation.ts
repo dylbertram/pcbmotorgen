@@ -11,6 +11,10 @@ export type RoutingFlip = keyof RoutingOrientation;
 /** Reflect an authoritative CAD edit, including manually picked endpoints. */
 export function flipCadGeometry(geometry: CadGeometry, flip: RoutingOrientation): CadGeometry {
   const result = structuredClone(geometry);
+  const applied = { ...DEFAULT_ROUTING_ORIENTATION, ...geometry.applied_orientation };
+  for (const key of Object.keys(flip) as RoutingFlip[]) if (flip[key]) applied[key] = !applied[key];
+  if (Object.values(applied).some(Boolean)) result.applied_orientation = applied;
+  else delete result.applied_orientation;
   const points = [
     ...geometry.routing.segments.flatMap(s => [s.start, s.end]),
     ...geometry.routing.curves.flatMap(c => [c.start, c.mid, c.end]),

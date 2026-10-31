@@ -2,6 +2,40 @@ use crate::ipc::{ProjectConfigStateIpc, LinearMotorConfigIpc};
 use pcbmotorgen_routing::RoutingOrientation;
 
 #[test]
+fn generated_preview_flips_cover_closed_delta_and_star_reference_settings() {
+    for connection in [0., 1., 2.] {
+        for strands in [3., 5.] {
+            let mut state = ProjectConfigStateIpc::default();
+            state.active_area_width_mm = 8.;
+            state.pcb_thickness_mm = 0.8;
+            if connection == 0. { state.routing_params.remove("connection"); }
+            else { state.routing_params.insert("connection".into(), connection); }
+            state.routing_params.insert("num_strands".into(), strands);
+            let base = state.to_linear_motor_ipc();
+            let original = tauri::async_runtime::block_on(super::physics::generate_coils(base.clone())).unwrap();
+            for mask in 0..8 {
+                let mut input = base.clone();
+                let flip = RoutingOrientation { mirror_x: mask & 1 != 0, mirror_y: mask & 2 != 0, reverse_layers: mask & 4 != 0 };
+                input.routing_orientation = flip;
+                let preview = tauri::async_runtime::block_on(super::physics::generate_coils(input.clone()))
+                    .unwrap_or_else(|error| panic!("connection {connection}, strands {strands}, flip {mask}: {error}"));
+                for old in &original.phases {
+                    let layer = flip.layer(old.layer_idx, input.num_layers);
+                    let actual = preview.phases.iter().find(|phase| phase.layer_idx == layer && phase.phase_idx == old.phase_idx).unwrap();
+                    for (a, b) in old.segments.iter().zip(&actual.segments) {
+                        for (before, after) in [(a.start, b.start), (a.end, b.end)] {
+                            let x = if flip.mirror_x { input.active_area_length_m - before[0] } else { before[0] };
+                            let y = if flip.mirror_y { input.board_width_m - before[1] } else { before[1] };
+                            assert!((after[0] - x).abs() < 1e-12 && (after[1] - y).abs() < 1e-12);
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[test]
 fn routing_orientation_persists_and_native_preview_edit_export_and_simulation_share_it() {
     let base = ProjectConfigStateIpc::default().to_linear_motor_ipc();
     let base_core = base.to_core();

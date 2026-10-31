@@ -45,6 +45,30 @@ test("Routing flips remain generated, compose independently, and persist across 
   await page.screenshot({ path: info.outputPath("routing-orientation-controls.png") });
 });
 
+for (const width of [1280, 390]) test(`Star generator keeps flip checkboxes visible at ${width}px`, async ({ page }, info) => {
+  await page.setViewportSize({ width, height: 844 });
+  await gotoDesignApp(page); await selectDesignPanel(page, "Routing");
+  const panel = page.getByRole("dialog", { name: "Routing", exact: true });
+  await expect(panel.getByRole("button", { name: "Routing source", exact: true })).toContainText("Star (Wye)");
+  const orientation = panel.getByRole("group", { name: "Routing orientation", exact: true });
+  await expect(orientation.getByRole("checkbox")).toHaveCount(3);
+  await expect(orientation.getByRole("button")).toHaveCount(0);
+  for (const label of ["Mirror left/right (X)", "Mirror up/down (Y)", "Reverse layers (Z)"]) {
+    const checkbox = orientation.getByRole("checkbox", { name: label, exact: true });
+    await expect(checkbox).toBeInViewport({ ratio: 1 });
+    await expect(checkbox).not.toBeChecked();
+    await checkbox.check(); await expect(checkbox).toBeChecked();
+  }
+  await page.screenshot({ path: info.outputPath(`star-generator-flip-checkboxes-${width}.png`) });
+  await expect.poll(() => page.evaluate(() => (window as any).orientationGeneration?.config.routing_orientation))
+    .toEqual({ mirror_x: true, mirror_y: true, reverse_layers: true });
+  const strands = panel.getByRole("spinbutton", { name: "Strands per period", exact: true });
+  await strands.fill("3"); await strands.press("Enter");
+  await expect.poll(() => page.evaluate(() => (window as any).orientationGeneration.config.routing_params.num_strands)).toBe(3);
+  for (const checkbox of await orientation.getByRole("checkbox").all()) await expect(checkbox).toBeChecked();
+  await expect(panel.getByRole("group", { name: "Imported CAD pattern", exact: true })).toHaveCount(0);
+});
+
 test("XYZ indicator is camera-aligned, passive and inside every desktop/mobile viewport", async ({ page }, info) => {
   await gotoDesignApp(page); await openCoilPreview(page);
   const workspace = coilWorkspace(page);
