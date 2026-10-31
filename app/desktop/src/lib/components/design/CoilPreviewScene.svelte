@@ -16,15 +16,16 @@
   import type { pcbBody } from "../../pcbBody";
   import SpatialMeasureScene from "./SpatialMeasureScene.svelte";
   import type { SpatialMeasure } from "../../spatialMeasure.svelte";
-  import { sceneToPhysicalMm } from "../../spatialMeasureGeometry";
   import ViaPadsBatch from "./ViaPadsBatch.svelte";
+  import CoilTerminalMarkers from "./CoilTerminalMarkers.svelte";
+  import type { CopperPad } from "../../viaCopperMesh";
 
   let { scene, paths, vias, pads = [], viaSize = {diameter:.04,drill:.02}, terminals, traceMode, reset, command, windowCommand = {id:0,a:[0,0],b:[1,1]}, zScale, onCamera, viewMode = "iso", topCamera = null, board = null, showPcb = false, measure = null, field = null, heat = null, opacity = .8, fieldStyle = "lines-slice", sliceFraction = .5, sectionView = false, magnets = [] }: {
     scene: CoilScene;
     paths: CopperPath[];
     vias: CoilScene["vias"];
-    pads?:Vector3[];
-    viaSize?:{diameter:number;drill:number};
+    pads?:CopperPad[];
+    viaSize?:{diameter:number;drill:number;plating?:number};
     terminals: CoilScene["terminals"];
     traceMode: "traces" | "centerlines";
     reset: number;
@@ -50,9 +51,9 @@
   let zoom = $derived(Math.max(1, Math.min($size.width, $size.height) / 14));
   const maximumLoss = $derived(heat ? Math.max(0, ...heat.values()) : 0);
   let batches = $derived(scene.thicknessByLayer.flatMap((thickness, layer) => heat
-    ? scene.nets.flatMap(net => [...HEAT_PALETTE, "#64748b"].map(color => ({ key: `${layer}:${net}:${color}`, thickness, color, contextPaths: paths.filter(p => p.layer === layer && p.net === net),
+    ? scene.nets.flatMap(net => [...HEAT_PALETTE, "#64748b"].map(color => ({ key: `${layer}:${net}:${color}`, thickness, color, pads:pads.filter(p=>p.layer===layer&&p.net===net), contextPaths: paths.filter(p => p.layer === layer && p.net === net),
       paths: paths.filter(p => p.layer === layer && p.net === net && (heat.has(p.key) ? heatColor(heat.get(p.key)!, maximumLoss) : "#64748b") === color) })))
-    : scene.nets.map((net, idx) => ({ key: `${layer}:${net}`, thickness, color: PHASE_COLORS[idx % PHASE_COLORS.length], contextPaths: paths.filter(p => p.layer === layer && p.net === net), paths: paths.filter(p => p.layer === layer && p.net === net) }))));
+    : scene.nets.map((net, idx) => ({ key: `${layer}:${net}`, thickness, color: PHASE_COLORS[idx % PHASE_COLORS.length], pads:pads.filter(p=>p.layer===layer&&p.net===net), contextPaths: paths.filter(p => p.layer === layer && p.net === net), paths: paths.filter(p => p.layer === layer && p.net === net) }))));
   const viaBatches = $derived(heat ? [...HEAT_PALETTE, "#64748b"].map(color => ({ color,
     paths: vias.filter(p => (heat.has(p.key) ? heatColor(heat.get(p.key)!, maximumLoss) : "#64748b") === color) }))
     : [{ color: "#fbbf24", paths: vias }]);
@@ -182,20 +183,16 @@
   </T.Mesh>
 {/if}
 {#each batches as batch (batch.key)}
-  <CoilCopperBatch paths={batch.paths} contextPaths={batch.contextPaths} width={scene.width} thickness={batch.thickness} color={batch.color} {zScale} centerlines={traceMode === "centerlines"} />
+  <CoilCopperBatch paths={batch.paths} contextPaths={batch.contextPaths} pads={batch.pads} padDiameter={viaSize.diameter} width={scene.width} thickness={batch.thickness} color={batch.color} {zScale} centerlines={traceMode === "centerlines"} />
 {/each}
 {#each viaBatches as batch (batch.color)}
-  <CoilCopperBatch paths={batch.paths} width={viaSize.drill} color={batch.color} {zScale} barrels />
+  <CoilCopperBatch paths={batch.paths} width={viaSize.drill} plating={viaSize.plating ?? .025*scene.scale} color={batch.color} {zScale} barrels />
 {/each}
-<ViaPadsBatch points={pads} diameter={viaSize.diameter} drill={viaSize.drill} {zScale}/>
+<ViaPadsBatch pads={vias.length ? pads : []} diameter={viaSize.diameter} drill={viaSize.drill} {zScale}/>
 {#if field}<SimulationFieldGlyphs {field} {scene} {zScale} {opacity} style={fieldStyle} {sliceFraction} />{/if}
 <SimulationMagnets {magnets} {scene} {zScale} />
-{#each terminals as terminal (terminal.key)}
-  <T.Mesh position={[terminal.point.x, terminal.point.y * zScale, terminal.point.z]} userData={{ measureable: true, physicalPoint: sceneToPhysicalMm(terminal.point, scene, 1) }}>
-    <T.SphereGeometry args={[Math.max(scene.width, 0.045), 12, 8]} />
-    <T.MeshBasicMaterial color="#34d399" />
-  </T.Mesh>
-{/each}
 </T.Group>
 {/key}
+<!-- Annotation sizes never participate in the physical camera-fit bounds. -->
+<CoilTerminalMarkers {terminals} {scene} {zScale}/>
 {#if measure}<SpatialMeasureScene {scene} {measure} {zScale} />{/if}

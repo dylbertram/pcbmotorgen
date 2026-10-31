@@ -1,5 +1,7 @@
 import { BufferGeometry, ExtrudeGeometry, Path, Shape, Vector2, Vector3 } from "three";
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
+import polygonClipping, { type Polygon } from "polygon-clipping";
+import { viaCircle, type CopperPad } from "./viaCopperMesh";
 
 const endpointKey = (v: Vector3) => v.toArray().map(n => Math.round(n * 1e8)).join(",");
 type Neighbors = Map<string, Vector2[]>;
@@ -82,17 +84,38 @@ export function copperRibbonShape(points: Vector3[], width: number, neighbors?: 
   return shape;
 }
 
-export function rectangularCopperGeometry(paths: { points: Vector3[] }[], width: number, thickness: number, zScale = 1, contextPaths = paths): BufferGeometry {
+export function rectangularCopperGeometry(paths: { points: Vector3[] }[], width: number, thickness: number, zScale = 1, contextPaths = paths, pads: CopperPad[] = [], padDiameter = 0): BufferGeometry {
   if (!Number.isFinite(thickness) || thickness <= 0) throw new Error("Copper thickness must be positive and finite.");
   const ribbons: BufferGeometry[] = [];
   const neighbors = endpointDirections(contextPaths);
   for (const points of joinCopperPaths(paths)) {
     const shape = copperRibbonShape(points, width, neighbors);
     if (!shape) continue;
-    const geometry = new ExtrudeGeometry(shape, { depth: thickness, bevelEnabled: false, steps: 1, curveSegments: 1 });
-    geometry.rotateX(-Math.PI / 2);
-    geometry.translate(0, points[0].y * zScale - thickness / 2, 0);
-    ribbons.push(geometry);
+    // Pads own the annular footprint. Cut the full ribbon, including its finite
+    // width and curved/mitered joins, at that edge instead of merely shortening
+    // its centerline. This cannot leave trace corners spanning the drill hole.
+    const outline = shape.getPoints();
+    const radius = padDiameter / 2;
+    const minX = Math.min(...outline.map(p => p.x)) - radius, maxX = Math.max(...outline.map(p => p.x)) + radius;
+    const minY = Math.min(...outline.map(p => p.y)) - radius, maxY = Math.max(...outline.map(p => p.y)) + radius;
+    const cutouts: Polygon[] = radius > 0 ? pads.filter(p => Math.abs(p.point.y - points[0].y) < 1e-8
+      && p.point.x >= minX && p.point.x <= maxX && -p.point.z >= minY && -p.point.z <= maxY)
+      .map(p => [viaCircle(p.point.x, -p.point.z, radius)]) : [];
+    let shapes = [shape];
+    if (cutouts.length) {
+      const ring = (path: Path) => path.getPoints().map(p => [p.x, p.y] as [number, number]);
+      shapes = polygonClipping.difference([ring(shape), ...shape.holes.map(ring)], ...cutouts).map(polygon => {
+        const result = new Shape(polygon[0].map(([x, y]) => new Vector2(x, y)));
+        result.holes = polygon.slice(1).map(hole => new Path(hole.map(([x, y]) => new Vector2(x, y))));
+        return result;
+      });
+    }
+    for (const ribbon of shapes) {
+      const geometry = new ExtrudeGeometry(ribbon, { depth: thickness, bevelEnabled: false, steps: 1, curveSegments: 1 });
+      geometry.rotateX(-Math.PI / 2);
+      geometry.translate(0, points[0].y * zScale - thickness / 2, 0);
+      ribbons.push(geometry);
+    }
   }
   const result = ribbons.length ? mergeGeometries(ribbons) : new BufferGeometry();
   for (const ribbon of ribbons) ribbon.dispose();

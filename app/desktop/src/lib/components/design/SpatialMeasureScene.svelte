@@ -1,9 +1,10 @@
 <script lang="ts">
   import { T, useThrelte } from "@threlte/core";
-  import { BufferGeometry, Raycaster, Vector2 } from "three";
+  import { BufferGeometry, Raycaster, Vector2, type OrthographicCamera } from "three";
   import type { CoilScene } from "../../coilScene";
   import type { SpatialMeasure } from "../../spatialMeasure.svelte";
   import { physicalMmToScene, sceneToPhysicalMm } from "../../spatialMeasureGeometry";
+  import { terminalMarkerPickRadius } from "../../terminalMarkers";
   let { scene, measure, zScale }: { scene: CoilScene; measure: SpatialMeasure; zScale: number } = $props();
   const { canvas, dom, scene: world, camera, invalidate } = useThrelte();
   const raycaster = new Raycaster();
@@ -18,15 +19,21 @@
     const pick = (event: PointerEvent) => {
       const rect = canvas.getBoundingClientRect();
       raycaster.params.Line.threshold = Math.max(scene.width / 2, .02);
+      const cam = camera.current as OrthographicCamera;
+      raycaster.params.Points.threshold = cam.isOrthographicCamera ? terminalMarkerPickRadius(cam, rect.height) : scene.width / 2;
       raycaster.setFromCamera(new Vector2(2 * (event.clientX - rect.left) / rect.width - 1, 1 - 2 * (event.clientY - rect.top) / rect.height), camera.current);
       world.updateMatrixWorld(true);
-      const hit = raycaster.intersectObjects(world.children, true).find(hit => {
+      const hits = raycaster.intersectObjects(world.children, true).filter(hit => {
         if (!hit.object.userData.measureable) return false;
         for (let o = hit.object; o; o = o.parent!) if (!o.visible) return false;
         return true;
       });
+      // Terminal dots are screen-space annotations drawn over copper. Pick
+      // their exact electrical center rather than the trace's nearer face.
+      const hit = hits.find(hit => hit.object.userData.terminalPointsMm) ?? hits[0];
       if (!hit) return null;
-      return hit.object.userData.physicalPoint ?? sceneToPhysicalMm(hit.point, scene, zScale, hit.object.userData.copperLayerY);
+      return hit.object.userData.terminalPointsMm?.[hit.index ?? -1] ?? hit.object.userData.physicalPoint
+        ?? sceneToPhysicalMm(hit.point, scene, zScale, hit.object.userData.copperLayerY);
     };
     const down = (e: PointerEvent) => { if (e.button !== 0) return; downs.set(e.pointerId, { x: e.clientX, y: e.clientY }); if (downs.size > 1) multi = true; };
     const move = (e: PointerEvent) => { if (measure.p1 && !measure.p2 && !downs.size) measure.cursor = pick(e); };

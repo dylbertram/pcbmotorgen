@@ -578,7 +578,7 @@
          data-pole-regions / data-revision are written imperatively by the
          renderer (canvas.dataset in coilPreviewCanvas.ts), NOT bound
          reactively — see the counter comment there. -->
-    <CoilPreviewIsoView geometry={terminalGeometry} pcbThicknessMm={config.pcb_thickness_mm} pcbStackup={config.pcb_stackup_mm} copperThicknessMm={{ outer: config.drive.outer_copper_oz * .035, inner: config.drive.inner_copper_oz * .035 }} viaSizeMm={{diameter:config.min_via_drill_mm + 2 * config.min_via_annular_ring_mm,drill:config.min_via_drill_mm}} {view} {visibleCopperKeys} topCamera={{transform:worldTransform,panX:gestures.panX,panY:gestures.panY,width:W,height:H}} onRenderStatus={available=>webglUnavailable=!available} isVisible={isTerminalVisible} showTerminals={false} simulation={visualizationInput} />
+    <CoilPreviewIsoView geometry={terminalGeometry} pcbThicknessMm={config.pcb_thickness_mm} pcbStackup={config.pcb_stackup_mm} copperThicknessMm={{ outer: config.drive.outer_copper_oz * .035, inner: config.drive.inner_copper_oz * .035 }} viaSizeMm={{diameter:config.min_via_drill_mm + 2 * config.min_via_annular_ring_mm,drill:config.min_via_drill_mm,plating:config.drive.via_plating_m * 1000}} {view} {visibleCopperKeys} topCamera={{transform:worldTransform,panX:gestures.panX,panY:gestures.panY,width:W,height:H}} onRenderStatus={available=>webglUnavailable=!available} isVisible={isTerminalVisible} showTerminals={false} simulation={visualizationInput} />
     {#if view.viewMode === "top"}<canvas bind:this={canvasRef} data-testid="coil-annotations" class="pointer-events-none absolute inset-0 block h-full w-full"></canvas>{/if}
   </PreviewFrame>
 

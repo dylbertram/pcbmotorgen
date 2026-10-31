@@ -132,6 +132,13 @@ test("Threlte renders copper and supports orbit, zoom, pan and visibility", asyn
       canvas.dataset.draws = String(Number(canvas.dataset.draws ?? 0) + 1);
       return draw.apply(this, args);
     };
+    // Extruded physical copper and point markers can use non-indexed buffers.
+    const arrays = WebGL2RenderingContext.prototype.drawArrays;
+    WebGL2RenderingContext.prototype.drawArrays = function (...args) {
+      const canvas = this.canvas as HTMLCanvasElement;
+      canvas.dataset.draws = String(Number(canvas.dataset.draws ?? 0) + 1);
+      return arrays.apply(this, args);
+    };
   });
   const view = await workspace(page);
   await view.getByRole("button", { name: "Display", exact: true }).click();

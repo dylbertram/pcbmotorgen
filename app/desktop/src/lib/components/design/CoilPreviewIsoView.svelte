@@ -10,7 +10,7 @@
     geometry: CadGeometry | null;
     pcbThicknessMm: number;
     pcbStackup?: PcbStackupMm | null;
-    viaSizeMm?: {diameter:number;drill:number};
+    viaSizeMm?: {diameter:number;drill:number;plating?:number};
     topCamera?: TopCameraTransform | null;
     visibleCopperKeys?: Set<string> | null;
     onRenderStatus?: (available:boolean)=>void;
