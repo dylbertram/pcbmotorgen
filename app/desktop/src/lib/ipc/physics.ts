@@ -25,8 +25,10 @@ import type {
 } from "../types";
 import type { HousingMotionAnalysis } from "../types/drive";
 import { isTauriAvailable } from "./core";
+import { orientCoilPreview } from "../routingOrientation";
 import type { PeriodicStaticReference } from "../types/periodicReference";
 import type { DcWindingGeometry } from "../types/dcCoupling";
+import type { MovePowerInputs, NativeMoveResult } from "../types/movePower";
 import {
   mockCoils,
   mockForceSweep,
@@ -51,8 +53,21 @@ export async function fetchMagnetGrades(): Promise<MagnetGrade[]> {
 export async function generateCoils(
   config: LinearMotorConfig,
 ): Promise<CoilPathDto> {
-  if (!isTauriAvailable()) return mockCoils(config);
+  if (!isTauriAvailable()) return orientCoilPreview(mockCoils(config), config);
   return await invoke<CoilPathDto>("generate_coils", { config });
+}
+
+/** No browser mock: engineering move traces require the actual native model. */
+export async function evaluateMovePower(requestId: string, inputs: MovePowerInputs): Promise<NativeMoveResult> {
+  if (!isTauriAvailable()) throw new Error("Move power requires the desktop app; browser previews do not produce engineering traces.");
+  if (inputs.topology !== "linear") throw new Error("Move power supports one linear track, not rotary motion.");
+  assertCadMapping(inputs.cad_geometry, inputs.config);
+  return await invoke<NativeMoveResult>("evaluate_move_power", { requestId, inputs });
+}
+
+export async function cancelMovePower(requestId: string): Promise<boolean> {
+  if (!isTauriAvailable()) return false;
+  return await invoke<boolean>("cancel_move_power", { requestId });
 }
 
 /** Travel limits of the mover array centre (see TravelEnvelopeDto). */

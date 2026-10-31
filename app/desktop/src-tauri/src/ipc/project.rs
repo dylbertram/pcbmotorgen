@@ -114,6 +114,13 @@ impl Default for ProjectStateIpc {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum CarriageMassSource {
+    Magnets,
+    Assembly,
+}
+
 /// Every user-facing design input, in UI units (mm and SI engineering
 /// units) — mirrors the fields of the frontend `ConfigStore` one-for-one.
 ///
@@ -148,7 +155,11 @@ pub struct ProjectConfigStateIpc {
 
     // --- Coil / routing (generation settings) ---
     pub routing_pattern: String,
+    // Do not apply the new-project termination to old files with no params.
+    #[serde(default)]
     pub routing_params: HashMap<String, f64>,
+    #[serde(default)]
+    pub routing_orientation: pcbmotorgen_routing::RoutingOrientation,
     pub phases: u32,
     pub num_layers: u32,
 
@@ -161,6 +172,9 @@ pub struct ProjectConfigStateIpc {
     pub peak_force_n: f64,
     pub friction_n: f64,
     pub carriage_mass_kg: f64,
+    /// None preserves legacy saved masses; new UI designs explicitly select magnets or assembly.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub carriage_mass_source: Option<CarriageMassSource>,
     pub max_accel_m_s2: f64,
     pub capacitor_bank_uf: f64,
 
@@ -180,6 +194,9 @@ pub struct ProjectConfigStateIpc {
     pub min_via_drill_mm: f64,
     pub min_via_annular_ring_mm: f64,
     pub pcb_thickness_mm: f64,
+    /// Explicit layer thicknesses in saved UI units.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pcb_stackup_mm: Option<PcbStackupMm>,
     pub max_layers: u32,
     pub drive_frequency_hz: f64,
     pub max_temperature_rise_c: f64,
@@ -188,6 +205,11 @@ pub struct ProjectConfigStateIpc {
     /// Driver IC limits and operating assumptions; absent in older files.
     pub drive: pcbmotorgen_simulation::drive::DriveSettings,
 
+    /// Explicit optional operating requirements. Legacy files have no move,
+    /// never an invented duration, mass breakdown, controller or loss law.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub power_move: Option<pcbmotorgen_simulation::drive::move_power::routed::RoutedMoveRequest>,
+
     // --- Backplane and housing stackup (t707) ---
     /// Layers below the PCB and the optional housing; absent in older files,
     /// which load with no backplane.
@@ -195,8 +217,10 @@ pub struct ProjectConfigStateIpc {
     pub backplane: Option<pcbmotorgen_simulation::backplane::BackplaneStack>,
 }
 
-/// Defaults mirror the frontend `ConfigStore` initial values (the app's
-/// out-of-the-box design) — keep the two in sync.
+/// Deserialization defaults preserve legacy inputs. New frontend designs use
+/// automatic magnet mass; legacy artifacts without a mass basis keep their
+/// saved carriage mass, with 15 g retained only as the missing-field fallback.
+/// Other values mirror the frontend initial design.
 impl Default for ProjectConfigStateIpc {
     fn default() -> Self {
         Self {
@@ -213,7 +237,10 @@ impl Default for ProjectConfigStateIpc {
             air_gap_mm: 0.5,
             electrical_pitch_mm: 12.0,
             routing_pattern: "infinity-braid".to_string(),
-            routing_params: HashMap::new(),
+            // New driver-ready projects use terminated star windings. Bare
+            // routing contexts can still explicitly request closed rings.
+            routing_params: HashMap::from([("connection".into(), 2.0)]),
+            routing_orientation: Default::default(),
             phases: 3,
             num_layers: 4,
             max_current_a: 1.0,
@@ -222,6 +249,7 @@ impl Default for ProjectConfigStateIpc {
             peak_force_n: 1.0,
             friction_n: 0.05,
             carriage_mass_kg: 0.015,
+            carriage_mass_source: None,
             max_accel_m_s2: 2.0,
             capacitor_bank_uf: 1000.0,
             commutation: CommutationModeIpc::MaxThrust,
@@ -233,13 +261,22 @@ impl Default for ProjectConfigStateIpc {
             min_via_drill_mm: 0.2,
             min_via_annular_ring_mm: 0.1,
             pcb_thickness_mm: 1.6,
+            pcb_stackup_mm: None,
             max_layers: pcbmotorgen_simulation::params::MAX_PCB_LAYERS,
             drive_frequency_hz: 500.0,
             max_temperature_rise_c: 20.0,
             drive: pcbmotorgen_simulation::drive::DriveSettings::default(),
+            power_move: None,
             backplane: None,
         }
     }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PcbStackupMm {
+    pub copper_mm: Vec<f64>,
+    pub dielectric_mm: Vec<f64>,
 }
 
 impl ProjectConfigStateIpc {
@@ -264,6 +301,10 @@ impl ProjectConfigStateIpc {
             active_area_length_m: m(active_len_mm),
             board_width_m: m(self.active_area_width_mm),
             pcb_thickness_m: m(self.pcb_thickness_mm),
+            pcb_stackup: self.pcb_stackup_mm.as_ref().map(|s| pcbmotorgen_simulation::params::PcbStackup {
+                copper_m: s.copper_mm.iter().map(|t| m(*t)).collect(),
+                dielectric_m: s.dielectric_mm.iter().map(|t| m(*t)).collect(),
+            }),
             strands_per_phase: self.strands_per_phase,
             magnet_count: self.magnet_count,
             magnet_width_m: m(self.magnet_width_mm),
@@ -276,6 +317,7 @@ impl ProjectConfigStateIpc {
             air_gap_m: m(self.air_gap_mm),
             routing_pattern: self.routing_pattern.clone(),
             routing_params: self.routing_params.clone(),
+            routing_orientation: self.routing_orientation,
             phases: self.phases,
             spacing_ratio: 1.0,
             max_current_a: self.max_current_a,
@@ -425,6 +467,24 @@ pub fn write_project_atomic(path: &Path, json: &str) -> Result<(), String> {
 mod tests {
     use super::*;
 
+    #[test]
+    fn carriage_mass_basis_round_trips_without_reinterpreting_legacy_mass() {
+        let legacy: super::ProjectConfigStateIpc = serde_json::from_value(serde_json::json!({
+            "carriage_mass_kg": 0.015
+        })).unwrap();
+        assert_eq!(legacy.carriage_mass_kg, 0.015);
+        assert_eq!(legacy.carriage_mass_source, None);
+        for source in [super::CarriageMassSource::Magnets, super::CarriageMassSource::Assembly] {
+            let config = super::ProjectConfigStateIpc {
+                carriage_mass_source: Some(source.clone()), ..legacy.clone()
+            };
+            let restored: super::ProjectConfigStateIpc = serde_json::from_str(
+                &serde_json::to_string(&config).unwrap()).unwrap();
+            assert_eq!(restored.carriage_mass_source, Some(source));
+            assert_eq!(restored.to_linear_motor_ipc().carriage_mass_kg, 0.015);
+        }
+    }
+
     /// A fully-populated state (every field non-default where meaningful).
     fn sample_state() -> ProjectStateIpc {
         let mut config = ProjectConfigStateIpc::default();
@@ -455,6 +515,7 @@ mod tests {
                 layer_z_mm: vec![-0.8, 0.8],
                 trace_width_mm: 0.2,
                 source_file_name: Some("motor-coils.dxf".into()),
+                applied_orientation: Some(pcbmotorgen_routing::RoutingOrientation { mirror_x: true, mirror_y: false, reverse_layers: true }),
                 source_layer_coils: std::collections::BTreeMap::from([(
                     "Bottom winding".into(),
                     "A".into(),
@@ -618,6 +679,21 @@ mod tests {
     }
 
     #[test]
+    fn new_project_star_default_does_not_reinterpret_legacy_or_explicit_connections() {
+        assert_eq!(ProjectConfigStateIpc::default().routing_params["connection"], 2.0);
+        for value in [serde_json::json!({}), serde_json::json!({"routing_params": {}})] {
+            let loaded: ProjectConfigStateIpc = serde_json::from_value(value).unwrap();
+            assert!(loaded.routing_params.is_empty());
+        }
+        for connection in [0.0, 1.0, 2.0] {
+            let loaded: ProjectConfigStateIpc = serde_json::from_value(serde_json::json!({
+                "routing_params": {"connection": connection}
+            })).unwrap();
+            assert_eq!(loaded.routing_params["connection"], connection);
+        }
+    }
+
+    #[test]
     fn legacy_project_without_nominal_width_uses_the_minimum() {
         // Files written before the nominal trace width existed must keep
         // their copper width: the converter seeds it from min_trace_mm.
@@ -739,5 +815,34 @@ mod tests {
         assert!(leftovers.is_empty(), "orphaned tmp files: {leftovers:?}");
 
         std::fs::remove_dir_all(&dir).expect("cleanup");
+    }
+
+    #[test]
+    fn legacy_projects_do_not_acquire_operating_requirements() {
+        let config: ProjectConfigStateIpc = serde_json::from_value(serde_json::json!({})).unwrap();
+        assert!(config.power_move.is_none());
+        assert!(serde_json::to_value(config).unwrap().get("power_move").is_none());
+        let (state, _) = parse_project_file(&serialize(&sample_state())).unwrap();
+        assert!(state.config.power_move.is_none());
+    }
+
+    #[test]
+    fn explicit_move_and_unknown_driver_losses_survive_saved_archive_roundtrip() {
+        let mut state = sample_state();
+        let input = serde_json::json!({
+            "profile": { "start_m":0.0025, "end_m":0.0655,
+                "initial_velocity_m_s":0.0, "final_velocity_m_s":0.0,
+                "duration_s":1.0, "travel_min_m":0.0025, "travel_max_m":0.0655,
+                "max_speed_m_s":0.5, "max_acceleration_m_s2":2.0, "max_deceleration_m_s2":1.0,
+                "moving_mass_kg":0.015, "mass_includes":"Explicit test scenario, cap included",
+                "coulomb_friction_n":0.05, "damping_n_s_per_m":0.0, "external_load_n":0.0,
+                "time_step_s":0.001 },
+            "control":"balanced_star_sinusoidal", "electrical_angle_at_zero_rad":0.0,
+            "phase_peak_limit_a":1.0, "source":{"boundary":"stiff_dc_link", "accepts_regeneration":false},
+            "additional_driver_loss_w":null, "force_positions":65
+        });
+        state.config.power_move = Some(serde_json::from_value(input.clone()).unwrap());
+        let (restored, _) = parse_project_file(&serialize(&state)).unwrap();
+        assert_eq!(serde_json::to_value(restored.config.power_move.unwrap()).unwrap(), input);
     }
 }

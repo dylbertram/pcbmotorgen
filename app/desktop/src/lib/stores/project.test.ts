@@ -8,6 +8,7 @@ import type { ProjectState } from "../types";
 import type { CadGeometry } from "../types";
 import type { LoadProjectResult } from "../types";
 import { confirmDiscardChanges, loadProject, saveProject, pickProjectSavePath, updateProjectVersion, relocateProject } from "../ipc";
+import { declaredLossFixture } from "../testFixtures/moveLosses";
 
 // Track load calls without losing the real module's other exports (the
 // config store uses them for its routing-pattern/magnet-grade catalog).
@@ -26,6 +27,92 @@ function makeStores(recents?: RecentFilesStore, kind: "motor" | "sensor" = "moto
   const projects = new ProjectStore(config, motion, recents, sensor, kind);
   return { config, motion, sensor, projects };
 }
+
+describe("explicit move persistence", () => {
+  it("round-trips routing orientation and clears it for legacy files", () => {
+    const { config, projects } = makeStores();
+    const legacy = projects.snapshotIpc(); delete legacy.config.routing_orientation;
+    config.toggleRoutingFlip("mirror_x"); config.toggleRoutingFlip("reverse_layers");
+    const saved = projects.snapshotIpc();
+    projects.applyToState(legacy);
+    expect(config.routing_orientation).toEqual({ mirror_x: false, mirror_y: false, reverse_layers: false });
+    projects.applyToState(saved);
+    expect(config.routing_orientation).toEqual({ mirror_x: true, mirror_y: false, reverse_layers: true });
+    expect(config.toIpc().routing_orientation).toEqual(saved.config.routing_orientation);
+  });
+  it("persists custom PCB copper/dielectric thicknesses and clears them when restoring a legacy design", () => {
+    const { config, projects } = makeStores();
+    const legacy = projects.snapshotIpc();
+    expect(legacy.config.pcb_stackup_mm).toBeUndefined();
+    projects.markClean();
+    config.pcb_stackup_mm = { copper_mm: [.035,.018,.070,.035], dielectric_mm: [.1,.4,.142] };
+    expect(projects.isDirty).toBe(true);
+    const saved = projects.snapshotIpc();
+    config.pcb_stackup_mm.dielectric_mm[0] = .2;
+    expect(saved.config.pcb_stackup_mm!.dielectric_mm[0]).toBe(.1);
+    projects.applyToState(saved);
+    expect(config.pcb_thickness_mm).toBeCloseTo(.8,12);
+    config.pcb_stackup_mm!.copper_mm[0] = .07;
+    expect(saved.config.pcb_stackup_mm!.copper_mm[0]).toBe(.035);
+    projects.applyToState(legacy);
+    expect(config.pcb_stackup_mm).toBeNull();
+    expect(config.pcb_thickness_mm).toBe(legacy.config.pcb_thickness_mm);
+  });
+  it("preserves legacy 15 g assemblies and persists automatic magnet mass selection", () => {
+    const { config, projects } = makeStores();
+    const legacy = projects.snapshotIpc();
+    delete legacy.config.carriage_mass_source;
+    legacy.config.carriage_mass_kg = 0.015;
+    projects.applyToState(legacy);
+    expect(config.carriage_mass_source).toBe("assembly");
+    config.magnet_count = 8;
+    expect(config.carriage_mass_kg).toBe(0.015);
+    expect(projects.snapshotIpc().config.carriage_mass_source).toBe("assembly");
+    config.carriage_mass_source = "magnets";
+    const automatic = projects.snapshotIpc();
+    config.carriage_mass_kg = 0.02;
+    projects.applyToState(automatic);
+    expect(config.carriage_mass_source).toBe("magnets");
+    expect(config.carriage_mass_kg).toBe(automatic.config.carriage_mass_kg);
+    config.magnet_count *= 2;
+    expect(config.carriage_mass_kg).toBeCloseTo(2 * automatic.config.carriage_mass_kg, 12);
+  });
+
+  it("loads legacy designs without inferred move requirements", () => {
+    const { config, projects } = makeStores();
+    expect(config.power_move).toBeNull();
+    const state = projects.snapshotIpc();
+    delete state.config.power_move;
+    projects.applyToState(state);
+    expect(config.power_move).toBeNull();
+  });
+
+  it("snapshots and restores an explicit move without sharing mutable state", () => {
+    const { config, projects } = makeStores();
+    config.power_move = {
+      profile: { start_m: 0.0025, end_m: 0.0655, initial_velocity_m_s: 0, final_velocity_m_s: 0,
+        duration_s: 1, travel_min_m: 0.0025, travel_max_m: 0.0655,
+        max_speed_m_s: 0.5, max_acceleration_m_s2: 2, max_deceleration_m_s2: 1,
+        moving_mass_kg: 0.015, mass_includes: "Test assumption, cap included", coulomb_friction_n: 0.05,
+        damping_n_s_per_m: 0, external_load_n: 0, time_step_s: 0.001 },
+      control: "balanced_star_sinusoidal", electrical_angle_at_zero_rad: 0, phase_peak_limit_a: 1,
+      source: { boundary: "stiff_dc_link", accepts_regeneration: false },
+      additional_driver_loss_w: null, force_positions: 65,
+      loss_model: declaredLossFixture(config.drive.driver.name, config.drive.driver.rds_on_ohm),
+    };
+    const snapshot = projects.snapshotIpc();
+    config.power_move.profile.duration_s = 2;
+    expect(snapshot.config.power_move?.profile.duration_s).toBe(1);
+    config.power_move.loss_model!.switching.constant_j = 9e-7;
+    expect(snapshot.config.power_move?.loss_model?.switching.constant_j).toBe(1e-7);
+    projects.applyToState(snapshot);
+    expect(config.power_move?.profile.duration_s).toBe(1);
+    expect(config.power_move?.additional_driver_loss_w).toBeNull();
+    expect(config.power_move?.loss_model?.switching.constant_j).toBe(1e-7);
+    config.power_move!.profile.max_deceleration_m_s2 = 3;
+    expect(snapshot.config.power_move?.profile.max_deceleration_m_s2).toBe(1);
+  });
+});
 
 describe("title-bar project name and location", () => {
   beforeEach(() => vi.clearAllMocks());
@@ -380,6 +467,18 @@ describe("ProjectStore openPath (kata eap8)", () => {
 describe("ProjectStore newProject", () => {
   beforeEach(() => {
     vi.mocked(confirmDiscardChanges).mockReset();
+  });
+
+  it("starts new motor designs in star without changing saved connection choices", () => {
+    const { config, projects } = makeStores();
+    expect(config.routing_params.connection).toBe(2);
+    const choices: Record<string, number>[] = [{}, { connection: 0 }, { connection: 1 }, { connection: 2 }];
+    for (const params of choices) {
+      const saved = projects.snapshotIpc();
+      saved.config.routing_params = params;
+      projects.applyToState(saved);
+      expect(projects.snapshotIpc().config.routing_params).toEqual(params);
+    }
   });
 
   it("resets motor, sensor, mover, file path, CAD, and messages", async () => {

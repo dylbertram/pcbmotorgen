@@ -1,11 +1,12 @@
 <script lang="ts">
   /**
    * Motor settings, coil ends and driver controls use the left rail; Layers
-   * and Display stay on the right. CAD import retains its single right rail.
+   * stays on the right. CAD import retains its single right rail.
    *
     * Each toggle pulls a panel out from the rail: the
-   * Layers panel (coil/phase/layer tree plus diagnostics overlays) and the
-    * Display panel (traces, copper layers, vias and arrows), terminals,
+     * Layers panel (phases containing layers or layers containing phases),
+     * with global visibility options in View. Import previews keep local options,
+     * terminals,
     * and optional driver settings in the expanded coil preview.
    * Panels overlay the drawing, so opening one never resizes the viewer, and
     * only one is open at a time. Terminal picking keeps the panel open for
@@ -15,13 +16,12 @@
    */
   import { fly } from "svelte/transition";
   import { onDestroy } from "svelte";
-  import { Layers, SlidersHorizontal, X, Plug, CircuitBoard, Ruler, Route, Magnet, Gauge } from "@lucide/svelte";
+  import { Layers, X, Plug, CircuitBoard, Route, Magnet, Gauge } from "@lucide/svelte";
   import type { Snippet } from "svelte";
   import { DESIGN_PANELS, isDesignPanel, isLeftPanel, type DesignPanelId, type PreviewPanelId } from "./previewPanels";
   import CoilTerminalPanel from "./CoilTerminalPanel.svelte";
   import type { CoilTerminalTool } from "../../utils/coilTerminalTool.svelte";
   import CoilPreviewVisibilityPanel from "./CoilPreviewVisibilityPanel.svelte";
-  import CoilPreviewDisplayPanel from "./CoilPreviewDisplayPanel.svelte";
   import type { CoilPreviewViewState } from "./coilPreviewViewState.svelte";
   import type { CadGeometry, DriveAnalysis } from "../../types";
   import DriverSelector from "../simulate/DriverSelector.svelte";
@@ -32,11 +32,11 @@
   import type { ConfigStore } from "../../stores/config.svelte";
   import NumberField from "../ui/NumberField.svelte";
 
-  let { view, layers, coils = [], isCoilVisible, onToggleCoil, label, displayLabel,
+  let { view, layers, coils = [], isCoilVisible, onToggleCoil, label,
     phases = [], showMotorControls = false, hasPolePitchData = false,
     hasBandWidthData = false, hasPoleRegionData = false, poleRegionPhases = [],
     geometry, selection, assignmentDisabled = false, terminalTool, onStartTerminals,
-    terminalsDisabled = false, dismissOnOutsideClick = true, showViewMode = false, config,
+    terminalsDisabled = false, dismissOnOutsideClick = true, viewControlsInMenu = false, config, generated = false,
     drive = null, driveError = null, drivePending = false,
     designSettings, designOnly = false, drawingOnly = false, open = $bindable<PreviewPanelId | null>(null), active = true }: {
     designOnly?: boolean;
@@ -46,6 +46,7 @@
     open?: PreviewPanelId | null;
     /** Shared motor settings, supplied by the expanded coil preview. */
     config?: ConfigStore;
+    generated?: boolean;
     drive?: DriveAnalysis | null;
     driveError?: string | null;
     drivePending?: boolean;
@@ -56,10 +57,10 @@
     onToggleCoil?: (name: string) => void;
     /** Accessible name of the Layers panel. */
     label: string;
-    /** Accessible name of the Display panel. */
-    displayLabel: string;
     phases?: { idx: number; name: string; colorIdx: number }[];
     showMotorControls?: boolean;
+    /** Global display options live in the motor document's native View menu. */
+    viewControlsInMenu?: boolean;
     hasPolePitchData?: boolean;
     hasBandWidthData?: boolean;
     hasPoleRegionData?: boolean;
@@ -76,17 +77,15 @@
      * so an outside click never surprises the user (kata qfdz).
      */
     dismissOnOutsideClick?: boolean;
-    /** Offer the Top-down / 3D switch in the Display panel (coil preview). */
-    showViewMode?: boolean;
   } = $props();
 
   const rippleCheck = $derived(drive?.checks.find((check) => check.id === "ripple"));
   let railEl: HTMLDivElement | null = $state(null);
-  const triggers: Partial<Record<PreviewPanelId, HTMLButtonElement | null>> = {};
+  const triggers = $state<Partial<Record<PreviewPanelId, HTMLButtonElement | null>>>({});
   const panelClass = $derived(`absolute bottom-0 top-0 z-30 flex w-60 flex-col overflow-hidden border-slate-700 bg-slate-900 text-slate-200 ${designOnly ? 'left-full max-w-[calc(100vw-8.25rem)] border-r shadow-[12px_0_20px_-8px_rgba(0,0,0,0.4)] [clip-path:inset(0_-32px_0_0)]' : 'right-full max-w-[calc(100vw-6rem)] border-l shadow-xl shadow-black/40'}`);
-  const designIcons = { constraints: Ruler, stackup: Layers, routing: Route, magnets: Magnet, drive: Gauge };
+  const designIcons = { stackup: Layers, routing: Route, magnets: Magnet, drive: Gauge };
   const activeDesignPanel = $derived(DESIGN_PANELS.find(({ id }) => id === open));
-  onDestroy(() => { if (!drawingOnly) { terminalTool?.cancel(); view.terminalPanelOpen = false; } });
+  onDestroy(() => { if (!drawingOnly) { terminalTool?.cancel(); view.setTerminalPanelOpen(false); } });
   // An outside request (the Simulation tab's ends alert) sets
   // `view.terminalPanelOpen`; mirror it into the local panel state.
   $effect(() => {
@@ -96,12 +95,12 @@
   function toggle(panel: PreviewPanelId) {
     if (open === "terminals") terminalTool?.cancel();
     open = open === panel ? null : panel;
-    view.terminalPanelOpen = open === "terminals";
+    view.setTerminalPanelOpen(open === "terminals");
   }
   function close() {
     const panel = open;
     open = null;
-    view.terminalPanelOpen = false;
+    view.setTerminalPanelOpen(false);
     if (panel === "terminals") terminalTool?.cancel();
     if (panel) triggers[panel]?.focus();
   }
@@ -145,13 +144,8 @@
     {/if}
     {#if !designOnly}<button type="button" bind:this={triggers.layers} aria-label="Layers" aria-expanded={open === "layers"} onclick={() => toggle("layers")}
       class="flex h-8 w-8 items-center justify-center rounded-md border border-transparent text-slate-300 hover:bg-slate-800 aria-expanded:border-emerald-500 aria-expanded:text-emerald-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
-      title="Show the coil, phase and layer tree.">
+      title="Show visibility by phase or layer.">
       <Layers size={16} aria-hidden="true" />
-    </button>
-    <button type="button" bind:this={triggers.display} aria-label="Display" aria-expanded={open === "display"} onclick={() => toggle("display")}
-      class="flex h-8 w-8 items-center justify-center rounded-md border border-transparent text-slate-300 hover:bg-slate-800 aria-expanded:border-emerald-500 aria-expanded:text-emerald-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
-      title="Show display options: traces, copper layers and vias.">
-      <SlidersHorizontal size={16} aria-hidden="true" />
     </button>
     {/if}
     {#if !drawingOnly}
@@ -172,7 +166,7 @@
   </div>
 
   {#if activeDesignPanel && designSettings}
-    <div role="dialog" aria-label={activeDesignPanel.label} aria-modal="false" class="absolute bottom-0 left-full top-0 z-30 flex w-[400px] max-w-[calc(100vw-8.25rem)] flex-col overflow-hidden border-r border-slate-700 bg-slate-900 text-slate-200 shadow-[12px_0_20px_-8px_rgba(0,0,0,0.4)] [clip-path:inset(0_-32px_0_0)]" transition:fly={{ x: -16, duration: 140 }}>
+    <div role="dialog" aria-label={activeDesignPanel.label} aria-modal="false" class="absolute bottom-14 lg:bottom-0 left-full top-0 z-30 flex w-[400px] max-w-[calc(100vw-8.25rem)] flex-col overflow-hidden border-r border-slate-700 bg-slate-900 text-slate-200 shadow-[12px_0_20px_-8px_rgba(0,0,0,0.4)] [clip-path:inset(0_-32px_0_0)]" transition:fly={{ x: -16, duration: 140 }}>
       <header class="flex shrink-0 items-center justify-between border-b border-slate-700 px-3 py-2">
         <div class="flex items-center"><h3 class="text-sm font-semibold">{activeDesignPanel.label}</h3>{#if activeDesignPanel.id === "stackup"}<HelpTag label="About the backplane model" tip="Fundamental-field model with saturation and eddy currents. Infinite layers; ignores edges, hysteresis and core losses." />{/if}</div>
         <button type="button" aria-label={`Close ${activeDesignPanel.label.toLowerCase()} panel`} onclick={close} class="rounded p-1 text-slate-400 hover:bg-slate-800"><X size={16} aria-hidden="true" /></button>
@@ -183,19 +177,22 @@
 
   {#if !drawingOnly}
   {#if open === "terminals" && geometry && terminalTool && onStartTerminals}
-    <div role="dialog" aria-label="Coil terminals" aria-modal="false" class={`${panelClass} ${showMotorControls ? 'max-sm:bottom-20' : ''}`} transition:fly={{ x: designOnly ? -16 : 16, duration: 140 }}>
+    <div role="dialog" aria-label="Coil terminals" aria-modal="false" class={`${panelClass} ${showMotorControls ? 'max-lg:bottom-44' : ''}`} transition:fly={{ x: designOnly ? -16 : 16, duration: 140 }}>
       <header class="flex shrink-0 items-center justify-between border-b border-slate-700 px-3 py-2">
         <h3 class="text-sm font-semibold">Coil ends</h3>
         <button type="button" aria-label="Close terminals panel" onclick={close} class="rounded p-1 text-slate-400 hover:bg-slate-800"><X size={16} aria-hidden="true" /></button>
       </header>
       <div class="min-h-0 overflow-y-auto overscroll-contain p-3">
-        <CoilTerminalPanel tool={terminalTool} {geometry} onStart={(coil) => { selection?.setMode("pan"); onStartTerminals(coil); }} disabled={terminalsDisabled} />
+        <CoilTerminalPanel tool={terminalTool} {geometry} declaredConnection={generated ? config?.generatorConnection : null} connectionLocked={generated && !!config?.generatorEndType}
+          connectionParam={generated && !config?.generatorEndType ? config?.routing_param_defs.find((def) => def.key === "connection") : undefined}
+          connectionValue={config?.routing_params.connection} onConnectionParamChange={generated && config ? (value) => config?.setRoutingParam("connection", value) : undefined}
+          onStart={(coil) => { selection?.setMode("pan"); onStartTerminals(coil); }} disabled={terminalsDisabled} />
       </div>
     </div>
   {/if}
 
   {#if open === "driver" && config}
-    <div role="dialog" aria-label="Preview driver settings" aria-modal="false" class={panelClass} transition:fly={{ x: designOnly ? -16 : 16, duration: 140 }}>
+    <div role="dialog" aria-label="Preview driver settings" aria-modal="false" class={`${panelClass} ${showMotorControls ? 'max-lg:bottom-14' : ''}`} transition:fly={{ x: designOnly ? -16 : 16, duration: 140 }}>
       <header class="flex shrink-0 items-center justify-between border-b border-slate-700 px-3 py-2">
         <h3 class="text-sm font-semibold">Driver</h3>
         <button type="button" aria-label="Close driver panel" onclick={close} class="rounded p-1 text-slate-400 hover:bg-slate-800"><X size={16} aria-hidden="true" /></button>
@@ -241,7 +238,7 @@
   {/if}
   {#if !designOnly}
   {#if open === "layers"}
-    <div role="dialog" aria-label={label} aria-modal="false" class={panelClass} transition:fly={{ x: 16, duration: 140 }}>
+    <div role="dialog" aria-label={label} aria-modal="false" class={`${panelClass} ${showMotorControls ? 'max-lg:bottom-14' : ''}`} transition:fly={{ x: 16, duration: 140 }}>
       <header class="flex shrink-0 items-center justify-between border-b border-slate-700 px-3 py-2">
         <h3 class="text-sm font-semibold">Layers</h3>
         <button type="button" aria-label="Close layers panel" onclick={close} class="rounded p-1 text-slate-400 hover:bg-slate-800 hover:text-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500">
@@ -250,23 +247,10 @@
       </header>
       <div class="min-h-0 overflow-y-auto overscroll-contain p-3">
         <CoilPreviewVisibilityPanel {view} uniqueLayers={layers} uniquePhases={phases} {coils} {isCoilVisible} {onToggleCoil}
-          {showMotorControls} {hasPolePitchData} {hasBandWidthData} {hasPoleRegionData} {poleRegionPhases} {geometry} {selection} {assignmentDisabled} />
+          {showMotorControls} {viewControlsInMenu} {hasPolePitchData} {hasBandWidthData} {hasPoleRegionData} {poleRegionPhases} {geometry} {selection} {assignmentDisabled} />
       </div>
     </div>
   {/if}
 
-  {#if open === "display"}
-    <div role="dialog" aria-label={displayLabel} aria-modal="false" class={panelClass} transition:fly={{ x: 16, duration: 140 }}>
-      <header class="flex shrink-0 items-center justify-between border-b border-slate-700 px-3 py-2">
-        <h3 class="text-sm font-semibold">Display</h3>
-        <button type="button" aria-label="Close display panel" onclick={close} class="rounded p-1 text-slate-400 hover:bg-slate-800 hover:text-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500">
-          <X size={16} aria-hidden="true" />
-        </button>
-      </header>
-      <div class="min-h-0 overflow-y-auto overscroll-contain p-3">
-        <CoilPreviewDisplayPanel {view} uniqueLayers={layers} {showViewMode} />
-      </div>
-    </div>
-  {/if}
   {/if}
 </div>

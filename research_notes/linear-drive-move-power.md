@@ -1,0 +1,1669 @@
+# Linear-drive move power model
+
+Implementation and historical evidence for pcbmotorgen#7744. Current behavior
+is described in **Design-goal independence, v4** below. That section supersedes
+the earlier design-limit gating and rejection interpretation. Earlier sections
+remain as a record of what was implemented and tested, not current requirements.
+
+## Supported model
+
+### Current generated four-layer, 0.8 mm power/alignment audit, 2026-10-31
+
+The user selected the **current generated** four-layer, three-strand Star/Wye
+braid and 0.8 mm PCB, not the original imported Fader copper. The Fader archive
+is only the configuration reference. The audit explicitly uses 0.2 mm trace
+width, 1 oz inner/outer copper, DRV8311 at 12 V/100 kHz, 47 µH per phase,
+75 °C winding, 15 g assembly and the previous assumed 50 mN friction. No
+saved file, production route, terminal choice or controller default was edited.
+
+**Finding: the layer pairs oppose each other.** Independent signed-current
+and PM-field reconstruction finds phase A layer-force amplitudes of
+0.030724/0.025910/0.021904/0.018497 N/A on layers 0/1/2/3. The first pair is
+near -110 degrees; the second is near +70 degrees. Their approximately
+180-degree opposition leaves only 16.72% of summed layer-force amplitude.
+The other phases agree. This is force cancellation, not a measured electrical
+efficiency or an assertion that 83% of electrical energy disappears.
+
+`stacked.rs` staggers successive openings by one **braid/pole pitch**, 6 mm in
+this case. `mod.rs` passes `layout.d_phase / layout.n_periods`. The actual
+electrical period is 12 mm, so that opening step is 180 electrical degrees,
+not a complete electrical cycle. The solved series winding has opposite force
+sense between adjacent pairs. This is distinct from the previously rejected
+doubled *phase-start* spacing. Do not repeat that geometry change to force
+120-degree phase axes.
+
+The generated directed phase-force offsets at mesh 40 are approximately
+A=-109.980, B=-169.980, C=+130.030 degrees. Their 60-degree separation under
+the existing terminal convention still does not match the model's canonical
+120-degree balanced-star command. The old 90-degree reference now fails the
+native positive-thrust guard at x=2.5 mm; no old-angle power number is published.
+A geometry-derived fixed reference of 310.030121 degrees allows a diagnostic
+imposed-demand run. It does not fix the opposing pairs, resolve phase
+polarity/ordering or establish a calibrated controller.
+These angles come from simulated force curves, not hardware measurements.
+Review terminal mapping and sign conventions before treating the directed
+phase-axis mismatch as a physical winding defect.
+
+| Imposed quintic move | Required peak W | Average W | Net J | Maximum required line V |
+| --- | ---: | ---: | ---: | ---: |
+| 63 mm / 1 s forward | 458.907 | 147.186 | 147.186 | 61.433 |
+| 1 mm / 0.25 s forward | 104.689 | 66.850 | 16.712 | 32.175 |
+| 1 mm / 0.25 s return | 107.904 | 68.509 | 17.127 | 32.658 |
+
+**None is achieved at the specified 12 V link.** These are hypothetical
+required imposed-motion demands, not actual consumption from an operating
+12 V prototype. Full-move trajectory peak speed remains 0.118125 m/s, not the
+configured 0.5 m/s target. The full run requires 7.763 A phase mean-current
+peak, 7.916 A including the declared approximate ripple, and a hypothetical
+38.242 A positive DC-link peak. Hot phase resistance is about 4.84 ohms;
+140.211 J of the 147.186 J source ledger is mean-current winding copper loss,
+against only 0.00315 J mechanical work. Source totals retain all previously
+named loss-model exclusions and are neither hardware ratings nor bounds.
+
+Validation used the actual generated geometry at conductor meshes 20/40,
+129/193 force positions and 0.5/0.25 ms time steps. Independent graph currents,
+resistance and free-space PM force pass; a separate layer decomposition of all
+three phases agrees with native force to at most 4.24e-12 N/A. Conductor force
+norm changes by 0.01654%. Spatial peak changes are at most 0.824%, passing the
+unchanged 2% peak/energy gates; independent energy balances pass. The frontend
+loss builder agrees with the independent Python formulas, and real native
+receipts map correctly to reports, snapshots and trace exports. No dynamic
+material solve or hardware qualification was performed.
+Final checks passed 580 frontend tests, with 12 optional tests skipped,
+and type-checking reported no errors or warnings. Five independent Python
+loss-formula tests passed. All seven supplied-reference hashes match their
+previously recorded values.
+
+Summary: `scripts/solvers/results/current-generated-braid-power-alignment-2026-10-31.json`.
+Full receipts live in approved temp `current-braid08-{force,oracle}-20261031`
+and `current-braid08-aligned-{baselines,models,results}-20261031`. The initial
+failed old-angle output is preserved separately. Reproduce the signed map with
+`PCB_MOTOR_SUPPLIED_DESIGN_DIR="$PWD" PCB_MOTOR_FORCE_AUDIT_OUTPUT=<new-directory> cargo test -p pcbmotorgen export_current_braid_signed_force_map -- --ignored --nocapture`.
+For baseline export use the existing saved-design command with
+`PCB_MOTOR_GENERATED_BRAID_AUDIT=1`,
+`PCB_MOTOR_FADER_PCB_THICKNESS_M=0.0008` and
+`PCB_MOTOR_FADER_ELECTRICAL_ZERO_RAD=5.41104639575015`.
+Keep the generated-audit flag set for the frontend model export and native
+refinement command; it selects `generated4` cases without reusing imported
+copper or relabeling it as a generated result. The summary CLI accepts
+`--generated-braid-audit`. `audit_braid_layer_force.py` consumes a matching
+independent oracle fixture and the native force map. Existing evidence and
+all seven supplied references remain unchanged.
+
+Next: investigate a series-aiding termination variant, keeping active XY
+unchanged, then verify phase order/polarity and controller reference. Moving
+the cut by a complete electrical period or changing relative pair connection
+sense requires explicit routing/reference review; neither has been applied.
+The exact-spacing DFM warnings, phase/controller applicability, legacy planar
+equilibrium limitation and through-only KiCad guard remain. #7744 stays open.
+
+### Routing sources and coil-end controls, 2026-10-31
+
+UI work tracked as pcbmotorgen#nstw:
+
+- Routing is the first/default left drawer and includes all former Constraints
+  inputs, assembly view, sizing readouts and validation warnings.
+- Routing sources offer `Infinity Braid - Star (Wye)` and `Infinity Braid - Delta`.
+  These are UI variants of the existing `infinity-braid` ID and numeric
+  `connection` values, not new persisted pattern IDs or new copper generators.
+- Optional `end_type` metadata declares a fixed connection or a parameter's
+  values and missing-value default. It passes through Rust/Python loaders and
+  catalog IPC. Coil ends shows declared types read-only. Uploaded/frozen copper
+  and undeclared generators retain editable winding controls in that panel.
+- Legacy absent connection parameters stay absent, so parameter-schema loading
+  cannot silently replace closed copper with Delta. Legacy/unknown values stay
+  visible rather than being silently changed to Star.
+- Auto-select ends retries inference for the current coil, or starts with the
+  first coil. It proposes a reviewable draft; Apply is still required. Failure
+  leaves manual choices intact and offers manual picking. A cancelled proposal
+  does not freeze live generated copper into imported geometry.
+- The highlighted `position | layers` text toggle switches the bottom controls
+  independently of endpoint picking. Entering Coil ends defaults to layers.
+  Both modes remain accessible on narrow screens. Camera fit reserves the
+  measured bar height so it cannot cover a pickable endpoint at reset zoom.
+- Winding-warning shortcuts and help text follow the relocated controls:
+  declared generators open Routing; uploaded copper and undeclared generators
+  open Coil ends. Opening a design drawer clears the terminal-panel request so
+  it cannot immediately reopen Coil ends over the requested drawer.
+
+No routing geometry, terminal heuristic, phase/polarity convention, DFM policy,
+or physics model changed. Fresh 2/4/6/8-layer native routing JSON and all eight
+3/5-strand preview payloads are byte-identical to
+`auto-terminals-matrix-20261031`. The seven supplied files remain untracked and
+untouched. Native plugin API is now 3 because the returned metadata structure
+changed; old binaries are rejected before pattern creation and must be rebuilt.
+Python metadata remains optional and backward compatible.
+
+Verification: 730 Rust tests passed with `cargo test --workspace`; 576 frontend
+tests passed, four skipped, with `PCB_MOTOR_TERMINAL_FIXTURES` set to fresh
+`routing-controls-native-20261031` exports. This includes auto-selection at all
+four layer counts and both strand counts. Svelte check has zero errors/warnings;
+build passes with the existing bundle-size warning. The complete 216-case
+affected browser suite passes at desktop widths and with mobile subcases,
+including uploaded files, manual endpoint choices, plugin dialogs, settings and
+simulation navigation. A driver-layout test now retries its full assertion
+because an asynchronous result replacement can invalidate an earlier bounds
+read; no layout coverage was removed. Earlier failed/timed-out runs are retained
+separately. Artifacts live in the approved temp directory under
+`routing-controls-browser-verified-20261031`,
+`routing-controls-targeted-final-20261031` and `routing-controls-native-20261031`.
+After the warning-shortcut integration, all 52 routing/driver/dock browser checks
+pass in `routing-controls-navigation-verified-20261031`, including new uploaded
+Delta navigation and generated-source navigation with Coil ends already open.
+The imported case also exposed a missing action: it previously checked only the
+generated connection before offering the shortcut. It now checks the active
+import's connection, without changing any electrical calculations.
+
+### Automatic winding terminals retain exact via spans, 2026-10-31
+
+The user reported failed automatic star/end-point selection after the even-layer
+work. Fresh `generate_coils` IPC payloads reproduced it: two layers selected
+correctly, while 4/6/8 layers returned no automatic pair. Native geometry and
+electrical extraction were still connected. The presentation boundary was losing
+the `PhaseCoil.routed_vias` spans and sending only XY `via_positions`; frontend
+`generatedTerminalGeometry` then guessed an adjacent pair from each presentation
+layer. That replaced full-stack series barrels with false 0/1 connections and
+made the terminal graph disconnected/dangling.
+
+`PhaseCoilIpc` now carries optional `routed_vias`, with SI-metre positions and
+exact layer indices. The frontend uses those spans when present, including an
+authoritative empty list. Missing/null metadata keeps the position-only legacy
+fallback. Native position-only legacy coils omit the new field; serde still
+accepts older payloads without it. The CAD-to-preview adapter also preserves
+spans instead of forcing its consumers to reconstruct them from duplicate XY
+positions. Existing point markers and legacy preview fields are unchanged.
+
+No terminal-inference heuristic, routing geometry, explicit manual choice,
+polarity, DFM rule, solver or power model was changed. Existing disconnected,
+closed/ambiguous-chain and dangling-via refusal tests still pass. Saved/imported
+CAD and known defective raw DXFs are not silently repaired. A previously cached
+native preview must be regenerated with the rebuilt native app to receive the
+new metadata; this does not rewrite saved editable geometry.
+
+The supplied-reference exporter now writes real native preview JSON artifacts.
+`generatedBraidTerminals.native.test.ts` consumes those payloads through the
+actual frontend conversion and `CoilTerminalTool`. It verifies driver ends at
+x=0 on the last layer, the shared neutral endpoint on layer zero, real candidate
+membership, automatic review/apply readiness, revealing both correct layers and
+preserving manual reversal. All eight 2/4/6/8-layer by 3/5-strand combinations
+pass. Removing the exact metadata reproduces the larger-stack failure as a
+negative control. Separate always-on tests cover mixed pair/full-stack spans,
+cut-series disconnection, authoritative emptiness and legacy fallback. Rust
+tests verify SI conversion, backward-compatible serde and every generated via
+surviving the preview boundary at all four layer counts.
+
+Before/after three-strand routing JSON artifacts are byte-identical at each
+layer count. Preview JSON is also identical after removing the additive
+`routed_vias` field. Those payloads retain 393/789/1185/1581 physical vias for
+2/4/6/8 layers respectively. All seven supplied files remain unchanged and
+untracked. No new physics campaign was needed for a presentation-only handoff
+fix; the model remains `linear-move-demand-v11` with its existing limitations.
+
+Evidence in approved temp:
+
+- `auto-terminals-before-20261031` and
+  `auto-terminals-frontend-before-20261031.log`: real pre-fix payloads and the
+  reproduced 4/6/8-layer failures, with two-layer success.
+- `auto-terminals-matrix-20261031` and
+  `auto-terminals-native-matrix-20261031.log`: fresh native 3/5-strand payloads
+  plus separately passing supplied-reference check.
+- `auto-terminals-all-frontend-final-20261031.log`: 568 frontend tests pass,
+  four skip, including all eight native payload/tool cases.
+- `auto-terminals-all-rust-20261031.log`: 728 Rust tests pass, 24 unit and
+  three doc tests ignored. `auto-terminals-ipc-20261031.log` covers the targeted
+  native handoff tests separately.
+- `auto-terminals-check-final-20261031.log`: Svelte check has zero errors/warnings.
+  `auto-terminals-build-20261031.log`: build passes with the existing bundle-size
+  warning.
+
+Reproduce with a fresh output directory:
+`PCB_MOTOR_SUPPLIED_DESIGN_DIR="$PWD" PCB_MOTOR_BRAID_OUTPUT=<fresh-dir> cargo test -p pcbmotorgen supplied_even_layer_copper_matches_generated_active_stack -- --ignored --nocapture`,
+then run frontend tests from `app/desktop` with
+`PCB_MOTOR_TERMINAL_FIXTURES=<fresh-dir> pnpm test`. Without that environment
+variable only the eight native-payload cases skip; the synthetic handoff and
+native serialization regressions remain always-on. Work is tracked as #graf.
+Nothing is pushed.
+
+### Exact braid angle and via-row lead pitch, 2026-10-31
+
+The user's next screenshot rejected `11e2fcc`'s steeper end legs and enlarged
+Y spacing. Star/wye diagonal output/connecting legs now use the uncapped braid
+edge slope, collinear with the projected braid edge through the open vertex.
+The first external row is one native via-row Y pitch above the pattern, then
+two pitches, three pitches, etc. Pair openings, phase labels, lead directions,
+main active copper, exact barrel spans and existing delta geometry do not change.
+The neutral risers retain their existing vertical shape and use the first row.
+
+Pitch is derived from the smallest positive interval between unique native
+via Y levels. In the normal three/five-strand braid this is the top-to-next-via
+interval. The two-strand braid has no intermediate upper crossing row, so the
+lower crossing rows supply that interval; distant centre-height end vias must
+not be mistaken for a four-millimetre lead pitch. No pad diameter, trace width
+or clearance override may change the star/wye lead angle or Y pitch.
+
+For the supplied three-strand case, the previous 0.627 mm rows and 62.003454
+degree diagonal become 0.444444 mm rows and the braid's 53.130102 degree diagonal.
+Rows are y=8.444444, 8.888889 and 9.333333 mm above an 8 mm body. The pink guide
+in approved temp `braid-collinear-closeup-after-20261031.png` is extended from an
+actual unchanged active braid segment, not a hand-picked display angle. Native
+2/4/6/8-layer plots and the eight-layer per-plane view were inspected.
+
+The exact geometry conflicts with the saved manufacturing clearance. With
+0.5 mm pads and 0.2 mm traces, the supplied 4/6/8-layer case has minimum series
+pad-to-unintended-trace edge gap 0.094444 mm and pad-to-other-pad gap 0.055556 mm,
+both below 0.127 mm. **The user explicitly selected generation with warnings**,
+not silent spacing/angle changes or generation failure. Invalid non-finite,
+negative or zero pad dimensions still reject as invalid input.
+
+Finite-pad checks therefore live downstream in DFM again, as non-mutating
+diagnostics. `pcbmotorgen-dfm/src/series_vias.rs` identifies barrels with two
+adjacent inner-layer taps, checks every trace/IO run throughout their physical
+span except intended same-net endpoint contacts, and checks all other pads with
+an overlapping physical span. Same-phase outer copper, including an unintended
+endpoint exactly on the barrel, is reported rather than hidden by net equality.
+The existing `check_coil_interference` IPC returns the new
+`series_via_clearance` and `series_via_pad_clearance` warnings with edge gaps in
+millimetres. The saved-reference test verifies both warnings pass through that
+real command while generation/preview still succeeds. Ordinary via checks are
+unchanged. This is not a complete-board DRC or fabrication qualification.
+
+Some other exact-spacing packs have actual copper overlap, not just a small
+positive clearance. The two-strand four-layer negative control has a B barrel
+on the C driver trace on layer 3; its -0.35 mm pad-to-trace edge gap is explicitly
+reported. Assigned-net resistance/current checks do not model a physical short
+between differently named nets. Such diagnostics must be resolved before using
+that geometry as a real winding; generation success is not electrical safety.
+
+Coverage retains 72 width/strand/pad/trace/layer cases, now asserting exact
+projected collinearity, via-derived Y pitch and geometry invariance under DFM
+size/clearance changes. Prior slope-cap/row-widening values are negative controls.
+The earlier 0.7 mm pad / 0.5 mm trace and oversized-pad packs generate and report
+DFM problems rather than being removed from coverage. Three new DFM tests cover
+same-net bypass, cross-phase inner/outer copper, pad gaps, the real three-strand
+case, actual two-strand overlap and non-mutation. Existing assigned-net series
+current, cut-each-link, copper-reference and exact DXF round-trip tests still pass.
+
+Final affected Rust suites: 726 pass, 24 unit and three doc tests ignored,
+`braid-collinear-all-rust-final-20261031.log`. Supplied references pass separately
+in `braid-collinear-references-verified-20261031.log`; the final same-phase
+outer-endpoint bypass control also passes in
+`braid-collinear-routing-dfm-final-20261031.log`. Frontend: 555 pass, four skipped,
+`braid-collinear-frontend-20261031.log`. All evidence is in the approved temp
+directory; supplied files are unchanged and untracked, nothing pushed.
+
+Independent R/current/dL/prescribed-PM free-space force checks at meshes 20/40
+pass for generated 2/4/6/8 and the legacy driver fixture in
+`braid-collinear-{two,four,six,eight,driver}-oracle-20261031`. Snapshots include the
+stacked termination and new DFM diagnostic source. The verified mesh-20 driver
+fixture is Kf=0.2621774339553868 N/A, thrust=0.2883951773509255 N and speed
+voltage=7.423082452263505 V. Regression constants changed only after the independent
+check, without loosening tolerances. Numerical agreement does not qualify a
+controller or resolve physical DRC warnings. Version is `linear-move-demand-v11`;
+no new move-power result or improvement claim. #7744 remains open.
+
+### Even-layer star/wye terminations, 2026-10-31
+
+The user supplied revised `star-wye_{2,4,6,8}-layer.dxf` examples and confirmed
+that this revision covers **star/wye only**. It supersedes the previous star
+lead positions and same-opening four-layer topology, including the incenter
+layout below. Legacy two/four-layer delta geometry remains unchanged; delta
+above four layers is explicitly rejected, not silently converted to star.
+
+`patterns/infinity/stacked.rs` copies the same active XY braid onto each
+adjacent pair. From the driver end toward neutral, each pair opens one complete
+braid period farther right. The old first-period via is restored before opening
+a later period. The final generated layer carries the driver leads, bent left;
+layer zero carries the neutral at the last opening. Each neighbouring pair
+connects through its own full-stack barrel with exactly two intended inner-layer
+landings. Closed mode retains independent closed rings per pair.
+
+The pattern declares a minimum of two layers and an even-count constraint, with
+no pattern-specific maximum. Star needs at least one existing braid period per
+pair. If that does not fit, generation rejects the configuration without changing
+the active winding. The application's board-layer maximum still applies.
+Checks cover 2/4/6/8/10 layers and a 64-layer generation case with enough repeats.
+
+The new DXFs are reference drawings, not electrically validated input. Their
+full-stack barrels are named net `0`; their first two C-phase outgoing leads
+have 0.054348 mm endpoint gaps, and the 6/8-layer drawings retain three extra
+missing first-period vias on one pair. Import warns rather than silently repairing
+these. The supplied-reference regression explicitly asserts the raw failures,
+then labels the unambiguous barrel phases and repairs the listed gaps/missing
+vias **only on an in-memory test copy** to check intended series topology.
+Generated routing does not inherit those defects. No importer behavior or user
+file was changed. Active copper matches all corresponding reference layers at
+1e-5 mm rounding, and all braid via sites match after the explicitly listed
+test-copy repairs. Reference lead shapes are not an exact-shape golden: the
+external rows and slopes also have to clear actual finite copper.
+
+The configured DFM pad size still controls the external spacing. Row pitch
+clears both a pad-to-trace gap and a pad-to-pad gap from existing braid vias;
+fan-out horizontal step is capped at phase pitch divided by twice the phase
+count, steepening only external leads to clear neighbouring phase risers.
+Each series pad is checked against every trace except its intended same-net
+endpoint contacts, and against every other pad. Unfittable sizes reject without
+moving the braid. This is not a whole-board DRC/fabrication qualification.
+
+For the saved two-layer config generated as 4/6/8 layers, 0.5 mm pads, 0.2 mm
+traces and 0.127 mm required clearance produce 0.627 mm external row spacing.
+Independent native-geometry measurements give minimum series-pad-to-unintended-
+trace clearance 0.238651 mm and series-pad-to-other-pad clearance 0.210099 mm.
+Two-layer driver leads use the revised reference slope; varying the pad size
+does not change that two-layer geometry. The active body is unchanged for every
+layer count. Exact pair-specific and full-stack via spans survive CAD and DXF
+round-trip for 2/4/6/8/10 layers, with the existing generated/imported layer-index
+reversal explicitly accounted for. The through-only KiCad writer guard remains.
+
+Moving the openings changes currents in the braid mesh. The old equal-current-
+on-every-copied-edge assertion applied to the old same-opening layout, not this
+one. Its replacement verifies signed currents against separately solved copies
+of **each actual pair with its own opening**, one terminal amp through each
+series link in the driver-to-neutral direction, and disconnection when any
+individual link is removed. No phase labels, terminal polarity or force-target
+geometry fitting changed. Clearance coverage includes 72 width/strand/pad/trace/
+layer-count cases, plus the invalid-size controls and
+independent pair/current/topology checks.
+The former 0.7 mm pad / 0.5 mm trace case is retained as an explicit rejection:
+it cannot clear this fan-out at the existing phase pitch.
+
+Final affected Rust suites pass 723 tests, with 24 unit and three doc tests
+ignored, in approved temp `even-braid-all-rust-final-20261031.log`. The ignored
+supplied-reference regression passes separately in
+`even-braid-references-final-20261031.log`. Frontend: 555 pass, four skipped,
+`even-braid-frontend-20261031.log`; no frontend source changed. Generated
+2/4/6/8-layer projects/routing are in `even-braid-generated-20261031`; actual
+lead copper and full-stack barrels were plotted and visually inspected in
+`even-braid-{2,4,6,8}-layers-20261031.png` and the eight-layer per-plane detail.
+These are layer-index exploded views, not a new physical stackup convention.
+
+Reproduce the supplied-reference check with
+`PCB_MOTOR_SUPPLIED_DESIGN_DIR="$PWD" cargo test -p pcbmotorgen supplied_even_layer_copper_matches_generated_active_stack -- --ignored --nocapture`.
+Optional `PCB_MOTOR_BRAID_OUTPUT` must name a fresh artifact directory.
+
+Independent R/current/dL/prescribed-PM free-space force checks at meshes 20/40
+pass for each of the four generated layer counts and the driver fixture in
+approved temp `even-braid-{two,four,six,eight,driver}-oracle-20261031`.
+Source snapshots include `stacked.rs`. The driver fixture's mesh-20 legacy
+excitation gives Kf=0.26217755167309104 N/A, thrust=0.28839530684040016 N and
+speed voltage=7.425057990651583 V. This supersedes its old same-opening values,
+including 0.9262415028 N/A. Regression constants changed only after independent
+verification; no numerical tolerance was loosened. These values are not a
+hardware measurement, controller qualification or force-improvement claim.
+
+Model version is `linear-move-demand-v10`. No replacement move-power result is
+accepted. The existing terminal/controller applicability limits and retracted
+power-improvement claim remain unresolved under #7744. Routing work is tracked
+separately as #3cw8. Nothing is pushed.
+
+The user replaced the earlier 2/4-layer DXFs with revised examples. The baseline
+hashes for **this request**, preserved unchanged, are:
+
+- 2-layer DXF: `d2957c805e330421d434031d5a33b141f7fa02ad811e682bf2e09ab18b81cc25`
+- 4-layer DXF: `f548be36c01fd32d7e7befd20f2035278bd9ea9d52d3809436358c8715690d52`
+- 6-layer DXF: `3ce4b6a1b52f16415e2552b4bedf6e6a6b4d8c352ec1fe4a8049d3860e288718`
+- 8-layer DXF: `e567aa3dbe2ede61d68c21c9cb0d1300132c0f599f8755749fdb925c67669b65`
+
+The three supplied PMMOTOR hashes remain unchanged from the earlier checkpoints.
+
+### Centered full-stack vias and pad clearance, 2026-10-30
+
+The user's next screenshot exposed a finite-pad clearance defect in
+`959d40c`: a full-stack via at half the triangle height can overlap the sloping
+outer-layer traces. The prior centerline-only no-bypass check did not catch
+this. This correction supersedes that commit's series-via/lead placement,
+not its active braid, series topology or unchanged two-layer layout.
+
+Full-stack series vias now sit at the incenter of the triangle between the
+outer diagonals and the first upper routing row. This gives equal perpendicular
+distance to the slopes and upper row. That row moves outward by at least one
+configured pad diameter beyond its old two-pitch height, and farther if the
+trace width and clearance require it. The host supplies the actual pad diameter
+from `DesignRules`, drill plus twice the annular ring, through an additive
+`RoutingContext.via_pad_diameter_mm` field. Older contexts may omit it, but
+cannot establish finite-pad clearance without their DFM sizes.
+
+Generation checks each series pad against every outer-layer trace, including
+same-phase copper that could bypass a winding pair, other-phase traces on all
+layers and other via pads. A size that cannot fit at the existing phase pitch
+is rejected explicitly; active copper is not stretched to hide the conflict.
+This is a series-terminal-region check, not whole-board DRC or fabrication
+qualification. The through-only KiCad writer guard remains in place.
+
+For the supplied two-layer config generated as four layers, the 0.3 mm drill
+and 0.1 mm annular ring give 0.5 mm pads; nominal traces are 0.2 mm and required
+space is 0.127 mm. The series-via row moves from y=8.444444 to 8.868056 mm,
+and the first upper routing row from 8.888889 to 9.388889 mm. Independently
+measured minimum pad-to-outer-trace edge gap changes from -0.083333 mm,
+an overlap, to +0.170833 mm. The actual generated geometry and finite copper
+widths were plotted and visually inspected in approved temp
+`braid-vias-centered-before-after-20261030.png`.
+
+Regression coverage includes 18 board-width/strand/pad/trace cases, independent
+barycentric incenter construction, distance-to-segment and pad-to-pad checks,
+an old-placement negative control, invalid/unfittable sizes, the DFM-to-routing
+size bridge, star/delta topology and exact two-layer geometry invariance under
+pad-size changes. `braid-via-clearance-verified-20261030.log` records 722 passing
+Rust tests with 24 unit and three doc tests ignored. No frontend code changed.
+The supplied-project/DXF active-copper and topology test still passes separately
+and writes generated artifacts only to approved temp
+`braid-via-centered-reference-20261030`.
+All five supplied project/DXF hashes remain unchanged.
+
+Fresh independent R/current/dL/free-space force checks at meshes 20/40 pass in
+`braid-via-centered-generated-oracle-20261030` and
+`braid-via-centered-driver-oracle-20261030`. Their summary SHA-256 values are
+`649fadb19c40d48c83728de113c85ff40460fdf9fe80f93021a57d4129c8cba1`
+and `4ba00ce171e44d617abb4fc906c263a738af752eee91fc06dc75409284f75046`.
+Source capture includes the new pad-size context and host bridge. The verified
+mesh-20 driver fixture is Kf=0.9262415028019103 N/A,
+thrust=1.0188656530821014 N and speed voltage=7.807136371602488 V.
+Only after this check were its geometry-specific regression constants updated;
+no force, energy or convergence tolerance was loosened. These checks do not
+qualify the exported legacy excitation as a controller waveform.
+
+Model version is `linear-move-demand-v9`. No new move-power result, physical
+wiring/polarity change, supplied-file rewrite or hardware qualification is
+claimed; the earlier power retraction and open #7744 limits still apply.
+
+### Four-layer braid generation and DXF references, 2026-10-30
+
+The user confirmed the restored compact two-layer generation, then supplied
+`star_2-layer.pmmotor`, `star_4-layer.pmmotor` and both `star-wye_*-layer.dxf`
+files to correct the four-layer case. The generator had ignored the requested
+four layers and emitted copper only on 0/1. Four-layer star/delta now repeats
+the unchanged active braid on 2/3 and connects the opened 1/2 ends in series at
+raised full-span barrels. Those barrels land on copper only on layers 1 and 2;
+outer-layer leads extend away from them to avoid bypassing a winding pair.
+Line terminals are on layer 3, star neutral on layer 0. No terminal reversal,
+phase relabeling or compact-XY change was made. Closed mode remains separate
+closed rings in each pair, not a terminated driver winding.
+
+Only two and four layers have implemented stack semantics. The pattern now
+rejects other counts rather than silently leaving selected layers empty.
+New projects explicitly select star in both frontend and native defaults.
+Saved choices, including empty/missing routing parameters, retain their old
+meaning; native deserialization and frontend restore regressions cover this.
+The four-layer project's config is stale delta/five-strand data; its actual
+embedded copper, confirmed by the four-layer DXF, is three-strand star.
+Neither supplied project nor DXF was rewritten to fix that mismatch.
+
+`PhaseCoil.routed_vias` preserves mixed 0/1, 2/3 and 0/3 barrel spans through
+presentation and CAD conversion. Legacy position-only coils retain their
+fallback. A CAD/DXF round-trip regression checks every via's net, position and
+span after accounting for DXF's bottom-to-top plane indexing. The generated
+top-to-bottom stack still spans 0 to minus the configured PCB thickness.
+The existing KiCad IPC writer only emits through vias. Direct writes and
+dry runs now reject separate layer-pair barrels before any IPC instead of
+widening them and shorting the series pairs. Blind/buried-via writing remains
+unsupported; use span-preserving 3D DXF for this geometry. No fabrication or
+finite-width clearance acceptance is claimed.
+
+Evidence, all under the approved OpenCode temp directory:
+
+- `four-layer-final-references-20261030.log`: ignored native reference test
+  passed against both unchanged projects and both DXFs. Generated active copper
+  on every layer matches clipped reference copper at 1e-5 mm rounding. Clipping
+  to y=0..8 mm excludes differently extended/filleted external leads, so this
+  is not an exact external-lead-shape comparison. Barrel-span counts match,
+  inferred line/neutral layers match, each four-layer series link carries one
+  amp per terminal amp, and removing it disconnects the winding pairs.
+- Routing/current regressions cover 2/3/5 strands, equal signed currents in
+  matching active layers of both pairs and absence of outer-layer copper at
+  series joins. Existing compact endpoint-grid checks remain unchanged.
+- `four-layer-generated-oracle-20261030/summary.json` and
+  `four-layer-driver-oracle-20261030/summary.json`: independent R/current/dL and
+  prescribed-PM free-space force checks pass at meshes 20 and 40. Source capture
+  now includes `four_layer.rs`. Summary SHA-256 values are respectively
+  `0eb037d83113f02f6078d9a2b096489b5d6bc6e114da5a8b63c8e30ef10a455d`
+  and `24b74e517b86e9b158074678728e83f736388c1a40b29ee189ee705f2548c0b8`.
+  The independent driver fixture verifies Kf=0.9262418794532284 N/A,
+  thrust=1.0188660673985515 N and speed voltage=7.80282100697782 V at mesh 20.
+  Only after this check were geometry-specific regression constants updated.
+  This verifies the exported legacy excitation, not controller applicability.
+- `four-layer-braid-20261030.png`: actual native generated copper on all four
+  layers and enlarged lead/join regions was visually inspected.
+- `four-layer-all-rust-final-20261030.log`: 718 Rust tests pass, 24 unit and
+  three doc tests explicitly ignored. The supplied-reference test passed
+  separately. Frontend: 555 tests pass, four skipped; Svelte check/build pass.
+  Old writer mocks that requested unsupported three-layer braids now use
+  nonempty two-layer fixtures rather than passing with no submitted items.
+  The historical two-layer plausibility fixture now explicitly requests two
+  layers; its physical bounds were not widened for the new four-layer case.
+
+The new two-layer DXF SHA-256 is
+`fc166c0f3bf82e16bf5531878001c281b1c9e7946f5cc45b5921479c5d70009b`.
+The four earlier supplied file hashes are unchanged from the rollback record.
+Model version `linear-move-demand-v8` distinguishes the populated four-layer
+geometry. No new move-power estimate is accepted or substituted for the
+retracted result below. Terminal/controller audit and the other #7744 practical
+estimate limitations remain open.
+
+### Retraction of doubled phase-start spacing, 2026-10-30
+
+**Current status:** the widened layout introduced by `a496f71` is rejected.
+The user's combined/top/bottom screenshots exposed missing bundle positions at
+both finite ends, including an isolated final phase group. Doubling phase-start
+translation while keeping strand spacing fixed produces this directly. The
+previous test requiring a uniform cross-phase endpoint pitch was incorrectly
+changed to accept the wider gap. Force-axis agreement and independent numerical
+force checks verified the altered model, not the validity of that design change.
+
+Restored compact consecutive phase bundles with start pitch `pole_pitch / 3`,
+unchanged strand pitch `pole_pitch / (phases * strands)`, and the compact end-span
+budget. Restored the original lead geometry and planar-equilibrium regression.
+Also rolled back the static commutation changes coupled to the widened geometry
+to avoid leaving a partial new controller policy. This restores legacy behavior;
+it does **not** validate that behavior as a realizable star-controller waveform.
+No polarity inversion, phase relabeling, supplied-file rewrite or new controller
+assumption was introduced. The independent oracle batching fix and tiny numerical
+repeatability helper remain, as they are unrelated to the geometry mistake.
+Model version is now `linear-move-demand-v7` to distinguish restored geometry
+from the v6 widened-layout receipts.
+
+New end-grid coverage checks actual left and right midpoint via rows for
+2/3/5 strands, closed/delta/star connections, and magnet-aware/fallback contexts.
+All 18 cases must have uniform intra- and inter-phase endpoint pitch and pass
+the routing validator. A negative control reproduces the extra per-phase
+translation and must fail the uniform-grid check at **both** ends. Signed
+terminal force axes remain a simulation diagnostic under the current terminal
+convention, not measured hardware angles or a reason to move copper.
+
+Affected Rust suites passed 505 tests with 22 unit and one doc test ignored.
+Log: approved temp `compact-braid-rollback-tests-20261030.log`.
+Additional DFM/export suites passed 206 tests with one unit and two doc tests
+ignored, logged in approved temp `compact-braid-export-tests-20261030.log`.
+Fresh independent current/R/dL/free-space force checks passed at 20 and 40
+subdivisions in approved temp `compact-braid-oracle-20261030/summary.json`.
+Native geometry from the old and restored driver fixtures was plotted side by
+side in approved temp `compact-braid-layout-comparison-20261030.png` and visually
+inspected. The rejected fixture's midpoint endpoint-row pitches ranged from
+0.4 to 2.4 mm at each end; the restored fixture is uniformly 0.4 mm at both
+ends. This is a generated reference fixture, not the user's exact screenshot
+configuration or a rewrite of the imported Fader.
+The restored legacy driver-reference assertions pass without refitting their
+constants. No new practical move-power estimate is claimed in this rollback.
+All four supplied archive/DXF SHA-256 hashes are unchanged.
+
+The v6 files `generated-star-commutation-2026-10-30.json` and
+`practical-move-generator120-2026-10-30.json` remain historical evidence of the
+**rejected widened geometry**, not current-design acceptance evidence. In
+particular, 10.5056 W is withdrawn as a proposed design improvement. #7744 stays
+open. Correct terminal polarity, phase order, electrical-period convention and
+controller applicability must be established while preserving the compact
+physical interleave, before making another layout or performance claim.
+
+### Rejected generated-spacing attempt, retained historical record, 2026-10-30
+
+The following account records the superseded `a496f71` attempt. Its layout
+acceptance and performance-improvement claims are retracted above.
+
+Confirmed the generated two-layer star had the same 60-degree directed phase
+axes as the imported Fader. Root cause: the infinity braid translated equally
+oriented phase windings by `pole_pitch / 3`. This is one 60-degree phase belt,
+not a 120-degree equal-polarity phase separation. The generator now uses
+`2 * pole_pitch / 3` for three phases, with no terminal-polarity reversal or
+fitted motor constant. For a 6 mm pole pitch, starts are 4 mm apart rather than
+2 mm. Within-phase strand spacing stays `pole_pitch / (phases * strands)`.
+The complete staggered end span is reserved before choosing connected complete
+periods, so the corrected layout remains inside the configured board.
+Other phase counts retain their previous placement; they are not newly qualified.
+
+Generated phase-band positions now reach the routed static force commutation
+law instead of being lost to its legacy analytic 60-degree fallback. When CAD
+exchange omits the sidecar, three-phase routed MaxThrust uses an explicit
+balanced 120-degree current law. Legacy independent-coil analytic fixtures are
+unchanged. Exported/imported copies of the same new copper agree again.
+This also supersedes old imported static-force results that used unbalanced
+independent-coil currents. The supplied Fader copper itself is not regenerated
+or modified and still has its original noncanonical phase layout. Its explicit
+balanced-star move calculations are not silently converted to new geometry.
+
+Regression coverage includes three strand counts, signed unit-terminal force
+axes, zero-sum star currents, neutral/lead connectivity, strict routing bounds,
+delta/closed lead construction and generator/CAD parity. The new generated
+star force-map offsets are 70.4602°, -49.5403°, -169.5338°, with residuals below
+0.005° from a common 120-degree sequence. Evidence:
+`scripts/solvers/results/generated-star-commutation-2026-10-30.json`.
+
+All six saved-design/control moves were regenerated with fresh loss models and
+unchanged 2% energy/peak refinement and balance gates. The generated star v1,
+1.6 mm PCB, 0.2 mm width/1 oz, original 90-degree reference now estimates
+10.5056 W peak / 6.49745 J net for the full move, and 5.56903/5.57500 W peak
+for short forward/return. Full source peak is 0.875468 A and required maximum
+line voltage is 5.83679 V, with no modeled voltage finding. These are results
+for **new generated copper**, not improved numbers for the unchanged imported
+four-layer Fader. The regenerated Fader control retains its 0.8 mm scenario
+37.6338 W peak at 90 degrees. Model version v6 records the implementation change.
+Receipt: `scripts/solvers/results/practical-move-generator120-2026-10-30.json`.
+
+Independent verification used reconstructed nodal currents, R and trace/via
+dL with Magpylib cuboid fields at 20/40 conductor subdivisions. The first two
+attempts exposed batch-size-dependent SciPy/Magpylib identity-rotation output;
+their failed evidence remains in approved temp `generator120-oracle-20261030`
+and `generator120-oracle-v2-20261030`. The final oracle evaluates the same
+public functional cuboid field in bounded batches, tested against scalar
+object results and repeated arrays larger than 33,000 points. No reference
+force or tolerance was fitted to Rust output. Final 20/40 checks passed with
+force-vector refinement 0.000896 N below the unchanged 2% gate. Accepted full
+report: approved temp `generator120-oracle-final-20261030/summary.json`, SHA-256
+`6ae643a40540b79bec65e44e7d29dea3b2fae626acd3adae1a40a54a3c13ceab`.
+The earlier successful v3 report is retained as an intermediate checkpoint.
+This is free-space prescribed-magnet validation, not material/hardware qualification.
+
+The old generated driver-reference numbers were replaced only after the new
+geometry's independent check. The geometry-specific equilibrium test now pins
+the corrected 120-degree charge state and explicitly unbracketed legacy planar
+rest fallback, rather than requiring the old 60-degree braid's rest point.
+The known layered/imported travel-equilibrium limitation remains open.
+A one-ULP backplane repeatability failure now uses the existing tested 1e-13
+numerical-repeatability helper, with physical positive controls retained;
+energy, force-reference and convergence tolerances were not changed.
+
+Final affected Rust suites: 504 passed, 22 unit and one documentation test
+ignored. Frontend full suite 554 passed/4 skipped, native-receipt mapping
+17 passed separately; Svelte check/build pass; ten Python formula/audit tests
+pass. Additional DFM/export suites passed 206 tests, with one optional user-file
+and two documentation tests ignored. Supplied archive/DXF hashes remain unchanged. No push or supplied-file
+rewrite, and no nonlinear or long external-solver campaign was performed.
+
+### Commutation alignment and copper-width check, 2026-10-30
+
+User clarified the requested copper is **0.2 mm trace width with 1 oz copper**.
+The imported Fader already has 0.2 mm source width, and both inner/outer copper
+are 1 oz, approximately 35 µm. CadBoard uses that imported width, not the
+configuration's unrelated 0.127 mm minimum. No width or copper-weight change
+was needed or simulated. The comparison retains the explicit 0.8 mm PCB scenario.
+
+`scripts/solvers/audit_move_commutation.py` audits signed unit-terminal force
+maps, without changing wiring or tuning geometry/force constants. On the
+geometry-selected interior interval 14.5–50.5 mm, three electrical periods,
+a DC+sine+cosine regression finds phase sine offsets A=69.9248°, B=9.9269°,
+C=-50.0707°, amplitudes approximately 0.09704 N/A, and R² above 0.99997.
+The directed axes are 60°, not 120°, apart under the saved terminal convention.
+Thus the actual winding/mapping polarity and conventional balanced-star current
+law are not a canonical match. A single reference angle cannot remove that.
+Mathematically reversing B would produce 120° spacing with the opposite phase
+sequence, but this is not a
+verified hardware wiring correction and was **not** applied. Phase polarity,
+mapping and physical star connections need review before changing any winding.
+
+The positive-sequence fundamental of the existing signed map gives electrical
+zero 2.2676493455876967 rad, or 129.9267°, versus the test scenario's 90°.
+This is a geometry-derived fixed-reference diagnostic, not an actual controller
+calibration or an optimal-current controller. The interval is selected from
+full-overlap bounds and electrical period, not from desired power or force.
+Using that reference, with every other Fader baseline input verified unchanged,
+gives the following explicit imposed-motion scenarios:
+
+| Move, 0.8 mm PCB | Peak W at 90° | Peak W at 129.93° | Net J at 90° | Net J at 129.93° |
+| --- | ---: | ---: | ---: | ---: |
+| Full forward | 37.6338 | 12.4062 | 10.3766 | 4.35611 |
+| Short forward | 2.68357 | 3.32011 | 0.504599 | 0.557689 |
+| Short return | 2.76087 | 3.41449 | 0.511402 | 0.569642 |
+
+The full move source peak is 1.03385 A; move-average power 4.35611 W; drawn
+equals net and returned energy is zero. Required line voltage peaks at 9.76837 V,
+so this scenario has no modeled 12 V tracking conflict. This is not proof of
+achieved motion, thermal suitability, controller implementation or winding
+qualification. Short moves worsen at the new reference because the residual
+noncanonical phase geometry makes coupling position-dependent. Do not present
+the reference as a universal efficiency improvement.
+
+All six diagnostic/control scenarios passed independent balances and unchanged
+2% energy/peak refinement gates. Real-native export mapping now checks the
+actual feasibility result rather than incorrectly assuming every full move
+must have a voltage conflict. Python regressions recover known 120° axes,
+detect 60° axes and distinguish a hypothetical polarity reversal from an
+electrical-zero change. No supplied design/default settings were modified.
+
+Evidence: `scripts/solvers/results/fader-commutation-audit-2026-10-30.json` and
+`scripts/solvers/results/practical-move-alignment-2026-10-30.json`. Full receipts
+are in approved temp `move-alignment-{baselines,models,results}-20261030`.
+Reproduce the harmonic audit from the prior 0.8 mm full-forward receipt, then
+run the existing baseline-export command with explicit
+`PCB_MOTOR_FADER_PCB_THICKNESS_M=0.0008` and
+`PCB_MOTOR_FADER_ELECTRICAL_ZERO_RAD=2.2676493455876967`, followed by the same
+fresh-directory builder/native/refinement/export commands. The star2 controls
+remain unchanged. Named loss-model exclusions and friction assumptions remain.
+
+### User-requested 0.8 mm Fader PCB scenario, 2026-10-30
+
+An explicit test-only `PCB_MOTOR_FADER_PCB_THICKNESS_M=0.0008` override changes
+the Fader scenario configuration, not its archive or app defaults. Every other
+baseline input was checked equal to the 1.6 mm corrected-Z run. The two-layer
+star control stays unchanged. Regenerated the loss declaration from the new
+native R/L analysis; no old geometry-bound coefficients were reused.
+Physical Fader layers are now -0.8, -0.5333333, -0.2666667, 0 mm. The same
+63 mm/1 s and 1 mm/0.25 s quintic moves, pi/2 phase reference, 50 mN friction,
+15 g mover, 75 C winding, 12 V/100 kHz and 47 µH per phase remain explicit.
+
+| Fader move | 1.6 mm peak W | 0.8 mm peak W | 1.6 mm net J | 0.8 mm net J |
+| --- | ---: | ---: | ---: | ---: |
+| Full forward | 56.5753 | 37.6338 | 15.2938 | 10.3766 |
+| Short forward | 3.85262 | 2.68357 | 0.717165 | 0.504599 |
+| Short return | 3.96737 | 2.76087 | 0.727275 | 0.511402 |
+
+The 0.8 mm full scenario has 3.13615 A sampled positive source peak and
+10.3766 W move-average power. The short forward/return averages are
+2.01840/2.04561 W and source peaks 0.223631/0.230073 A. All three have zero
+returned energy, so drawn equals net. Full peak falls 33.5% and net energy
+32.2%. Phase R falls only about 0.6%, from approximately 4.86 to 4.83 Ω;
+the main benefit is stronger coupling to the now-closer lower layers.
+The full move still requires up to 19.011 V line voltage, above the 12 V link.
+It remains imposed demand, not achieved motion or a board/current rating.
+Short cases have no voltage tracking finding. This does not validate the
+pi/2 phase alignment or the friction estimate, nor resolve omitted losses.
+
+The three Fader cases and unchanged star controls passed the same independent
+energy balances and 2% time/force-map energy/peak convergence checks. Seventeen
+native-receipt report/export tests and six Python formula/summary tests passed.
+Receipt `scripts/solvers/results/practical-move-pcb08-2026-10-30.json` records
+the thickness and explicit override. Full receipts are in approved temp
+`move-pcb08-{baselines,models,results}-20261030`. Reproduce using the earlier
+export/build/evaluate commands with this explicit Fader-only environment override
+on the baseline-export command and fresh output directories. Supplied files
+remain unchanged; this scenario does not switch the user's active saved design.
+
+### Simulation height audit after the PCB correction
+
+Audited the active desktop simulation entry points, not just move power:
+
+| Path | Height source and audit result |
+| --- | --- |
+| Static force sweep | CadBoard physical layer hints, then routed current-weighted Lorentz samples. Scaled source Z and already-placed Z give equal force. |
+| Driver resistance/inductance | Same hints for trace heights, via lengths and Neumann integrals. Scaled and already-placed source results agree for R and effective L. |
+| Copper heat preview | Same CadBoard hints. Added a public-command regression checking every trace/via sample against the DC snapshot layer heights, plus software-thickness edits. |
+| DC geometry, live coupled DC and coil B field | Host rebuilds via prepare_dc_winding_geometry before worker requests; workers consume physical geometry_hints, not raw CAD Z. No external solver launched. In-app imported source preparation remains explicitly unsupported. |
+| PM-only B-field grids and 3D PM field | Sample requested physical XYZ with PCB top at zero and magnet height from air gap. No CAD-layer-height dependency. |
+| Housing motion and stack calculations | Housing separation uses configured PCB thickness and air gap. Imported placement validation uses CadBoard hints. |
+| 3D copper and heat mapping | Proportional physical layer placement from configured thickness, added in 1b30eb8. |
+| Travel envelope/equilibrium | **Outstanding limitation.** physics::travel_envelope generates coils without CAD input; equilibrium/charge.rs builds legacy conductor samples in one Z=0 plane. It is not an actual layered/imported Fader equilibrium calculation. Do not treat its rest positions as qualified by the corrected force/move results. |
+
+The heat visualization implementation fingerprint now includes cad_source.rs,
+so layer-placement implementation changes alter provenance. The coordinate text
+now discloses imported-Z scaling. This audit does not fix the separate legacy
+travel-envelope geometry model or qualify old external solver caches.
+
+### PCB layer placement correction, user clarification 2026-10-29
+
+The configured PCB thickness is authoritative. Raw imported DXF Z values encode
+relative layer spacing, not the physical board thickness. This supersedes the
+earlier interpretation in this document that the Fader's -4.8/-3.2/-1.6/0 mm
+source heights must be used directly by physics. For every motor CAD board the
+placement is now `(source_z - max_z) / (max_z - min_z) * pcb_thickness`.
+A single layer is at zero. Layer indices, relative spacing, XY copper and
+terminal connectivity are unchanged. The supplied archive/DXF bytes are not
+edited. The Fader's 1.6 mm PCB therefore uses -1.600, -1.0666667, -0.5333333,
+0 mm copper heights. Changing the software PCB thickness changes this placement.
+
+The same CadBoard placement feeds force, winding resistance/inductance, via
+lengths, heat visualization, DC geometry snapshots and move power. The 3D viewer
+and power report use the same proportional placement. Raw input geometry remains
+in exported inputs; native move notes record the physical heights. Move model
+version is now `linear-move-demand-v5`. Older raw-Z results are historical and
+must not be reused as current Fader evidence. Changed DC geometry requires fresh
+hash-bound qualification; no external qualification campaign was run here.
+
+Regenerated all six cases using the same trajectories, pi/2 phase reference,
+50 mN friction, 15 g mass, copper/PWM/driver/inductor assumptions and convergence
+gates. Receipt: `scripts/solvers/results/practical-move-zfix-2026-10-29.json`.
+The Fader full move now estimates 56.5753 W peak, 4.71461 A source peak,
+15.2938 W average and 15.2938 J drawn/net, with zero returned energy. Previous
+raw-Z values were 158.2377 W and 41.6086 J. Full-move winding heating at the new
+peak is 53.4919 W. A physical 12 V voltage tracking conflict remains, so these
+are imposed-motion estimates, not achieved hardware demand. Phase alignment and
+friction assumptions still need review; this correction alone does not close
+the reopened practical-accuracy issue.
+
+All six cases passed independent balances and the unchanged 2% spatial/time
+energy and peak gates. The native-receipt UI/report/CSV/snapshot mappings pass.
+Full Rust: 139 desktop + 241 simulation + 7 integration passed, 22 ignored.
+Frontend: 555 passed, 3 skipped; Svelte check and build pass. Seven Chromium
+power/3D-display tests pass. Regression cases cover unequal spacing, shifted or
+reversed source Z, one layer, source immutability, thickness edits and shared
+physics/DC placement. Full receipts: approved temp `move-zfix-{baselines,models,results}-20261029`.
+
+### Geometry-bound engineering estimate, 2026-10-29
+
+**Acceptance audit update:** the superseding receipt is
+`scripts/solvers/results/practical-move-audit-v2-2026-10-29.json`. The earlier
+geometry-bound receipt incorrectly described the two-layer design's saved 15 g
+carriage mass as a user-approved Fader assembly. Its numeric value was not
+changed. The corrected two-layer case explicitly treats that saved mass as a
+scenario assumption with unverified assembly coverage. The 15 g full-assembly
+approval applies to the Fader only. The corrected runs preserve all design data.
+
+The full-forward trajectories cover 63 mm in 1 s and the shorter trajectories
+cover 1 mm in 0.25 s. Their zero-end-velocity quintic profiles reach 0.118125 and
+0.0075 m/s respectively: the Fader's configured 0.5 m/s is a design target,
+not the peak speed of these particular moves. At 193 positions and 0.25 ms the
+estimated peak W / peak A / average W / drawn J / returned J / net J are:
+
+| Design and move | Peak W | Peak A | Average W | Drawn J | Returned J | Net J |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Fader full forward | 158.238 | 13.186 | 41.609 | 41.609 | 0 | 41.609 |
+| Fader short forward | 10.110 | 0.843 | 7.433 | 1.858 | 0 | 1.858 |
+| Fader short return | 10.427 | 0.869 | 7.544 | 1.886 | 0 | 1.886 |
+| Two-layer full forward | 115.102 | 9.592 | 31.812 | 31.812 | 0 | 31.812 |
+| Two-layer short forward | 9.279 | 0.773 | 7.395 | 1.849 | 0 | 1.849 |
+| Two-layer short return | 9.496 | 0.791 | 7.473 | 1.868 | 0 | 1.868 |
+
+Zero returned energy is a result for these dissipative cases, not an assumption
+that regeneration is impossible. The separate braking balance tests exercise
+positive returned energy and explicit sink handling. The summary includes
+scenario profiles, geometry bindings and hashes for the native inputs, models,
+results and winding sensitivity receipts; it checks snapshot/model equality,
+energy balance and the unchanged convergence gates before writing. Full trace
+receipts were kept externally. The 10%/100% winding AC probes are hypothetical
+stress cases, not bounds: peak Fader power rises to 173.327/309.132 W and
+two-layer to 125.984/223.924 W, showing the impact of excluded winding physics.
+
+To reproduce, from the repository root choose a new empty parent directory in
+`OUT` (each child must not exist), and put the two hash-matched supplied archives
+in `DESIGNS`. The commands use the checked-in test fixtures and do not write the
+supplied archives:
+
+```sh
+PCB_MOTOR_SUPPLIED_DESIGN_DIR="$DESIGNS" PCB_MOTOR_SCREENING_OUTPUT="$OUT/baselines" cargo test -p pcbmotorgen export_saved_design_screening_inputs -- --ignored --nocapture
+(cd app/desktop && PCB_MOTOR_SCREENING_BASELINES="$OUT/baselines" PCB_MOTOR_ESTIMATE_OUTPUT="$OUT/models" pnpm exec vitest run src/lib/practicalMoveEstimate.test.ts)
+PCB_MOTOR_ENGINEERING_ESTIMATE=1 PCB_MOTOR_SCREENING_BASELINES="$OUT/baselines" PCB_MOTOR_SCREENING_MODELS="$OUT/models" PCB_MOTOR_SCREENING_OUTPUT="$OUT/results" cargo test -p pcbmotorgen evaluate_saved_design_screening_assumptions -- --ignored --nocapture
+PCB_MOTOR_SCREENING_RESULTS="$OUT/results" PCB_MOTOR_SCREENING_OUTPUT="$OUT/winding" cargo test -p pcbmotorgen winding_ac_uncertainty_sensitivity -- --ignored --nocapture
+(cd app/desktop && PCB_MOTOR_SCREENING_RESULTS="$OUT/results" pnpm exec vitest run src/lib/powerRequirements.test.ts)
+python3 scripts/solvers/summarize_move_screening.py "$OUT/baselines" "$OUT/models" "$OUT/results" "$OUT/summary.json" --engineering-estimate --builder app/desktop/src/lib/practicalMoveEstimate.ts --winding-sensitivity "$OUT/winding"
+```
+
+Use absolute paths for `OUT` and `DESIGNS`. Archive hashes are enforced by the
+export fixture. The timing and force-grid gates validate numerical convergence,
+not model accuracy. The generated 20 A / 1 m/s loss applicability domain is a
+scenario validity interval, not a motor or driver rating or a design-goal gate;
+outside it the declared loss model does not extrapolate.
+
+The move editor can explicitly construct an approximate DRV8311 12 V / 100 kHz
+scenario from the current native three-phase analysis. It uses the referenced
+driver and Bourns 47 µH data and the RL, phase-pair and isolated-slab estimates
+described below. The inductor Q-derived term is combined excess AC loss, not
+separately measured core loss. Winding proximity and via AC distribution,
+inductor bias/harmonics and board-level auxiliary loads remain excluded. Complete
+hardware totals remain Unknown. The stiff DC-link boundary explicitly accepts
+regeneration; upstream supply and capacitor transients are not modeled. Dynamic
+housing/backplane move losses remain unsupported.
+
+The model snapshot binds the estimate to hot phase resistances, effective
+inductance, copper thickness and electrical period; changing these rejects stale
+coefficients. The UI does not replace an existing declaration. The full Fader
+uses its unchanged 15 g assembly, 63 mm travel, 0.5 m/s target, 12 V, 100 kHz,
+47 µH per phase and saved copper/connectivity/depths. Both full moves report a
+physical voltage tracking conflict separately from imposed-motion demand.
+
+`scripts/solvers/results/practical-move-ui-bound-estimate-2026-10-29.json`
+hashes the unchanged archives, model declarations, inputs and native receipts
+for both designs and six moves. At 193 positions and 0.25 ms, full-forward
+Fader is 158.238 W peak, 13.186 A peak and 41.609 J net; the two-layer star is
+approximately 115.102 W and 31.812 J net. They are estimates with exclusions,
+not achieved motion or guaranteed maxima. Each move passed the existing 2%
+force-map and time-step energy/peak convergence checks and independent energy
+balances. The UI report, CSV, snapshot and trace mappings were checked against
+the regenerated native receipts. Earlier ripple/driver and hypothetical +10%
+and +100% winding-AC resistance probes illustrate sensitivity, not confidence
+intervals or measurements. Full receipts remain outside the checkout.
+
+Verification: 386 Rust tests passed (22 ignored), 553 frontend tests passed
+(2 skipped), five independent Python formula tests passed, Svelte check and
+build passed, and six Chromium power tests passed. All four supplied files
+retained their recorded SHA-256 hashes. These checks establish numerical and
+export consistency, not physical accuracy or hardware qualification.
+
+### Carriage setup clarification, 2026-10-29
+
+The user accepts 15 g as a reasonable full moving-assembly estimate for the
+Fader, including its moving bushings and enclosure. It is an engineering input,
+not a measured mass, and no longer needs to be treated as an unresolved coverage
+blocker for this scenario. Friction means bushing-to-rail sliding resistance.
+Reasonable estimates are acceptable before planned board/prototype tests;
+perfect material/friction measurements are not prerequisites for useful design
+simulation. This supersedes the earlier Fader mass-coverage caveats below,
+without qualifying unrelated designs or filling in driver/inductor losses.
+
+Design setup now exposes carriage mass and friction under Drive. New designs
+default to the combined magnet mass, using a list of known weights seeded with
+the user's 5×5×3 mm N52 = 0.57 g reference. Other NdFeB sizes use an explicitly
+approximate volume × 7.6 g/cm³ estimate consistent with that reference. The
+display lists current dimensions/count, each magnet's mass and combined mass.
+The full-assembly override includes magnets once plus all other moving parts,
+not stationary rails. Existing saved masses remain overrides, including 15 g;
+they are never replaced on load by the new magnet-only default. Automatic mode
+updates with magnet dimensions/count and survives save/load.
+
+The optional move remains separately explicit. “Use design mass and friction”
+copies these estimates and their inclusion statement into the move draft, which
+must then be applied. It does not invent a trajectory, source sink capability or
+loss coefficients, and does not silently overwrite an existing applied move.
+Reports separately show design estimates and the mass/friction actually used by
+an explicit move.
+
+Verification: 550 frontend unit tests pass with one existing skip, Svelte check
+has zero errors/warnings, production build passes with its existing large-chunk
+warning, and thirteen affected Chromium tests pass, including mobile layout.
+The Rust suite passes 137 desktop, 239 simulation unit and seven integration
+tests, with 18 explicit ignores. Native persistence tests cover legacy-mass
+preservation and both saved mass modes. Browser screenshots are UI
+evidence, not native WKWebView or physics validation.
+
+### Simulation assumptions
+
+- One three-phase star winding, sinusoidal FOC with id = 0. Phase current means
+  peak sinusoidal amplitude, not RMS, line-to-line current or source current.
+- A prescribed quintic position trajectory over an explicit duration. Start and
+  end velocity are specified; endpoint acceleration is zero. Both travel bounds,
+  maximum speed, acceleration and deceleration are declared by the caller.
+  The model does not integrate achieved motion or simulate current-limit response.
+  Moves are monotonic. A reversal is evaluated as separate forward and reverse
+  moves, not a smoothed Coulomb-friction sign change inside one interval.
+- Total moving mass is an explicit input with an inclusion statement. Friction
+  is Coulomb force, damping is viscous, and external load is a signed force that
+  the motor must overcome. Zero values must be supplied explicitly.
+- Position-dependent Kf is a bounded, linearly interpolated table in the
+  first-magnet-center coordinate used by ForceEvaluator. No extrapolation or
+  fitted mean constant is permitted in the production adapter. Ke = 2 Kf / 3
+  is the reciprocal phase-peak convention of this sinusoidal model.
+- Balanced hot phase resistance and constant synchronous phase inductance,
+  including declared external inductors. The production adapter must reject
+  unsupported phase imbalance, connection, commutation, saliency, or conductive
+  stack models rather than silently using their mean or omitting their drag.
+- PWM-cycle-averaged voltage and power. No switching ripple is included in
+  current, RMS, copper loss or scenario peaks. Finite time samples are not
+  guaranteed maxima, current-trip predictions or thermal qualification.
+
+## Electrical accounting
+
+For signed q-axis phase amplitude I, velocity v and electrical angular speed w:
+
+    F = Kf(x) I
+    vq = R I + L dI/dt + Ke(x) v
+    vd = -w L I
+    Pmotor = F v + 1.5 R I² + d(0.75 L I²)/dt
+
+The model records mechanical work, Coulomb/damping dissipation, external-load
+work, kinetic energy and magnetic energy independently. Voltage feasibility uses
+sqrt(3) times the required phase-vector magnitude, plus the declared driver
+conduction-path voltage allowance, against the available line-voltage envelope.
+Current feasibility uses the declared phase-amplitude limit, not an invented
+OCP duration. Failure means the prescribed motion is not demonstrated achievable.
+It does not produce an achieved-motion trace.
+
+Driver conduction loss is 0.75 I² Rpath, where Rpath is the datasheet high-side
+plus low-side resistance and equal high/low on-resistance is assumed. A declared
+additional constant loss in watts may account for switching, dead-time and
+control consumption over this one interval. This is a scenario assumption, not
+a validated loss law or conservative bound. Without that declaration total
+source power/current/energy remain unavailable; partial inverter demand remains
+available and labelled partial.
+
+The initial source model is an explicitly selected stiff source directly at the
+DC link. Its voltage is constant, so capacitor energy change is zero. A caller
+must declare whether that source accepts regeneration. Negative demand with a
+non-sinking source is rejected; the model does not invent a clamp, brake resistor,
+overvoltage response or capacitor transient. The separate capacitor-energy
+function computes 0.5 C (Vend² - Vstart²) only. It cannot reconstruct source
+peak power or a source waveform from endpoint voltages.
+
+Psource = Vsource Isource, positive for draw and negative for return. Drawn and
+returned energy are positive magnitudes; net = drawn - returned. All integrals
+and phase RMS values cover exactly [0, duration]. Piecewise-linear integration
+splits zero crossings for drawn/returned energy. Startup before t=0, shutdown
+after the final sample, idle, hold, repeated operation, and switching transients
+are excluded. Nonzero endpoint magnetic energy is recorded, not hidden.
+
+## Numerical validation and remaining gates
+
+Backend unit tests use analytic limiting cases, not substitutes for active saved
+design evidence. Energy-balance residuals are exported rather than corrected.
+Convergence checks compare time steps and peak power separately. The model's
+current derivative uses second-order finite differences, so the caller must
+check derivative and peak sensitivity when refining its time step and force map.
+
+Before wiring this into engineering exports:
+
+1. Prepare actual routed copper, layer depths, terminals and temperature-dependent
+   resistance through existing authoritative backend paths. Generate the force
+   table for the active design and declared sinusoidal law, never accept a
+   frontend-supplied Kf as authoritative. Check the law against actual per-phase
+   excitation, not merely a positive mean thrust.
+2. Persist an optional move and source/loss declarations. Legacy files have no
+   move, not default operating requirements. Connect native jobs with input
+   identity, cancellation, pending/error and stale-result suppression.
+3. Extend UI, report, requirements CSV, model snapshot and trace CSV from the same
+   native result. Browser fixtures must not enter engineering exports.
+4. Validate a supported saved design and a materially different one, then the
+   actual Fader-traces-workspace.pmmotor attachment. That attachment is absent
+   from this checkout. Its 63 mm travel, 0.5 m/s target, 12 V, 100 kHz PWM and
+   47 µH per phase are not enough to infer mass, loads, profile or driver losses.
+5. Record saved-design energy tolerances, time/space convergence and peak
+   sensitivity. A partial or all-Unknown report cannot close #7744. Numerical
+   validation does not establish measured performance, a worst-case supply
+   bound, permitted peak duration or safe hardware operation.
+
+## First-slice test evidence, 2026-10-28
+
+`cargo test -p pcbmotorgen-simulation` passed 221 unit tests and 7 integration
+tests, with 2 pre-existing ignored tests. Twenty new tests cover the move-power
+kernel. No app integration or saved-design acceptance is implied by this run.
+The first targeted run exposed an over-tight fixed residual tolerance in the
+convergence test. It was replaced with the stated second-order residual gate,
+not by forcing the residual to zero or changing calculated power.
+
+The analytic refinement case is an 80 mm quintic move over 1 s, 0.5 kg,
+0.02 N Coulomb friction, Kf = 2 N/A, R = 0.5 ohm per phase, L = 10 mH per
+phase, and Rpath = 0.2 ohm. Additional driver losses are explicitly zero and
+the source explicitly accepts return, so these are idealized scenario results,
+not total hardware demand or active-design evidence.
+
+| Time step, s | Electrical balance residual, J |
+| --- | --- |
+| 0.01 | 5.292000e-8 |
+| 0.005 | 1.336500e-8 |
+| 0.0025 | 3.358125e-9 |
+| 0.000625 | 2.106739e-10 |
+
+The mechanical residual stays below 2e-17 J in this case. The regression gate
+for each independent balance residual is 6e-4 times dt squared, in joules
+with dt in seconds. The combined source balance gate is twice that tolerance.
+Other analytic cases use explicit absolute tolerances in the test source.
+
+Relative to the 0.000625 s reference, net-energy error falls from 5.139747e-8 J
+at 0.01 s to 3.142346e-9 J at 0.0025 s. Sampled positive peak-power error falls
+from 1.418470e-5 W to 6.573318e-7 W; the reference peak is 0.03449528 W.
+The test requires energy error reduction greater than 8, peak error reduction
+greater than 4, and refined relative peak error below 0.1 percent. These are
+kernel-case numerical gates, not tolerances transferred to an untested design.
+
+## Native integration, 2026-10-29
+
+The first slice was committed locally as `2b84071`. The attachments are now in
+the project root. Earlier statements that the attachment was missing describe
+the initial checkout, not the current state.
+
+### Phase-domain model and delivery
+
+Model `linear-move-sinusoidal-v2` supersedes the scalar/balanced-resistance
+restriction above for native routed designs. It uses three individual hot
+resistances and the full symmetric self/mutual inductance matrix, plus external
+series inductance on its diagonal. A non-passive matrix is rejected rather than
+repaired. The native force map contains actual signed terminal N/A coefficients
+from the existing network-current-weighted Lorentz integration at the saved
+conductor depths. No mean sweep Kf or fitted replacement geometry is used.
+
+For declared balanced sine basis q(x), motor force coefficients k(x), and
+required force F, the imposed phase commands are:
+
+    I_amplitude = F / dot(k(x), q(x))
+    i_phase = I_amplitude q(x)
+    v_phase = R_phase i_phase + L_matrix di_phase/dt + k(x) velocity
+    Pterminal = dot(v_phase, i_phase)
+    Umagnetic = 0.5 dot(i_phase, L_matrix i_phase)
+
+Force coefficients and back EMF obey terminal reciprocity directly; no scalar
+Ke convention is imposed on an unbalanced or non-sinusoidal force distribution.
+The explicit balanced-star move controller is separate from the existing static
+preview's commutation law. The declared electrical zero is not automatically
+fitted, rectified or calibrated to force a passing move. Singular/nonpositive
+coupling rejects the request. Floating-neutral SVPWM feasibility uses the
+instantaneous max-minus-min command voltage, including conduction allowance.
+
+Only linear, declared star windings with three connected networks are supported.
+For legacy imported files with no connection enum, explicit terminal picks at a
+shared physical neutral establish star connectivity. A filename and unrelated
+generated-routing settings do not. Stack/housing requests are rejected because
+their dynamic inductance, drag and eddy losses are not integrated. In particular,
+`star_2-layer.pmmotor` version 2 is not silently reduced to its bare version 1.
+Partial copper overlap is evaluated with the actual finite magnet/copper field.
+The full-overlap interval is recorded, never treated as a measured mechanical
+end stop or used to alter the requested 63 mm travel.
+
+The desktop command accepts exact inputs, echoes them with SHA-256 identity and
+simulation provenance, and permits one owned calculation. Cancellation is
+cooperative between solver stages; ownership is retained until exit. The client
+invalidates publication immediately on edits, pending reruns, failure, cancel or
+disposal, and checks request identity and the complete input payload again.
+Browser mode has no substitute move solver or engineering trace export.
+
+An optional `power_move` persists the explicit request. Missing legacy fields
+remain None/null. The current UI uses an advanced JSON editor with incomplete
+null placeholders, explicit apply/run/clear actions, native cancellation, model
+limitations and a requested-motion rejection message. It does not guess a move
+from the static target. Reports, requirements CSV, snapshot v2 and time-series
+CSV share the same current native result and identity checks. CSV records phase
+names, units, source boundary, required commands, provenance, interval stage,
+averaging treatment and partial-model scope. No achieved trajectory, startup,
+idle, settling or repeated-operation trace is synthesized.
+Unsupported JSON fields are rejected by both the editor and native request
+parser rather than silently dropping a requirement such as a peak-duration law.
+
+### Read-only saved-design evidence
+
+The supplied files remain byte-for-byte unchanged and untracked. SHA-256:
+
+- `Fader-traces-workspace.pmmotor`: `567d97900475c92598f9ad6f7df9e7aeaf374dfc542fa25fa7e04b90dbfb287b`
+- `star_2-layer.pmmotor`: `0ed215f6ff403b927dbeac1ea3d4d9587489a1f1c0680e4ce3a2a48658475d82`
+- `star_4-layer.pmmotor`: `6a550dcb4327a6e846582fb883c4958a0d275cba85b33271337deee405794e81`
+- `star-wye_4-layer.dxf`: `4769c3da7030241c9a4b58c009cd120e18aa53e35156542733669c12c1772ca0`
+
+The bounded regression explicitly selects version 1 of each motor file. The
+Fader retains all 1055 segments, 3 curves, 789 vias, its selected terminals,
+0.2 mm trace width, saved depths [-4.8, -3.2, -1.6, 0] mm, 12 V supply,
+100 kHz PWM and 47 microhenry per-phase external inductors. The generated
+two-layer star version 1 is a materially different copper source. The four-layer
+0.127 mm imported version also ran at the initial grid; it was not substituted
+for the Fader.
+
+The test scenario is deliberately not a new saved operating requirement:
+63 mm imposed move from 2.5 to 65.5 mm first-magnet-center position over 1 s,
+zero endpoint velocity/acceleration, speed cap from the saved target,
+acceleration cap from the saved configuration, explicitly symmetric deceleration
+cap, saved 0.05 N kinetic friction, explicitly zero damping/external load,
+configured 15 g used only as an unconfirmed numerical scenario, declared
+balanced-star reference pi/2, saved phase-amplitude limit of 1 A, and a declared
+stiff source accepting return. Cap/mass breakdown and actual supply sink behavior
+are not inferred. Additional switching/dead-time/control loss is Unknown.
+The Fader's 0.5 m/s remains a target cap, not a claimed achieved speed or a
+voltage-limited replacement target.
+
+Both full-travel requests fail the current and voltage checks. The following
+are **required demand for rejected motion**, not consumed energy or achievable
+source power:
+
+| Design/version | Force points | dt, s | Required copper energy, J | Required partial DC-link sampled peak, W |
+| --- | --- | --- | --- | --- |
+| Fader / 1 | 65 | 0.001 | 40.7129907251 | initial grid |
+| Fader / 1 | 97 | 0.001 | 39.7920619315 | 155.862626133 |
+| Fader / 1 | 129 | 0.001 | 39.4736103343 | 155.277586432 |
+| Fader / 1 | 129 | 0.0005 | 39.4733617018 | 155.277595309 |
+| Generated two-layer star / 1 | 65 | 0.001 | 28.4888342894 | initial grid |
+| Generated two-layer star / 1 | 97 | 0.001 | 27.8811269403 | 112.125602271 |
+| Generated two-layer star / 1 | 129 | 0.001 | 27.6732622584 | 111.926027590 |
+| Generated two-layer star / 1 | 129 | 0.0005 | 27.6730872592 | 111.926027745 |
+
+Spatial refinement at fixed dt compares 97 versus 129 force positions. Required
+copper-energy changes are 0.8067% for the Fader and 0.7511% for generated star;
+partial-peak changes are 0.3768% and 0.1783%. Both pass the declared 2% local
+refinement gates. Separate time refinement at the fixed 129-point map changes
+copper energy by about 0.00063%; the partial peak changes below 0.00001%.
+The initial 65-to-97 spatial change exceeded 2% and is retained as coarse-grid
+evidence, not relabelled as converged.
+
+Finest-grid independent electrical balance residuals are 2.0822e-10 J and
+5.7523e-12 J; mechanical residuals are below 2e-18 J. Gates are electrical
+residual below 1e-6 times copper energy, and mechanical residual below 1e-9 J.
+These are local model-convergence checks, not independent absolute magnetic
+force qualification or worst-case peak bounds.
+
+A separate 1 mm reverse request from 12.5 to 11.5 mm over 0.25 s, using the
+129-point map and 0.0005 s time step, passes the Fader's sampled current/voltage
+envelope and fails the two-layer version's envelope. Both reconcile their energy
+balances. This is a separate monotonic reverse move, not a simulated reversal
+transient, OCP response, or achieved-motion measurement.
+
+For that Fader reverse move only, a separate explicitly idealized constant-zero
+additional-driver-loss scenario gives partial modeled source peak 7.10315 W,
+peak source current 0.591929 A, average 5.87867 W and net/drawn energy 1.469667 J,
+with zero returned energy over the exact 0.25 s interval. Its independent source
+balance and peak-current/power convention pass. These numbers are **not total
+hardware demand or a conservative bound**. The unknown-loss version withholds
+even those partial source totals.
+
+Reproduce these bounded checks, without editing the files:
+
+```sh
+PCB_MOTOR_PROJECT_PATH="$PWD/Fader-traces-workspace.pmmotor" \
+PCB_MOTOR_MOVE_REFINEMENT=1 cargo test -p pcbmotorgen \
+  commands::move_power::tests::supplied_saved_design_move_scenario -- --ignored --nocapture
+```
+
+Repeat with `star_2-layer.pmmotor` for explicitly selected version 1. Each run
+checks the supplied file bytes again before returning. Final local logs are in
+the approved OpenCode temporary directory as
+`move-power-20261029-Fader-traces-workspace-final.log` and
+`move-power-20261029-star_2-layer-final.log`.
+
+### Current gate and verification
+
+The native result records `source_model_scope = partial_declared_scenario`.
+Total supply peak/average/energy stay Unknown in UI and exports even when a
+constant driver loss is declared, because ripple/AC copper/external-inductor
+loss models are absent. Partial modeled source W/A/J are separate, labelled
+scenario results. They are not the ticket's total-power or maximum requirement.
+
+Current verification passes: 131 desktop Rust tests with 14 explicit ignored,
+227 simulation unit plus 7 integration tests with 2 pre-existing ignored,
+537 frontend tests with 1 pre-existing skipped, and 10 Chromium report/control
+tests at two viewports. The two supplied-design refinement tests were run
+explicitly in addition to the ordinary suite. Svelte/type check has zero errors
+or warnings; the production frontend build passes with its existing chunk-size
+warning. Browser native-transport fixtures test UI/identity/export behavior only,
+not native WKWebView observation or engineering physics evidence.
+
+#7744 remains open. Remaining acceptance needs complete supported loss accounting
+or properly bounded totals, confirmed operating/mass/source inputs, and numerical
+validation of that complete model for supported saved designs. Hardware thermal,
+current-duration, controller-bandwidth and worst-case guarantees remain unknown.
+No physical design was modified, no external-solver campaign was launched, and
+no original housing was removed to force a passing request.
+
+## Declared loss-model extension
+
+### Practical-estimate investigation, 2026-10-29
+
+#### Referenced partial screening case
+
+`scripts/solvers/practical_move_assumptions.py` now constructs an explicit,
+limited 12 V/100 kHz DRV8311 scenario from a native baseline's actual phase
+resistances, phase names and effective inductance. It is a screening model,
+not a new saved-design setting. It preserves supplied geometry and drive inputs.
+
+- TI SLVSFN2B section 7.5 gives typical 0.21 Ω high-side plus low-side path at
+  25 °C; SLEW=01 gives 75 V/µs (20–80%); DEADTIME=001 gives 200 ns. The saved
+  driver path value is used unchanged. The SLEW and DEADTIME choices are
+  assumptions, not recovered board settings. The assumed diode drop is 0.7 V,
+  not a TI-specified value. Typical 12 V operating current is interpolated
+  between 10 mA at 25 kHz and 12 mA at 200 kHz. External control/regulator
+  consumption remains unspecified. TI section 12.3.1 FOC switching/dead-time
+  equations use electrical-cycle RMS. Their coefficients are mapped to
+  `sum(abs(phase current))` by equating their averages for ideal balanced
+  sinusoidal currents, not by claiming an instantaneous switching simulation.
+- Ripple uses the exact 50%-duty two-phase RL peak-to-peak formula at the
+  native effective inductance and worst hot phase R, plus assumed external
+  inductor DCR and half the driver conduction-path resistance. The covariance
+  approximates a symmetric triangular ripple shared by a uniformly selected
+  phase pair. It is not an SVPWM solution, measured ripple, or universal bound.
+  An independent exponential half-cycle march verifies the RL formula, and
+  numerical triangle integration verifies the balanced covariance.
+- Bourns SRP1265WA-470M is a **representative scenario part**, not a board
+  modification: 47 µH, 74.1 mΩ typical DCR, 89 mΩ maximum DCR, Q typical 20
+  at 100 kHz / 1 V, all at 25 °C. Its typical 5.2 A Irms and 6 A Isat are not
+  hardware guarantees. Estimate DCR at the assumed winding temperature using
+  copper's 0.00393/°C coefficient. Q gives total small-signal AC resistance
+  `2πfL/Q`, not core resistance alone. Subtract 25 °C DCR once and apply the
+  remainder to the triangle's fundamental mean-square current. The result is
+  entered in the existing constant-inductor-loss field, but is explicitly a
+  combined AC-excess proxy, not separately measured core loss. Bias, temperature,
+  nonlinearity and harmonics are not characterized. The generated two-layer
+  design has no external inductor and remains unchanged.
+- An isolated-slab skin-effect formula uses 35 µm copper and the actual hot DC
+  phase resistance as a proxy. It applies the maximum-domain electrical
+  frequency for fundamental and 100 kHz for ripple. A complex-impedance
+  calculation independently checks the formula. This approximation does not
+  model conductor proximity, via-specific current distribution or harmonics.
+  Those limitations, external board electronics, and inductor bias/harmonic
+  limitations remain **named omissions**, so `source_model_scope` stays
+  `partial_declared_scenario` and complete supply totals remain Unknown.
+
+References: TI sections [7.5](https://www.ti.com/document-viewer/DRV8311/datasheet/GUID-XXXXXXXX-SF0T-XXXX-XXXX-000000179401)
+and [12.3.1](https://www.ti.com/document-viewer/DRV8311/datasheet/GUID-C826F7E8-19E5-47C8-9C09-E13912428538),
+[Bourns SRP1265WA](https://www.bourns.com/docs/product-datasheets/srp1265wa.pdf),
+and [Coilcraft on Q](https://www.coilcraft.com/en-us/resources/application-notes/key-parameters-for-selecting-rf-inductors/).
+
+Read-only Fader version 1 and generated two-layer star version 1 were evaluated
+at 129/193 force positions at 0.0005 s, then 193 positions at 0.00025 s.
+Full forward is 63 mm in 1 s; short moves are ±1 mm in 0.25 s. Both use a
+stiff 12 V DC link explicitly accepting regeneration, zero endpoint velocity,
+15 g mass and 0.05 N bushing/rail friction, with zero external load/damping
+as explicit test assumptions. This does not assert the actual supply can sink
+energy. The Fader's saved 0.5 m/s setting remains unchanged and is not used as
+a cap. Both full moves have physical voltage-tracking findings; calculated
+demand is retained, not claimed as achievable.
+
+| Case | Partial sampled peak W | Partial peak A | Partial average W | Drawn / returned / net J |
+| --- | ---: | ---: | ---: | ---: |
+| Fader full forward | 158.238 | 13.1865 | 41.6086 | 41.6086 / 0 / 41.6086 |
+| Fader short forward | 10.1104 | 0.8425 | 7.4334 | 1.85835 / 0 / 1.85835 |
+| Fader short return | 10.4274 | 0.8690 | 7.5442 | 1.88605 / 0 / 1.88605 |
+| Two-layer full forward | 115.102 | 9.5919 | 31.8123 | 31.8123 / 0 / 31.8123 |
+| Two-layer short forward | 9.2792 | 0.7733 | 7.3955 | 1.84887 / 0 / 1.84887 |
+| Two-layer short return | 9.4955 | 0.7913 | 7.4731 | 1.86828 / 0 / 1.86828 |
+
+The two full cases are imposed demand above the DC-link voltage, not delivered
+power or achieved motion. The short-move absence of a voltage finding does not
+prove tracking or current/thermal safety. Zero returned energy here is a result
+of these lossy trajectories, not a general braking claim.
+
+All six cases pass the unchanged 2% energy/peak gates for each spatial and
+time refinement, independent electrical/source balance below 1e-6 of accounted
+losses, and mechanical balance below 1e-8 J. The largest spatial changes are
+0.6002% net energy and 0.8314% peak; the largest time changes are 0.0003% net
+energy and 0.0044% peak. These are convergence checks for the stated model,
+not error bounds on its approximations.
+
+An intentionally broad assumption sensitivity scales ripple amplitude and
+switching/dead-time coefficients by 0.5 and 2; the Q proxy scales with ripple
+amplitude squared. Full-move partial net energy spans 41.2315–42.5086 J for
+Fader and 29.7412–39.3822 J for two-layer. These are sensitivity probes, not
+calibrated confidence intervals or guaranteed extrema; in particular the
+uninducted two-layer estimate is sensitive to ripple assumptions.
+
+Hash-bound compact receipts, including sensitivity hashes, are in
+`scripts/solvers/results/practical-move-screening-v3-2026-10-29.json`.
+Full baseline, model and native receipts are in the approved temporary folder's
+`move-screening-baselines-20261029`, `move-screening-models-v2-20261029`,
+`move-screening-results-v2-20261029`, and `move-screening-sensitivity-v2-20261029`
+directories. The earlier `practical-move-screening-2026-10-29.json` and v1
+temporary receipts preserve the first approximation before the slab addition.
+The optional native receipt report test checks all six cases against UI report,
+CSV, snapshot and time-series mapping, while confirming complete totals remain
+Unknown. No browser physics or hardware results are implied.
+
+During the full Rust verification the imported-copper goal-invariance test
+failed once on a one-ULP mutual-inductance difference. Its filament accumulation
+uses a Rayon parallel sum with nondeterministic reduction order. The invariance
+helper now compares numerical arrays at 1e-13 relative with a 1e-12 scale
+floor, while still requiring matching structure and nonnumeric fields. A new
+control accepts 1e-14 relative roundoff and rejects a 1e-10 relative change.
+This is a numerical-repeatability tolerance, not a motor-performance target;
+the source/energy and 2% refinement gates above were not changed. The full
+Rust suite passed on rerun.
+
+The practical-goal completion criterion is **not yet met**: the included loss
+approximations are useful partial screening, but omitted winding proximity,
+inductor nonlinearity/harmonics and external electronics remain unquantified.
+Do not relabel the above partial numbers as complete W/A/J estimates.
+
+The existing declared-loss interface has a constant, balanced three-phase ripple
+covariance and constant per-inductor core watts over the move. These are model
+assumptions, not quantities furnished by a 47 µH inductance rating. A practical
+scenario must derive and document the selected PWM, current/voltage range,
+ripple statistics and core-loss estimate and test sensitivity. It must not
+relabel the existing numerical fixture as component data.
+
+TI DRV8311 datasheet SLVSFN2B sections 7.5 and 12.3.1 give a useful starting
+point: typical HS+LS resistance 0.210 Ω at 25 °C and 0.330 Ω at 150 °C,
+VM operating current 10 mA at 25 kHz and 12 mA at 200 kHz (12 V, 25 °C),
+and separate FOC conduction, switching and dead-time equations. At SLEW 01,
+the typical 20–80% slew rate is 75 V/µs; DEADTIME 001 is typically 200 ns.
+These are conditional typical values, not evidence that the saved board uses
+those settings. The datasheet FOC equations use electrical-cycle RMS; mapping
+them into an instantaneous whole-inverter loss law requires an explicit
+waveform assumption and independent check. Operating current may include gate
+drive power, so its boundary must be reconciled before adding switching terms.
+Sources: https://www.ti.com/document-viewer/DRV8311/datasheet/GUID-XXXXXXXX-SF0T-XXXX-XXXX-000000179401
+and https://www.ti.com/document-viewer/DRV8311/datasheet/GUID-C826F7E8-19E5-47C8-9C09-E13912428538.
+
+One commercially listed 47 µH candidate, Coilcraft MSS6132T-473MLC, is listed
+by DigiKey with 0.300 Ω maximum DCR at its specified reference conditions
+and 1.3 A current rating: https://www.digikey.com/en/products/detail/coilcraft/MSS6132T-473MLC/21381941.
+This is a possible comparison component, not a selected part, core-loss model,
+proof of saturation margin or a change to the saved design. Manufacturer
+core-loss information and its applicable waveform still need confirmation.
+
+The optional `supplied_saved_design_declared_loss_model` diagnostic previously
+required `feasible` on its base and refined cases, contradicting v4 goal and
+physical-tracking separation. Those assertions were removed; the numerical
+source, conservation and unchanged 2% refinement checks remain. Executed with
+the unchanged Fader version 1 and refinement enabled: it passed at 129/193
+positions and 0.0005/0.00025 s; spatial changes in net energy and sampled peak
+were 0.632% and 0.626%, and the subsequent time changes were approximately
+1e-9 relative. These are **synthetic loss-fixture** results, not the requested
+practical estimate or a completed saved-design acceptance. Fader SHA-256 remained
+`567d97900475c92598f9ad6f7df9e7aeaf374dfc542fa25fa7e04b90dbfb287b`.
+
+Remaining: derive, implement and independently check a supported practical
+loss scenario with honest limits; run full and short forward/return cases for
+both unchanged saved designs, establish exports and sensitivity evidence, and
+update ticket acceptance. No external-solver campaign or hardware qualification
+is implied by this investigation.
+
+Model `linear-move-sinusoidal-v3` accounts for declared cycle-average losses without inventing a
+PWM waveform or driver efficiency. It requires explicit phase ordering,
+references, a fixed voltage/PWM/temperature/driver operating point and current
+and speed applicability limits. It rejects extrapolation outside that domain.
+
+Winding fundamental AC resistance increments, winding ripple AC increments,
+external series resistance and external-inductor core watts are separate inputs.
+Hot winding DC resistance remains authoritative from the actual copper network.
+No winding resistance or motor constant may be replaced by these declarations.
+
+Declared zero-mean phase-ripple covariance and peak-deviation bounds describe
+cycle-average statistics, not synthetic switching samples. The covariance must
+be positive semidefinite, symmetric and balanced at a floating star neutral.
+Its diagonal adds to each phase's mean-current squared for RMS heating. A
+constant covariance adds constant magnetic stored energy, not a second energy
+flow or startup stage. Zero-ripple or explicitly idealized cases stay partial.
+
+Switching and dead-time each use a declared whole-inverter energy-per-PWM-cycle
+law: constant plus a coefficient times the sum of absolute mean phase currents
+plus a coefficient times the sum of mean-square phase currents. The latter
+includes declared ripple variance. These are calibrated/declared average laws,
+not derivations of switching-event currents from RMS data. Controller and other
+DC-link watts are explicit. Legacy lumped driver watts and this component model
+cannot both be applied.
+
+Only a non-idealized, in-domain declaration with all terms and no stated
+omissions may supply totals for that declared model. Such totals remain modeled
+scenario quantities, not measured hardware totals or guaranteed maxima. Missing
+declarations, idealized choices and stated omissions retain Unknown total rows.
+The source remains an explicitly stiff DC link; no upstream or capacitor
+transient capability is implied. Actual mass coverage, losses and source
+behavior still need confirmation before saved-design total-power acceptance.
+
+### v3 verification, 2026-10-29
+
+The native public command was exercised on unchanged Fader version 1 with a
+1 mm reverse move from 12.5 to 11.5 mm over 0.25 s. Configured mass/friction were
+retained; mass coverage is still explicitly unconfirmed. Travel, speed cap,
+12 V source, 100 kHz PWM and 47 µH external inductance per phase were unchanged.
+The test supplies explicitly numerical loss coefficients and ripple statistics,
+NOT measured or datasheet-qualified DRV8311, inductor or winding AC properties.
+It explicitly assumes the stiff DC link accepts regeneration. No physical
+design, configured motor constants or imported copper was substituted.
+
+At 129 force positions and 0.0005 s timestep the conditional fixture produced
+7.2681532938 W sampled peak, 0.6056794411 A sampled source peak,
+6.0289761543 W average and 1.5072440386 J drawn/net energy, with zero returned
+energy. Mean phase peak was 0.9318889867 A; the declared-ripple envelope was
+0.9518889867 A. Accounted loss energy was 1.5071857854 J and the independently
+recomputed source-energy residual was 2.0596e-10 J. Input SHA-256:
+`670521de6ddcb64dd7952b4e17925aeb8b536453746d731e9d98677fbbef952f`.
+
+Separate refinements passed the predeclared 2% energy/peak gates:
+
+- 193 force positions at fixed 0.0005 s: 1.4977757816 J and 7.2229036308 W;
+  relative changes 0.6321545% energy and 0.6264747% peak.
+- Fixed 193 positions at 0.00025 s: 1.4977757795 J and 7.2229036373 W;
+  relative changes approximately 1.41e-9 energy and 9.01e-10 peak.
+- Final source residual 5.1475e-11 J, below the gate of
+  `1e-6 * accounted_loss_energy_j`. No numerical residual correction was used.
+
+Reproduction (from repository root):
+
+```sh
+PCB_MOTOR_PROJECT_PATH="$PWD/Fader-traces-workspace.pmmotor" PCB_MOTOR_DECLARED_LOSS_REFINEMENT=1 cargo test -p pcbmotorgen commands::move_power::tests::supplied_saved_design_declared_loss_model -- --ignored --nocapture
+```
+
+Full Rust verification passed 132 desktop tests (15 explicit ignores), 237
+simulation unit tests (two pre-existing ignores) and seven integration tests.
+Frontend verification passed 545 tests (one pre-existing skip), zero
+svelte-check errors/warnings, and production build (existing chunk-size warning).
+Ten Chromium regressions passed across 1280/1600 px viewports; artifacts are in
+`app/desktop/e2e-results/loss-v3-final-20261029/`. Browser tests use synthetic
+transport DTOs only, not numerical solver evidence. They cover complete-model
+totals and exports, incomplete templates, coefficient-edit invalidation,
+Unknown demo/partial totals and cancelled late-response suppression. The
+generated desktop `move-power.png` was inspected. This is not observed native
+WKWebView acceptance. Svelte autofixer reported no issues; its effect suggestions
+refer to the existing imperative job-ownership lifecycle, not derived physics.
+
+Report/snapshot/time-series exports retain the loss laws, domain, references,
+phase ordering, RMS/peak distinctions and component ledger. Snapshot format is
+now v3. Legacy saved moves need no new declaration. The editor adds incomplete
+null fields rather than guessed zero-loss values. Native checks reject invalid
+covariance, domain mismatch, coefficient overflow and legacy/component driver
+double counting; analytic tests cover hold, braking, ripple and timestep refinement.
+
+All four supplied root file hashes still match the values recorded above.
+Ticket #7744 remains open: actual loss/ripple parameters, moving-mass coverage
+and source sink behavior must be confirmed for actual saved-design total-power
+acceptance. Placeholder coefficients do not satisfy that gate. The previously
+tested 63 mm requests remain electrically infeasible. Unsupported dynamic
+backplane/housing losses still reject; no external-solver campaign, hardware
+maximum, permitted peak-duration, controller or thermal qualification is claimed.
+
+### Additional saved-design rejection evidence
+
+The same 1 mm/0.25 s declared-loss request was next tried against the two other
+supplied version-1 designs. Both calls to the existing success-only
+`supplied_saved_design_declared_loss_model` test failed its feasibility assertion:
+
+- `star_2-layer.pmmotor`: current-limit failure, mean phase peak
+  1.0622824503 A and declared-ripple envelope 1.0822824503 A against 1 A.
+  Input SHA-256 before the mass-label clarification was
+  `bab26c905bc954a73669a94976c39057df2953d44cf5b13249c03fb74f366756`.
+- `star_4-layer.pmmotor`: voltage-limit failure, required line peak
+  12.7698317899 V. Input SHA-256 before the label clarification was
+  `48f0040cca2da708d2dad71fd6fd17dc2bbe3b8446fd277666736954a26bbfec`.
+
+These failed success probes are not successful total-power scenarios. No design,
+current limit, move duration or load was changed to make them pass. The existing
+success-only assertion remains unchanged. A separate rejection regression now
+pins the archive hashes and explicitly selects version 1, checks these expected
+limits and requires `source = null` at each resolution. It checks energy balance
+for required excitation, not achieved source demand, and compares accounted
+losses, phase envelope and required line-voltage peak under separate 129→193
+spatial and 0.0005→0.00025 s time refinements. All comparisons pass 2% gates.
+
+Final required-excitation diagnostics at 193 positions/0.00025 s:
+
+- Two-layer: 1.0788584841 A declared envelope, 4.8899911371 V required line
+  peak, 1.0214920739 J accounted losses, source residual 1.5457e-12 J.
+  Input SHA-256 `461f708773dd539f78e59b52c18d5aa6b19a0c2a9b850d461749cc67490cdc1a`.
+- Four-layer: 0.9489543302 A declared envelope, 12.7296176980 V required line
+  peak, 2.2902780384 J accounted losses, source residual 2.7620e-12 J.
+  Input SHA-256 `0757561657eacea742e8688b9ec4b82fe163726400a209a2b1ebdb744b529be8`.
+
+The regression separately selects two-layer version 2 and confirms that its
+actual saved backplane/housing survives request construction and causes explicit
+unsupported-dynamic-loss rejection. It never falls back to version 1.
+
+```sh
+PCB_MOTOR_SUPPLIED_DESIGN_DIR="$PWD" cargo test -p pcbmotorgen supplied_loss_model_rejects_current_voltage_and_unsupported_stack_without_repair -- --ignored --nocapture
+```
+
+The shared request helper now describes mass as the configured carriage mass
+with unconfirmed complete-assembly/cap coverage, rather than hard-coding 15 g
+in the text. The numeric value still comes from the saved design. Re-running
+Fader and both refinements produces identical numerical results to the previous
+section; its clarified-label base input SHA-256 is now
+`0049a7a0fb3b31fa6e05221656bbaf68fdf9695828b69e9cc94f8e12d6848979`.
+
+### Driver source audit and inputs still required
+
+Checked TI's DRV8311 production datasheet SLVSFN2B, revision B, February 2022,
+using its HTML sections on 2026-10-29:
+
+- [7.5 Electrical characteristics](https://www.ti.com/document-viewer/DRV8311/datasheet/GUID-XXXXXXXX-SF0T-XXXX-XXXX-000000179401)
+  specifies 210 mΩ typical HS+LS resistance at VM ≥ 6 V, 1 A and junction
+  temperature 25°C; 330 mΩ typical at 150°C. The saved 0.21 Ω is therefore a
+  configured typical cold value, not a hot-driver or worst-case resistance.
+  Saved winding temperature 75°C does not establish driver junction temperature.
+  No resistance value was changed or interpolated from these endpoints.
+- The same section specifies VM operating current at 12 V and 25/200 kHz,
+  for example 10/12 mA typical at 25°C. These are not a qualified 100 kHz
+  controller-only coefficient. Standby/operating current, charge-pump/gate
+  consumption and externally supplied logic/regulator loads need a clear
+  boundary before combining them with switching and controller terms. Do not
+  add the entire operating-current draw to overlapping calibrated loss laws.
+- [12.3.1 Power dissipation](https://www.ti.com/document-viewer/DRV8311/datasheet/GUID-C826F7E8-19E5-47C8-9C09-E13912428538)
+  provides FOC estimates for conduction, switching and diode dead-time losses.
+  It requires rise/fall time, diode forward voltage, dead time and current
+  conventions. Section 7.5 specifies slew/dead time under selected settings;
+  the saved file identifies only DRV8311, not the H/S/P variant, PWM mode,
+  SLEW/DEADTIME settings or driver temperature. Do not choose a setting or map
+  a whole-electrical-cycle RMS estimate to an instantaneous current law silently.
+- [11.1 Bulk capacitance](https://www.ti.com/document-viewer/DRV8311/datasheet/GUID-73020C97-0258-497F-8442-8933E816B34B)
+  explicitly depends on supply capability, wiring inductance, allowable voltage
+  ripple and braking method. A chip capable of synchronous conduction does not
+  prove that the upstream 12 V supply can sink regenerative energy.
+
+The supplied Fader has 15 g configured carriage mass, 0.05 N friction and
+47 µH external inductance per phase, but no moving-part coverage statement,
+inductor manufacturer/part number, DCR/core-loss data, qualified ripple moments,
+winding AC-loss increments or source sink declaration. Inductance alone cannot
+identify an inductor's losses. Magnet dimensions alone cannot establish total
+moving mass. These missing inputs require design-owner data or an explicitly
+approved, referenced modeling assumption; they cannot be recovered from this
+datasheet. No production loss preset or saved-design total was fabricated.
+
+Follow-up changes touch tests and this evidence note only. Verification reruns
+the six automatic native move-command tests and explicitly executes the new
+saved-design rejection regression and the unchanged Fader success/refinement
+gates. Previous frontend/build/Chromium evidence applies to unchanged production
+code; those suites were not rerun for this test-only follow-up. Original root
+hashes were checked again and match. The blocking inputs above remain open.
+
+## Design-goal independence, v4
+
+User clarification on 2026-10-29: the goal is accurate simulation results,
+not checking the design goals. Exceeding goals is acceptable and irrelevant
+to the simulation. The previous treatment of current/speed/acceleration goals
+and voltage margins as publication gates was wrong.
+
+Model `linear-move-demand-v4` calculates the imposed trajectory's required
+force, current, voltage, power and energy without clamping to or rejecting
+against those goals. The configured static-preview current setpoint and driver
+peak rating no longer cap the move allocation. Legacy request current/speed/
+acceleration-limit fields remain readable but are ignored; new JSON templates
+omit them and native deserialization permits their absence. Move-specific
+physical validation no longer requires force-target relationships or positive
+acceleration/current/temperature-rise goals; ordinary design validation is
+unchanged. No physical geometry or material parameters are substituted.
+
+Design targets and model validity are distinct. Invalid covariance, unsupported
+housing/stack physics, loss-domain extrapolation, nonfinite inputs, unresolved
+internal reversal and source-return incompatibility still cannot produce
+unsupported results. A supplied loss law's applicability domain is a statement
+of where its equations are valid, not a desired performance goal.
+
+The physical DC-link voltage still enters power/current accounting. Required
+phase-command voltage above that actual bus is recorded as a physical tracking
+finding, without the configurable headroom factor. It does not suppress required
+W/A/J. Such demand describes the imposed motion, not actual hardware delivery or
+achieved tracking. The legacy `feasible` field now means only physical tracking
+compatibility and never design-goal compliance. UI/report show "Physical
+tracking findings" instead of treating goals as a pass/fail gate. Snapshot
+format is v4 and the trace column is `physical_tracking_compatible`.
+
+Native public-command regressions on both supplied star designs independently
+change the configured current setpoint to zero, contradictory force goals,
+zero acceleration goal, target speed, driver peak rating, request limits and
+voltage margin. The complete per-sample traces and source W/A/J are exactly
+identical before and after those goal edits. No geometry, loss law, physical
+source voltage or trajectory changes in these comparisons.
+
+At 193 force positions and 0.00025 s, the numerical-coefficient fixtures now
+publish required demand for both designs:
+
+- Two-layer v1: 4.8824137794 W sampled peak, 0.4068678150 A sampled source
+  peak, 4.0861682867 W average, 1.0215420717 J drawn/net, no returned energy.
+- Four-layer v1: 11.0535335716 W sampled peak, 0.9211277976 A sampled source
+  peak, 9.1613121707 W average, 2.2903280427 J drawn/net, no returned energy.
+  The 12.7296176980 V required line peak exceeds the actual 12 V bus; the
+  calculated demand remains available with that separate physical finding.
+
+These are still numerical loss-law fixtures, not accurate production-loss
+estimates or hardware measurements. Missing real loss data remains an accuracy
+limitation; exceeding a design goal does not. Fader outputs and its separate
+2% spatial/time refinement gates remain numerically unchanged. Two-layer v2
+still rejects missing dynamic housing/stack physics, not a design goal.
+
+Reproduction:
+
+```sh
+PCB_MOTOR_SUPPLIED_DESIGN_DIR="$PWD" cargo test -p pcbmotorgen supplied_loss_model_demand_is_independent_of_design_goals -- --ignored --nocapture
+```
+
+Verification: 132 desktop Rust tests, 237 simulation unit tests and seven
+integration tests pass, with 18 explicit ignored tests across those crates.
+The two saved-design goal-invariance/refinement runs and Fader refinement test
+were explicitly executed and pass. Frontend passes 546 tests with one existing
+skip, check reports zero errors/warnings, build passes with its existing chunk
+warning, and 10 Chromium regressions pass. New report/browser assertions retain
+totals despite physical tracking findings and preserve stale/cancel/demo guards.
+Artifacts: `app/desktop/e2e-results/demand-independent-goals-final-20261029/`.
+Svelte autofixer reports no issues. Original supplied files remain unchanged.

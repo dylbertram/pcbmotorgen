@@ -90,7 +90,7 @@ pub fn pm_field(
     request: &VisualizationRequest,
 ) -> Result<FieldPreview, String> {
     request.validate()?;
-    sim.validate().map_err(|e| e.to_string())?;
+    sim.validate_for_simulation().map_err(|e| e.to_string())?;
     // The existing screening assembly can include image magnets. This mode
     // deliberately excludes them and labels itself PM-only, not a solved stack.
     let mut bare = sim.clone();
@@ -175,7 +175,7 @@ pub fn copper_loss(
     hints: &DriveGeometryHints,
     phase_peak_a: f64,
 ) -> Result<CopperLossPreview, String> {
-    sim.validate().map_err(|e| e.to_string())?;
+    sim.validate_for_simulation().map_err(|e| e.to_string())?;
     if !phase_peak_a.is_finite() || !(0. ..=1000.).contains(&phase_peak_a) {
         return Err("Invalid winding-phase peak current".into());
     }
@@ -253,14 +253,7 @@ pub fn copper_loss(
                 EdgeKind::Trace {
                     layer, length_m, ..
                 } => {
-                    let inner = sim.num_layers > 2 && *layer != 0 && *layer + 1 != sim.num_layers;
-                    rho * length_m
-                        / (sim.min_trace_m
-                            * crate::units::oz_to_m(if inner {
-                                settings.inner_copper_oz
-                            } else {
-                                settings.outer_copper_oz
-                            }))
+                    rho * length_m / (sim.min_trace_m * crate::drive::copper_thickness_m(*layer, sim, settings))
                 }
                 EdgeKind::Via { layers, .. } => via_resistance_ohm(
                     sim.min_via_drill_m,

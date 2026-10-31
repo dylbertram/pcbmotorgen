@@ -2,9 +2,8 @@ import { test, expect } from "@playwright/test";
 import { gotoDesignApp } from "./helpers";
 
 const sections = [
-  { name: "Constraints", heading: "design-constraints-heading" },
-  { name: "Stackup", heading: "backplane-heading" },
   { name: "Routing", heading: "topology-board-heading" },
+  { name: "Stackup", heading: "backplane-heading" },
   { name: "Drive & force targets", heading: "drive-targets-heading" },
   { name: "Magnets", heading: "magnets-heading" },
 ];
@@ -54,7 +53,11 @@ test("each design section has its own left-side button and panel", async ({ page
   const workspace = page.getByRole("region", { name: "Coil design workspace", exact: true });
   const left = workspace.getByRole("toolbar", { name: "Design side tools", exact: true });
   const right = workspace.getByRole("toolbar", { name: "Preview side tools", exact: true });
-  await expect(left.getByRole("button")).toHaveCount(7);
+  await expect(left.getByRole("button")).toHaveCount(6);
+  await expect(left.getByRole("button").first()).toHaveAccessibleName("Routing");
+  await expect(left.getByRole("button", { name: "Constraints", exact: true })).toHaveCount(0);
+  await expect(workspace.getByRole("dialog", { name: "Routing", exact: true })).toBeVisible();
+  await expect(page.locator("#design-constraints-heading")).toBeVisible();
   await expect(page.getByRole("button", { name: "Design settings", exact: true })).toHaveCount(0);
   await expect(workspace.getByRole("heading", { name: "Coil Preview", exact: true })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Expand coil preview", exact: true })).toHaveCount(0);
@@ -138,14 +141,14 @@ test("edits survive panel changes and workflow changes", async ({ page }) => {
   await count.fill("10");
   await count.press("Enter");
   await left.getByRole("button", { name: "Routing", exact: true }).click();
-  await page.getByRole("combobox", { name: "Winding connection", exact: true }).selectOption("2");
+  await expect(page.getByRole("button", { name: "Routing source", exact: true })).toHaveText("Infinity Braid - Star (Wye)");
   await page.getByRole("button", { name: "Driver settings", exact: true }).click();
   await expect(page.getByRole("dialog", { name: "Routing", exact: true })).toHaveCount(0);
   await expect(page.getByRole("region", { name: "Preview driver simulation results" })).toContainText("Current ripple");
-  await left.getByRole("button", { name: "Constraints", exact: true }).click();
+  await left.getByRole("button", { name: "Routing", exact: true }).click();
   await expect(travel).toHaveValue("100");
   await page.getByRole("tab", { name: /^Simulate/i }).click();
-  await expect(page.getByRole("dialog", { name: "Constraints", exact: true })).toBeVisible();
+  await expect(page.getByRole("dialog", { name: "Routing", exact: true })).toBeVisible();
   await left.getByRole("button", { name: "Magnets", exact: true }).click();
   await expect(count).toHaveValue("10");
   await page.getByRole("tab", { name: /^Design/i }).click();
@@ -187,7 +190,7 @@ test("returning from Simulate repaints canvas pixels and preserves the selected 
   }
 });
 
-test("all seven left panels fit mobile without moving or overflowing the canvas", async ({ page }, testInfo) => {
+test("all six left panels fit mobile without moving or overflowing the canvas", async ({ page }, testInfo) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await gotoDesignApp(page);
   const left = page.getByRole("toolbar", { name: "Design side tools", exact: true });

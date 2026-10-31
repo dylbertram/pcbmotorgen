@@ -44,7 +44,15 @@ def main():
     sources=capture(work,[Path(__file__),root/'scripts/validate_magpylib.py',Path(__file__).parent/'winding_oracle.py',
         Path(__file__).parent/'check_free_space.py',root/'crates/pcbmotorgen-simulation/src/drive/geometry.rs',
         root/'crates/pcbmotorgen-simulation/src/drive/mod.rs',root/'crates/pcbmotorgen-simulation/src/magnetic/force_eval/mod.rs',
-        root/'app/desktop/src-tauri/src/commands/physics.rs'])
+        root/'app/desktop/src-tauri/src/commands/physics.rs',
+        root/'crates/pcbmotorgen-routing/src/patterns/infinity/mod.rs',
+        root/'crates/pcbmotorgen-routing/src/patterns/infinity/four_layer.rs',
+        root/'crates/pcbmotorgen-routing/src/patterns/infinity/stacked.rs',
+        root/'crates/pcbmotorgen-routing/src/context.rs',
+        root/'app/desktop/src-tauri/src/config/bridges.rs',
+        root/'crates/pcbmotorgen-dfm/src/series_vias.rs',
+        Path(__file__).parent/'prescribed_pm_oracle.py',
+        root/'crates/pcbmotorgen-simulation/src/magnetic/force_eval/commutation.rs'])
     report={'scope':__doc__,'status':'running','project':str(project) if project else None,'version_index':args.version,
             'driver_reference_requested':args.driver_reference,
             'project_sha256':sha(project) if project else None,'source_snapshots':sources,'levels':{},'refinements':{},'failures':[],

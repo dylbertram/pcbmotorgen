@@ -66,7 +66,6 @@ test("driver library edits persist and feed the Simulation selector", async ({ p
   // The Simulation tab selects from the same library.
   await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
   await selectDesignPanel(page, "Routing");
-  await page.getByRole("combobox", { name: "Winding connection", exact: true }).selectOption("2");
   await page.getByRole("tab", { name: /^Simulate/i }).click();
   await coilWorkspace(page).getByRole("button", { name: "Driver settings", exact: true }).click();
   await page.getByRole("combobox", { name: "Driver to evaluate" }).selectOption("Settings driver v2");
@@ -106,7 +105,7 @@ test("coil pattern library lists bundled generators and the installed set", asyn
   await gotoDesignApp(page);
   const dialog = await settings(page);
   const library = dialog.locator("fieldset", { hasText: "Coil pattern library" });
-  await expect(library).toContainText("Infinity Braid (pcbBraid)");
+  await expect(library).toContainText("Infinity Braid");
   await expect(library).toContainText("Built-in");
   await expect(library).toContainText("No user-installed generators.");
   await expect(library.getByRole("button", { name: /^Remove / })).toHaveCount(0);

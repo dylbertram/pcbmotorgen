@@ -81,6 +81,8 @@ pub struct LinearMotorConfig {
     pub board_width_m: f64,
     /// PCB substrate thickness [m].
     pub pcb_thickness_m: f64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pcb_stackup: Option<pcbmotorgen_simulation::params::PcbStackup>,
     /// Magnet face to PCB copper clearance [m].
     pub air_gap_m: f64,
     /// Number of parallel serpentine paths per phase on the same layer
@@ -112,6 +114,8 @@ pub struct LinearMotorConfig {
     /// pattern and never appear here. Defaults to empty = use pattern defaults.
     #[serde(default)]
     pub routing_params: std::collections::HashMap<String, f64>,
+    #[serde(default)]
+    pub routing_orientation: pcbmotorgen_routing::RoutingOrientation,
     /// Number of electrical phases.
     pub phases: u32,
     /// Vernier phase-band pitch spacing ratio. 1.0 = standard 1:1.
@@ -186,6 +190,7 @@ impl Default for LinearMotorConfig {
             active_area_length_m: mm(195.0),
             board_width_m: mm(20.0),
             pcb_thickness_m: 0.0016,
+            pcb_stackup: None,
             air_gap_m: mm(0.5),
             // Round 9: multi-strand defaults that the production code
             // path uses for the MagneticFader reference design. With
@@ -205,6 +210,7 @@ impl Default for LinearMotorConfig {
             strands_per_phase: 2,
             routing_pattern: "infinity-braid".to_string(),
             routing_params: std::collections::HashMap::new(),
+            routing_orientation: Default::default(),
             phases: 3,
             spacing_ratio: 1.0,
             max_current_a: 1.0,

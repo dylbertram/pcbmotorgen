@@ -4,13 +4,13 @@
   import BackplanePanel from "../design/BackplanePanel.svelte";
   import MagnetsPanel from "../design/parameters/MagnetsPanel.svelte";
   import DrivePanel from "../design/parameters/DrivePanel.svelte";
-  import CopperPanel from "../design/parameters/CopperPanel.svelte";
   import type { MotionStore } from "../../stores/motion.svelte";
   import { stripBoundsDomainMm, type TraceMeasure } from "../../previewGeometry";
   import TravelIsoView from "../design/TravelIsoView.svelte";
   import ConstraintReadouts from "../design/ConstraintReadouts.svelte";
   import TopologySelector from "../design/TopologySelector.svelte";
   import TracesBoardPanel from "../design/parameters/TracesBoardPanel.svelte";
+  import RoutingOrientationPanel from "../design/RoutingOrientationPanel.svelte";
   import ValidationWarning from "../design/ValidationWarning.svelte";
   import NumberField from "../ui/NumberField.svelte";
   import HelpTag from "../ui/HelpTag.svelte";
@@ -30,7 +30,7 @@
     onGeometryChange,
     backplaneAnalysis = null,
     driveBackplane = null,
-    section = "constraints",
+    section = "routing",
   }: {
     config: ConfigStore;
     motion: MotionStore;
@@ -55,7 +55,7 @@
 >
   <div class="design-settings space-y-3">
     <!-- Travel inputs, live assembly geometry and derived sizing readouts. -->
-    {#if section === "constraints"}
+    {#snippet constraints()}
     <section
       id="design-constraints-heading"
       aria-label="Design constraints"
@@ -136,7 +136,8 @@
       <ConstraintReadouts {config} measuredTraceLengthMm={measuredTrace?.traceLengthMm ?? null} {routingDimensions} />
     </section>
     <ValidationWarning {config} />
-    {:else if section === "stackup"}
+    {/snippet}
+    {#if section === "stackup"}
 
     <BackplanePanel {config} {backplaneAnalysis} {driveBackplane} {cadGeometry} />
     {:else if section === "routing"}
@@ -150,6 +151,8 @@
     >
       <div class="space-y-3">
         <TopologySelector {config} cadGeometryActive={cadGeometry !== null} cadSourceFileName={cadGeometry?.source_file_name} {onImportCad} {onUseGenerated} />
+        <RoutingOrientationPanel {config} geometry={cadGeometry} {onGeometryChange} />
+        {@render constraints()}
         {#if cadGeometry}
           <div
             class="rounded-md border border-sky-500/30 bg-sky-500/5 px-3 py-3"
@@ -192,7 +195,6 @@
           onTraceWidthChange={cadGeometry && onGeometryChange ? (width) => {
             if (cadGeometry) onGeometryChange?.({ ...cadGeometry, trace_width_mm: width });
            } : undefined} />
-        <CopperPanel {config} />
       </div>
     </section>
 

@@ -128,6 +128,35 @@ if "--metadata" in sys.argv:
 The metadata block is **optional** — if the runner doesn't support `--metadata`,
 the app falls back to the file stem as the id and leaves author/version blank.
 
+### Winding end type
+
+Generators can declare `end_type` in their metadata. For a fixed winding use
+`{"kind": "fixed", "connection": "star"}`. The connection is `star`, `delta`,
+or `closed`. For a parameter-controlled winding, declare its exact values:
+
+```json
+"end_type": {
+  "kind": "parameter",
+  "key": "connection",
+  "default": 0,
+  "options": [
+    { "value": 2, "connection": "star" },
+    { "value": 1, "connection": "delta" },
+    { "value": 0, "connection": "closed" }
+  ]
+}
+```
+
+The default must match generation when the parameter is absent in a saved file.
+It does not change the default for new projects. The host presents these choices
+as routing sources and shows the declared connection read-only in Coil ends.
+Legacy closed rings remain visible when selected in an existing file. Without
+this metadata, Coil ends retains an editable winding selector, as it does for
+uploaded copper. Rust generators override `RoutingPattern::metadata` and set
+`PluginMetadata::end_type`; Python runners return the same JSON with `--metadata`.
+Native plugins must rebuild against API version 3 because the metadata structure
+has changed. Version 2 binaries fail the version check before their pattern is created.
+
 ---
 
 ## 4. Exposing parameters to the app
@@ -274,7 +303,7 @@ reference. The C-ABI surface is:
 
 ```rust
 #[no_mangle]
-pub static pcbmotorgen_ROUTING_PLUGIN_API: u32 = 2;  // millimetre contract
+pub static pcbmotorgen_ROUTING_PLUGIN_API: u32 = 3;  // end-type metadata; millimetre contract
 
 #[no_mangle]
 pub unsafe extern "C" fn pcbmotorgen_routing_plugin_create() -> *mut std::ffi::c_void {

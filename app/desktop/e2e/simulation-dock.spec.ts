@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { gotoDesignApp } from "./helpers";
+import { gotoDesignApp, selectRoutingConnection } from "./helpers";
 
 async function selectPanel(page: import("@playwright/test").Page, name: string) {
   const trigger = page.getByRole("toolbar", { name: "Design side tools", exact: true }).getByRole("button", { name, exact: true });
@@ -8,7 +8,7 @@ async function selectPanel(page: import("@playwright/test").Page, name: string) 
 
 test("Simulate opens four result tabs below the same live coil workspace", async ({ page }, testInfo) => {
   await gotoDesignApp(page);
-  const canvas = page.getByRole("region", { name: "Coil design workspace", exact: true }).locator("canvas");
+  const canvas = page.getByRole("region", { name: "Coil design workspace", exact: true }).getByTestId("coil-annotations");
   await expect.poll(async () => Number(await canvas.getAttribute("data-segments"))).toBeGreaterThan(0);
   await canvas.evaluate((el) => el.setAttribute("data-test-instance", "retained"));
   const before = (await canvas.boundingBox())!;
@@ -91,7 +91,6 @@ test("Simulate opens four result tabs below the same live coil workspace", async
 test("driver results use bounded meters and horizontal subsections", async ({ page }, testInfo) => {
   await gotoDesignApp(page);
   await selectPanel(page, "Routing");
-  await page.getByRole("combobox", { name: "Winding connection", exact: true }).selectOption("2");
   await page.getByRole("tab", { name: /^Simulate/i }).click();
   const dock = page.getByRole("region", { name: "Simulation results", exact: true });
   await dock.getByRole("tab", { name: "Driver suitability", exact: true }).click();
@@ -99,14 +98,26 @@ test("driver results use bounded meters and horizontal subsections", async ({ pa
   const checks = dock.getByRole("region", { name: "Driver checks", exact: true });
   await expect(voltage).toBeVisible();
   await expect(checks).toBeVisible();
-  const voltageBounds = (await voltage.boundingBox())!;
-  const checkBounds = (await checks.boundingBox())!;
-  expect(checkBounds.x).toBeGreaterThan(voltageBounds.x);
-  expect(Math.abs(checkBounds.y - voltageBounds.y)).toBeLessThanOrEqual(1);
-  expect((await voltage.getByLabel("Voltage budget", { exact: true }).boundingBox())!.width).toBeLessThanOrEqual(384);
-  for (const meter of await checks.locator(".check-meter").all()) {
-    expect((await meter.boundingBox())!.width).toBeLessThanOrEqual(320);
-  }
+  // Sweep completion can replace the driver result between these reads.
+  // Retry the whole layout assertion rather than dereferencing stale bounds.
+  await expect(async () => {
+    const voltageBounds = await voltage.boundingBox();
+    const checkBounds = await checks.boundingBox();
+    expect(voltageBounds).not.toBeNull();
+    expect(checkBounds).not.toBeNull();
+    expect(checkBounds!.x).toBeGreaterThan(voltageBounds!.x);
+    expect(Math.abs(checkBounds!.y - voltageBounds!.y)).toBeLessThanOrEqual(1);
+    const budget = await voltage.getByLabel("Voltage budget", { exact: true }).boundingBox();
+    expect(budget).not.toBeNull();
+    expect(budget!.width).toBeLessThanOrEqual(384);
+    const meters = await checks.locator(".check-meter").all();
+    expect(meters.length).toBeGreaterThan(0);
+    for (const meter of meters) {
+      const bounds = await meter.boundingBox();
+      expect(bounds).not.toBeNull();
+      expect(bounds!.width).toBeLessThanOrEqual(320);
+    }
+  }).toPass({ timeout: 5000 });
   await expect(dock.getByRole("region", { name: "Operating limits", exact: true })).toBeVisible();
   await expect(dock.getByRole("region", { name: "Routed copper measurements", exact: true })).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath("simulation-driver.png") });
@@ -180,22 +191,33 @@ test("operating and thermal settings live in the left target panel and update li
   await expect(targets.getByRole("spinbutton", { name: "Winding temperature (°C)", exact: true })).toHaveValue("60");
 });
 
-test("copper weights and via plating belong to Routing and persist across panels", async ({ page }) => {
+test("copper weights belong to Stackup and via plating stays with Routing via sizes across panels", async ({ page }) => {
   await gotoDesignApp(page);
+  await selectPanel(page, "Stackup");
+  const stackup = page.getByRole("dialog", { name: "Stackup", exact: true });
+  await stackup.getByRole("combobox", { name: "Outer layer copper weight", exact: true }).selectOption("2");
+  await stackup.getByRole("combobox", { name: "Inner layer copper weight", exact: true }).selectOption("0.5");
+  await expect(stackup.getByRole("spinbutton", { name: "Via plating thickness (µm)", exact: true })).toHaveCount(0);
   await selectPanel(page, "Routing");
   const routing = page.getByRole("dialog", { name: "Routing", exact: true });
-  await routing.getByRole("combobox", { name: "Outer layer copper weight", exact: true }).selectOption("2");
-  await routing.getByRole("combobox", { name: "Inner layer copper weight", exact: true }).selectOption("0.5");
-  const plating = routing.getByRole("spinbutton", { name: "Via plating thickness (µm)", exact: true });
+  await expect(routing.getByRole("combobox", { name: /layer copper weight/ })).toHaveCount(0);
+  const vias = routing.getByRole("figure", { name: "Via sizing guide", exact: true });
+  await expect(vias.getByRole("spinbutton", { name: "Via hole size (mm)", exact: true })).toBeVisible();
+  await expect(vias.getByRole("spinbutton", { name: "Annular ring width (mm)", exact: true })).toBeVisible();
+  const plating = vias.getByRole("spinbutton", { name: "Via plating thickness (µm)", exact: true });
+  await expect(plating).toHaveAttribute("min", "5");
+  await expect(plating).toHaveAttribute("max", "100");
+  await expect(plating).toHaveAttribute("step", "5");
   await plating.fill("35");
   await plating.press("Enter");
   await expect(routing.getByRole("spinbutton", { name: "Winding temperature (°C)", exact: true })).toHaveCount(0);
   await selectPanel(page, "Driver settings");
   const driver = page.getByRole("dialog", { name: "Preview driver settings", exact: true });
   await expect(driver.getByRole("combobox", { name: "Outer layer copper weight", exact: true })).toHaveCount(0);
+  await selectPanel(page, "Stackup");
+  await expect(stackup.getByRole("combobox", { name: "Outer layer copper weight", exact: true })).toHaveValue("2");
+  await expect(stackup.getByRole("combobox", { name: "Inner layer copper weight", exact: true })).toHaveValue("0.5");
   await selectPanel(page, "Routing");
-  await expect(routing.getByRole("combobox", { name: "Outer layer copper weight", exact: true })).toHaveValue("2");
-  await expect(routing.getByRole("combobox", { name: "Inner layer copper weight", exact: true })).toHaveValue("0.5");
   await expect(plating).toHaveValue("35");
 });
 
@@ -207,7 +229,6 @@ test("driver results update from the target panel even when the thrust sweep fai
   }));
   await gotoDesignApp(page);
   await selectPanel(page, "Routing");
-  await page.getByRole("combobox", { name: "Winding connection", exact: true }).selectOption("2");
   await page.getByRole("tab", { name: /^Simulate/i }).click();
   const dock = page.getByRole("region", { name: "Simulation results", exact: true });
   await dock.getByRole("tab", { name: "Driver suitability", exact: true }).click();
@@ -242,14 +263,14 @@ test("touch dragging the resize handle changes the dock height", async ({ page }
 
 test("winding connection warnings open Routing without hiding the results dock", async ({ page }) => {
   await gotoDesignApp(page);
+  await selectRoutingConnection(page, "delta");
   await page.getByRole("tab", { name: /^Simulate/i }).click();
   const dock = page.getByRole("region", { name: "Simulation results", exact: true });
   await dock.getByRole("tab", { name: "Driver suitability", exact: true }).click();
   await dock.getByRole("button", { name: "Change winding connection", exact: true }).click();
   await expect(dock).toBeVisible();
   await expect(page.getByRole("tab", { name: /^Simulate/i })).toHaveAttribute("aria-selected", "true");
-  const routing = page.getByRole("dialog", { name: "Routing", exact: true });
-  await routing.getByRole("combobox", { name: "Winding connection", exact: true }).selectOption("2");
+  await selectRoutingConnection(page, "star");
   await expect(dock.getByRole("list", { name: "Driver checks", exact: true })).toBeVisible();
   await expect(dock.getByText(/Driver analysis failed:/)).toHaveCount(0);
 });

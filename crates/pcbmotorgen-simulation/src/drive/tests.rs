@@ -4,6 +4,115 @@ use pcbmotorgen_routing::{
 };
 
 #[test]
+fn compact_braid_simulated_terminal_axes_are_diagnostic_not_a_spacing_target() {
+    use crate::magnetic::{CommutationMode, ForceEvaluator};
+    let period = 0.012;
+    for strands in [2, 3, 5] {
+        let ctx = RoutingContext {
+            active_area_length_mm: 92.0, board_width_mm: 8.0, num_layers: 2, phases: 3,
+            min_trace_mm: 0.127, trace_width_mm: 0.2, min_space_mm: 0.127,
+            params: std::collections::HashMap::from([("num_strands".into(), strands as f64), ("connection".into(), 2.0)]),
+            magnet_pitch_mm: Some(6.0), magnet_array_span_mm: Some(29.0), ..Default::default()
+        };
+        let routing = generate_routing_result(&ctx, "infinity-braid").unwrap();
+        let sim = SimulationInput { active_area_length_m: 0.092, board_width_m: 0.008,
+            magnet_dims_m: [0.005, 0.005, 0.003], magnet_count: 5, magnet_pitch_m: 0.006,
+            min_trace_m: 0.0002, num_layers: 2, air_gap_m: 0.0005, ..Default::default() };
+        let (evaluator, _) = ForceEvaluator::new(2, 8, CommutationMode::MaxThrust, 0.0)
+            .with_routed_currents(&routing, &sim, &DriveSettings::default(), &Default::default()).unwrap();
+        let mut sine = [0.0; 3];
+        let mut cosine = [0.0; 3];
+        for n in 0..48 {
+            let x = 0.018 + period * n as f64 / 48.0;
+            let theta = std::f64::consts::TAU * x / period;
+            let force = evaluator.unit_phase_force_constants_at(&sim, x).unwrap();
+            for j in 0..3 { sine[j] += force[j] * theta.sin(); cosine[j] += force[j] * theta.cos(); }
+        }
+        let angles: [f64; 3] = std::array::from_fn(|j| cosine[j].atan2(sine[j]));
+        for j in 1..3 {
+            // Preserve the observed signed-terminal convention without moving
+            // copper to force 120°. Polarity/controller applicability is open.
+            let error = angles[j] - angles[0] + j as f64 * std::f64::consts::PI / 3.0;
+            let wrapped = error.sin().atan2(error.cos());
+            assert!(wrapped.abs() < 0.02, "strands={strands}, terminal phase {j}: error {wrapped} rad");
+        }
+    }
+}
+
+#[test]
+fn staggered_braid_pairs_carry_their_own_opening_currents_without_polarity_reversal() {
+    for strands in [2, 3, 5] {
+      for layers in [2, 4, 6, 8, 10] {
+        let ctx = RoutingContext {
+            active_area_length_mm: 92.0, board_width_mm: 8.0, num_layers: layers, phases: 3,
+            min_trace_mm: 0.127, trace_width_mm: 0.2, min_space_mm: 0.127,
+            params: std::collections::HashMap::from([("num_strands".into(), strands as f64), ("connection".into(), 2.0)]),
+            magnet_pitch_mm: Some(6.0), magnet_array_span_mm: Some(29.0), ..Default::default()
+        };
+        let routing = generate_routing_result(&ctx, "infinity-braid").unwrap();
+        let networks = extract_phase_networks(&routing);
+        assert_eq!(networks.len(), 3);
+        for net in &networks {
+            assert_eq!(net.layers(), (0..layers).collect::<Vec<_>>());
+            let solution = solve_network(net, &vec![1.0; net.edges.len()]);
+            assert!(solution.connected, "{} must connect line to neutral", net.net);
+            let mut joins = 0;
+            for (edge, current) in net.edges.iter().zip(&solution.current_share) {
+                if let EdgeKind::Via { layers: [a, b], .. } = edge.kind {
+                  if a % 2 == 1 && b == a + 1 {
+                    joins += 1;
+                    assert!((current + 1.0).abs() < 1e-8, "each series link carries one amp from the driver toward neutral");
+                  }
+                }
+            }
+            assert_eq!(joins, layers / 2 - 1);
+            let active = |layer| net.edges.iter().zip(&solution.current_share).filter_map(|(edge, current)| {
+                match &edge.kind {
+                    EdgeKind::Trace { layer: l, points, .. } if *l == layer && points.iter().all(|p| p[1] <= 0.008 + 1e-12) => Some((points, current)),
+                    _ => None,
+                }
+            }).collect::<Vec<_>>();
+            // Different cuts in the braid mesh need not have equal edge
+            // currents. Solve each actual pair separately, keeping its own
+            // opening and lead orientation, then compare signed active paths.
+            for pair in 0..layers / 2 {
+                let lo = 2 * pair;
+                let hi = lo + 1;
+                let isolated = RoutingResult {
+                    segments: routing.segments.iter().filter(|s| s.layer == lo || s.layer == hi).cloned().collect(),
+                    vias: routing.vias.iter().filter(|v| v.from_layer == lo && v.to_layer == hi).cloned().collect(),
+                    ..Default::default()
+                };
+                let single = extract_phase_networks(&isolated).into_iter().find(|n| n.net == net.net).unwrap();
+                let expected = solve_network(&single, &vec![1.0; single.edges.len()]);
+                assert!(expected.connected);
+                for layer in [lo, hi] {
+                    let actual = active(layer);
+                    let standalone: Vec<_> = single.edges.iter().zip(&expected.current_share).filter_map(|(edge, current)| {
+                        match &edge.kind {
+                            EdgeKind::Trace { layer: l, points, .. } if *l == layer && points.iter().all(|p| p[1] <= 0.008 + 1e-12) => Some((points, current)),
+                            _ => None,
+                        }
+                    }).collect();
+                    assert_eq!(actual.len(), standalone.len());
+                    for ((a, ia), (b, ib)) in actual.iter().zip(&standalone) {
+                        assert_eq!(a, b);
+                        assert!((*ia - *ib).abs() < 1e-8, "a series connection must preserve the standalone pair's signed currents");
+                    }
+                }
+            }
+        }
+        for via in routing.vias.iter().filter(|v| layers > 2 && v.from_layer == 0 && v.to_layer == layers - 1) {
+            let mut cut = routing.clone();
+            cut.vias.retain(|v| v.position != via.position || v.net != via.net);
+            let net = extract_phase_networks(&cut).into_iter().find(|n| n.net == via.net).unwrap();
+            assert!(!solve_network(&net, &vec![1.0; net.edges.len()]).connected);
+        }
+      }
+    }
+}
+
+#[test]
 fn signed_branch_currents_obey_kirchhoff_and_power_balance() {
     use super::geometry::Edge;
     let net = PhaseNetwork {
@@ -43,6 +152,8 @@ fn generated_braid_currents_obey_kirchhoff_and_power_balance() {
                 expects_continuous: false,
                 params: std::collections::HashMap::from([("num_strands".into(), strands as f64), ("connection".into(), 2.0)]),
                 magnet_pitch_mm: Some(6.0), magnet_array_span_mm: Some(35.0), phase_clearance_mm: None,
+                via_pad_diameter_mm: None,
+                orientation: Default::default(),
             };
             let routing = pcbmotorgen_routing::generate_routing_result(&ctx, "infinity-braid").unwrap();
             for net in extract_phase_networks(&routing) {
@@ -82,6 +193,36 @@ fn empty_routing_cannot_produce_a_force_result() {
     assert!(ForceEvaluator::default().with_routed_currents(
         &RoutingResult::default(), &sim(), &DriveSettings::default(), &DriveGeometryHints::default()
     ).is_err());
+}
+
+#[test]
+fn unit_terminal_coefficients_reproduce_calibrated_routed_force_without_dividing_by_current() {
+    use crate::magnetic::{CommutationMode, ForceEvaluator};
+    let routing = two_strand_fixture();
+    let mut sim = sim();
+    let (mut evaluator, coils) = ForceEvaluator::new(3, 8, CommutationMode::PhaseAOnly, 0.0)
+        .with_routed_currents(&routing, &sim, &DriveSettings::default(), &DriveGeometryHints::default()).unwrap();
+    let x = 0.003;
+    let force = evaluator.evaluate_at(&sim, &coils, x).unwrap().0[0];
+    let currents = evaluator.excitation_currents_at(&sim, &coils, x).unwrap();
+    let coefficients = evaluator.unit_phase_force_constants_at(&sim, x).unwrap();
+    let reconstructed: f64 = coefficients.iter().zip(currents).map(|(k,i)| k*i).sum();
+    assert!((force-reconstructed).abs() < 1e-12);
+    sim.max_current_a = 0.0;
+    assert_eq!(coefficients, evaluator.unit_phase_force_constants_at(&sim, x).unwrap());
+    assert!(evaluator.unit_phase_force_constants_at(&sim, f64::NAN).is_err());
+}
+
+#[test]
+fn native_inductance_matrix_retains_self_mutual_and_phase_order() {
+    let routing = two_strand_fixture();
+    let analysis = analyze_drive(&sim(), &routing, &DriveSettings::default(), None);
+    let matrix = &analysis.phase_inductance_matrix_h;
+    assert_eq!(matrix.len(), analysis.phases.len());
+    for i in 0..matrix.len() {
+        assert_eq!(matrix[i][i], analysis.phases[i].self_inductance_h);
+        for j in 0..matrix.len() { assert_eq!(matrix[i][j], matrix[j][i]); }
+    }
 }
 
 #[test]
@@ -229,7 +370,8 @@ fn housing_motion_is_opt_in_and_computed_for_generated_and_imported_copper() {
     let ctx = RoutingContext { active_area_length_mm: 110., board_width_mm: 8., num_layers: 2, phases: 3,
         min_trace_mm: 0.1, trace_width_mm: 0.1, min_space_mm: 0.127, expects_continuous: false,
         params: std::collections::HashMap::from([("num_strands".into(), 2.), ("connection".into(), 2.)]),
-        magnet_pitch_mm: Some(6.), magnet_array_span_mm: Some(35.), phase_clearance_mm: None };
+        magnet_pitch_mm: Some(6.), magnet_array_span_mm: Some(35.), phase_clearance_mm: None, via_pad_diameter_mm: None,
+        orientation: Default::default() };
     let generated = generate_routing_result(&ctx, "infinity-braid").unwrap();
     let mut config = config;
     config.backplane = Some(BackplaneStack { layers: vec![], housing: Some(HousingSpec { material: HousingMaterial::Stainless304, thickness_m: 0.001, gap_m: 0.0 }) });
@@ -482,6 +624,8 @@ fn generated_braid_remains_one_connected_winding_across_repeat_counts() {
                 expects_continuous: false,
                 params: std::collections::HashMap::from([("num_strands".into(), strands as f64), ("connection".into(), 2.0)]),
                 magnet_pitch_mm: Some(6.0), magnet_array_span_mm: Some(35.0), phase_clearance_mm: None,
+                via_pad_diameter_mm: None,
+                orientation: Default::default(),
             };
             let routing = pcbmotorgen_routing::generate_routing_result(&ctx, "infinity-braid").unwrap();
             for net in extract_phase_networks(&routing) {
@@ -545,14 +689,31 @@ fn ripple_estimate_matches_the_assumed_fifty_percent_rl_loop() {
         current = -target + (high + target) * decay;
     }
     assert!((high - current - a.ripple_pp_a).abs() < 1e-9);
-    let at_required_pwm = cfg.supply_voltage_v / r_loop
-        * (r_loop / (4.0 * a.min_pwm_hz * l_loop)).tanh();
-    assert!((at_required_pwm - settings.ripple_limit_fraction * cfg.max_current_a).abs() < 1e-9);
     let mut higher_bus = cfg.clone();
     higher_bus.supply_voltage_v *= 2.0;
     let higher = analyze_drive(&higher_bus, &two_strand_fixture(), &settings, Some(0.5));
     assert!((higher.ripple_pp_a - 2.0 * a.ripple_pp_a).abs() < 1e-10);
     assert_eq!(higher.thrust_n, a.thrust_n);
+}
+
+#[test]
+fn ripple_goal_recommendation_inverts_the_formula_without_changing_predicted_ripple() {
+    // This is a design-advice utility test, not numerical physics acceptance
+    // based on meeting a ripple target. Tightening the goal changes the proposed
+    // PWM floor, never the calculated ripple at the actual configured frequency.
+    let cfg = sim();
+    let settings = DriveSettings::default();
+    let baseline = analyze_drive(&cfg, &two_strand_fixture(), &settings, Some(0.5));
+    for fraction in [0.1, 0.3, 0.6] {
+        let goals = DriveSettings { ripple_limit_fraction: fraction, ..settings.clone() };
+        let a = analyze_drive(&cfg, &two_strand_fixture(), &goals, Some(0.5));
+        assert_eq!(a.ripple_pp_a, baseline.ripple_pp_a);
+        let r_loop = 2.0 * a.phase_resistance_ohm;
+        let l_loop = 2.0 * a.synchronous_inductance_h;
+        let at_proposed_pwm = cfg.supply_voltage_v / r_loop
+            * (r_loop / (4.0 * a.min_pwm_hz * l_loop)).tanh();
+        assert!((at_proposed_pwm - fraction * cfg.max_current_a).abs() < 1e-9);
+    }
 }
 
 #[test]
@@ -647,11 +808,41 @@ fn al_stack() -> Option<crate::backplane::BackplaneStack> {
 }
 
 #[test]
-fn braid_fixture_produces_plausible_values() {
+fn backplane_physics_and_drag_crossing_do_not_depend_on_goal_driven_plot_bounds() {
+    let cfg = SimulationInput { backplane: al_stack(), ..sim() };
+    let baseline = DriveSettings { target_speed_m_s: 0.001, ..Default::default() };
+    let strict = DriveSettings { voltage_headroom: 0.0001, ripple_limit_fraction: 0.0001,
+        allowed_rise_c: 0.1, ..baseline.clone() };
+    let a = analyze_drive(&cfg, &two_strand_fixture(), &baseline, Some(0.5));
+    let b = analyze_drive(&cfg, &two_strand_fixture(), &strict, Some(0.5));
+    let x = a.backplane.unwrap();
+    let y = b.backplane.unwrap();
+    assert_eq!(x.drag_n, y.drag_n);
+    assert_eq!(x.normal_force_n, y.normal_force_n);
+    assert_eq!(x.pwm_inductance_h, y.pwm_inductance_h);
+    assert_eq!(x.pwm_resistance_ohm, y.pwm_resistance_ohm);
+    assert_eq!(x.ripple_eddy_loss_w, y.ripple_eddy_loss_w);
+    assert_eq!(x.net_thrust_n, y.net_thrust_n);
+    assert!(x.drag_limited_speed_m_s.is_some());
+    assert_eq!(x.drag_limited_speed_m_s, y.drag_limited_speed_m_s,
+        "A goal-dependent plot range cannot decide whether the physical drag/thrust crossing exists");
+    let thrust = a.thrust_n.unwrap();
+    let solved = cfg.backplane.as_ref().unwrap().solve(&cfg);
+    let crossing = x.drag_limited_speed_m_s.unwrap();
+    assert!((solved.magnet_forces(&cfg, crossing).drag_n / thrust - 1.0).abs() < 1e-9);
+    let changed_excitation = SimulationInput { max_current_a: 2.0 * cfg.max_current_a, ..cfg };
+    let physical = analyze_drive(&changed_excitation, &two_strand_fixture(), &baseline, Some(0.5));
+    assert_ne!(physical.backplane.unwrap().drag_limited_speed_m_s, x.drag_limited_speed_m_s);
+}
+
+#[test]
+fn two_layer_braid_fixture_produces_plausible_values() {
+    // These original bounds describe the two-layer weave that this fixture
+    // historically generated, even when it incorrectly requested four layers.
     let ctx = RoutingContext {
         active_area_length_mm: 147.0,
         board_width_mm: 20.0,
-        num_layers: 4,
+        num_layers: 2,
         phases: 3,
         min_trace_mm: 0.127,
         trace_width_mm: 0.127,
@@ -661,9 +852,11 @@ fn braid_fixture_produces_plausible_values() {
         magnet_pitch_mm: Some(6.0),
         magnet_array_span_mm: Some(72.0),
         phase_clearance_mm: None,
+        via_pad_diameter_mm: None,
+        orientation: Default::default(),
     };
     let routing = generate_routing_result(&ctx, "infinity-braid").expect("braid");
-    let s = SimulationInput { num_layers: 4, min_trace_m: 0.127e-3, magnet_pitch_m: 6e-3, ..SimulationInput::default() };
+    let s = SimulationInput { num_layers: 2, min_trace_m: 0.127e-3, magnet_pitch_m: 6e-3, ..SimulationInput::default() };
     let a = analyze_drive(&s, &routing, &DriveSettings::default(), Some(0.3));
     eprintln!(
         "R={:.3} Ω L={:.2} µH M={:.2} µH L_LL={:.2} µH ripple={:.2} A strands={} vias/strand={} len/strand={:.1} mm",

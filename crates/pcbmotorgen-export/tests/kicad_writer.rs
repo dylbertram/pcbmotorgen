@@ -58,7 +58,7 @@ const TEST_ACTIVE_AREA_MM: f64 = 48.0;
 
 /// Generate the bundled infinity-braid coil set for a board of `num_layers`
 /// layers. Mirrors the old `generate_coils_for_board`. The braid requires
-/// `num_layers >= 2` (returns an empty set for a 1-layer board).
+/// two or four layers (returns an empty set for unsupported stack counts).
 fn braid_coils(num_layers: u32) -> Vec<PhaseCoil> {
     let mut params = HashMap::new();
     params.insert("num_strands".to_string(), 5.0);
@@ -513,7 +513,8 @@ fn test_board_handle_write_coils_end_to_end() {
     };
     // The mock response must contain one `ItemCreationResult` per submitted
     // item, otherwise the new per-item tallying will report a mismatch.
-    let (coils, num_layers) = (braid_coils(3), 3u32);
+    let (coils, num_layers) = (braid_coils(2), 2u32);
+    assert!(!coils.is_empty());
     let items = braid_items(&coils, num_layers);
     let expected_items = items.len() as u32;
     let created_items: Vec<_> = (0..expected_items)
@@ -572,7 +573,8 @@ fn test_board_handle_write_coils_dry_run_does_not_call_commit() {
     );
     let doc = pcb_document("dryrun.kicad_pcb");
 
-    let (coils, num_layers) = (braid_coils(3), 3u32);
+    let (coils, num_layers) = (braid_coils(2), 2u32);
+    assert!(!coils.is_empty());
     let items = braid_items(&coils, num_layers);
     let expected_items = items.len() as u32;
 
@@ -591,6 +593,25 @@ fn test_board_handle_write_coils_dry_run_does_not_call_commit() {
         "dry-run must report an empty failure_summary; got {:?}",
         result.failure_summary
     );
+}
+
+#[test]
+fn four_layer_pair_vias_are_rejected_before_any_live_or_dry_run_ipc() {
+    let coils = braid_coils(4);
+    assert!(!coils.is_empty());
+    for dry_run in [false, true] {
+        // Any IPC call would exhaust this transport and fail with a different
+        // error. The span check must run before even querying the board name.
+        let transport = SequencedMockTransport::new(Vec::new());
+        let mut client = KiCadClient::with_transport(Box::new(transport), Some("test"), 2000);
+        let mut board = pcbmotorgen_export::BoardHandle::new(&mut client, pcb_document("span-check.kicad_pcb"));
+        let error = if dry_run {
+            board.write_coils_dry_run(&coils, 4, &braid_rules(), BRAID_ACTIVE_AREA_MM)
+        } else {
+            board.write_coils(&coils, 4, &braid_rules(), BRAID_ACTIVE_AREA_MM)
+        }.unwrap_err();
+        assert!(error.to_string().contains("supports through vias only"), "{error}");
+    }
 }
 
 // ---------------------------------------------------------------------------

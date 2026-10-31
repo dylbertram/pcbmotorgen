@@ -16,6 +16,8 @@ import type { CadGeometry } from "./dxf";
 import type { SensorConfig } from "./sensor";
 import type { DriveSettings } from "./drive";
 import type { BackplaneStack } from "./backplane";
+import type { RoutedMoveRequest } from "./movePower";
+import type { PcbStackupMm } from "../pcbStackup";
 
 export type DocumentKind = "motor" | "sensor";
 
@@ -53,6 +55,7 @@ export interface ProjectConfigState {
   // --- Coil / routing (generation settings) ---
   routing_pattern: string;
   routing_params: Record<string, number>;
+  routing_orientation?: import("../routingOrientation").RoutingOrientation;
   phases: number;
   num_layers: number;
 
@@ -65,6 +68,8 @@ export interface ProjectConfigState {
   peak_force_n: number;
   friction_n: number;
   carriage_mass_kg: number;
+  /** Missing in legacy designs: preserve their saved mass as an assembly override. */
+  carriage_mass_source?: "magnets" | "assembly" | null;
   max_accel_m_s2: number;
   capacitor_bank_uf: number;
 
@@ -81,6 +86,7 @@ export interface ProjectConfigState {
   min_via_drill_mm: number;
   min_via_annular_ring_mm: number;
   pcb_thickness_mm: number;
+  pcb_stackup_mm?: PcbStackupMm | null;
   max_layers: number;
   drive_frequency_hz: number;
   max_temperature_rise_c: number;
@@ -88,6 +94,8 @@ export interface ProjectConfigState {
   // --- Driver suitability (Simulation tab) ---
   /** Missing in files saved before the driver check existed. */
   drive?: DriveSettings;
+  /** Absent in legacy files. No operating requirements are inferred on load. */
+  power_move?: RoutedMoveRequest | null;
 
   // --- Backplane and housing (t707) ---
   /** Missing in files saved before the backplane existed. `null` = none. */

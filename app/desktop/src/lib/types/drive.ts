@@ -135,10 +135,13 @@ export interface DriveAnalysis {
   trace_width_m: number;
   outer_copper_m: number;
   inner_copper_m: number;
+  layer_copper_m?: number[] | null;
   via_resistance_each_ohm: number;
   phase_resistance_ohm: number;
   phase_inductance_h: number;
   mutual_inductance_h: number;
+  /** Native copper-only matrix, in phases order; legacy browser mocks omit it. */
+  phase_inductance_matrix_h?: number[][];
   line_inductance_h: number;
   synchronous_inductance_h: number;
   /** External series inductance per phase defined at the terminals [H]. */

@@ -81,6 +81,7 @@
   } from "./coilPreviewCanvas";
   import { CoilPreviewViewState } from "./coilPreviewViewState.svelte";
   import type { VisualizationInput } from "../../types/simulationVisualization";
+  import { previewCopperKeys } from "../../previewCopperKeys";
 
   let {
     config,
@@ -102,7 +103,11 @@
   }: { config: ConfigStore; coils: CoilPathDto | null; motion: MotionStore; expanded?: boolean; workspace?: boolean; active?: boolean; simulationActive?: boolean; designSettings?: Snippet<[DesignPanelId]>; sidePanel?: PreviewPanelId | null; drive?: DriveAnalysis | null; driveError?: string | null; drivePending?: boolean; importedGeometry?: CadGeometry | null; onGeometryChange?: (geometry: CadGeometry) => void; camera?: PreviewCamera; view?: CoilPreviewViewState } =
     $props();
 
-  export function showDesignSettings(section: DesignPanelId = "constraints"): void { sidePanel = section; }
+  export function showDesignSettings(section: DesignPanelId = "routing"): void {
+    terminalTool.cancel();
+    view.setTerminalPanelOpen(false);
+    sidePanel = section;
+  }
 
   const simplifyTool = new CadSimplifyTool({ getGeometry: () => importedGeometry, onChange: (geometry) => onGeometryChange?.(geometry) });
   let canUndoSimplify = $derived(simplifyTool.canUndo);
@@ -142,7 +147,9 @@
   // views. The toggles live in the lightbox UI; the draw effect below
   // reads the same instance, so a flip there repaints the schematic.
   // -------------------------------------------------------------------
-  let terminalGeometry = $derived(importedGeometry ? withAutomaticCadTerminals(importedGeometry) : coils ? generatedTerminalGeometry(coils, config.num_layers, config.pcb_thickness_mm, config.trace_width_mm, config.routing_pattern === "infinity-braid" ? config.routing_params.connection : undefined) : null);
+  // Older catalogs omit end_type; retain the existing braid parameter contract.
+  const generatedConnection = $derived(config.generatorConnection ?? (!config.generatorEndType && config.routing_pattern === "infinity-braid" ? config.routing_params.connection : undefined));
+  let terminalGeometry = $derived(importedGeometry ? withAutomaticCadTerminals(importedGeometry) : coils ? generatedTerminalGeometry(coils, config.num_layers, config.pcb_thickness_mm, config.trace_width_mm, generatedConnection) : null);
   const terminalTool = new CoilTerminalTool({
     getGeometry: () => terminalGeometry,
     onChange: (geometry) => onGeometryChange?.(geometry),
@@ -217,7 +224,10 @@
     const inset = interactive ? leftInset + 44 + (sidePanel && !isLeftPanel(sidePanel) ? Math.min(drawerWidth, Math.max(0, viewportWidth - 132)) : 0) : 0;
     const fitWidth = W * Math.max(0.15, 1 - inset / Math.max(viewportWidth, 1));
     const fit = (bounds: typeof overlayFitBounds) => {
-      const transform = fitWorldToView(bounds, fitWidth, H, PAD, zoom);
+      // The layer/position controls must never sit on a pickable endpoint.
+      const bottomInset = terminalTool.active ? (view.positionBarHeight + 24 + (viewportWidth < 1024 ? 52 : 0)) * W / Math.max(viewportWidth, 1) : 0;
+      const fitHeight = Math.max(PAD * 2 + 1, H - bottomInset);
+      const transform = fitWorldToView(bounds, fitWidth, fitHeight, PAD, zoom);
       return { ...transform, tx: transform.tx + W * leftInset / Math.max(viewportWidth, 1) };
     };
     // A command focuses the selected coil, not the unrelated magnet array.
@@ -285,6 +295,8 @@
   let visibleArcs = $derived(
     computeVisibleArcs(coils, view.oneSection, oneSectionConductorCount),
   );
+  const visibleCopperKeys = $derived(view.oneSection ? previewCopperKeys(terminalGeometry,coils,visibleSegments,visibleArcs) : null);
+  let webglUnavailable = $state(false);
 
   // -------------------------------------------------------------------
   // routing_dimensions sidecar overlays: pole-pitch ruler, band-width rows,
@@ -496,6 +508,7 @@
     void g;
     void expanded;
     renderer.draw(frame, canvas, {
+      annotationsOnly: !webglUnavailable,
       coils,
       activeAreaLengthMm: config.active_area_length_mm,
       geometry: g,
@@ -565,20 +578,9 @@
          data-pole-regions / data-revision are written imperatively by the
          renderer (canvas.dataset in coilPreviewCanvas.ts), NOT bound
          reactively — see the counter comment there. -->
-    {#if view.viewMode === "iso"}
-      <CoilPreviewIsoView geometry={terminalGeometry} {view} isVisible={isTerminalVisible} showTerminals={false} simulation={visualizationInput} />
-    {:else}
-      <canvas bind:this={canvasRef} class="block h-full w-full"></canvas>
-    {/if}
+    <CoilPreviewIsoView geometry={terminalGeometry} pcbThicknessMm={config.pcb_thickness_mm} pcbStackup={config.pcb_stackup_mm} copperThicknessMm={{ outer: config.drive.outer_copper_oz * .035, inner: config.drive.inner_copper_oz * .035 }} viaSizeMm={{diameter:config.min_via_drill_mm + 2 * config.min_via_annular_ring_mm,drill:config.min_via_drill_mm,plating:config.drive.via_plating_m * 1000}} {view} {visibleCopperKeys} topCamera={{transform:worldTransform,panX:gestures.panX,panY:gestures.panY,width:W,height:H}} onRenderStatus={available=>webglUnavailable=!available} isVisible={isTerminalVisible} showTerminals={false} simulation={visualizationInput} />
+    {#if view.viewMode === "top"}<canvas bind:this={canvasRef} data-testid="coil-annotations" class="pointer-events-none absolute inset-0 block h-full w-full"></canvas>{/if}
   </PreviewFrame>
-
-  {#if coils && coils.phases.length > 0}
-    <p class="mt-2 text-xs text-slate-500">
-      <span class="text-slate-600"
-        >{view.viewMode === "iso" ? "Drag to orbit · Scroll or pinch to zoom · Switch to Top-down to edit" : "Drag to pan · Pinch or Ctrl-scroll to zoom · Expand to edit"}</span
-      >
-    </p>
-  {/if}
 
 </div>
 {/if}
@@ -602,6 +604,8 @@
       {view}
       {gestures}
       {measure}
+      {visibleCopperKeys}
+      onRenderStatus={available=>webglUnavailable=!available}
       onSimplify={importedGeometry && onGeometryChange ? simplifyImportedLines : undefined}
       onUndoSimplify={canUndoSimplify ? undoSimplify : undefined}
       {simplifyNotice}

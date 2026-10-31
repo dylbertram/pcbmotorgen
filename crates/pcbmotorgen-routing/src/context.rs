@@ -37,6 +37,10 @@ pub struct RoutingContext {
     /// contexts serialized before this field existed keep their behaviour.
     #[serde(default)]
     pub trace_width_mm: f64,
+    /// Via pad diameter supplied by the host's DFM sizing authority. None
+    /// preserves older routing contexts, which cannot claim pad clearance.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub via_pad_diameter_mm: Option<f64>,
     /// Minimum trace-to-trace clearance [mm].
     ///
     /// Also the default inter-phase clearance: when
@@ -50,6 +54,9 @@ pub struct RoutingContext {
     pub expects_continuous: bool,
     /// Pattern-specific numeric parameters (e.g. `num_strands`, `angle_deg`).
     pub params: HashMap<String, f64>,
+    /// Applied by the host after generation and validation, not by plugins.
+    #[serde(default)]
+    pub orientation: crate::RoutingOrientation,
     /// Magnetic pole pitch [mm] (`magnet_width + magnet_gap`) of the mover the
     /// stator serves. This is the centre-to-centre distance between adjacent
     /// north and south poles (`tau_p` in the phase-band width equations).

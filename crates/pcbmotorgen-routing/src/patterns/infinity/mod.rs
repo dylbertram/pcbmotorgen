@@ -1,12 +1,13 @@
 //! The "infinity" diamond braid routing pattern.
 //!
 //! Faithful Rust port of `docs/reference/pcbBraid` (after Verbeek & Dehez).
-//! Produces a two-layer braid: `top_layer_segments` on layer 0, `bottom_layer_segments`
-//! on layer 1, and vias (at every peak/valley/edge endpoint) routing 0 → 1.
+//! Produces matching active XY braid geometry on every adjacent layer pair.
 //!
-//! Pattern-owned layer semantics: this pattern is inherently 2-layer and uses
-//! vias at crossing points. It is not constrained by the earlier single-layer
-//! ranking.
+//! Pattern-owned layer semantics: the repeating braid uses two layers and
+//! vias at crossing points. Star/wye connects any even-layer stack in series,
+//! with driver leads on the last layer and neutral on layer 0. Each pair opens
+//! one full braid period farther right toward the neutral. Delta retains its
+//! legacy two/four-layer termination; higher-layer delta is not defined.
 //!
 //! ## Magnet-aware period count
 //!
@@ -21,6 +22,11 @@
 //! forms one connected ring per phase before its lead cut, not several rings.
 //! Contexts built without a magnet layout fall back to the packaged `n_periods`
 //! default (kept for backward compatibility with plugin probes and unit tests).
+//!
+//! Phase starts occupy consecutive strand bundles on the compact interleave
+//! grid. Physical bundle pitch is not, by itself, a declaration of terminal
+//! polarity or controller electrical phase. Do not spread the bundles to fit
+//! a desired force-axis angle; winding polarity/commutation needs its own audit.
 //!
 //! The geometry is split into three submodules:
 //! - [`diamonds`] — the diamond / period geometry engine,
@@ -76,10 +82,18 @@
 //!
 //! Leads are inactive (non-thrust) conductors and are the only copper the
 //! braid places outside the board width.
+//!
+//! Those lead details describe legacy delta routing. Star/wye uses the
+//! staggered openings and mirrored fan-outs in [`stacked`], following the
+//! supplied 2/4/6/8-layer examples without changing the main XY braid.
+//! Closed mode retains separate closed
+//! rings in each pair, without inventing external terminals or series links.
 
 mod diamonds;
+mod four_layer;
 mod peaks_valleys;
 mod segments;
+mod stacked;
 
 use crate::context::RoutingContext;
 use crate::error::{RoutingError, RoutingErrorKind};
@@ -100,7 +114,7 @@ enum Connection {
     Closed,
     /// Each phase is opened and both ends are brought out as leads.
     Delta,
-    /// As [`Connection::Delta`], with the layer-1 ends tied by a neutral bus.
+    /// Layer-0 ends tied by a neutral bus; opposite outer-layer ends are leads.
     Star,
 }
 
@@ -128,11 +142,32 @@ impl RoutingPattern for InfinityBraidPattern {
     }
 
     fn display_name(&self) -> &str {
-        "Infinity Braid (pcbBraid)"
+        "Infinity Braid"
+    }
+
+    fn metadata(&self) -> crate::PluginMetadata {
+        use crate::pattern::{EndTypeOption, GeneratorEndType, WindingConnection};
+        crate::PluginMetadata {
+            display_name: self.display_name().to_string(),
+            description: self.description().to_string(),
+            min_layers: self.min_layers(),
+            max_layers: self.max_layers(),
+            layers_multiple_of: self.layers_multiple_of(),
+            end_type: Some(GeneratorEndType::Parameter {
+                key: "connection".to_string(),
+                default: Connection::CLOSED,
+                options: vec![
+                    EndTypeOption { value: Connection::STAR, connection: WindingConnection::Star },
+                    EndTypeOption { value: Connection::DELTA, connection: WindingConnection::Delta },
+                    EndTypeOption { value: Connection::CLOSED, connection: WindingConnection::Closed },
+                ],
+            }),
+            ..crate::PluginMetadata::new(self.id())
+        }
     }
 
     fn description(&self) -> &str {
-        "Two-layer overlapping diamond braid after Verbeek & Dehez, with vias at crossing points."
+        "Even-layer diamond braid after Verbeek & Dehez; star/wye connects staggered braid pairs in series. Delta supports two or four layers."
     }
 
     fn author(&self) -> &str {
@@ -151,11 +186,13 @@ impl RoutingPattern for InfinityBraidPattern {
         vec![
             PatternParameter::int("num_strands", "Strands per period", 5.0, 2.0, 99.0)
                 .with_description("Number of parallel braided paths in each period."),
+            // Saved legacy closed windings explicitly use 0. The source picker
+            // hides that choice for new designs, but validation must accept it.
             PatternParameter::int(
                 "connection",
                 "Winding connection",
                 Connection::DELTA,
-                Connection::DELTA,
+                Connection::CLOSED,
                 Connection::STAR,
             )
             .with_description(
@@ -164,6 +201,7 @@ impl RoutingPattern for InfinityBraidPattern {
             .with_options(vec![
                 ParamOption::new(Connection::DELTA, "Delta"),
                 ParamOption::new(Connection::STAR, "Star (wye)"),
+                ParamOption::new(Connection::CLOSED, "Closed (legacy)"),
             ]),
         ]
     }
@@ -172,6 +210,14 @@ impl RoutingPattern for InfinityBraidPattern {
         // The braid weaves a top layer against a mirrored bottom layer with
         // vias between them; `validated_braid_context` rejects < 2 layers,
         // so declare it as metadata instead of a generate-time surprise.
+        Some(2)
+    }
+
+    fn max_layers(&self) -> Option<u32> {
+        None
+    }
+
+    fn layers_multiple_of(&self) -> Option<u32> {
         Some(2)
     }
 
@@ -204,7 +250,8 @@ impl RoutingPattern for InfinityBraidPattern {
             num_strands,
             connection,
             lead_pitch,
-        );
+            ctx,
+        )?;
 
         // Pattern-declared leg grid: the braid's active legs populate a
         // uniform interleave grid of one slot per phase/strand position per
@@ -243,6 +290,14 @@ fn validated_braid_context(ctx: &RoutingContext) -> Result<Option<f64>, RoutingE
                 ctx.num_layers
             ),
         ));
+    }
+    if ctx.num_layers % 2 != 0 {
+        return Err(RoutingError::new(0, "num_layers", RoutingErrorKind::BadLayer,
+            "the infinity braid requires an even number of copper layers"));
+    }
+    if ctx.num_layers > 4 && Connection::from_param(ctx.param("connection", Connection::CLOSED)) == Connection::Delta {
+        return Err(RoutingError::new(0, "num_layers", RoutingErrorKind::BadLayer,
+            "delta braid terminations support only 2 or 4 copper layers; use star/wye for larger even-layer stacks"));
     }
     if !ctx.active_area_length_mm.is_finite() || ctx.active_area_length_mm <= 0.0 {
         return Err(RoutingError::new(
@@ -292,16 +347,14 @@ fn resolve_braid_layout(
     phases: i64,
     num_strands: i64,
 ) -> Result<BraidLayout, RoutingError> {
+    let tail_slots = phases * num_strands - 1;
     match magnet_pitch {
         Some(pitch) => {
-            // The final right-hand endpoint is one interleave step before
-            // the end of the next period. Reserve that step before
-            // selecting the number of complete periods; otherwise the
-            // leftover remainder creates a visibly wide via gap between
-            // the last strand of one period and the first strand of the
-            // next period.
+            // Reserve consecutive phase/strand bundles. Widening phase starts
+            // while retaining the strand grid leaves missing bundles at both ends.
             let interleave_step = pitch / (num_strands * phases) as f64;
-            let mut n_periods = ((d_tot + interleave_step) / pitch).floor() as i64 - 1;
+            let tail_span = tail_slots as f64 * interleave_step;
+            let mut n_periods = ((d_tot - tail_span) / pitch).floor() as i64;
             // The braid's end joins permute its strands by the repeat
             // count. A shared divisor creates separate closed rings rather
             // than the single winding that the lead cut is meant to open.
@@ -320,14 +373,11 @@ fn resolve_braid_layout(
                     format!(
                         "the routable length ({:.3} mm) cannot fit one complete pole-pitched braid period plus its phase/strand interleave ({:.3} mm required); increase the active area",
                         d_tot,
-                        2.0 * pitch - interleave_step
+                        pitch + tail_span
                     ),
                 ));
             }
-            // One pole pitch contains every phase/strand position exactly
-            // once. This keeps the final point of one phase to the first
-            // point of the next phase equal to the preceding within-phase
-            // point spacing on both layer copies.
+            // Endpoints as well as interior repeats retain the uniform grid.
             let o = -interleave_step;
             Ok(BraidLayout {
                 n_periods,
@@ -339,8 +389,8 @@ fn resolve_braid_layout(
             // No magnet layout: fall back to the packaged `n_periods` default
             // (kept for plugin probes and unit tests).
             let n_periods = (ctx.param("n_periods", 4.0) as i64).max(1);
-            let o = d_tot / ((n_periods + 1) * num_strands * phases - 1) as f64 * -1.0;
-            let d_phase = d_tot - ((o * num_strands as f64 * -1.0) * phases as f64) - o;
+            let o = -d_tot / (n_periods * num_strands * phases + tail_slots) as f64;
+            let d_phase = n_periods as f64 * num_strands as f64 * phases as f64 * -o;
             Ok(BraidLayout {
                 n_periods,
                 d_phase,
@@ -350,7 +400,8 @@ fn resolve_braid_layout(
     }
 }
 
-/// Centre-to-centre spacing of the lead runs above the board [mm].
+/// Legacy delta lead-run spacing above the board [mm]. Star/wye takes its
+/// exact row pitch from the braid vias, without this manufacturing clamp.
 ///
 /// Matches the depth of the braid's first crossing below its peaks (the
 /// interleave step times the diamond edge slope), so the first lead sits at
@@ -381,8 +432,9 @@ fn braid_geometry(
     num_strands: i64,
     connection: Connection,
     lead_pitch: f64,
-) -> BraidGeometry {
-    let offset_step = layout.o * num_strands as f64 * -1.0;
+    ctx: &RoutingContext,
+) -> Result<BraidGeometry, RoutingError> {
+    let offset_step = -layout.o * num_strands as f64;
     let mut geometry = BraidGeometry {
         segments: Vec::new(),
         vias: Vec::new(),
@@ -418,7 +470,7 @@ fn braid_geometry(
         }
         // Declared phase bands (kata hzs2), consistent with the pole regions:
         // the centerline is the first region's center (the band's first
-        // repeat — adjacent phases sit one phase-band pitch apart), the
+        // repeat — adjacent phases occupy consecutive strand bundles), the
         // extent spans all of the phase's pole regions, and the diamonds map
         // onto the full board width [0, 2a].
         if let (Some(first), Some(last)) = (region_xs.first(), region_xs.last()) {
@@ -492,11 +544,16 @@ fn braid_geometry(
         }
     }
 
-    if connection != Connection::Closed {
+    if connection != Connection::Delta {
+        stacked::stack_and_terminate(&mut geometry, &ends, connection,
+            layout.d_phase / layout.n_periods as f64, layout.n_periods, ctx)?;
+    } else if ctx.num_layers == 4 {
+        four_layer::stack_and_terminate(&mut geometry, &ends, connection, lead_pitch, ctx)?;
+    } else if connection != Connection::Closed {
         add_leads(&mut geometry, &ends, connection, lead_pitch);
     }
 
-    geometry
+    Ok(geometry)
 }
 
 /// Bring each opened phase out to the edge (see the module docs).
@@ -842,7 +899,7 @@ mod tests {
             }
         }
 
-        // Adjacent phase centerlines sit exactly one phase-band pitch apart:
+        // Adjacent phase centerlines sit one physical bundle pitch apart:
         // the commutation offsets read from the declaration equal the
         // analytic pi * tau_band / tau_p law.
         let pitch = magnet_ctx().magnet_pitch().unwrap();
@@ -899,6 +956,24 @@ mod tests {
         }
     }
 
+    #[test]
+    fn explicit_legacy_closed_connection_matches_absent_connection_through_public_dispatch() {
+        for layers in [2, 4, 6, 8] {
+            let mut explicit = fader_ctx(Connection::CLOSED);
+            explicit.num_layers = layers;
+            let mut missing = explicit.clone();
+            missing.params.remove("connection");
+            let expected = crate::generate_routing_report(&missing, "infinity-braid").unwrap();
+            let actual = crate::generate_routing_report(&explicit, "infinity-braid").unwrap();
+            assert_eq!(actual, expected, "explicit legacy 0 must not be rejected or rewired");
+            assert_eq!(explicit.params["connection"], Connection::CLOSED);
+        }
+        for invalid in [-1., 0.5, 3., f64::NAN, f64::INFINITY] {
+            let context = fader_ctx(invalid);
+            assert!(crate::generate_routing_report(&context, "infinity-braid").is_err());
+        }
+    }
+
     type NodeKey = (u32, i64, i64);
 
     fn node(layer: u32, p: Point) -> NodeKey {
@@ -917,7 +992,9 @@ mod tests {
             link(node(s.layer, s.start), node(s.layer, s.end));
         }
         for v in r.vias.iter().filter(|v| v.net == net) {
-            link(node(v.from_layer, v.position), node(v.to_layer, v.position));
+            for layer in v.from_layer..v.to_layer {
+                link(node(layer, v.position), node(layer + 1, v.position));
+            }
         }
         g
     }
@@ -966,7 +1043,7 @@ mod tests {
         })
     }
 
-    /// Layer-1 lead of every phase, shared by delta and star: up from the
+    /// Legacy delta layer-1 lead of every phase: up from the
     /// break to its lead height, then left to x = 0.
     fn assert_layer_one_leads(r: &RoutingResult) {
         for (i, net) in ["A", "B", "C"].into_iter().enumerate() {
@@ -1008,10 +1085,14 @@ mod tests {
 
     #[test]
     fn star_matches_the_fader_example() {
-        // Reference: motor-coils_3s_0-4mm_star.dxf. Each layer-0 end rises
-        // one lead pitch onto a layer-0 neutral bar.
+        // Revised star-wye_2-layer.dxf: driver risers bend left along the
+        // mirrored braid slope; the neutral remains on layer zero.
         let r = InfinityBraidPattern.generate(&fader_ctx(2.0)).unwrap();
-        assert_layer_one_leads(&r);
+        for (i, net) in ["A", "B", "C"].into_iter().enumerate() {
+            let x = BREAK_X[i] - (i + 1) as f64 / 3.0;
+            assert!(has_lead(&r, net, 1, (BREAK_X[i], 8.0), (x, LEAD[i])));
+            assert!(has_lead(&r, net, 1, (x, LEAD[i]), (0.0, LEAD[i])));
+        }
 
         let n = LEAD[0];
         for (i, net) in ["A", "B", "C"].into_iter().enumerate() {
@@ -1038,7 +1119,9 @@ mod tests {
             link(node(s.layer, s.start), node(s.layer, s.end));
         }
         for v in vias {
-            link(node(v.from_layer, v.position), node(v.to_layer, v.position));
+            for layer in v.from_layer..v.to_layer {
+                link(node(layer, v.position), node(layer + 1, v.position));
+            }
         }
         g
     }
@@ -1096,7 +1179,7 @@ mod tests {
     }
 
     #[test]
-    fn leads_never_tighter_than_trace_plus_space() {
+    fn legacy_delta_leads_never_tighter_than_trace_plus_space() {
         let mut c = fader_ctx(1.0);
         c.min_trace_mm = 0.4;
         c.min_space_mm = 0.4;
@@ -1139,6 +1222,249 @@ mod tests {
     }
 
     #[test]
+    fn staggered_legs_keep_the_projected_braid_angle_and_actual_via_y_pitch() {
+        for width in [8.0, 20.0] {
+            for strands in [2, 3, 5] {
+                for (pad, trace) in [(0.4, 0.127), (0.5, 0.2), (0.7, 0.5)] {
+                  for layers in [4, 6, 8, 10] {
+                    let mut context = fader_ctx(2.0);
+                    context.num_layers = layers;
+                    context.board_width_mm = width;
+                    context.via_pad_diameter_mm = Some(pad);
+                    context.trace_width_mm = trace;
+                    context.params.insert("num_strands".into(), strands as f64);
+                    let result = InfinityBraidPattern.generate(&context).unwrap();
+                    let mut ys: Vec<_> = result.vias.iter().filter(|v| v.position.y <= width + 1e-9)
+                        .map(|v| v.position.y).collect();
+                    ys.sort_by(|a, b| b.total_cmp(a));
+                    ys.dedup_by(|a, b| (*a - *b).abs() < 1e-9);
+                    // Two strands have only lower intermediate crossing
+                    // rows. The centre-height end vias are not a row pitch.
+                    let pitch = if strands == 2 { ys[ys.len() - 2] - ys[ys.len() - 1] } else { ys[0] - ys[1] };
+                    for s in result.segments.iter().filter(|s| !s.is_active && (s.start.y - width).abs() < 1e-9) {
+                        let phase = PHASE_NAMES.iter().position(|n| *n == s.net).unwrap();
+                        let expected_row = if s.layer == 0 { 1 } else { phase + 1 };
+                        assert!((s.end.y - width - expected_row as f64 * pitch).abs() < 1e-9);
+                        if s.layer == 0 { continue; } // Neutral bar risers remain vertical.
+                        let matches_projected_braid = result.segments.iter().filter(|a| a.is_active && a.net == s.net)
+                            .filter_map(|a| if a.start.distance_to(s.start) < 1e-9 { Some(a.end) }
+                                else if a.end.distance_to(s.start) < 1e-9 { Some(a.start) } else { None })
+                            .any(|other| {
+                                let (ax, ay) = (s.start.x - other.x, s.start.y - other.y);
+                                let (bx, by) = (s.end.x - s.start.x, s.end.y - s.start.y);
+                                (ax * by - ay * bx).abs() < 1e-9 && ax * bx + ay * by > 0.0
+                            });
+                        assert!(matches_projected_braid, "end leg must be collinear with the projected braid edge, not a capped slope");
+                    }
+                    let joins: Vec<_> = result.vias.iter().filter(|v| (v.from_layer, v.to_layer) == (0, layers - 1)).collect();
+                    assert_eq!(joins.len(), (3 * (layers / 2 - 1)) as usize);
+                    for via in joins {
+                        let mut landing: Vec<_> = result.segments.iter().filter(|s| s.net == via.net
+                            && (s.start == via.position || s.end == via.position)).map(|s| s.layer).collect();
+                        landing.sort(); landing.dedup();
+                        assert_eq!(landing.len(), 2, "each barrel lands on exactly two inner layers");
+                        assert_eq!(landing[0] % 2, 1);
+                        assert_eq!(landing[1], landing[0] + 1);
+                    }
+                    let mut two = context.clone();
+                    two.num_layers = 2;
+                    let two_with_size = InfinityBraidPattern.generate(&two).unwrap();
+                    two.via_pad_diameter_mm = None;
+                    assert_eq!(two_with_size, InfinityBraidPattern.generate(&two).unwrap(), "two-layer copper must not change");
+                    let mut changed_rules = context.clone();
+                    changed_rules.via_pad_diameter_mm = Some(pad + 0.3);
+                    changed_rules.trace_width_mm = trace + 0.1;
+                    changed_rules.min_space_mm += 0.2;
+                    assert_eq!(result, InfinityBraidPattern.generate(&changed_rules).unwrap(),
+                        "manufacturing rules must not change the requested angle or Y spacing");
+                  }
+                }
+            }
+        }
+        // Negative controls reproduce 11e2fcc's baseline slope cap and row
+        // widening. Neither is allowed to follow DFM size changes again.
+        let expected_pitch = 4.0_f64 / 9.0;
+        let old_pitch = 0.5 + 0.127;
+        let old_slope = (1.0 / 3.0) / old_pitch;
+        assert!((old_pitch - expected_pitch).abs() > 0.1);
+        assert!((old_slope - 0.75_f64).abs() > 0.1);
+    }
+
+    #[test]
+    fn four_layer_star_and_delta_keep_their_series_topology() {
+        for connection in [1.0, 2.0] {
+            let mut context = fader_ctx(connection);
+            context.num_layers = 4;
+            context.via_pad_diameter_mm = Some(0.5);
+            context.trace_width_mm = 0.2;
+            let result = InfinityBraidPattern.generate(&context).unwrap();
+            assert!(Validator::validate(&result, &context, false).is_ok());
+            for phase in ["A", "B", "C"] {
+                assert!(connected(&net_graph(&result, phase)));
+            }
+        }
+    }
+
+    #[test]
+    fn four_layer_rejects_invalid_pad_sizes_but_leaves_clearance_to_dfm() {
+        let mut context = fader_ctx(2.0);
+        context.num_layers = 4;
+        for size in [0.0, -0.4, f64::NAN, f64::INFINITY] {
+            context.via_pad_diameter_mm = Some(size);
+            assert!(InfinityBraidPattern.generate(&context).is_err(), "invalid/unfittable pad {size}");
+        }
+        // The user selected geometry plus warnings, not generation rejection.
+        context.via_pad_diameter_mm = Some(0.7);
+        context.trace_width_mm = 0.5;
+        assert!(InfinityBraidPattern.generate(&context).is_ok());
+        context.via_pad_diameter_mm = Some(4.0);
+        assert!(InfinityBraidPattern.generate(&context).is_ok());
+    }
+
+    #[test]
+    fn four_layer_stack_populates_every_layer_and_connects_pairs_in_series() {
+        for strands in [2, 3, 5] {
+            let mut context = fader_ctx(2.0);
+            context.num_layers = 4;
+            context.params.insert("num_strands".into(), strands as f64);
+            let result = InfinityBraidPattern.generate(&context).unwrap();
+            assert!(Validator::validate(&result, &context, false).is_ok());
+            assert_eq!(result.phase_bands.len(), 12);
+            for layer in 0..4 {
+                assert!(result.segments.iter().any(|s| s.layer == layer && s.is_active));
+                for net in ["A", "B", "C"] {
+                    let active = |l| result.segments.iter().filter(|s| s.layer == l && s.is_active && s.net == net)
+                        .map(|s| (s.start, s.end)).collect::<Vec<_>>();
+                    assert_eq!(active(layer), active(layer % 2));
+                }
+            }
+            let bridges: Vec<_> = result.vias.iter().filter(|v| v.from_layer == 0 && v.to_layer == 3).collect();
+            assert_eq!(bridges.len(), 3);
+            for net in ["A", "B", "C"] {
+                assert!(connected(&net_graph(&result, net)));
+                let bridge = bridges.iter().find(|v| v.net == net).unwrap();
+                // Same-phase outer copper must not bypass a winding pair.
+                // Cross-phase collisions are now reported by DFM, as chosen
+                // by the user, rather than changing the angle or row pitch.
+                for layer in [0, 3] {
+                    assert!(!result.segments.iter().filter(|s| s.layer == layer && s.net == net).any(|s| {
+                        let p = bridge.position;
+                        let cross = (p.x-s.start.x)*(s.end.y-s.start.y) - (p.y-s.start.y)*(s.end.x-s.start.x);
+                        cross.abs() < 1e-8 && p.x >= s.start.x.min(s.end.x)-1e-8 && p.x <= s.start.x.max(s.end.x)+1e-8
+                            && p.y >= s.start.y.min(s.end.y)-1e-8 && p.y <= s.start.y.max(s.end.y)+1e-8
+                    }));
+                }
+                let mut cut = result.clone();
+                cut.vias.retain(|v| !(v.net == net && v.from_layer == 0 && v.to_layer == 3));
+                assert!(!connected(&net_graph(&cut, net)), "removing the series join must separate the two winding pairs");
+            }
+            assert!(result.segments.iter().filter(|s| !s.is_active && s.start.x == 0.0 || !s.is_active && s.end.x == 0.0)
+                .all(|s| s.layer == 3));
+        }
+    }
+
+    #[test]
+    fn staggered_star_opens_exactly_one_period_per_pair_without_changing_the_body() {
+        for layers in [2, 4, 6, 8, 10] {
+            let mut context = fader_ctx(2.0);
+            context.num_layers = layers;
+            let result = InfinityBraidPattern.generate(&context).unwrap();
+            assert!(Validator::validate(&result, &context, false).is_ok());
+            let mut closed_context = context.clone();
+            closed_context.params.insert("connection".into(), 0.0);
+            let closed = InfinityBraidPattern.generate(&closed_context).unwrap();
+            assert!(closed.segments.iter().all(|s| s.is_active));
+            assert!(closed.vias.iter().all(|v| v.to_layer == v.from_layer + 1 && v.from_layer % 2 == 0));
+            assert_eq!(result.phase_bands.len(), (3 * layers) as usize);
+            for layer in 0..layers {
+                let active = |r: &RoutingResult, l| r.segments.iter().filter(|s| s.is_active && s.layer == l)
+                    .map(|s| (s.net.clone(), s.start, s.end)).collect::<Vec<_>>();
+                assert_eq!(active(&result, layer), active(&closed, layer));
+                assert_eq!(active(&result, layer), active(&result, layer % 2));
+            }
+            for pair in 0..layers / 2 {
+                let cut_x = 4.0 + T + (layers / 2 - 1 - pair) as f64 * 6.0;
+                for (i, net) in ["A", "B", "C"].into_iter().enumerate() {
+                    let removed: Vec<_> = closed.vias.iter().filter(|v| v.net == net && v.from_layer == 2 * pair
+                        && !result.vias.contains(v)).collect();
+                    assert_eq!(removed.len(), 1, "never leave the old cut open as well");
+                    assert!(approx(removed[0].position, cut_x + 2.0 * i as f64, 8.0));
+                    assert!(connected(&net_graph(&result, net)));
+                }
+            }
+            assert!(result.segments.iter().filter(|s| !s.is_active && (s.start.x == 0.0 || s.end.x == 0.0))
+                .all(|s| s.layer == layers - 1));
+        }
+        let mut short = fader_ctx(2.0);
+        short.active_area_length_mm = 20.0;
+        short.num_layers = 8;
+        assert!(InfinityBraidPattern.generate(&short).unwrap_err().message.contains("one braid period per layer pair"));
+        let mut large = magnet_ctx();
+        large.num_layers = 64;
+        large.params.insert("connection".into(), 2.0);
+        let result = InfinityBraidPattern.generate(&large).unwrap();
+        assert_eq!(result.phase_bands.len(), 3 * 64);
+        assert_eq!(result.vias.iter().filter(|v| v.from_layer == 0 && v.to_layer == 63).count(), 3 * 31);
+    }
+
+    #[test]
+    fn rejects_undefined_braid_stack_counts_instead_of_leaving_layers_empty() {
+        for layers in [0, 1, 3, 5, 7, 9] {
+            let mut context = fader_ctx(2.0);
+            context.num_layers = layers;
+            assert_eq!(InfinityBraidPattern.generate(&context).unwrap_err().kind, RoutingErrorKind::BadLayer);
+            assert!(crate::generate_routing_result(&context, "infinity-braid").is_err());
+        }
+        assert_eq!(InfinityBraidPattern.layers_multiple_of(), Some(2));
+        assert_eq!(InfinityBraidPattern.max_layers(), None);
+        for layers in [6, 8, 10] {
+            let mut context = fader_ctx(1.0);
+            context.num_layers = layers;
+            assert!(InfinityBraidPattern.generate(&context).unwrap_err().message.contains("delta"));
+        }
+    }
+
+    #[test]
+    fn compact_interleave_covers_both_ends_for_all_connection_modes() {
+        // The doubled phase offset formerly passed interior/force checks while
+        // leaving gaps at the finite winding's ends. Check the actual via rows,
+        // not just the declared band metadata, including a negative control.
+        for strands in [2, 3, 5] {
+            for magnet_pitch in [None, Some(6.0)] {
+                for connection in [0.0, 1.0, 2.0] {
+                    let mut context = fader_ctx(connection);
+                    context.active_area_length_mm = 92.0;
+                    context.magnet_pitch_mm = magnet_pitch;
+                    context.params.insert("num_strands".into(), strands as f64);
+                    let layout = resolve_braid_layout(&context, 92.0, magnet_pitch, 3, strands).unwrap();
+                    let result = InfinityBraidPattern.generate(&context).unwrap();
+                    let mut row: Vec<_> = result.vias.iter()
+                        .filter(|v| (v.position.y - context.board_width_mm / 2.0).abs() < 1e-10)
+                        .map(|v| (v.position.x, v.net.clone())).collect();
+                    row.sort_by(|a, b| a.0.total_cmp(&b.0));
+                    let count = (3 * strands) as usize;
+                    assert_eq!(row.len(), 2 * count);
+                    let uniform = |points: &[(f64, String)]| points.windows(2)
+                        .all(|p| ((p[1].0 - p[0].0) - layout.o.abs()).abs() < 1e-10);
+                    assert!(uniform(&row[..count]), "left end: strands={strands}, pitch={magnet_pitch:?}, connection={connection}");
+                    assert!(uniform(&row[count..]), "right end: strands={strands}, pitch={magnet_pitch:?}, connection={connection}");
+                    assert!(Validator::validate(&result, &context, false).is_ok());
+
+                    // Reproduce a496f71's extra bundle shift on each phase.
+                    let mut widened = row.clone();
+                    for (x, phase) in &mut widened {
+                        let index = PHASE_NAMES.iter().position(|&name| name == phase).unwrap();
+                        *x += index as f64 * strands as f64 * layout.o.abs();
+                    }
+                    widened.sort_by(|a, b| a.0.total_cmp(&b.0));
+                    assert!(!uniform(&widened[..count]));
+                    assert!(!uniform(&widened[count..]));
+                }
+            }
+        }
+    }
+
+    #[test]
     fn via_x_spacing_is_uniform_across_phase_boundaries_on_both_layers() {
         let context = magnet_ctx();
         let result = InfinityBraidPattern.generate(&context).unwrap();
@@ -1161,6 +1487,8 @@ mod tests {
                 let across_phases =
                     (next[0].position.x - left[strands - 1].position.x).abs();
                 assert!((across_phases - within_phase).abs() < 1e-12);
+                let start_step = next[0].position.x - left[0].position.x;
+                assert!((start_step - context.magnet_pitch().unwrap() / 3.0).abs() < 1e-12);
             }
         }
 

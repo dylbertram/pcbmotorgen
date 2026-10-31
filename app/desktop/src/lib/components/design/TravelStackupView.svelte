@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { ConfigStore } from "../../stores/config.svelte";
+  import { pcbStackupHeightsMm } from "../../pcbStackup";
   import {
     HOUSING_MATERIAL_OPTIONS,
     layerMaterialLabel,
@@ -96,6 +97,9 @@
     stackParts(config.backplane, config.pcb_thickness_mm, config.air_gap_mm, config.magnet_height_mm),
   );
   let totalMm = $derived(parts.reduce((sum, part) => sum + part.mm, 0));
+  const copperHeights = $derived.by(() => {
+    try { return config.pcb_stackup_mm ? pcbStackupHeightsMm(config.pcb_stackup_mm) : []; } catch { return []; }
+  });
   // One scale for every part, fitted between the top and bottom padding.
   let zScale = $derived((ORTHO_H - ORTHO_PAD_T - ORTHO_PAD_B) / Math.max(totalMm, 0.1));
 
@@ -149,7 +153,12 @@
       {@const look = SEGMENT_STYLE[seg.kind]}
       {@const h = seg.bottom - seg.top}
       <rect x={ORTHO_PAD_L} y={seg.top} width={RECT_W} height={h}
-            fill={look.fill} stroke={look.stroke} stroke-width="0.6" />
+             fill={look.fill} stroke={look.stroke} stroke-width="0.6" />
+      {#if seg.kind === "pcb" && config.pcb_stackup_mm}
+        {#each copperHeights as z, layer (layer)}
+          <line x1={ORTHO_PAD_L} x2={ORTHO_PAD_L + RECT_W} y1={seg.top - z * zScale} y2={seg.top - z * zScale} stroke="#d99a45" stroke-width={config.pcb_stackup_mm.copper_mm[layer] * zScale} />
+        {/each}
+      {/if}
       {#if seg.inside && h >= MIN_INSIDE_LABEL_PX}
         <text x={ORTHO_PAD_L + RECT_W / 2} y={seg.top + h / 2 + 2.5} text-anchor="middle"
                class={look.text} style="font-size:10px">{seg.inside}</text>

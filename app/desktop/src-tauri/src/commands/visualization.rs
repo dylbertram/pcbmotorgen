@@ -30,7 +30,7 @@ pub async fn sample_simulation_visualization(
 ) -> Result<VisualizationReport, String> {
     request.validate()?;
     let core = config.to_core();
-    core.validate().map_err(|e| e.to_string())?;
+    core.validate_for_simulation().map_err(|e| e.to_string())?;
     let input_sha256 = format!(
         "{:x}",
         Sha256::digest(
@@ -39,6 +39,7 @@ pub async fn sample_simulation_visualization(
         )
     );
     let implementation_sha256=format!("{:x}",Sha256::digest(concat!(include_str!("visualization.rs"),
+        include_str!("cad_source.rs"),
         include_str!("../../../../../Cargo.lock"),
         include_str!("../../../../../crates/pcbmotorgen-simulation/src/visualization.rs"),
         include_str!("../../../../../crates/pcbmotorgen-simulation/src/drive/geometry.rs"),
@@ -66,7 +67,7 @@ pub async fn sample_simulation_visualization(
                         &board.simulation_input(cad, &core),
                         &board.routing,
                         &drive_settings,
-                        &super::cad_source::CadBoard::drive_hints(cad),
+                        &board.drive_hints(cad),
                         request.phase_peak_a,
                     );
                 }
@@ -97,7 +98,7 @@ pub async fn sample_simulation_visualization(
             implementation_sha256,
             app_version: env!("CARGO_PKG_VERSION"),
             coordinate_convention:
-                "SI routing frame: X travel, Y across board, PCB top Z=0; no geometry relocation",
+                "SI routing frame: X travel, Y across board, PCB top Z=0; imported layer Z ratios scaled to configured PCB thickness",
             field,
             heat,
             heat_unavailable_reason,

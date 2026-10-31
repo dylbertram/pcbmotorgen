@@ -1443,7 +1443,7 @@ mod tests {
             let core = config.to_linear_motor_ipc().to_core();
             let board = super::super::cad_source::CadBoard::new(cad,&core).unwrap();
             pcbmotorgen_simulation::dc_geometry::circular_qualification_snapshot(&board.simulation_input(cad,&core),
-                &board.routing,&config.drive,&super::super::cad_source::CadBoard::drive_hints(cad)).unwrap()
+                &board.routing,&config.drive,&board.drive_hints(cad)).unwrap()
         } else {
             tauri::async_runtime::block_on(super::super::physics::prepare_dc_winding_geometry(
                 config.to_linear_motor_ipc(), config.drive, cad)).unwrap()

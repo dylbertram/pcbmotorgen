@@ -2,7 +2,10 @@ import { describe, expect, it } from "vitest";
 import { ConfigStore } from "./stores/config.svelte";
 import { mockDriveAnalysis, mockForceSweep } from "./ipc/mocks";
 import type { CadGeometry } from "./types";
-import { powerRequirements, powerReportMarkdown, powerRequirementsCsv, powerModelSnapshot, forceSweepCsv, phaseElectricalCsv, type PowerRequirementsInput } from "./powerRequirements";
+import { powerRequirements, powerReportMarkdown, powerRequirementsCsv, powerModelSnapshot, forceSweepCsv, phaseElectricalCsv, currentMoveResult, moveTraceCsv, type PowerRequirementsInput } from "./powerRequirements";
+import { declaredLossFixture } from "./testFixtures/moveLosses";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 
 // Inputs transcribed from the user's Fader-traces-workspace.pmmotor. This
 // fixture deliberately does not claim to reproduce its imported trace solver.
@@ -10,7 +13,7 @@ function fixture(): PowerRequirementsInput {
   const config = new ConfigStore();
   Object.assign(config, { desired_travel_mm: 63, active_area_width_mm: 8,
     magnet_count: 5, magnet_width_mm: 5, magnet_cross_width_mm: 5,
-    magnet_height_mm: 3, electrical_pitch_mm: 12, supply_voltage_v: 12,
+    magnet_height_mm: 3, electrical_pitch_mm: 12, supply_voltage_v: 12, carriage_mass_kg: 0.015,
     routing_params: { num_strands: 3, connection: 0 } });
   const driveSettings = { ...config.drive, series_inductance_h: 47e-6 };
   return { config: config.toIpc(), driveSettings, desiredTravelMm: 63,
@@ -31,7 +34,7 @@ describe("power requirements", () => {
     expect(item(input, "Electrical travel period").value).toBe("12 mm");
     expect(item(input, "Electrical travel period").detail).toContain("pole pitch 6 mm");
     expect(item(input, "Configured carriage mass").value).toBe("0.015 kg");
-    expect(item(input, "Configured carriage mass").detail).toContain("fader cap is unknown");
+    expect(item(input, "Configured carriage mass").detail).toContain("full-assembly override");
   });
 
   it("separates target speed and ripple-inclusive analytical phase peak from supply demand", () => {
@@ -97,7 +100,8 @@ describe("power requirements", () => {
     const snapshot = JSON.parse(powerModelSnapshot(fixture()));
     expect(snapshot.sections).toEqual(sections);
     for (const content of [markdown, csv, JSON.stringify(snapshot.sections)]) {
-      expect(content).not.toMatch(/scribble|LED|USB|grid|adapter|17 faders|60 W|haptic|65 mm|1\.15 A|Source and dependencies|Remaining system decisions/i);
+      // Exclude the peripheral, not words such as "sampled" or "modeled".
+      expect(content).not.toMatch(/scribble|\bLED\b|USB|grid|adapter|17 faders|60 W|haptic|65 mm|1\.15 A|Source and dependencies|Remaining system decisions/i);
     }
   });
 
@@ -122,5 +126,213 @@ describe("power requirements", () => {
     expect(phaseElectricalCsv(drive)).toContain("'=HYPERLINK(\"\"url\"\")");
     expect(phaseElectricalCsv(drive)).toContain('"Unknown"');
     expect(JSON.parse(powerModelSnapshot(input)).drive.phase_resistance_ohm).toBeNull();
+  });
+});
+
+// Synthetic DTOs test report mapping only, not numerical solver validation.
+function withMove(): PowerRequirementsInput {
+  const input = fixture();
+  input.moveRequest = { profile: { duration_s: 1, mass_includes: "Test assembly only", moving_mass_kg: 0.015,
+    start_m: 0.0025, end_m: 0.0655, initial_velocity_m_s: 0, final_velocity_m_s: 0,
+    travel_min_m: 0.0025, travel_max_m: 0.0655, max_speed_m_s: 0.5,
+    max_acceleration_m_s2: 2, max_deceleration_m_s2: 2, coulomb_friction_n: 0.05, time_step_s: 0.001,
+    external_load_n: 0, damping_n_s_per_m: 0 }, control: "balanced_star_sinusoidal",
+    electrical_angle_at_zero_rad: 0, phase_peak_limit_a: 1,
+    source: { boundary: "stiff_dc_link", accepts_regeneration: true }, additional_driver_loss_w: 0, force_positions: 65 };
+  input.moveResult = { request_id: "test", input_sha256: "a".repeat(64), provenance: "simulated_not_measured",
+    inputs: { topology: input.topology, config: input.config, drive: input.driveSettings, cad_geometry: input.cadGeometry, move_request: input.moveRequest },
+    result: { drive: mockDriveAnalysis(input.config, input.driveSettings, null), full_overlap_bounds_m: [0.0025, 0.062833333],
+      conductor_samples: 10, force_map_step_m: 0.001, meshing: 4,
+      demand: { model_version: "report-test-only", source_model_scope: "partial_declared_scenario", profile: input.moveRequest.profile,
+      electrical: { additional_driver_loss_w: 0, source_accepts_regeneration: true,
+        winding: "balanced_star_sinusoidal", phase_resistance_hot_ohm: 1, effective_phase_inductance_h: 47e-6,
+        electrical_period_m: 0.012, electrical_angle_at_zero_rad: 0, force_map: [], phase_peak_limit_a: 1,
+        source_voltage_v: 12, voltage_headroom: 0.85, driver_path_resistance_ohm: 0.21 }, feasible: true,
+      source: { sampled_positive_peak_power_w: 2, sampled_positive_peak_current_a: 1/6, average_power_w: 1,
+        drawn_energy_j: 1.2, returned_energy_j: 0.2, net_energy_j: 1 },
+      actual_time_step_s: 0.001, requested_distance_m: 0.063, sampled_phase_peak_a: 0.8, phase_rms_a: [0.4, 0.5, 0.6],
+      sampled_requested_peak_speed_m_s: 0.1, sampled_requested_positive_acceleration_m_s2: 1,
+      sampled_requested_negative_acceleration_m_s2: -1, achieved_distance_m: null, conduction_energy_j: 0.01,
+      mechanical_work_j: 0.002, friction_damping_energy_j: 0.001, external_load_work_j: 0,
+      kinetic_energy_change_j: 0, magnetic_energy_change_j: 0, capacitor_energy_change_j: 0,
+      copper_energy_j: 0.1, mechanical_balance_residual_j: 1e-9, electrical_balance_residual_j: 2e-9,
+      source_balance_residual_j: null, loss_energy: null, accounted_loss_energy_j: 0.11,
+      phase_rms_including_declared_ripple_a: null, sampled_phase_peak_including_declared_ripple_a: null,
+      limiting_factors: [], missing_inputs: [], notes: ["Synthetic report-mapping test, not engineering evidence."],
+      samples: [{ time_s: 0, position_m: 0.0025, velocity_m_s: 0, acceleration_m_s2: 0, motor_force_n: 0,
+        required_source_voltage_v: 12, required_source_current_a: 1/6, required_source_power_w: 2,
+        q_current_phase_peak_a: 0.8, phase_currents_a: [0.8, -0.4, -0.4], required_phase_voltages_v: [1, -0.5, -0.5],
+        required_line_voltage_v: 1.5, required_d_voltage_v: 0, required_q_voltage_v: 1,
+        copper_loss_w: 0.1, driver_conduction_loss_w: 0.01, mechanical_power_w: 0,
+        friction_damping_loss_w: 0, external_load_power_w: 0, kinetic_energy_j: 0, magnetic_energy_j: 1e-5,
+        magnetic_power_w: 0, partial_dc_link_power_w: 1.9, losses: null }] } } };
+  return input;
+}
+
+describe("move power report consistency", () => {
+  it.skipIf(!process.env.PCB_MOTOR_SCREENING_RESULTS)("maps real native partial screening receipts without promoting omitted losses", () => {
+    const root = process.env.PCB_MOTOR_SCREENING_RESULTS!;
+    const designs = process.env.PCB_MOTOR_GENERATED_BRAID_AUDIT ? ["generated4"] : ["fader", "star2"];
+    for (const design of designs) for (const scenario of ["full-forward", "short-forward", "short-return"]) {
+      const records = JSON.parse(readFileSync(join(root, `${design}-${scenario}.json`), "utf8"));
+      const native = records.at(-1);
+      const source = native.result.demand.source;
+      const input: PowerRequirementsInput = {
+        config: native.inputs.config, driveSettings: native.inputs.drive,
+        desiredTravelMm: 63, topology: native.inputs.topology,
+        cadGeometry: native.inputs.cad_geometry, sweep: null, drive: native.result.drive,
+        native: true, moveRequest: native.inputs.move_request, moveResult: native,
+      };
+      expect(currentMoveResult(input)).not.toBeNull();
+      expect(item(input, "Peak supply power during a move").value).toBe("Unknown");
+      const peak = `${Number(source.sampled_positive_peak_power_w.toPrecision(7))} W`;
+      const net = `${Number(source.net_energy_j.toPrecision(7))} J`;
+      const estimate = native.result.demand.source_model_scope === "engineering_estimate";
+      const label = estimate ? "Engineering estimate" : "Partial scenario";
+      expect(item(input, `${label} peak source power`).value).toBe(peak);
+      expect(item(input, `${label} net source energy`).value).toBe(net);
+      expect(powerReportMarkdown(powerRequirements(input))).toContain(peak);
+      expect(powerRequirementsCsv(powerRequirements(input))).toContain(`"${label} net source energy","${net}"`);
+      expect(JSON.parse(powerModelSnapshot(input)).moveResult.result.demand.source).toEqual(source);
+      const trace = moveTraceCsv(input)!;
+      expect(trace).toContain('"required_source_power_W"');
+      expect(trace).toContain('"simulated_not_measured"');
+      expect(item(input, "Physical tracking findings").value).toBe(native.result.demand.feasible ? "No modeled conflict" : "Imposed demand only");
+      expect(item(input, "Source model scope").detail).toContain(estimate ? "excluded contributions" : "omissions keep totals Unknown");
+      if (estimate) {
+        expect(item(input, "Estimated peak supply power").value).toBe(peak);
+        expect(item(input, "Estimated peak supply current").value).toBe(`${Number(source.sampled_positive_peak_current_a.toPrecision(7))} A`);
+        expect(item(input, "Estimated average move power").value).toBe(`${Number(source.average_power_w.toPrecision(7))} W`);
+        expect(item(input, "Estimated drawn / returned / net energy").value).toContain(net);
+      }
+    }
+  });
+
+  it("maps native scenario values consistently to report, requirements CSV, snapshot and time-series CSV", () => {
+    const input = withMove();
+    const sections = powerRequirements(input);
+    expect(item(input, "Partial scenario peak source power").value).toBe("2 W");
+    expect(item(input, "Partial scenario net source energy").value).toBe("1 J");
+    expect(item(input, "Peak supply power during a move").value).toBe("Unknown");
+    expect(item(input, "Electrical energy per move").value).toBe("Unknown");
+    expect(item(input, "Partial scenario peak source power").detail).toContain("not total supply power");
+    expect(powerReportMarkdown(sections)).toContain("2 W");
+    expect(powerRequirementsCsv(sections)).toContain('"Partial scenario net source energy","1 J"');
+    expect(JSON.parse(powerModelSnapshot(input)).moveResult.result.demand.source.net_energy_j).toBe(1);
+    const trace = moveTraceCsv(input)!;
+    expect(trace).toContain('"required_source_power_W"');
+    expect(trace).toContain('"required_source_voltage_V"');
+    expect(trace).toContain('"phase_0_current_A"');
+    expect(trace).toContain('"simulated_not_measured","true","0","0.0025"');
+  });
+  it("withholds engineering results and traces in browser/demo or for stale design/move/driver inputs", () => {
+    for (const change of [(i: PowerRequirementsInput) => { i.native = false; },
+      (i: PowerRequirementsInput) => { i.config = { ...i.config, supply_voltage_v: 24 }; },
+      (i: PowerRequirementsInput) => { i.moveRequest = { ...i.moveRequest!, force_positions: 129 }; },
+      (i: PowerRequirementsInput) => { i.driveSettings = { ...i.driveSettings, series_inductance_h: 0 }; },
+      (i: PowerRequirementsInput) => { i.cadGeometry = { source_file_name: "changed.dxf", trace_width_mm: 0.2,
+        layer_z_mm: [0], routing: { segments: [], curves: [], vias: [] } } as unknown as CadGeometry; }]) {
+      const input = withMove(); change(input);
+      expect(currentMoveResult(input)).toBeNull();
+      expect(moveTraceCsv(input)).toBeNull();
+      expect(JSON.parse(powerModelSnapshot(input)).moveResult).toBeNull();
+    }
+  });
+  it("reports required demand separately from physical tracking findings", () => {
+    const input = withMove();
+    const m = input.moveResult!.result.demand;
+    m.feasible = false;
+    m.limiting_factors = ["Required voltage exceeds the physical DC link"];
+    expect(item(input, "Peak supply power during a move").value).toBe("Unknown");
+    expect(item(input, "Physical tracking findings").value).toBe("Imposed demand only");
+    expect(item(input, "Partial scenario peak source power").value).toBe("2 W");
+    expect(moveTraceCsv(input)).toContain('"simulated_not_measured","false"');
+  });
+});
+
+it("an explicit engineering estimate never becomes a complete or measured total", () => {
+  const input = withDeclaredLosses();
+  const model = input.moveRequest!.loss_model!;
+  model.basis = "engineering_estimate";
+  model.omitted_losses = ["Proximity effects are approximated only"];
+  input.moveResult!.result.demand.electrical.loss_model = model;
+  input.moveResult!.result.demand.source_model_scope = "engineering_estimate";
+  input.moveResult!.result.demand.missing_inputs = ["Declared omitted loss: Proximity effects are approximated only"];
+  expect(item(input, "Peak supply power during a move").value).toBe("Unknown");
+  expect(item(input, "Estimated peak supply power").value).toBe("2 W");
+  expect(item(input, "Source model scope").detail).toContain("Proximity");
+  expect(moveTraceCsv(input)).toContain('"engineering_estimate"');
+});
+
+function withDeclaredLosses(): PowerRequirementsInput {
+  const input = withMove();
+  const model = declaredLossFixture(input.driveSettings.driver.name, input.driveSettings.driver.rds_on_ohm);
+  input.moveRequest!.additional_driver_loss_w = null;
+  input.moveRequest!.loss_model = model;
+  const m = input.moveResult!.result.demand;
+  m.source_model_scope = "declared_loss_model";
+  m.electrical.loss_model = model;
+  m.electrical.additional_driver_loss_w = null;
+  m.loss_energy = { winding_dc_ripple_energy_j: 0.00012, winding_ac_energy_j: 0.03756,
+    external_series_energy_j: 0.075015, external_core_energy_j: 0.006,
+    switching_energy_j: 0.013614, deadtime_energy_j: 0.003732, controller_energy_j: 0.02, other_dc_link_energy_j: 0.03 };
+  m.accounted_loss_energy_j = 0.9; m.source_balance_residual_j = 1e-10;
+  m.phase_rms_including_declared_ripple_a = [0.41, 0.51, 0.61];
+  m.sampled_phase_peak_including_declared_ripple_a = 0.82;
+  m.samples[0].losses = { mean_square_phase_current_a2: [0.6401, 0.1601, 0.1601],
+    phase_peak_envelope_a: [0.82, 0.42, 0.42], winding_dc_ripple_loss_w: 0.00012,
+    winding_ac_loss_w: 0.03756, external_series_loss_w: 0.075015, external_core_loss_w: 0.006,
+    switching_loss_w: 0.013614, deadtime_loss_w: 0.003732, controller_loss_w: 0.02, other_dc_link_loss_w: 0.03 };
+  return input;
+}
+
+describe("declared loss-model reports", () => {
+  it("maps conditional total W/A/J and loss terms identically to UI sections, report, CSV and snapshot", () => {
+    const input = withDeclaredLosses();
+    const sections = powerRequirements(input);
+    expect(item(input, "Peak supply power during a move").value).toBe("2 W");
+    expect(item(input, "Average supply power over a move").value).toBe("1 W");
+    expect(item(input, "Electrical energy per move").value).toBe("1 J");
+    expect(item(input, "Guaranteed maximum source power").value).toBe("Unknown");
+    expect(item(input, "Peak supply power during a move").detail).toContain("declared loss model");
+    expect(item(input, "Source model scope").value).toBe("Declared loss-model total");
+    expect(item(input, "Controller energy").value).toBe("0.02 J");
+    expect(powerReportMarkdown(sections)).toContain("Declared loss-model total");
+    expect(powerRequirementsCsv(sections)).toContain('"Electrical energy per move","1 J"');
+    const snapshot = JSON.parse(powerModelSnapshot(input));
+    expect(snapshot.sections).toEqual(sections);
+    expect(snapshot.moveResult.result.demand.loss_energy.controller_energy_j).toBe(0.02);
+    const trace = moveTraceCsv(input)!;
+    expect(trace).toContain('"driver_deadtime_loss_W"');
+    expect(trace).toContain('"phase_0_mean_square_current_A2"');
+    expect(trace).toContain('"declared_loss_model"');
+    expect(trace).toContain('"0.6401","0.1601","0.1601"');
+  });
+  it("never promotes idealized, incomplete, failed or browser results into total rows", () => {
+    for (const mutate of [(i: PowerRequirementsInput) => { i.moveResult!.result.demand.electrical.loss_model!.basis = "idealized"; },
+      (i: PowerRequirementsInput) => { i.moveResult!.result.demand.loss_energy = null; },
+      (i: PowerRequirementsInput) => { i.moveResult!.result.demand.missing_inputs = ["Unknown core law"]; },
+      (i: PowerRequirementsInput) => { i.native = false; }]) {
+      const input = withDeclaredLosses(); mutate(input);
+      expect(item(input, "Peak supply power during a move").value).toBe("Unknown");
+      expect(item(input, "Electrical energy per move").value).toBe("Unknown");
+    }
+  });
+  it("keeps complete-model required totals available despite tracking findings", () => {
+    const input = withDeclaredLosses();
+    input.moveResult!.result.demand.feasible = false;
+    input.moveResult!.result.demand.limiting_factors = ["Physical voltage cannot track imposed motion"];
+    expect(item(input, "Peak supply power during a move").value).toBe("2 W");
+    expect(item(input, "Electrical energy per move").value).toBe("1 J");
+    expect(item(input, "Physical tracking findings").value).toBe("Imposed demand only");
+    expect(powerReportMarkdown(powerRequirements(input))).toContain("Physical voltage cannot track imposed motion");
+  });
+  it("invalidates totals and trace export after loss inputs change", () => {
+    const input = withDeclaredLosses();
+    input.moveRequest = structuredClone(input.moveRequest!);
+    input.moveRequest.loss_model!.switching.constant_j = 9e-7;
+    expect(currentMoveResult(input)).toBeNull();
+    expect(moveTraceCsv(input)).toBeNull();
+    expect(JSON.parse(powerModelSnapshot(input)).moveResult).toBeNull();
   });
 });

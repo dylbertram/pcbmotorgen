@@ -952,7 +952,7 @@ The C-ABI surface (verified on load, before registration):
 
 ```rust
 #[no_mangle]
-pub static pcbmotorgen_ROUTING_PLUGIN_API: u32 = 2;  // millimetre contract
+pub static pcbmotorgen_ROUTING_PLUGIN_API: u32 = 3;  // end-type metadata; millimetre contract
 
 #[no_mangle]
 pub unsafe extern "C" fn pcbmotorgen_routing_plugin_create() -> *mut std::ffi::c_void {
@@ -968,7 +968,7 @@ pub unsafe extern "C" fn pcbmotorgen_routing_plugin_destroy(v: *mut std::ffi::c_
 ```
 
 Build with `crate-type = ["cdylib"]` (`*.dylib` on macOS, `*.so` on Linux,
-`*.dll` on Windows). The host verifies `pcbmotorgen_ROUTING_PLUGIN_API == 2`
+`*.dll` on Windows). The host verifies `pcbmotorgen_ROUTING_PLUGIN_API == 3`
 before registering; the plugin is then **probed** by generating against the
 current config and rejected on upload if the shape fails validation.
 

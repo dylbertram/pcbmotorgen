@@ -21,7 +21,7 @@ test.describe("Design constraints restructure", () => {
     await expect(page.locator("#panel-design").getByLabel("Mover position (mm)", { exact: true })).toBeVisible();
     await selectDesignPanel(page, "Stackup");
     await expect(stackup.getByRole("img", { name: /Front-on orthographic/ })).toBeVisible();
-    await selectDesignPanel(page, "Constraints");
+    await selectDesignPanel(page, "Routing");
     await expect(page.getByRole("heading", { name: "Design reflection", exact: true })).toHaveCount(0);
     await expect(page.getByRole("heading", { name: "Design dimensions", exact: true })).toHaveCount(0);
     await expect(constraints.getByRole("img", { name: /Per-phase holding force/ })).toHaveCount(0);
@@ -100,7 +100,7 @@ test.describe("Design constraints restructure", () => {
     await expect(stackup.getByLabel("PCB thickness (mm)")).toBeVisible();
     await expect(stackup.getByLabel("Air gap (mm)")).toBeVisible();
 
-    // No active-area fields remain under the combined Topology & Board panel.
+    // The active-area controls now live inside Routing; vertical controls stay in Stackup.
     await expect(numberField(page, "PCB thickness (mm)")).toBeEnabled();
     await expect(numberField(page, "Air gap (mm)")).toBeEnabled();
     await selectDesignPanel(page, "Routing");
@@ -113,7 +113,7 @@ test.describe("Design constraints restructure", () => {
           return label.toLowerCase().includes("active area");
         }).length,
       ),
-    ).toBe(0);
+    ).toBe(1);
 
     // The old Stackup box is gone.
     await expect(
@@ -129,7 +129,7 @@ test.describe("Design constraints restructure", () => {
     ).toHaveCount(0);
     await openCoilPreview(page);
     await expect(page.locator("#panel-design").getByRole("slider", { name: "Mover position slider (mm)" })).toBeVisible();
-    await selectDesignPanel(page, "Constraints");
+    await selectDesignPanel(page, "Routing");
     await expect(numberField(page, "Active area width (mm)")).toBeEnabled();
   }, { tag: ["@constraints", "@desktop"] });
 

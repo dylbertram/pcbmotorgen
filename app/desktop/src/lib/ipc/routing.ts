@@ -25,7 +25,10 @@ import { isTauriAvailable } from "./core";
  */
 export async function listRoutingPatterns(): Promise<RoutingPatternInfo[]> {
   if (!isTauriAvailable()) {
-    return [{ id: "infinity-braid", display_name: "Infinity Braid (pcbBraid)" }];
+    return [{ id: "infinity-braid", display_name: "Infinity Braid", min_layers: 2, layers_multiple_of: 2,
+      end_type: { kind: "parameter", key: "connection", default: 0, options: [
+        { value: 2, connection: "star" }, { value: 1, connection: "delta" }, { value: 0, connection: "closed" },
+      ] } }];
   }
   return await invoke<RoutingPatternInfo[]>("list_routing_patterns");
 }
@@ -48,12 +51,13 @@ const MOCK_BRAID_PARAMS: RoutingParamDef[] = [
     description: "How each phase winding terminates.",
     param_type: "int",
     default: 1,
-    min: 1,
+    min: 0,
     max: 2,
     step: 1,
     options: [
       { value: 1, label: "Delta" },
       { value: 2, label: "Star (wye)" },
+      { value: 0, label: "Closed (legacy)" },
     ],
   },
 ];

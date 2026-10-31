@@ -20,9 +20,11 @@ fn reference_context() -> RoutingContext {
         phases: 3,
         min_trace_mm: 0.127,
         trace_width_mm: 0.127,
+        via_pad_diameter_mm: None,
         min_space_mm: 0.127,
         expects_continuous: true,
         params: HashMap::new(), // pattern defaults (num_strands = 5; 2 is only the minimum)
+        orientation: Default::default(),
         magnet_pitch_mm: Some(6.0),
         magnet_array_span_mm: Some(72.0),
         // No explicit inter-phase clearance: the documented min_space_mm

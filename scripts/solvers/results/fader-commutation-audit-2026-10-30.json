@@ -1,0 +1,47 @@
+{
+  "interval_m": [
+    0.0145,
+    0.0505
+  ],
+  "positions_used": 110,
+  "phase_dc_n_per_a": [
+    1.2272458813169302e-05,
+    8.169727448576051e-06,
+    1.1269216175084345e-05
+  ],
+  "phase_fundamental_amplitude_n_per_a": [
+    0.09704676390783921,
+    0.0970409195985673,
+    0.09704581796853903
+  ],
+  "phase_sine_offset_deg": [
+    69.92484301474485,
+    9.926873951123012,
+    -50.07067584765521
+  ],
+  "fundamental_fit_r_squared": [
+    0.9999730950991409,
+    0.9999732809109879,
+    0.9999730407782819
+  ],
+  "positive_sequence_reference_rad": 2.2676493455876967,
+  "positive_sequence_reference_deg": 129.9267369177781,
+  "phase_axis_residual_from_120deg_deg": [
+    -60.00189390303323,
+    0.0001370333449172013,
+    60.00258723456668
+  ],
+  "mean_positive_sequence_coupling_n_per_a": 0.09704031864503418,
+  "receipt_sha256": "ad4474451598ade85f2cb9f97e57933a694ade2c5beea0fa35e868724d915ab2",
+  "input_sha256": "cf51f0bbaf10458f7d5a3915edb88d759edee8d7fe5c8d0b6d22d57969557214",
+  "phase_names": [
+    "A",
+    "B",
+    "C"
+  ],
+  "configured_reference_rad": 1.5707963267948966,
+  "trace_width_mm": 0.2,
+  "outer_copper_oz": 1.0,
+  "inner_copper_oz": 1.0,
+  "scope": "Geometry fundamental audit, not controller calibration, rewiring, measured performance or a realizable optimal-current proof"
+}

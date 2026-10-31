@@ -239,7 +239,11 @@
       </div>
       <p class="mt-2 text-xs text-slate-400">
         Trace {(analysis.trace_width_m * 1e3).toFixed(3)} mm wide,
-        {(analysis.outer_copper_m * 1e6).toFixed(0)} µm outer and {(analysis.inner_copper_m * 1e6).toFixed(0)} µm inner copper,
+        {#if analysis.layer_copper_m}
+          layer copper {analysis.layer_copper_m.map(t => Number((t * 1e6).toPrecision(5))).join(", ")} µm,
+        {:else}
+          {(analysis.outer_copper_m * 1e6).toFixed(0)} µm outer and {(analysis.inner_copper_m * 1e6).toFixed(0)} µm inner copper,
+        {/if}
         {formatSi(analysis.via_resistance_each_ohm, "Ω")} per via
         ({formatSi(analysis.phases[0]?.via_resistance_ohm ?? 0, "Ω")} of phase {analysis.phases[0]?.net ?? "A"}'s hot resistance).
         R hot is at the winding temperature.

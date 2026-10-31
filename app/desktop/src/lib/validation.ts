@@ -12,6 +12,7 @@
  */
 
 import { MAX_MAGNET_COUNT, MAX_PCB_LAYERS } from "./types/simulationLimits";
+import { validatePcbStackup, type PcbStackupMm } from "./pcbStackup";
 import { BACKPLANE_MAX_LAYERS, BACKPLANE_MAX_THICKNESS_M, HOUSING_MAX_THICKNESS_M, HOUSING_MAX_GAP_M, BACKPLANE_MAX_MU_R, BACKPLANE_MAX_BSAT_T, isSupportedHousingMaterial, type BackplaneStack } from "./types/backplane";
 
 export type FindingLevel = "error" | "warning";
@@ -46,6 +47,7 @@ export interface DesignConfigInput {
   peak_force_n: number;
   target_force_n: number;
   backplane?: BackplaneStack | null;
+  pcb_stackup_mm?: PcbStackupMm | null;
 }
 
 /** Explain unsupported restored settings without clamping or rewriting them. */
@@ -72,6 +74,10 @@ export function validateBackplaneInput(stack: BackplaneStack | null | undefined)
 /** Run all cross-field checks against `config`. */
 export function validateDesign(config: DesignConfigInput): Finding[] {
   const next: Finding[] = validateBackplaneInput(config.backplane);
+  if (config.pcb_stackup_mm) {
+    try { validatePcbStackup(config.pcb_stackup_mm, config.num_layers); }
+    catch (error) { next.push({ id: "pcb-stackup", level: "error", message: error instanceof Error ? error.message : String(error) }); }
+  }
   const travel = config.travel_mm;
 
   if (!Number.isFinite(travel) || travel <= 0) {

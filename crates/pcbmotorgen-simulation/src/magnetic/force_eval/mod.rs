@@ -114,6 +114,35 @@ impl ForceEvaluator {
         self.routed_samples.as_deref()
     }
 
+    /// Axial mover force per terminal ampere for each solved phase network.
+    /// This evaluates the actual routed copper at its physical depth. It does
+    /// not apply or calibrate any commutation law, or divide by a commanded
+    /// current which might be zero. Reciprocity gives the same signed phase
+    /// back-EMF coefficient in V/(m/s).
+    pub fn unit_phase_force_constants_at(
+        &self,
+        config: &SimulationInput,
+        position_m: f64,
+    ) -> Result<Vec<f64>, SimulationError> {
+        let phases = self.routed_samples.as_ref().ok_or_else(||
+            SimulationError("Unit phase forces require solved routed conductor samples".into()))?;
+        if !position_m.is_finite() {
+            return Err(SimulationError("Unit phase forces require a finite position".into()));
+        }
+        let assembly = MagnetArray::new(config).build_assembly(position_m);
+        let result: Vec<f64> = phases.iter().map(|samples| {
+            let points: Vec<_> = samples.iter().map(|s|
+                nalgebra::Point3::from(s.midpoint_3d)).collect();
+            let fields = physics::compute_b_batch_parallel(&assembly, &points);
+            -samples.iter().zip(fields).map(|(s, b)|
+                s.dl_3d[1]*b.z - s.dl_3d[2]*b.y).sum::<f64>()
+        }).collect();
+        if result.iter().any(|v| !v.is_finite()) {
+            return Err(SimulationError("Unit phase forces produced a nonfinite coefficient".into()));
+        }
+        Ok(result)
+    }
+
     /// Reproduce the excitation used by a completed, calibrated force run.
     /// This records the model's command, not a validated controller waveform.
     pub fn excitation_currents_at(&self, config: &SimulationInput, coils: &[PhaseCoil], position_m: f64) -> Result<Vec<f64>, SimulationError> {
@@ -151,9 +180,7 @@ impl ForceEvaluator {
             let resistances: Vec<f64> = net.edges.iter().map(|edge| match &edge.kind {
                 EdgeKind::Via { layers, .. } => crate::drive::via_resistance_ohm(config.min_via_drill_m, settings.via_plating_m, hints.via_length_m(config, *layers), rho),
                 EdgeKind::Trace { layer, length_m, .. } => {
-                    let inner = config.num_layers > 2 && *layer != 0 && *layer + 1 != config.num_layers;
-                    let oz = if inner { settings.inner_copper_oz } else { settings.outer_copper_oz };
-                    rho * length_m / (config.min_trace_m * crate::units::oz_to_m(oz))
+                    rho * length_m / (config.min_trace_m * crate::drive::copper_thickness_m(*layer, config, settings))
                 }
             }).collect();
             let solution = solve_network(&net, &resistances);
@@ -596,12 +623,14 @@ mod tests {
             phases: config.phases,
             min_trace_mm: config.min_trace_m * 1e3,
             trace_width_mm: config.min_trace_m * 1e3,
+            via_pad_diameter_mm: Some(config.min_via_pad_m() * 1e3),
             min_space_mm: config.min_space_m * 1e3,
             expects_continuous: false,
             params: std::collections::HashMap::new(),
             magnet_pitch_mm: Some(config.magnet_pitch_m * 1e3),
             magnet_array_span_mm: Some(config.magnet_array_span_m() * 1e3),
             phase_clearance_mm: None,
+            orientation: Default::default(),
         };
         pcbmotorgen_routing::generate_coils_from_context(&ctx, "infinity-braid")
     }
@@ -621,6 +650,7 @@ mod tests {
             pattern_id: "infinity-braid".to_string(),
             layer_pair: None,
             center_via_positions: vec![],
+            routed_vias: vec![],
         }
     }
 
@@ -669,6 +699,7 @@ mod tests {
                     pattern_id: "serpentine-test".to_string(),
                     layer_pair: None,
                     center_via_positions: vec![],
+                    routed_vias: vec![],
                 }
             })
             .collect()
@@ -846,7 +877,7 @@ mod tests {
     /// passes the 3-point guard, and yields finite forces with positive mean
     /// thrust.
     #[test]
-    fn test_ripple_at_default_is_low() {
+    fn default_braid_force_is_finite_without_a_ripple_goal() {
         let cfg = SimulationInput::default();
         let coils = generate_coils(&cfg);
         assert!(!coils.is_empty(), "infinity-braid must produce coils for the default config");
@@ -867,7 +898,7 @@ mod tests {
     /// did, so the 3-point polarity + alignment guard may legitimately reject
     /// the config (that is the guard doing its job, not an FOC bug).
     #[test]
-    fn test_ripple_at_vernier_4_5_is_low() {
+    fn vernier_braid_force_is_finite_or_reports_controller_model_incompatibility() {
         let cfg = SimulationInput {
             spacing_ratio: 0.8,
             ..SimulationInput::default()

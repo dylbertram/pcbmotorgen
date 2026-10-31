@@ -150,6 +150,7 @@ export class ProjectStore {
         electrical_pitch_mm: this.config.electrical_pitch_mm,
         routing_pattern: this.config.routing_pattern,
         routing_params: Object.fromEntries(params.map((p) => [p.key, p.value])),
+        routing_orientation: { ...this.config.routing_orientation },
         phases: this.config.phases,
         num_layers: this.config.num_layers,
         max_current_a: this.config.max_current_a,
@@ -158,6 +159,7 @@ export class ProjectStore {
         peak_force_n: this.config.peak_force_n,
         friction_n: this.config.friction_n,
         carriage_mass_kg: this.config.carriage_mass_kg,
+        carriage_mass_source: this.config.carriage_mass_source,
         max_accel_m_s2: this.config.max_accel_m_s2,
         capacitor_bank_uf: this.config.capacitor_bank_uf,
         commutation: this.config.commutation,
@@ -169,10 +171,12 @@ export class ProjectStore {
         min_via_drill_mm: this.config.min_via_drill_mm,
         min_via_annular_ring_mm: this.config.min_via_annular_ring_mm,
         pcb_thickness_mm: this.config.pcb_thickness_mm,
+        ...(this.config.pcb_stackup_mm ? { pcb_stackup_mm: $state.snapshot(this.config.pcb_stackup_mm) } : {}),
         max_layers: this.config.max_layers,
         drive_frequency_hz: this.config.drive_frequency_hz,
         max_temperature_rise_c: this.config.max_temperature_rise_c,
         drive: $state.snapshot(this.config.drive),
+        power_move: $state.snapshot(this.config.power_move),
         backplane: $state.snapshot(this.config.backplane),
       },
       mover_position_mm: this.motion.positionMm,
@@ -206,6 +210,7 @@ export class ProjectStore {
     this.config.electrical_pitch_mm = c.electrical_pitch_mm;
     this.config.routing_pattern = c.routing_pattern;
     this.config.routing_params = { ...c.routing_params };
+    this.config.routing_orientation = { mirror_x: false, mirror_y: false, reverse_layers: false, ...c.routing_orientation };
     this.config.routing_params_version += 1;
     this.config.phases = c.phases;
     this.config.num_layers = c.num_layers;
@@ -215,6 +220,7 @@ export class ProjectStore {
     this.config.peak_force_n = c.peak_force_n;
     this.config.friction_n = c.friction_n;
     this.config.carriage_mass_kg = c.carriage_mass_kg;
+    this.config.carriage_mass_source = c.carriage_mass_source === "magnets" ? "magnets" : "assembly";
     this.config.max_accel_m_s2 = c.max_accel_m_s2;
     this.config.capacitor_bank_uf = c.capacitor_bank_uf;
     this.config.commutation = c.commutation;
@@ -228,12 +234,14 @@ export class ProjectStore {
     this.config.min_via_drill_mm = c.min_via_drill_mm;
     this.config.min_via_annular_ring_mm = c.min_via_annular_ring_mm;
     this.config.pcb_thickness_mm = c.pcb_thickness_mm;
+    this.config.pcb_stackup_mm = c.pcb_stackup_mm ? structuredClone(c.pcb_stackup_mm) : null;
     this.config.max_layers = c.max_layers;
     this.config.drive_frequency_hz = c.drive_frequency_hz;
     this.config.max_temperature_rise_c = c.max_temperature_rise_c;
     this.config.drive = c.drive
       ? { ...DEFAULT_DRIVE_SETTINGS, ...c.drive, driver: { ...DEFAULT_DRIVE_SETTINGS.driver, ...c.drive.driver } }
       : structuredClone(DEFAULT_DRIVE_SETTINGS);
+    this.config.power_move = c.power_move ? structuredClone(c.power_move) : null;
     // Files saved before the backplane existed have no field: start with none.
     this.config.backplane = c.backplane ? structuredClone(c.backplane) : null;
     this.motion.positionMm = state.mover_position_mm;

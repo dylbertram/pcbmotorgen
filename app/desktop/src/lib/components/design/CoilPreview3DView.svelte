@@ -1,7 +1,7 @@
 <script lang="ts">
   import { Canvas } from "@threlte/core";
   import type { CadGeometry } from "../../types";
-  import { buildCoilScene } from "../../coilScene";
+  import { buildCoilScene, connectedViaPads, isViaVisible } from "../../coilScene";
   import type { CoilPreviewViewState } from "./coilPreviewViewState.svelte";
   import CoilPreviewScene from "./CoilPreviewScene.svelte";
   import Slider from "../ui/Slider.svelte";
@@ -14,23 +14,47 @@
   import type { DcWindingFieldResult } from "../../types/dcCoupling";
   import QualifiedCoilFieldControls from "./QualifiedCoilFieldControls.svelte";
   import { combineVisualizationFields } from "../../combineVisualizationFields";
+  import { placedCopperGeometry } from "../../copperLayerPlacement";
+  import { pcbBody } from "../../pcbBody";
+  import type { SpatialMeasure } from "../../spatialMeasure.svelte";
+  import ZoomWindowOverlay from "./ZoomWindowOverlay.svelte";
+  import type { PcbStackupMm } from "../../pcbStackup";
+  import type { TopCameraTransform } from "../../fitCoilCamera";
+  import ViewportAxes from "./ViewportAxes.svelte";
 
-  let { geometry, view, isVisible = () => true, showTerminals = true, simulation = null }: {
+  let { geometry: sourceGeometry, pcbThicknessMm, pcbStackup = null, copperThicknessMm = { outer: .035, inner: .035 }, viaSizeMm = {diameter:.4,drill:.2}, view, isVisible = () => true, showTerminals = true, simulation = null, measure = null, topCamera = null, visibleCopperKeys = null, onRenderStatus, axisRightInset = 0 }: {
     geometry: CadGeometry | null;
+    pcbThicknessMm: number;
+    pcbStackup?: PcbStackupMm | null;
+    viaSizeMm?: {diameter:number;drill:number;plating?:number};
+    topCamera?: TopCameraTransform | null;
+    visibleCopperKeys?: Set<string> | null;
+    onRenderStatus?: (available:boolean)=>void;
+    axisRightInset?: number;
+    copperThicknessMm?: { outer: number; inner: number };
     view: CoilPreviewViewState;
     isVisible?: (coil: string, layer: number) => boolean;
     showTerminals?: boolean;
     simulation?: VisualizationInput | null;
+    measure?: SpatialMeasure | null;
   } = $props();
 
-  let scene = $derived(buildCoilScene(geometry));
-  let paths = $derived(scene?.paths.filter(p => view.isLayerVisible(p.layer) && isVisible(p.net, p.layer)) ?? []);
+  const placement = $derived.by(() => {
+    try { return { geometry: sourceGeometry ? placedCopperGeometry(sourceGeometry, pcbThicknessMm, pcbStackup) : null, error: "" }; }
+    catch (error) { return { geometry: null, error: error instanceof Error ? error.message : String(error) }; }
+  });
+  const geometry = $derived(placement.geometry);
+  let scene = $derived(buildCoilScene(geometry, { ...copperThicknessMm, layers: pcbStackup?.copper_mm }));
+  const board = $derived(geometry && scene ? pcbBody(geometry, scene, pcbThicknessMm, view.zScale, pcbStackup ? 0 : undefined) : null);
+  $effect(() => { void geometry; untrack(() => measure?.clear()); });
+  let paths = $derived(scene?.paths.filter(p => view.isLayerVisible(p.layer) && isVisible(p.net, p.layer) && (!visibleCopperKeys || visibleCopperKeys.has(p.key))) ?? []);
   let vias = $derived(view.showVias ? scene?.vias.filter(v =>
-    (view.isLayerVisible(v.from_layer) && isVisible(v.net, v.from_layer)) ||
-    (view.isLayerVisible(v.to_layer) && isVisible(v.net, v.to_layer))) ?? [] : []);
+    isViaVisible(v, layer => view.isLayerVisible(layer), isVisible)) ?? [] : []);
+  const pads = $derived(scene ? connectedViaPads(scene, paths, viaSizeMm.diameter * scene.scale) : []);
   let terminals = $derived(showTerminals && view.showTerminals ? scene?.terminals.filter(t => view.isLayerVisible(t.layer) && isVisible(t.net, t.layer)) ?? [] : []);
-  let reset = $state(0);
-  let command = $state({ id: 0, zoom: 1 });
+  let windowCommand = $state<{ id: number; a: [number, number]; b: [number, number] }>({ id: 0, a: [0, 0], b: [1, 1] });
+  let cameraSnapshot = $state<{ position: number[]; target: number[]; up: number[]; zoom: number } | null>(null);
+  let glAvailable = $state<boolean | null>(null);
   let mode = $state<VisualizationMode>("fields");
   let density = $state("sparse");
   let opacity = $state(.8);
@@ -50,7 +74,7 @@
   let visualization = $state<VisualizationView>({ phase: "idle", report: null, error: null });
   const controller = new SimulationVisualizationController(sampleSimulationVisualization, next => { visualization = next; });
   const field = $derived.by(() => {
-    if (!simulation) return null;
+    if (!simulation || view.viewMode === "top") return null;
     if (fieldSource === "pm") return includeMagnets ? visualization.report?.field ?? null : null;
     if (!coilField) return null;
     if (!includeMagnets) return coilField.field;
@@ -58,7 +82,7 @@
     return pm ? combineVisualizationFields(coilField.field, pm) : null;
   });
   // Visible solids are independent of the selected field and its availability.
-  const visibleMagnets = $derived(simulation && showMagnets ? Array.from({ length: simulation.config.magnet_count }, (_, i) => ({
+  const visibleMagnets = $derived(simulation && showMagnets && view.viewMode !== "top" ? Array.from({ length: simulation.config.magnet_count }, (_, i) => ({
     center_m: [simulation.moverPositionM + i * simulation.config.magnet_pitch_m, simulation.config.board_width_m / 2,
       simulation.config.air_gap_m + simulation.config.magnet_height_m / 2] as [number, number, number],
     size_m: [simulation.config.magnet_width_m, simulation.config.magnet_cross_width_m, simulation.config.magnet_height_m] as [number, number, number], positive_z: i % 2 === 0,
@@ -123,27 +147,31 @@
   onDestroy(() => { controller.invalidate(); magnetController.invalidate(); });
 </script>
 
-<div class="coil-3d relative h-full w-full bg-slate-950" bind:clientWidth={viewerWidth} role="img" aria-label="Coil preview — isometric"
-  data-testid="coil-iso" data-layers={geometry?.layer_z_mm.filter((_, i) => view.isLayerVisible(i)).length ?? 0}
-  data-segments={paths.length} data-vias={vias.length} data-terminals={terminals.length} data-trace-mode={view.traceMode} data-z-scale={view.zScale}
+<div class="coil-3d relative h-full w-full bg-slate-900" bind:clientWidth={viewerWidth} role="img" aria-label={`Coil preview — ${view.viewMode}`}
+  data-testid={`coil-${view.viewMode}`} data-renderer={glAvailable === false ? "canvas2d-fallback" : "shared-three"} data-layers={geometry?.layer_z_mm.filter((_, i) => view.isLayerVisible(i)).length ?? 0}
+  data-layer-z-mm={JSON.stringify(geometry?.layer_z_mm ?? [])} data-pcb-thickness-mm={pcbThicknessMm}
+  data-trace-width-mm={scene ? scene.width / scene.scale : 0} data-trace-width-px={view.traceMode === "centerlines" ? 1 : (scene?.width ?? 0) * (cameraSnapshot?.zoom ?? 0)} data-via-diameter-mm={viaSizeMm.diameter} data-via-drill-mm={viaSizeMm.drill}
+  data-segments={paths.length} data-vias={vias.length} data-via-pads={vias.length ? pads.length : 0} data-terminals={terminals.length} data-trace-mode={view.traceMode} data-z-scale={view.zScale} data-pcb-visible={view.showPcb} data-copper-section="rectangular" data-measure-points={measure?.p2 ? 2 : measure?.p1 ? 1 : 0} data-measure-mm={measure?.distanceMm ?? ""} data-camera={cameraSnapshot ? JSON.stringify(cameraSnapshot) : ""}
   data-field-samples={field?.samples.length ?? 0} data-visible-magnets={visibleMagnets.length} data-include-magnets={includeMagnets} data-field-source={fieldSource} data-field-style={fieldStyle} data-field-slice={sliceFraction} data-heat-unit="W/m" data-settings-open={settingsExpanded} data-legends-open={legendsOpen} data-heat-paths={heatMapping.values?.size ?? 0} data-visualization-state={visualization.phase}>
   {#if scene}
-    <svelte:boundary>
+    <svelte:boundary onerror={() => { glAvailable=false; onRenderStatus?.(false); }}>
       <Canvas renderMode="on-demand">
-        <CoilPreviewScene {scene} {paths} {vias} {terminals} {reset} {command} zScale={view.zScale} traceMode={view.traceMode}
+         <CoilPreviewScene {scene} {paths} {vias} {pads} viaSize={{diameter:viaSizeMm.diameter*scene.scale,drill:viaSizeMm.drill*scene.scale,plating:(viaSizeMm.plating ?? .025)*scene.scale}} {terminals} reset={view.cameraReset} fit={view.cameraFit} command={view.cameraCommand} {windowCommand} {board} {measure} {topCamera} viewMode={view.viewMode} onCamera={snapshot => {cameraSnapshot = snapshot; if(view.viewMode !== "top") view.spatialZoom=snapshot.zoom/snapshot.fitZoom; glAvailable=true; onRenderStatus?.(true);}} showPcb={view.showPcb} zScale={view.zScale} traceMode={view.traceMode}
            {field} heat={heatMapping.values} {opacity} {fieldStyle} {sliceFraction} {sectionView} magnets={visibleMagnets} />
       </Canvas>
       {#snippet failed()}
-        <div class="flex h-full items-center justify-center p-4 text-sm text-slate-400" role="status">
-          3D rendering is unavailable. Switch to Top-down to view this geometry.
+        <div class="pointer-events-none absolute bottom-2 left-2 right-2 text-xs text-slate-400" role="status">
+          {view.viewMode === "top" ? "WebGL unavailable. Using the 2D fallback." : "3D rendering is unavailable. Switch to Top-down to view this geometry."}
         </div>
       {/snippet}
     </svelte:boundary>
-    <div class="absolute left-2 top-2 flex gap-1 rounded border border-slate-700 bg-slate-900/95 p-1" role="group" aria-label="3D camera controls">
-      <button class="text-slate-300 hover:bg-slate-800 hover:text-emerald-300" type="button" aria-label="Zoom in 3D" onclick={() => command = { id: command.id + 1, zoom: 1.25 }}>+</button>
-      <button class="text-slate-300 hover:bg-slate-800 hover:text-emerald-300" type="button" aria-label="Zoom out 3D" onclick={() => command = { id: command.id + 1, zoom: 0.8 }}>−</button>
-      <button class="text-slate-300 hover:bg-slate-800 hover:text-emerald-300" type="button" onclick={() => reset++}>Reset 3D view</button>
+    <div class="axis-indicator pointer-events-none absolute z-10" style:right={`calc(.75rem + ${axisRightInset}px)`}>
+      <ViewportAxes view={view.viewMode} camera={glAvailable === false ? null : cameraSnapshot} />
     </div>
+    {#if view.zoomWindow && view.viewMode !== "top"}
+      <ZoomWindowOverlay onCancel={() => view.zoomWindow = false} onFit={(a, b) => { windowCommand = { id: windowCommand.id + 1, a, b }; view.zoomWindow = false; }} />
+    {/if}
+    {#if view.viewMode !== "top"}
     {#if simulation}
       <div class="simulation-controls absolute right-2 top-2 z-20 rounded border border-slate-700 bg-slate-900/95 text-xs text-slate-300" role="group" aria-label="3D simulation overlays">
         <button type="button" class="inspector-toggle" aria-expanded={settingsExpanded} onclick={() => settingsOpen = !settingsExpanded}>
@@ -229,26 +257,27 @@
       <Slider orientation="vertical" min={1} max={20} step={0.1} bind:value={view.zScale} ariaLabel="Z height scale" class="min-h-0 flex-1" />
       <output class="font-mono text-[10px] text-emerald-300" aria-label="Z height multiplier">{view.zScale}×</output>
     </div>
-    <div class="pointer-events-none absolute bottom-2 left-16 right-12 text-[10px] text-slate-400">
-      Drag to orbit · Right-drag to pan · Scroll or pinch to zoom · Z × {view.zScale}
-    </div>
     <div class="layer-depths pointer-events-none absolute right-12 top-2 text-right font-mono text-[10px] text-slate-400" class:simulation-depths={simulation !== null}>
       {#each geometry?.layer_z_mm ?? [] as z, idx (idx)}
         {#if view.isLayerVisible(idx)}<div>L{idx + 1} · {z.toFixed(2)} mm</div>{/if}
       {/each}
     </div>
+    {/if}
   {:else}
-    <div class="flex h-full items-center justify-center text-sm text-slate-500">Awaiting coil generation…</div>
+    <div class="flex h-full items-center justify-center p-4 text-sm text-slate-500" role="status">{placement.error || "Awaiting coil generation…"}</div>
   {/if}
 </div>
 
 <style>
   .coil-3d { container-type: size; }
-  .overlay-legends { max-height: 40cqh; right: auto; max-width: min(26rem, calc(100% - 4.75rem)); }
-  .simulation-controls { width: 22rem; max-width: calc(100% - 4.5rem); }
+  .axis-indicator { top: var(--coil-axis-top, .5rem); }
+  .overlay-legends { bottom: calc(2rem + var(--coil-overlay-inset, 0px)); max-height: 40cqh; right: auto; max-width: min(26rem, calc(100% - 4.75rem)); }
+  .z-height { top: var(--coil-preset-inset, 3rem); bottom: calc(2rem + var(--coil-overlay-inset, 0px)); }
+  .simulation-controls { right: 6.25rem; width: 22rem; max-width: calc(100% - 4.5rem); }
+  .layer-depths { right: 6.25rem; }
   .inspector-toggle { display: flex; justify-content: space-between; align-items: center; width: 100%; min-height: 2rem; text-align: left; padding: 0.5rem 0.75rem; }
   .inspector-toggle:hover { background: rgb(var(--slate-800)); }
-  .overlay-control-fields { display: grid; gap: 0.625rem; padding: 0.625rem; max-height: calc(100cqh - 5rem); overflow-y: auto; border-top: 1px solid rgb(var(--slate-700)); }
+  .overlay-control-fields { display: grid; gap: 0.625rem; padding: 0.625rem; max-height: calc(100cqh - 5rem - var(--coil-overlay-inset, 0px)); overflow-y: auto; border-top: 1px solid rgb(var(--slate-700)); }
   .overlay-control-fields[hidden] { display: none; }
   .control-row { display: grid; grid-template-columns: 5.75rem minmax(0, 1fr); align-items: center; gap: 0.5rem; }
   .control-row select { width: 100%; min-width: 0; min-height: 2rem; }
@@ -263,12 +292,14 @@
   .section-button { min-height: 2rem; }
   .section-button[aria-pressed="true"] { border-color: #10b981; color: #10b981; }
   .simulation-depths { display: none; }
-  .compact-overlay-toggle { display: none; }
+  .compact-overlay-toggle { display: none; line-height: 1.4; }
+  .compact-overlay-toggle button { padding: .25rem; font-size: inherit; line-height: 1.2; }
   @container (max-width: 760px) {
-    .simulation-controls { top: 3rem; }
-    .overlay-control-fields { max-height: calc(65cqh - 4rem); }
+    .simulation-controls { right: .5rem; top: max(calc(var(--coil-axis-top, .5rem) + 5.5rem), var(--coil-preset-inset, 0px)); }
+    .overlay-control-fields { max-height: min(calc(65cqh - 4rem), calc(100cqh - var(--coil-axis-top, .5rem) - 8rem - var(--coil-overlay-inset, 0px))); }
   }
   @container (max-width: 520px) {
+    .overlay-legends { bottom: calc(.5rem + var(--coil-overlay-inset, 0px)); }
     .compact-overlay-toggle { display: block; }
     .overlay-legends-body { display: none; }
     .coil-3d[data-legends-open="true"] .overlay-legends-body { display: flex; }
@@ -277,7 +308,7 @@
     .control-row { grid-template-columns: 4.75rem minmax(0, 1fr); }
   }
   @container (max-height: 180px) {
-    .z-height { top: 2.75rem; bottom: 0.25rem; padding: 0.25rem; gap: 0.25rem; }
+    .z-height { top: var(--coil-preset-inset, 2.75rem); bottom: calc(.25rem + var(--coil-overlay-inset, 0px)); padding: 0.25rem; gap: 0.25rem; }
     .z-label { display: none; }
   }
   button { padding: 0.25rem 0.5rem; border-radius: 0.25rem; font-size: 0.75rem; }

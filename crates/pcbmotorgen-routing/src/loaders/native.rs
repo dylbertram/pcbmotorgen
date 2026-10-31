@@ -7,7 +7,7 @@
 //! symbols:
 //!
 //! ```ignore
-//! static pcbmotorgen_ROUTING_PLUGIN_API: u32      // = 2 (millimetre contract)
+//! static pcbmotorgen_ROUTING_PLUGIN_API: u32      // = 3 (end-type metadata)
 //! unsafe extern "C" fn pcbmotorgen_routing_plugin_create() -> *mut c_void
 //! unsafe extern "C" fn pcbmotorgen_routing_plugin_destroy(v: *mut c_void)
 //! ```
@@ -32,7 +32,7 @@ use crate::model::RoutingResult;
 use crate::pattern::RoutingPattern;
 
 /// API version a plugin must declare. Bump on breaking ABI changes.
-pub const PLUGIN_API_VERSION: u32 = 2;
+pub const PLUGIN_API_VERSION: u32 = 3;
 
 /// A loaded native plugin, keeping its backing library alive for the lifetime
 /// of the pattern.
@@ -98,6 +98,10 @@ impl NativePlugin {
 }
 
 impl RoutingPattern for NativePlugin {
+    fn metadata(&self) -> crate::PluginMetadata {
+        self.pattern.metadata()
+    }
+
     fn id(&self) -> &str {
         self.pattern.id()
     }

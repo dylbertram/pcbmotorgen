@@ -19,6 +19,30 @@ impl LinearMotorConfig {
 
     /// Validate all fields (mirrors Python `_validate_base` + `_validate_linear`).
     pub fn validate(&self) -> Result<(), ConfigError> {
+        self.validate_fields(true, true)
+    }
+
+    /// Imposed-move physics does not depend on force or acceleration goals.
+    pub fn validate_for_move(&self) -> Result<(), ConfigError> {
+        self.validate_fields(false, true)
+    }
+
+    /// Physics commands must not reject a design for missing its performance goals.
+    /// Static force/heat still consume the configured current as excitation.
+    pub fn validate_for_simulation(&self) -> Result<(), ConfigError> {
+        self.validate_fields(false, true)
+    }
+
+    /// Draw the requested copper even below the manufacturing width floor.
+    /// Positive dimensions, supported limits and routing-shape validation still apply.
+    pub fn validate_for_preview(&self) -> Result<(), ConfigError> {
+        self.validate_fields(false, false)
+    }
+
+    fn validate_fields(&self, check_goals: bool, enforce_trace_floor: bool) -> Result<(), ConfigError> {
+        if let Some(stack) = &self.pcb_stackup {
+            stack.validate(self.num_layers, self.pcb_thickness_m).map_err(ConfigError)?;
+        }
         if let Some(stack) = &self.backplane {
             stack.validate().map_err(ConfigError)?;
         }
@@ -77,7 +101,7 @@ impl LinearMotorConfig {
                 self.spacing_ratio
             )));
         }
-        if self.max_current_a <= 0.0 {
+        if check_goals && self.max_current_a <= 0.0 {
             return Err(ConfigError(format!(
                 "max_current_a must be positive, got {}",
                 self.max_current_a
@@ -101,7 +125,7 @@ impl LinearMotorConfig {
                 self.trace_width_m
             )));
         }
-        if self.trace_width_m < self.min_trace_m {
+        if enforce_trace_floor && self.trace_width_m < self.min_trace_m {
             return Err(ConfigError(format!(
                 "trace_width_m ({}) must be at least the minimum trace width ({})",
                 self.trace_width_m, self.min_trace_m
@@ -158,7 +182,7 @@ impl LinearMotorConfig {
                 self.drive_frequency_hz
             )));
         }
-        if self.max_temperature_rise_c <= 0.0 {
+        if check_goals && self.max_temperature_rise_c <= 0.0 {
             return Err(ConfigError(format!(
                 "max_temperature_rise_c must be positive, got {}",
                 self.max_temperature_rise_c
@@ -219,13 +243,13 @@ impl LinearMotorConfig {
                 )));
             }
         }
-        if self.target_force_n <= 0.0 {
+        if check_goals && self.target_force_n <= 0.0 {
             return Err(ConfigError(format!(
                 "target_force_n must be positive, got {}",
                 self.target_force_n
             )));
         }
-        if self.peak_force_n < self.target_force_n {
+        if check_goals && self.peak_force_n < self.target_force_n {
             return Err(ConfigError(format!(
                 "peak_force_n ({:.3} N) must be ≥ target_force_n ({:.3} N)",
                 self.peak_force_n, self.target_force_n
@@ -243,7 +267,7 @@ impl LinearMotorConfig {
                 self.carriage_mass_kg
             )));
         }
-        if self.max_accel_m_s2 <= 0.0 {
+        if check_goals && self.max_accel_m_s2 <= 0.0 {
             return Err(ConfigError(format!(
                 "max_accel_m_s2 must be positive, got {}",
                 self.max_accel_m_s2

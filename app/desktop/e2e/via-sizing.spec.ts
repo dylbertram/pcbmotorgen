@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { gotoDesignApp, selectDesignPanel } from "./helpers";
+import { gotoDesignApp, selectDesignPanel, openCoilPreview } from "./helpers";
 
 test("via guide distinguishes hole diameter from ring width and updates live", async ({ page }) => {
   await gotoDesignApp(page);
@@ -30,6 +30,13 @@ test("via guide distinguishes hole diameter from ring width and updates live", a
   await page.getByRole("button", { name: "About via diameter", exact: true }).blur();
   await page.getByRole("button", { name: "About annular ring width", exact: true }).focus();
   await expect(page.getByText("Copper width on one side of the hole.", { exact: false })).toBeVisible();
+  await openCoilPreview(page);
+  for(const [label,id] of [["Top-down","top"],["3D fields and heat","iso"]]){
+    await page.getByRole("button",{name:label,exact:true}).click();
+    const viewer=page.getByTestId(`coil-${id}`);
+    await expect.poll(async()=>Number(await viewer.getAttribute("data-via-diameter-mm"))).toBeCloseTo(.35,12);
+    await expect(viewer).toHaveAttribute("data-via-drill-mm","0.2");
+  }
 });
 
 test("CAD import shares the same via sizing guide and help", async ({ page }) => {

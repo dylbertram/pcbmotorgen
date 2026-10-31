@@ -45,6 +45,7 @@ pub mod induction_sensor;
 pub mod io;
 pub mod loaders;
 pub mod model;
+pub mod orientation;
 pub mod pattern;
 pub mod patterns;
 pub mod registry;
@@ -53,6 +54,7 @@ pub mod validator;
 
 pub use coil::{CoilArc, CoilSegment, PhaseCoil, PHASE_NAMES};
 pub use context::RoutingContext;
+pub use orientation::RoutingOrientation;
 pub use dimensions::{
     max_phase_band_width_from_pole_pitch_mm, phase_band_width_from_trace_geometry_mm,
     slot_pitch_from_leg_grid_mm, slot_width_from_leg_geometry_mm, PhaseBandWidth,

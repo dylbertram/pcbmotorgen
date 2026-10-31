@@ -1,15 +1,17 @@
 <script lang="ts">
   import { GitMerge, Undo2 } from "@lucide/svelte";
+  import ZoomWindowIcon from "./ZoomWindowIcon.svelte";
   import type { CadGeometry } from "../../types";
   import type { CadSelectionTool } from "../../utils/cadSelectionTool.svelte";
   import type { CoilTerminalTool } from "../../utils/coilTerminalTool.svelte";
   import type { CoilPreviewMeasure } from "../../utils/coilPreviewMeasure.svelte";
   import CadSelectionToolbar from "./CadSelectionToolbar.svelte";
   import CoilPreviewMeasureToolbar from "./CoilPreviewMeasureToolbar.svelte";
+  import type { SpatialMeasure } from "../../spatialMeasure.svelte";
 
   let { label, geometry, selection, measure, terminalTool, disabled = false,
     onActivateSelection, onSimplify, onUndoSimplify,
-    simplifyNotice = "", onPrepareGeometry, borderless = false }: {
+    simplifyNotice = "", onPrepareGeometry, borderless = false, spatialMeasure = null, zoomWindow = false, onToggleZoomWindow, showZoomWindowControl = true }: {
     label: string;
     geometry: CadGeometry | null;
     selection: CadSelectionTool;
@@ -22,11 +24,15 @@
     simplifyNotice?: string;
     onPrepareGeometry?: () => Promise<boolean>;
     borderless?: boolean;
+    spatialMeasure?: SpatialMeasure | null;
+    zoomWindow?: boolean;
+    onToggleZoomWindow?: () => void;
+    showZoomWindowControl?: boolean;
   } = $props();
   let preparing = $state(false);
   let error = $state("");
-  // One fixed-height status line under the toolbar divider. Reserving the row
-  // keeps the drawing from shifting when the selection or merge hint appears.
+  // Embedded feedback stays inside the backed toolbar, not over the viewport.
+  // CAD import reserves a status row so tool hints never shift its drawing.
   let status = $derived(
     error
       || (selection.mode === "chain" || selection.selected.length
@@ -37,6 +43,7 @@
       || "",
   );
   function activateSelection() {
+    if (zoomWindow) onToggleZoomWindow?.();
     terminalTool?.cancel();
     measure.mode = false;
     onActivateSelection?.();
@@ -58,7 +65,7 @@
     return false;
   }
   function handleKeydown(event: KeyboardEvent) {
-    if (disabled || event.defaultPrevented || event.altKey || event.shiftKey) return;
+   if (disabled || spatialMeasure || event.defaultPrevented || event.altKey || event.shiftKey) return;
     if (!(event.ctrlKey || event.metaKey) || event.key.toLowerCase() !== "z") return;
     const target = event.target as HTMLElement | null;
     // Native undo owns text fields and selects.
@@ -74,20 +81,32 @@
   <!-- The bottom rule stays after the editing boxes were removed; it is the
        line between the toolbar and the viewer. -->
   <div class="flex flex-wrap items-start gap-2 border-b border-slate-700 {borderless ? 'bg-slate-900 py-1.5 pl-3 pr-1.5' : 'border-t p-2'}">
-  {#if geometry}
-    <CadSelectionToolbar tool={selection} {geometry} {disabled} onActivate={activateSelection} />
-  {:else if onPrepareGeometry}
-    <button type="button" onclick={prepare} disabled={disabled || preparing} class="inline-flex h-8 shrink-0 items-center justify-center rounded border border-slate-700 bg-slate-800 px-4 text-xs text-slate-300 disabled:opacity-40" title="Create editable geometry to select and reassign segments. Edits stop following the routing settings.">{preparing ? "Preparing segments…" : "Edit segments"}</button>
+  {#if onToggleZoomWindow && showZoomWindowControl}
+    <button type="button" class="icon-tool" aria-label="Zoom window" aria-pressed={zoomWindow} {disabled} title="Zoom window: drag a rectangle or click two opposite corners. Escape cancels." onclick={onToggleZoomWindow}><ZoomWindowIcon /></button>
   {/if}
-  <CoilPreviewMeasureToolbar {measure} {disabled} onToggle={() => { selection.setMode("pan"); terminalTool?.cancel(); measure.toggleMode(); }} />
+  {#if geometry}
+    <CadSelectionToolbar tool={selection} {geometry} disabled={disabled || !!spatialMeasure} onActivate={activateSelection} />
+  {:else if onPrepareGeometry}
+    <button type="button" onclick={prepare} disabled={disabled || preparing || !!spatialMeasure} class="inline-flex h-8 shrink-0 items-center justify-center rounded border border-slate-700 bg-slate-800 px-4 text-xs text-slate-300 disabled:opacity-40" title={spatialMeasure ? "Switch to Top-down to edit segments" : "Create editable geometry to select and reassign segments. Edits stop following the routing settings."}>{preparing ? "Preparing segments…" : "Edit segments"}</button>
+  {/if}
+  {#if spatialMeasure}
+    <CoilPreviewMeasureToolbar measure={spatialMeasure} {disabled} spatial distanceMm={spatialMeasure.distanceMm} onToggle={() => { if (zoomWindow) onToggleZoomWindow?.(); selection.setMode("pan"); terminalTool?.cancel(); measure.mode = false; spatialMeasure?.toggleMode(); }} />
+  {:else}
+    <CoilPreviewMeasureToolbar {measure} {disabled} onToggle={() => { if (zoomWindow) onToggleZoomWindow?.(); selection.setMode("pan"); terminalTool?.cancel(); measure.toggleMode(); }} />
+  {/if}
   {#if onSimplify}
-    <button type="button" aria-label="Simplify lines" onclick={() => { selection.clear(); selection.setMode("pan"); onSimplify?.(); }} disabled={disabled || terminalTool?.active} class="icon-tool" title="Simplify lines: merge collinear lines in saved and exported geometry."><GitMerge size={16} aria-hidden="true" /></button>
-    {#if onUndoSimplify}<button type="button" aria-label="Undo simplify" onclick={() => { selection.clear(); onUndoSimplify?.(); }} disabled={disabled || terminalTool?.active} class="icon-tool" title="Undo line simplification."><Undo2 size={16} aria-hidden="true" /></button>{/if}
+    <button type="button" aria-label="Simplify lines" onclick={() => { selection.clear(); selection.setMode("pan"); onSimplify?.(); }} disabled={disabled || terminalTool?.active || !!spatialMeasure} class="icon-tool" title="Simplify lines: merge collinear lines in saved and exported geometry."><GitMerge size={16} aria-hidden="true" /></button>
+    {#if onUndoSimplify}<button type="button" aria-label="Undo simplify" onclick={() => { selection.clear(); onUndoSimplify?.(); }} disabled={disabled || terminalTool?.active || !!spatialMeasure} class="icon-tool" title="Undo line simplification."><Undo2 size={16} aria-hidden="true" /></button>{/if}
+  {/if}
+  {#if borderless}
+    <span role="status" class="min-w-0 flex-1 self-center truncate text-xs text-slate-400" title={status}>{status}</span>
   {/if}
   </div>
-  <div class="flex h-5 min-w-0 items-center text-xs text-slate-400 {borderless ? 'absolute inset-x-0 top-full' : ''}">
+  {#if !borderless}
+  <div class="flex h-5 min-w-0 items-center text-xs text-slate-400">
     <span role="status" class="truncate" title={status}>{status}</span>
   </div>
+  {/if}
 </div>
 
 <style>

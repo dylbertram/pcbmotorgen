@@ -11,6 +11,23 @@ impl SimulationInput {
 
     /// Validate all fields.
     pub fn validate(&self) -> Result<(), SimulationError> {
+        self.validate_with_design_goals(true)
+    }
+
+    /// Validate physical inputs without requiring design-goal relationships.
+    pub fn validate_for_move(&self) -> Result<(), SimulationError> {
+        self.validate_with_design_goals(false)
+    }
+
+    /// Preserve geometry/material checks without enforcing performance goals.
+    pub fn validate_for_simulation(&self) -> Result<(), SimulationError> {
+        self.validate_with_design_goals(false)
+    }
+
+    fn validate_with_design_goals(&self, check_goals: bool) -> Result<(), SimulationError> {
+        if let Some(stack) = &self.pcb_stackup {
+            stack.validate(self.num_layers, self.pcb_thickness_m).map_err(SimulationError)?;
+        }
         if let Some(stack) = &self.backplane {
             stack.validate().map_err(SimulationError)?;
         }
@@ -68,7 +85,7 @@ impl SimulationInput {
                 self.spacing_ratio
             )));
         }
-        if self.max_current_a <= 0.0 {
+        if check_goals && self.max_current_a <= 0.0 {
             return Err(SimulationError(format!(
                 "max_current_a must be positive, got {}",
                 self.max_current_a
@@ -137,7 +154,7 @@ impl SimulationInput {
                 self.drive_frequency_hz
             )));
         }
-        if self.max_temperature_rise_c <= 0.0 {
+        if check_goals && self.max_temperature_rise_c <= 0.0 {
             return Err(SimulationError(format!(
                 "max_temperature_rise_c must be positive, got {}",
                 self.max_temperature_rise_c
@@ -194,13 +211,13 @@ impl SimulationInput {
                 )));
             }
         }
-        if self.target_force_n <= 0.0 {
+        if check_goals && self.target_force_n <= 0.0 {
             return Err(SimulationError(format!(
                 "target_force_n must be positive, got {}",
                 self.target_force_n
             )));
         }
-        if self.peak_force_n < self.target_force_n {
+        if check_goals && self.peak_force_n < self.target_force_n {
             return Err(SimulationError(format!(
                 "peak_force_n ({:.3} N) must be ≥ target_force_n ({:.3} N)",
                 self.peak_force_n, self.target_force_n
@@ -218,7 +235,7 @@ impl SimulationInput {
                 self.carriage_mass_kg
             )));
         }
-        if self.max_accel_m_s2 <= 0.0 {
+        if check_goals && self.max_accel_m_s2 <= 0.0 {
             return Err(SimulationError(format!(
                 "max_accel_m_s2 must be positive, got {}",
                 self.max_accel_m_s2

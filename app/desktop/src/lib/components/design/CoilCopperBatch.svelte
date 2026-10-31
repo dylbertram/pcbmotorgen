@@ -1,15 +1,22 @@
 <script lang="ts">
   import { T, useThrelte } from "@threlte/core";
-  import { BufferGeometry, Float32BufferAttribute, CurvePath, LineCurve3, TubeGeometry } from "three";
+  import { BufferGeometry, Float32BufferAttribute } from "three";
   import type { Vector3 } from "three";
-  import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
+  import { rectangularCopperGeometry } from "../../copperMesh";
+  import { viaBarrelsGeometry, type CopperPad } from "../../viaCopperMesh";
 
-  let { paths, width, color, centerlines = false, zScale = 1 }: {
+  let { paths, width, color, centerlines = false, zScale = 1, thickness = .0035, barrels = false, contextPaths, pads = [], padDiameter = 0, plating = .0025 }: {
     paths: { points: Vector3[] }[];
     width: number;
     color: string;
     centerlines?: boolean;
     zScale?: number;
+    thickness?: number;
+    barrels?: boolean;
+    contextPaths?: { points: Vector3[] }[];
+    pads?: CopperPad[];
+    padDiameter?: number;
+    plating?: number;
   } = $props();
   const { invalidate } = useThrelte();
 
@@ -23,17 +30,8 @@
       for (const points of scaledPaths) for (let i = 1; i < points.length; i++) positions.push(...points[i - 1].toArray(), ...points[i].toArray());
       return new BufferGeometry().setAttribute("position", new Float32BufferAttribute(positions, 3));
     }
-    const tubes: TubeGeometry[] = [];
-    for (const points of scaledPaths) {
-      const path = new CurvePath<Vector3>();
-      for (let i = 1; i < points.length; i++) {
-        if (points[i - 1].distanceToSquared(points[i]) > 1e-16) path.add(new LineCurve3(points[i - 1], points[i]));
-      }
-      if (path.curves.length) tubes.push(new TubeGeometry(path, Math.max(1, points.length - 1), width / 2, 6, false));
-    }
-    const merged = tubes.length ? mergeGeometries(tubes) : new BufferGeometry();
-    for (const tube of tubes) tube.dispose();
-    return merged;
+    if (!barrels) return rectangularCopperGeometry(paths, width, thickness, zScale, contextPaths ?? paths, pads, padDiameter);
+    return viaBarrelsGeometry(paths, width, plating, zScale);
   });
   $effect(() => {
     const current = geometry;
@@ -44,12 +42,12 @@
 
 {#if geometry}
   {#if centerlines}
-    <T.LineSegments>
+    <T.LineSegments userData={{ measureable: true, copperLayerY: barrels ? undefined : paths[0]?.points[0]?.y }}>
       <T is={geometry} />
       <T.LineBasicMaterial {color} />
     </T.LineSegments>
   {:else}
-    <T.Mesh>
+    <T.Mesh userData={{ measureable: true, copperLayerY: barrels ? undefined : paths[0]?.points[0]?.y }}>
       <T is={geometry} />
       <T.MeshStandardMaterial {color} roughness={0.5} metalness={0.25} />
     </T.Mesh>

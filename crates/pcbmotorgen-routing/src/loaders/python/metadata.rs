@@ -34,6 +34,8 @@ pub fn python_metadata(script: &std::path::Path) -> Result<Option<RunnerMeta>, S
 /// Strict metadata block a Python runner may emit in `--metadata` mode.
 #[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
 pub struct RunnerMeta {
+    #[serde(default)]
+    pub end_type: Option<crate::pattern::GeneratorEndType>,
     /// Stable id (registry key). Falls back to the file stem if empty.
     #[serde(default)]
     pub id: String,

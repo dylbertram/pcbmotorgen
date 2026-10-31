@@ -769,6 +769,7 @@ mod tests {
                     pattern_id: "serpentine-test".to_string(),
                     layer_pair: None,
                     center_via_positions: vec![],
+                    routed_vias: vec![],
                 }
             })
             .collect()
@@ -910,12 +911,14 @@ mod tests {
             phases: 3,
             min_trace_mm: 0.127,
             trace_width_mm: 0.127,
+            via_pad_diameter_mm: None,
             min_space_mm: 0.127,
             expects_continuous: false,
             params: Default::default(),
             magnet_pitch_mm: Some(6.0),
             magnet_array_span_mm: Some(72.0),
             phase_clearance_mm: None,
+            orientation: Default::default(),
         };
         let braid = generate_coils_from_context(&ctx, "infinity-braid");
         let first = band_charge_state_from_coils(&cfg, &braid, EndMagnet::First).expect("first");

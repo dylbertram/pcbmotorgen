@@ -16,6 +16,34 @@ function fixture(ambiguous = false) {
 }
 
 describe("CoilTerminalTool", () => {
+  it("retries automatic selection as a reviewable draft without replacing saved manual polarity", () => {
+    const { tool, onChange, getGeometry } = fixture();
+    tool.begin("A");
+    tool.flip();
+    tool.done();
+    const saved = getGeometry();
+    const manual = saved.coil_terminals!.A;
+    onChange.mockClear();
+    tool.begin("A");
+    tool.autoSelect();
+    expect(tool.step).toBe("review");
+    expect(tool.input).toEqual(manual.output);
+    expect(tool.notice).toContain("Automatic ends found");
+    expect(onChange).not.toHaveBeenCalled();
+    tool.cancel();
+    expect(getGeometry()).toBe(saved);
+    expect(getGeometry().coil_terminals!.A).toEqual(manual);
+  });
+  it("reports an ambiguous auto-selection without changing the draft or geometry", () => {
+    const { tool, onChange, getGeometry } = fixture(true);
+    const before = getGeometry();
+    tool.begin("A");
+    tool.autoSelect();
+    expect(tool.error).toContain("Select them manually");
+    expect(tool.canApply).toBe(false);
+    expect(getGeometry()).toBe(before);
+    expect(onChange).not.toHaveBeenCalled();
+  });
   it("infers the opposite end when either free end is chosen as the driver end", () => {
     const { tool, getGeometry } = fixture();
     tool.begin(); tool.change("input");

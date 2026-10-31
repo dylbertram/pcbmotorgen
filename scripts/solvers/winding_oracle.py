@@ -11,10 +11,23 @@ from scipy.sparse import coo_matrix
 from scipy.sparse.linalg import spsolve
 
 
+def custom_stack(sim):
+    stack = sim.get('pcb_stackup')
+    if stack is None:return None
+    copper, dielectric = stack['copper_m'], stack['dielectric_m']
+    if len(copper)!=sim['num_layers'] or len(dielectric)!=sim['num_layers']-1:
+        raise ValueError('PCB stackup layer count mismatch')
+    values=np.asarray(copper+dielectric,dtype=float)
+    if not np.isfinite(values).all() or np.any(values<=0) or not math.isclose(float(values.sum()),sim['pcb_thickness_m'],rel_tol=1e-9,abs_tol=1e-10):
+        raise ValueError('Invalid PCB stackup thickness')
+    return stack
+
+
 def layer_z(sim,hints,layer):
     if isinstance(layer,bool) or not isinstance(layer,int) or not 0<=layer<sim['num_layers']:raise ValueError('Invalid copper layer')
     depths=hints.get('layer_z_m',[])
-    z=depths[layer] if layer<len(depths) else -layer*sim['pcb_thickness_m']/max(1,sim['num_layers']-1)
+    stack=custom_stack(sim)
+    z=depths[layer] if layer<len(depths) else (-sum(stack['copper_m'][:layer])-sum(stack['dielectric_m'][:layer])-stack['copper_m'][layer]/2 if stack else -layer*sim['pcb_thickness_m']/max(1,sim['num_layers']-1))
     if not np.isfinite(z):raise ValueError('Nonfinite layer depth')
     return float(z)
 
@@ -45,7 +58,8 @@ def resistances(network,sim,drive,hints):
         if geometry['kind']=='trace':
             layer=geometry['layer'];inner=sim['num_layers']>2 and layer not in [0,sim['num_layers']-1]
             oz=drive['inner_copper_oz'] if inner else drive['outer_copper_oz']
-            area=sim['min_trace_m']*oz*35e-6
+            stack=custom_stack(sim)
+            area=sim['min_trace_m']*(stack['copper_m'][layer] if stack else oz*35e-6)
         else:area=math.pi*drive['via_plating_m']*(sim['min_via_drill_m']+drive['via_plating_m'])
         if not np.isfinite([length,area]).all() or min(length,area)<=0:raise ValueError('Invalid conductor dimensions')
         result.append(rho*length/area)

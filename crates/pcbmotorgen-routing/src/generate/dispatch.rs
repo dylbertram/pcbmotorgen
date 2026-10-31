@@ -141,7 +141,7 @@ fn generate_with_report(
     // to generate the geometry.  The bundled infinity braid has a known
     // diamond angle and strand count; generic plugins use their active
     // geometry and the conventional trace-count parameter when present.
-    let dimensions = if id == "infinity-braid" {
+    let mut dimensions = if id == "infinity-braid" {
         let trace_count = ctx.param("num_strands", 5.0).round().max(1.0) as u32;
         let (period_pitch, period_count) = infinity_period(ctx);
         RoutingDimensions::for_infinity(
@@ -156,6 +156,11 @@ fn generate_with_report(
     }
     .map_err(|e| format!("pattern \"{id}\" dimensions were rejected: {e}"))?;
 
+    if ctx.orientation != Default::default() {
+        ctx.orientation.apply(&mut result, ctx.active_area_length_mm, ctx.board_width_mm, ctx.num_layers);
+        ctx.orientation.dimensions(&mut dimensions, ctx.num_layers);
+        Validator::validate(&result, ctx, pattern.expects_continuous()).map_err(|error| format!("Oriented routing rejected: {error}"))?;
+    }
     Ok(RoutingReport { result, dimensions })
 }
 
@@ -234,6 +239,7 @@ pub fn register_python_runner(
             min_layers: meta.min_layers,
             max_layers: meta.max_layers,
             layers_multiple_of: meta.layers_multiple_of,
+            end_type: meta.end_type,
         });
         pattern.set_parameters(meta.parameters);
     } else if let Some(id) = custom_id {

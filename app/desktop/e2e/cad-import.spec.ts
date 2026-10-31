@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { gotoDesignApp, openCoilPreview, coilWorkspace, selectDesignPanel } from "./helpers";
+import { installViewMenu, setViewMenuChecked } from "./view-menu-helpers";
 
 async function revisitWorkspace(page: Page) {
   await page.getByRole("tab", { name: /^Simulate/i }).click();
@@ -10,6 +11,7 @@ async function revisitWorkspace(page: Page) {
 // Exercise the real dialog, store and preview with a deterministic IPC boundary.
 // Parsing and coil assignments themselves are covered by Rust DXF fixtures.
 test.beforeEach(async ({ page }) => {
+  await installViewMenu(page);
   await page.route(/\/@tauri-apps_plugin-dialog\.js(?:\?.*)?$/, async route => {
     const response = await route.fetch();
     const body = (await response.text()).replace(/async function confirm\(message2, options\) \{[\s\S]*?\n\}/, "async function confirm() { return window.__cadConfirmResult ?? false; }");
@@ -150,9 +152,8 @@ test("imported geometry renders in the isometric view", async ({ page }) => {
   await dialog.getByRole("button", { name: "Open with this geometry" }).click();
   await openCoilPreview(page);
   const modal = coilWorkspace(page);
-  await modal.getByRole("button", { name: "Display", exact: true }).click();
-  const display = page.getByRole("dialog", { name: "Coil preview display", exact: true });
-  await display.getByRole("radio", { name: "3D", exact: true }).check();
+  await modal.getByRole("button", { name: "Layers", exact: true }).click();
+  await page.getByRole("button", { name: "3D fields and heat", exact: true }).click();
   const iso = modal.getByTestId("coil-iso");
   await expect(iso).toBeVisible();
   await expect(iso).toHaveAttribute("data-layers", /[1-9]/);
@@ -233,7 +234,7 @@ test("overlapping endpoints are disambiguated by copper layer and support keyboa
   expect(cards).toHaveLength(4);
   for (const [i, a] of cards.entries()) for (const b of cards.slice(i + 1)) expect(a.x + a.width <= b.x || b.x + b.width <= a.x || a.y + a.height <= b.y || b.y + b.height <= a.y).toBe(true);
   await page.screenshot({ path: testInfo.outputPath("offset-terminal-arrows.png") });
-  await expect(command.getByRole("combobox")).toHaveCount(0);
+  await expect(command.getByRole("combobox", { name: "Winding connection", exact: true })).toHaveValue("star");
   await command.getByRole("button", { name: "Select driver end for coil A", exact: true }).click();
   const slider = page.getByRole("slider", { name: "Preview layer", exact: true });
   await slider.focus(); await page.keyboard.press("End");
@@ -269,8 +270,8 @@ test("terminal panel configures multiple phases, switches topology and temporari
   const modal = coilWorkspace(page);
   await expect(modal.getByRole("slider", { name: "Preview layer" })).toBeVisible();
   await expect(modal.getByRole("dialog", { name: "Phase waveform", exact: true })).toHaveCount(0);
-  await expect(command.getByRole("radio", { name: "Star (wye)", exact: true })).toBeChecked();
-  await command.getByRole("radio", { name: "Delta", exact: true }).check();
+  await expect(command.getByRole("combobox", { name: "Winding connection", exact: true })).toHaveValue("star");
+  await command.getByRole("combobox", { name: "Winding connection", exact: true }).selectOption("delta");
   await expect(command).toContainText("next coil's driver end");
   await expect(command).toContainText("Delta end");
   await expect(command.getByRole("button", { name: "Select delta end for coil A", exact: true })).toHaveCount(0);
@@ -290,10 +291,10 @@ test("terminal panel configures multiple phases, switches topology and temporari
   // retired modal's phase-waveform popover.
   await expect(modal.getByRole("dialog", { name: "Phase waveform", exact: true })).toHaveCount(0);
   await expect(modal.getByRole("slider", { name: "Mover position slider (mm)", exact: true })).toBeVisible();
-  await page.getByRole("button", { name: "Display", exact: true }).click();
-  await page.getByRole("checkbox", { name: "Show terminal arrows", exact: true }).uncheck();
+  await page.getByRole("button", { name: "Layers", exact: true }).click();
+  await setViewMenuChecked(page, "view:terminals", false);
   await expect(modal.getByRole("img", { name: /Coil A Driver end,/ })).toHaveCount(0);
-  await page.getByRole("checkbox", { name: "Show terminal arrows", exact: true }).check();
+  await setViewMenuChecked(page, "view:terminals", true);
   await revisitWorkspace(page);
   await expect(modal.getByRole("img", { name: "Coil A Driver end, L0, X 2 mm, Y 0 mm", exact: true })).toBeVisible();
 });
@@ -396,11 +397,12 @@ test("CAD layer slider isolates each layer and restores all layers", async ({ pa
   await page.screenshot({ path: testInfo.outputPath("cad-layer-slider.png") });
 
   // Side-panel visibility changes and the slider share the same layer state.
-  await dialog.getByRole("button", { name: "Display", exact: true }).click();
-  const display = page.getByRole("dialog", { name: "CAD import display", exact: true });
+  await dialog.getByRole("button", { name: "Layers", exact: true }).click();
+  const display = page.getByRole("dialog", { name: "CAD import layers", exact: true });
+  await display.getByRole("radio", { name: "Layers", exact: true }).check();
   await expect(display.getByRole("checkbox", { name: "Show layer 0", exact: true })).toBeChecked();
   await expect(display.getByRole("checkbox", { name: "Show layer 1", exact: true })).not.toBeChecked();
-  await dialog.getByRole("button", { name: "Display", exact: true }).click();
+  await dialog.getByRole("button", { name: "Layers", exact: true }).click();
   await page.setViewportSize({ width: 390, height: 844 });
   await steps.getByRole("button", { name: "Layer 2", exact: true }).click();
   await expect(traces).toHaveCount(1);
@@ -449,6 +451,7 @@ test("shared editing tools measure and edit CAD drafts, then keep those edits in
   const motor = coilWorkspace(page);
   const motorTools = motor.getByRole("toolbar", { name: "Coil preview tools" });
   expect(await motorTools.getByRole("button").evaluateAll(buttons => buttons.map(button => button.getAttribute("aria-label")).filter(Boolean))).toEqual(toolNames);
+  await expect(motor.getByRole("group", { name: "Zoom controls" }).getByRole("button", { name: "Zoom window", exact: true })).toBeVisible();
   await expect(motor.getByRole("img", { name: "Coil A Driver end, L0, X 2 mm, Y 0 mm", exact: true })).toBeVisible();
   await motorTools.getByRole("button", { name: "Toggle measure tool" }).click();
   for (const x of [0, 2]) {
@@ -479,6 +482,68 @@ test("shared editing tools measure and edit CAD drafts, then keep those edits in
   await page.screenshot({ path: testInfo.outputPath("shared-motor-editor.png") });
 });
 
+for (const width of [1280, 390]) test(`Routing DXF checkboxes retain flips and picked endpoints at ${width}px`, async ({ page }, info) => {
+  await page.setViewportSize({ width, height: 844 });
+  const { command } = await openTerminalTool(page);
+  await command.getByRole("button", { name: "Apply terminals", exact: true }).click();
+  const motor = coilWorkspace(page);
+  await expect(motor.getByRole("img", { name: "Coil A Driver end, L0, X 0 mm, Y 0 mm", exact: true })).toBeVisible();
+  await selectDesignPanel(page, "Routing");
+  const panel = motor.getByRole("dialog", { name: "Routing", exact: true });
+  const orientation = panel.getByRole("group", { name: "Routing orientation", exact: true });
+  await expect(orientation.getByRole("checkbox")).toHaveCount(3);
+  await expect(orientation.getByRole("button")).toHaveCount(0);
+  for (const [label, marker] of [
+    ["Mirror left/right (X)", "Coil A Driver end, L0, X 2 mm, Y 0 mm"],
+    ["Mirror up/down (Y)", "Coil A Driver end, L0, X 2 mm, Y 2 mm"],
+    ["Reverse layers (Z)", "Coil A Driver end, L1, X 2 mm, Y 2 mm"],
+  ]) {
+    await panel.getByRole("checkbox", { name: label, exact: true }).check();
+    await expect(panel.getByRole("checkbox", { name: label, exact: true })).toBeChecked();
+    await expect(motor.getByRole("img", { name: marker, exact: true })).toBeVisible();
+  }
+  await expect(panel.getByRole("group", { name: "Imported CAD pattern", exact: true })).toBeVisible();
+  await page.screenshot({ path: info.outputPath(`dxf-flip-checkboxes-${width}.png`) });
+  await selectDesignPanel(page, "Stackup"); await selectDesignPanel(page, "Routing");
+  for (const checkbox of await orientation.getByRole("checkbox").all()) await expect(checkbox).toBeChecked();
+  for (const label of ["Mirror left/right (X)", "Mirror up/down (Y)", "Reverse layers (Z)"]) {
+    await panel.getByRole("checkbox", { name: label, exact: true }).uncheck();
+  }
+  await expect(motor.getByRole("img", { name: "Coil A Driver end, L0, X 0 mm, Y 0 mm", exact: true })).toBeVisible();
+});
+
+test("motor tool feedback stays inside the toolbar instead of behind viewport presets", async ({ page }, testInfo) => {
+  const dialog = await openImport(page);
+  await dialog.getByRole("button", { name: "Open with this geometry" }).click();
+  await openCoilPreview(page);
+  const motor = coilWorkspace(page);
+  const toolbar = motor.getByRole("toolbar", { name: "Coil preview tools", exact: true });
+  const presets = motor.getByRole("group", { name: "Viewport view", exact: true });
+  const feedback = toolbar.getByRole("status").filter({ hasText: "Choose the first segment." });
+  for (const width of [1280, 1600, 390]) {
+    await page.setViewportSize({ width, height: 844 });
+    await motor.getByRole("button", { name: "Top-down", exact: true }).click();
+    const before = await toolbar.boundingBox();
+    await toolbar.getByRole("button", { name: "Chain", exact: true }).click();
+    await expect(feedback).toHaveText("Choose the first segment.");
+    expect(await toolbar.boundingBox()).toEqual(before);
+    for (const view of ["Top-down", "Front", "Left", "3D fields and heat"]) {
+      await presets.getByRole("button", { name: view, exact: true }).click();
+      const bar = (await toolbar.boundingBox())!;
+      const hint = (await feedback.boundingBox())!;
+      const modes = (await presets.boundingBox())!;
+      expect(hint.y).toBeGreaterThanOrEqual(bar.y);
+      expect(hint.y + hint.height).toBeLessThanOrEqual(bar.y + bar.height);
+      expect(hint.x).toBeGreaterThanOrEqual(bar.x);
+      expect(hint.x + hint.width).toBeLessThanOrEqual(bar.x + bar.width);
+      expect(modes.y).toBeGreaterThan(bar.y + bar.height);
+    }
+    await page.screenshot({ path: testInfo.outputPath(`toolbar-chain-feedback-${width}.png`) });
+    await motor.getByRole("button", { name: "Top-down", exact: true }).click();
+    await toolbar.getByRole("button", { name: "Select", exact: true }).click();
+  }
+});
+
 test("CAD terminal editing works on mobile and changing tools cancels unapplied drafts", async ({ page }) => {
   await page.addInitScript(() => { (window as any).__cadNoVias = true; });
   await page.setViewportSize({ width: 390, height: 844 });
@@ -500,12 +565,11 @@ test("CAD terminal editing works on mobile and changing tools cancels unapplied 
   expect(await dialog.evaluate(element => element.scrollHeight <= element.clientHeight)).toBe(true);
 });
 
-test("CAD side rail docks the Layers and Display panels without resizing the viewer", async ({ page }, testInfo) => {
+test("CAD Layers combines reciprocal phase-layer sorting with display options without resizing the viewer", async ({ page }, testInfo) => {
   const dialog = await openImport(page);
   const trigger = dialog.getByRole("button", { name: "Layers", exact: true });
-  const displayTrigger = dialog.getByRole("button", { name: "Display", exact: true });
   const panel = page.getByRole("dialog", { name: "CAD import layers", exact: true });
-  const display = page.getByRole("dialog", { name: "CAD import display", exact: true });
+  await expect(dialog.getByRole("button", { name: "Display", exact: true })).toHaveCount(0);
   const frame = dialog.getByRole("img", { name: "CAD import preview", exact: true });
   const traces = frame.locator(":scope > svg path");
   const vias = frame.locator(":scope > svg circle");
@@ -524,46 +588,55 @@ test("CAD side rail docks the Layers and Display panels without resizing the vie
     await expect(trigger).toHaveAttribute("aria-expanded", "true");
     expect(await frame.boundingBox()).toEqual(before);
     await expect(panel.getByRole("checkbox", { name: "Show phase waveform" })).toHaveCount(0);
-    await displayTrigger.click();
-    await expect(display).toBeVisible();
-    await expect(panel).toBeHidden();
-    await display.getByRole("checkbox", { name: "Show layer 0", exact: true }).uncheck();
-    await expect(traces).toHaveCount(0);
-    await display.getByRole("checkbox", { name: "Show layer 0", exact: true }).check();
-    await trigger.click();
-    await expect(panel).toBeVisible();
+    await expect(panel.getByText("Phases and coils", { exact: true })).toHaveCount(0);
+    await panel.getByRole("radio", { name: "Phases", exact: true }).check();
     await panel.getByRole("checkbox", { name: "Coil B", exact: true }).uncheck();
     await expect(traces).toHaveCount(2);
-    await displayTrigger.click();
-    await display.getByRole("radio", { name: "Centerlines", exact: true }).check();
+    await panel.getByRole("radio", { name: "Layers", exact: true }).check();
+    await expect(panel.getByRole("checkbox", { name: "Coil B", exact: true })).toHaveCount(0);
+    await expect(panel.getByRole("checkbox", { name: /^Show layer / })).toHaveCount(2);
+    for (const layer of [1, 2]) {
+      const group = panel.getByRole("group", { name: `Layer ${layer}`, exact: true });
+      await expect(group.getByRole("button", { name: `Move selection to A, layer ${layer}`, exact: true })).toHaveText("Phase A");
+      await expect(group.getByRole("button", { name: `Move selection to B, layer ${layer}`, exact: true })).toHaveText("Phase B");
+    }
+    await expect(traces).toHaveCount(2);
+    expect(await frame.boundingBox()).toEqual(before);
+    await panel.getByRole("checkbox", { name: "Show layer 0", exact: true }).uncheck();
+    await expect(traces).toHaveCount(0);
+    await panel.getByRole("checkbox", { name: "Show layer 0", exact: true }).check();
+    await expect(traces).toHaveCount(2);
+    await panel.getByRole("radio", { name: "Centerlines", exact: true }).check();
     await expect.poll(() => traces.first().evaluate((path) => {
       const matrix = (path as SVGGraphicsElement).getScreenCTM()!;
       return Number(getComputedStyle(path).strokeWidth.replace("px", "")) * Math.abs(matrix.a);
     })).toBeCloseTo(1, 2);
-    await display.getByRole("checkbox", { name: "Show vias", exact: true }).uncheck();
+    await panel.getByRole("checkbox", { name: "Show vias", exact: true }).uncheck();
     await expect(vias).toHaveCount(0);
     await page.screenshot({ path: testInfo.outputPath(`cad-layers-${viewport.width}.png`) });
-    const bounds = (await display.boundingBox())!;
+    const bounds = (await panel.boundingBox())!;
     expect(bounds.x + bounds.width).toBeLessThanOrEqual(railBounds.x + 4);
     expect(bounds.x).toBeGreaterThanOrEqual(0);
     expect(bounds.y).toBeGreaterThanOrEqual(0);
     expect(bounds.x + bounds.width).toBeLessThanOrEqual(viewport.width);
     expect(bounds.y + bounds.height).toBeLessThanOrEqual(viewport.height);
     await page.keyboard.press("Escape");
-    await expect(display).toBeHidden();
-    await expect(displayTrigger).toBeFocused();
+    await expect(panel).toBeHidden();
+    await expect(trigger).toBeFocused();
     await expect(dialog).toBeVisible();
     await trigger.click();
+    await expect(panel.getByRole("radio", { name: "Layers", exact: true })).toBeChecked();
+    await expect(panel.getByRole("radio", { name: "Centerlines", exact: true })).toBeChecked();
+    await expect(panel.getByRole("checkbox", { name: "Show vias", exact: true })).not.toBeChecked();
+    await panel.getByRole("radio", { name: "Layers", exact: true }).focus();
+    await page.keyboard.press("ArrowLeft");
+    await expect(panel.getByRole("radio", { name: "Phases", exact: true })).toBeChecked();
     await expect(panel.getByRole("checkbox", { name: "Coil B", exact: true })).not.toBeChecked();
     await panel.getByRole("checkbox", { name: "Coil B", exact: true }).check();
+    await panel.getByRole("radio", { name: "Traces", exact: true }).check();
+    await panel.getByRole("checkbox", { name: "Show vias", exact: true }).check();
     await panel.getByRole("button", { name: "Close layers panel" }).click();
     await expect(panel).toBeHidden();
-    await displayTrigger.click();
-    await expect(display.getByRole("radio", { name: "Centerlines", exact: true })).toBeChecked();
-    await display.getByRole("radio", { name: "Traces", exact: true }).check();
-    await display.getByRole("checkbox", { name: "Show vias", exact: true }).check();
-    await display.getByRole("button", { name: "Close display panel" }).click();
-    await expect(display).toBeHidden();
     // An outside click, a repeat trigger click, and the Close button all dismiss.
     await trigger.click();
     await expect(panel).toBeVisible();
@@ -745,31 +818,37 @@ test("outside clicks dismiss context menus and submenus while selecting in CAD a
   }
 });
 
-test("nested layer destinations support Move to, direct clicks, and independent visibility", async ({ page }, testInfo) => {
+for (const sort of ["Phases", "Layers"]) {
+test(`nested destinations sorted by ${sort} support Move to, direct clicks, and independent visibility`, async ({ page }, testInfo) => {
   const dialog = await openImport(page);
   const tools = dialog.getByRole("group", { name: "Segment selection tools" });
   await dialog.getByRole("button", { name: "Layers", exact: true }).click();
   const panel = page.getByRole("dialog", { name: "CAD import layers", exact: true });
-  const phaseB = panel.getByRole("group", { name: "Phase B", exact: true });
-  await expect(phaseB.getByRole("button", { name: "Move selection to B, layer 1", exact: true })).toBeDisabled();
-  await expect(phaseB.getByRole("button", { name: "Move selection to B, layer 2", exact: true })).toBeDisabled();
+  await panel.getByRole("radio", { name: sort, exact: true }).check();
+  const destination = panel.getByRole("group", { name: sort === "Phases" ? "Phase B" : "Layer 2", exact: true });
+  await expect(panel.getByRole("button", { name: "Move selection to B, layer 1", exact: true })).toBeDisabled();
+  await expect(destination.getByRole("button", { name: "Move selection to B, layer 2", exact: true })).toBeDisabled();
   await panel.getByRole("button", { name: "Close layers panel" }).click();
   await clickTrace(page, .5, 0);
   await dialog.getByRole("button", { name: "Layers", exact: true }).click();
-  await phaseB.getByRole("button", { name: "Move selection to B, layer 2", exact: true }).click({ button: "right" });
+  await destination.getByRole("button", { name: "Move selection to B, layer 2", exact: true }).click({ button: "right" });
   await page.getByRole("menuitem", { name: "Move to", exact: true }).click();
   await expect(panel).toBeVisible();
   await expect(tools).toContainText("1 selected");
   await expect(dialog.getByRole("option", { name: /Segment 1, coil B, layer 1/ })).toHaveCount(1);
-  await phaseB.getByRole("checkbox", { name: "Show B, layer 2", exact: true }).uncheck();
+  await destination.getByRole("checkbox", { name: "Show B, layer 2", exact: true }).uncheck();
   await expect(dialog.getByRole("option", { name: /Segment 1, coil B, layer 1/ })).toHaveCount(0);
   await expect(dialog.getByRole("option", { name: /coil A, layer 0/ })).toHaveCount(1);
-  await phaseB.getByRole("button", { name: "Move selection to B, layer 2", exact: true }).click();
-  await expect(phaseB.getByRole("checkbox", { name: "Show B, layer 2", exact: true })).toBeChecked();
+  await destination.getByRole("button", { name: "Move selection to B, layer 2", exact: true }).click();
+  await expect(destination.getByRole("checkbox", { name: "Show B, layer 2", exact: true })).toBeChecked();
+  await panel.getByRole("radio", { name: sort === "Phases" ? "Layers" : "Phases", exact: true }).check();
+  await expect(panel.getByRole("checkbox", { name: "Show B, layer 2", exact: true })).toBeChecked();
+  await panel.getByRole("radio", { name: "Phases", exact: true }).check();
   await panel.getByRole("button", { name: "Move selection to Phase A", exact: true }).click();
   await expect(dialog.getByRole("option", { name: /Segment 1, coil A, layer 1/ })).toHaveCount(1);
   await page.screenshot({ path: testInfo.outputPath("nested-coil-layers.png") });
 });
+}
 
 test("outside clicks dismiss destination and toolbar menus without consuming the next action", async ({ page }) => {
   const dialog = await openImport(page);
@@ -806,7 +885,7 @@ test("nested motor layers move selections on mobile and toggle only their own co
   const panel = page.getByRole("dialog", { name: "Coil preview layers", exact: true });
   await panel.getByRole("button", { name: "Move selection to B, layer 2", exact: true }).click();
   await expect(motor.getByRole("option", { name: /Segment 1, coil B, layer 1/ })).toHaveCount(1);
-  const canvas = motor.locator("canvas");
+  const canvas = motor.getByTestId("coil-annotations");
   const overlay = motor.getByRole("listbox", { name: "Segment selection preview" }).locator("svg > g");
   const camera = (await overlay.getAttribute("transform"))!;
   const before = Number(await canvas.getAttribute("data-segments"));

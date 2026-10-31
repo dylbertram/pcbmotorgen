@@ -39,6 +39,7 @@
 
 pub mod interference;
 pub mod rules;
+mod series_vias;
 
 pub use interference::{check_interference, InterferenceViolation};
 pub use rules::DesignRules;

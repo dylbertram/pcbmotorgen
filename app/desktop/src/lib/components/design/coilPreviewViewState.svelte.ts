@@ -15,10 +15,16 @@
  */
 
 export class CoilPreviewViewState {
-  /** Top-down canvas or the layer-aware isometric view (kata zje4). */
-  viewMode = $state<"top" | "iso">("top");
+  /** Shared copper renderer with orthographic presets and an orbitable 3D view. */
+  viewMode = $state<"top" | "front" | "left" | "iso">("top");
   /** Display-only Z magnification, shared by the inline and expanded viewer. */
   zScale = $state(1);
+  zoomWindow = $state(false);
+  /** Shared viewport controls dispatch to the spatial camera when not in Top. */
+  cameraCommand = $state({ id: 0, zoom: 1 });
+  cameraReset = $state(0);
+  cameraFit = $state(0);
+  spatialZoom = $state(1);
   /** Copper uses physical widths; centerlines use a thin screen-width stroke. */
   traceMode = $state<"traces" | "centerlines">("traces");
   /** Phase waveform below the mover slider in the expanded preview. */
@@ -38,8 +44,18 @@ export class CoilPreviewViewState {
   poleRegionPhase = $state("");
   /** Inter-layer via markers. Toggle lives in the expanded lightbox only. */
   showVias = $state(true);
+  showPcb = $state(false);
   showTerminals = $state(true);
   terminalPanelOpen = $state(false);
+  positionBarMode = $state<"position" | "layers">("position");
+  /** Measured overlay height, reserved by the endpoint-picking camera fit. */
+  positionBarHeight = $state(0);
+
+  setTerminalPanelOpen(open: boolean): void {
+    if (open && !this.terminalPanelOpen) this.positionBarMode = "layers";
+    if (!open && this.terminalPanelOpen) this.positionBarMode = "position";
+    this.terminalPanelOpen = open;
+  }
 
   // --- outside requests -----------------------------------------------------
   /** Incremented by an outside prompt (the Simulation tab's ends alert) to
@@ -50,7 +66,7 @@ export class CoilPreviewViewState {
 
   requestTerminals(coil?: string): void {
     this.requestedTerminalCoil = coil;
-    this.terminalPanelOpen = true;
+    this.setTerminalPanelOpen(true);
     this.terminalRequest += 1;
   }
 
@@ -64,6 +80,8 @@ export class CoilPreviewViewState {
   // layers visible (empty record → everything on).
   layerVisibility = $state<Record<number, boolean>>({});
   coilLayerVisibility = $state<Record<string, boolean>>({});
+  /** Changes only the organization of the Layers drawer, never its filters. */
+  layerSortMode = $state<"phases" | "layers">("phases");
 
   isCoilLayerVisible(coil: string, layer: number): boolean {
     return this.coilLayerVisibility[JSON.stringify([coil, layer])] !== false;

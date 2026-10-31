@@ -1,32 +1,19 @@
 <script lang="ts">
   /**
-   * Global display options for the shared preview viewers: how copper is
-   * drawn (traces or centerlines), whole copper-layer visibility, and the
-   * via markers. These are the controls that apply to every coil, as opposed
-   * to the per-coil/layer tree in the Layers panel.
+   * Display options inside the Layers drawer: how copper is
+   * drawn (traces or centerlines) and the overlay markers.
+   * The motor viewport keeps the global options in View;
+   * import previews retain them here while the document menu is disabled.
    */
   import type { CoilPreviewViewState } from "./coilPreviewViewState.svelte";
 
-  let { view, uniqueLayers, showViewMode = false }: {
+  let { view }: {
     view: CoilPreviewViewState;
-    uniqueLayers: { idx: number }[];
-    /** Show the Top-down / 3D switch (coil preview only). */
-    showViewMode?: boolean;
   } = $props();
   const displayGroup = $props.id();
 </script>
 
 <div class="display-controls">
-  {#if showViewMode}
-    <fieldset>
-      <legend>View</legend>
-      <div class="mode-options">
-        <label><input type="radio" name={"view-" + displayGroup} value="top" bind:group={view.viewMode} />Top-down</label>
-        <label><input type="radio" name={"view-" + displayGroup} value="iso" bind:group={view.viewMode} />3D</label>
-      </div>
-    </fieldset>
-  {/if}
-
   <fieldset>
     <legend>Traces</legend>
     <div class="mode-options">
@@ -34,19 +21,6 @@
       <label><input type="radio" name={displayGroup} value="centerlines" bind:group={view.traceMode} />Centerlines</label>
     </div>
   </fieldset>
-
-  {#if uniqueLayers.length > 0}
-    <fieldset>
-      <legend>Copper layers</legend>
-      {#each uniqueLayers as layer (layer.idx)}
-        <label class="layer-row" class:hidden-row={!view.isLayerVisible(layer.idx)}>
-          <input type="checkbox" checked={view.isLayerVisible(layer.idx)} onchange={() => view.toggleLayer(layer.idx)} aria-label={"Show layer " + layer.idx} />
-          <span class="swatch copper"></span><span>Layer {layer.idx + 1}</span>
-        </label>
-      {/each}
-    </fieldset>
-  {/if}
-
   <fieldset>
     <legend>Overlays</legend>
     <label class="layer-row" class:hidden-row={!view.showTerminals}>
@@ -56,6 +30,10 @@
     <label class="layer-row" class:hidden-row={!view.showVias}>
       <input type="checkbox" bind:checked={view.showVias} aria-label="Show vias" />
       <span class="swatch" style:background-color="#fbbf24"></span><span>Vias</span>
+    </label>
+    <label class="layer-row" class:hidden-row={!view.showPcb}>
+      <input type="checkbox" bind:checked={view.showPcb} aria-label="Show PCB body preview" />
+      <span class="swatch" style:background-color="#166534"></span><span>PCB body preview</span>
     </label>
   </fieldset>
 </div>
@@ -69,7 +47,6 @@
   .hidden-row { color: rgb(var(--slate-500)); }
   .hidden-row .swatch { opacity: 0.35; }
   .swatch { width: 0.65rem; height: 0.65rem; border-radius: 2px; }
-  .copper { background: rgb(var(--slate-300)); }
   input { accent-color: #34d399; }
   input:focus-visible { outline: 2px solid #34d399; outline-offset: 3px; }
   .mode-options { display: flex; gap: 0.75rem; font-size: 0.75rem; color: rgb(var(--slate-200)); }

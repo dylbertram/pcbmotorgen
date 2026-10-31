@@ -13,6 +13,7 @@ mod commands;
 mod config;
 mod ipc;
 mod menu;
+mod view_menu;
 mod plugins;
 
 fn main() {
@@ -23,6 +24,7 @@ fn main() {
             // The Open Recent mirror state (kata eap8) must exist before the
             // menu is installed / any command resolves it.
             app.manage(menu::RecentFiles::default());
+            app.manage(view_menu::ActiveViewMenu::default());
             app.manage(commands::workspace::ExitApproval::default());
             app.manage(commands::dc_jobs::DcJobs::default());
             menu::install(app.handle())?;
@@ -54,6 +56,8 @@ fn main() {
                 // The "Clear Recent Files" entry is handled by the frontend
                 // recents store, the single owner of the list.
                 let _ = app.emit(id, ());
+            } else if let Some(action) = view_menu::event_payload(&app.state::<view_menu::ActiveViewMenu>(), id) {
+                let _ = app.emit(view_menu::VIEW_EVENT, action);
             } else if let Some(path) =
                 menu::recent_event_payload(&app.state::<menu::RecentFiles>(), id)
             {
@@ -63,6 +67,7 @@ fn main() {
             }
         })
         .invoke_handler(tauri::generate_handler![
+            view_menu::set_view_menu_state,
             commands::physics::get_magnet_grades,
             commands::physics::compute_height_stack,
             commands::physics::periodic_backplane_reference,
@@ -73,6 +78,8 @@ fn main() {
             commands::physics::travel_envelope,
             commands::physics::compute_friction,
             commands::physics::analyze_drive,
+            commands::move_power::evaluate_move_power,
+            commands::move_power::cancel_move_power,
             commands::physics::analyze_housing_motion,
             commands::physics::prepare_dc_winding_geometry,
             commands::dc_jobs::dc_coupling_capability,

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { placedCopperGeometry } from "./lib/copperLayerPlacement";
   import { onDestroy, untrack } from "svelte";
   import type { DocumentSession } from "./lib/stores/workspace.svelte";
   import { BitsConfig, Tabs } from "bits-ui";
@@ -24,9 +25,11 @@
     DriveAnalysis,
     SensorConfig,
     CadGeometry,
+    TravelEnvelopeDto,
   } from "./lib/types";
   import { TABS, type TabId } from "./lib/ui";
   import { DrcController } from "./lib/stores/drc.svelte";
+  import { LatestAsyncTask } from "./lib/utils/latestAsyncTask";
   import { measureTrace, computePreviewSummary } from "./lib/previewGeometry";
   import PreviewStatus from "./lib/components/design/PreviewStatus.svelte";
   import { cadGeometryToPreview } from "./lib/cadPreview";
@@ -94,7 +97,7 @@
   let coilPreviewExpanded = $state(false);
   let motorWorkspaceHeight = $state(0);
   let motorStatusHeight = $state(0);
-  let previewPanel = $state<PreviewPanelId | null>("constraints");
+  let previewPanel = $state<PreviewPanelId | null>("routing");
   let coilPreview: CoilPreview | undefined = $state();
   let drivePending = $state(false);
   let loading = $state(false);
@@ -147,7 +150,7 @@
     try {
       const cadGeometry = designType === "sensor" ? sensorStore.cadGeometry : projects.cadGeometry;
       const result = cadGeometry
-        ? await exportCadGeometryDxf(cadGeometry)
+        ? await exportCadGeometryDxf(designType !== "sensor" && config.pcb_stackup_mm ? placedCopperGeometry(cadGeometry, config.pcb_thickness_mm, config.pcb_stackup_mm) : cadGeometry)
         : designType === "sensor" ? await exportSensorDxf(sensorStore.toIpc()) : await exportCoilsDxf(config.toIpc());
       const path = await saveTextToFile(result.dxf_content, `${designType}-coil.dxf`, ["dxf"]);
       if (path) projects.notice = `Exported DXF to ${path}.`;
@@ -166,14 +169,28 @@
   // config from replacing a newer preview. The preview keeps its last good
   // result while a new request is pending or fails.
   let previewGeneration = 0;
+  // Equilibrium is a slow background solve, not part of drawing the copper.
+  // Keep at most one native solve and replace queued edits with the latest.
+  const scheduleTravelEnvelope = new LatestAsyncTask<
+    { generation: number; ipc: ReturnType<typeof config.toIpc> }, TravelEnvelopeDto
+  >({
+    delayMs: 300,
+    run: ({ ipc }) => fetchTravelEnvelope(ipc),
+    onResult: (envelope, { generation }) => {
+      if (generation === previewGeneration) motion.setEnvelope(envelope);
+    },
+    // Failure retains the previous envelope or the flagged placeholder.
+  });
   const scheduleCoilPreview = debounce((generation: number) => {
     if (generation !== previewGeneration) return;
     if (!valid) {
       coils = null;
       return;
     }
-    void updateCoilPreview(generation, config.toIpc());
-  }, 150);
+    const ipc = config.toIpc();
+    void updateCoilPreview(generation, ipc);
+    scheduleTravelEnvelope.request({ generation, ipc });
+  }, 0);
 
   let sensorGeneration = 0;
   const scheduleSensorGeometry = debounce(
@@ -233,22 +250,13 @@
       // Keep the previous preview visible. A transient generation failure
       // must not make the design reflection depend on simulation state.
     }
-    // Equilibrium travel envelope (stable rest positions of the mover
-    // centre). Fetched on the same debounced/generation-guarded stream; a
-    // failure keeps the previous envelope (or the flagged placeholder —
-    // MotionStore raises "travel envelope unavailable", kata ab30).
-    try {
-      const env = await fetchTravelEnvelope(ipc);
-      if (generation === previewGeneration) motion.setEnvelope(env);
-    } catch {
-      // Keep the previous envelope — bounds stay at their last good values.
-    }
   }
 
   // Generate the Design-tab reflection when geometry or routing inputs change.
   // This effect intentionally runs regardless of the active workflow tab.
   $effect(() => {
     const generation = ++previewGeneration;
+    scheduleTravelEnvelope.cancel();
     if (!active || designType !== "motor") {
       scheduleCoilPreview.cancel();
       return;
@@ -263,6 +271,7 @@
       config.electrical_pitch_mm,
       config.routing_pattern,
       config.routing_params_version,
+      JSON.stringify(config.routing_orientation),
       geometryKey(projects.cadGeometry),
       config.phases,
       config.num_layers,
@@ -408,6 +417,7 @@
       config.air_gap_mm,
       config.routing_pattern,
       config.routing_params_version,
+      JSON.stringify(config.routing_orientation),
       config.phases,
       config.num_layers,
       config.strands_per_phase,
@@ -530,6 +540,7 @@
     return JSON.stringify([
       config.routing_pattern,
       config.routing_params_version,
+      config.routing_orientation,
       config.num_layers,
       config.min_trace_mm,
       config.trace_width_mm,
@@ -556,10 +567,13 @@
   });
 
   // A layout change invalidates the previous DRC result immediately. The
-  // request id and layout key together prevent stale responses from opening
+  // request generation and layout key prevent stale responses from opening
   // the export gate for a newer config.
   $effect(() => {
-    if (!active || designType !== "motor") return;
+    if (!active || designType !== "motor") {
+      drc.cancel();
+      return;
+    }
     void drc.currentLayoutKey;
     drc.request();
   });
@@ -598,6 +612,8 @@
     ++sensorGeneration;
     ++simulationGeneration;
     scheduleCoilPreview.cancel();
+    scheduleTravelEnvelope.cancel();
+    drc.cancel();
     scheduleSensorGeometry.cancel();
     scheduleSimulation.cancel();
     ++driveGeneration;
@@ -718,8 +734,10 @@
                 powerInput={{ config: config.toIpc(), driveSettings: config.drive, desiredTravelMm: config.desired_travel_mm, topology: config.topology, cadGeometry: projects.cadGeometry, sweep: powerSweep, drive: powerDrive, native: isTauriAvailable() }}
                 open={activeTab === "simulate"}
                 availableHeight={Math.max(0, motorWorkspaceHeight - motorStatusHeight)}
-                onConfigureWinding={() => coilPreview?.showDesignSettings("routing")}
-                onShow3D={() => { session.previewView.viewMode = "iso"; previewPanel = null; }}
+                onConfigureWinding={() => {
+                  if (projects.cadGeometry || !config.generatorEndType) session.previewView.requestTerminals();
+                  else coilPreview?.showDesignSettings("routing");
+                }}
                 {config}
                 active={active && activeTab === "simulate"}
                 {sweep}

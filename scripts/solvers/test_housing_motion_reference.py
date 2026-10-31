@@ -6,6 +6,12 @@ from check_housing_motion_reference import fem_mode,reference,case_base
 
 
 class HousingMotionReferenceTest(unittest.TestCase):
+    def test_performance_goals_do_not_change_reference_loss(self):
+        case=case_base();case['speed_m_s']=2.
+        baseline=reference(case,24,samples=32)
+        case['sim'].update(target_force_n=100.,peak_force_n=.001,max_accel_m_s2=0.,max_temperature_rise_c=0.)
+        self.assertEqual(reference(case,24,samples=32),baseline)
+
     def test_insulating_limit_has_no_joule_power(self):
         loss,work=fem_mode(500.,1000.,[(1.,0.,.001)],24)
         np.testing.assert_array_equal(loss,[0.]);self.assertAlmostEqual(work,0.)

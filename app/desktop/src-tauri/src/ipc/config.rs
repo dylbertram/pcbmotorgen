@@ -44,6 +44,8 @@ pub struct LinearMotorConfigIpc {
     pub active_area_length_m: f64,
     pub board_width_m: f64,
     pub pcb_thickness_m: f64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pcb_stackup: Option<pcbmotorgen_simulation::params::PcbStackup>,
     /// Number of parallel serpentine paths per phase on the same layer
     /// ("strands", stacked in y). Mirrors `LinearMotorConfig::strands_per_phase`.
     /// Default 1 (the historical single-strand behaviour).
@@ -74,6 +76,8 @@ pub struct LinearMotorConfigIpc {
     /// (e.g. `num_strands`). Empty = pattern defaults.
     #[serde(default)]
     pub routing_params: std::collections::HashMap<String, f64>,
+    #[serde(default)]
+    pub routing_orientation: pcbmotorgen_routing::RoutingOrientation,
     pub phases: u32,
     /// Vernier spacing ratio as a raw f64 (1.0, 0.8, 0.8333…).
     pub spacing_ratio: f64,
@@ -136,11 +140,13 @@ impl LinearMotorConfigIpc {
             active_area_length_m: self.active_area_length_m,
             board_width_m: self.board_width_m,
             pcb_thickness_m: self.pcb_thickness_m,
+            pcb_stackup: self.pcb_stackup.clone(),
             // Round 9: multi-strand pass-through to the core.
             strands_per_phase: self.strands_per_phase,
             air_gap_m: self.air_gap_m,
             routing_pattern: self.routing_pattern.clone(),
             routing_params: self.routing_params.clone(),
+            routing_orientation: self.routing_orientation,
             phases: self.phases,
             spacing_ratio: self.spacing_ratio,
             max_current_a: self.max_current_a,
@@ -172,6 +178,7 @@ impl From<&CoreConfig> for LinearMotorConfigIpc {
             active_area_length_m: c.active_area_length_m,
             board_width_m: c.board_width_m,
             pcb_thickness_m: c.pcb_thickness_m,
+            pcb_stackup: c.pcb_stackup.clone(),
             // Round 9: pass through the multi-strand field. For configs
             // that pre-date it, the core `Default` gives
             // `strands_per_phase: 1` (single strand), the historical
@@ -188,12 +195,13 @@ impl From<&CoreConfig> for LinearMotorConfigIpc {
             air_gap_m: c.air_gap_m,
             routing_pattern: c.routing_pattern.clone(),
             routing_params: c.routing_params.clone(),
+            routing_orientation: c.routing_orientation,
             phases: c.phases,
             spacing_ratio: c.spacing_ratio,
             max_current_a: c.max_current_a,
             supply_voltage_v: c.supply_voltage_v,
-            // The core has no "current layer count" field — default to max.
-            num_layers: c.max_layers,
+            // Preserve the actual stack, not the manufacturer's layer limit.
+            num_layers: c.num_layers,
             min_trace_m: c.min_trace_m,
             trace_width_m: c.trace_width_m,
             min_space_m: c.min_space_m,

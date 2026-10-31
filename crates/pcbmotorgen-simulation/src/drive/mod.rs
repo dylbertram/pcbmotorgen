@@ -27,6 +27,7 @@
 
 mod geometry;
 mod inductance;
+pub mod move_power;
 
 pub use geometry::{
     extract_phase_networks, extract_phase_networks_with_terminals, solve_network, EdgeKind,
@@ -252,6 +253,8 @@ pub struct DriveAnalysis {
     pub trace_width_m: f64,
     pub outer_copper_m: f64,
     pub inner_copper_m: f64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub layer_copper_m: Option<Vec<f64>>,
     pub via_resistance_each_ohm: f64,
     // --- Electrical summary (worst / mean phase) ---
     /// Worst (highest) hot phase resistance [Ω].
@@ -261,6 +264,9 @@ pub struct DriveAnalysis {
     /// Mean mutual inductance between phases [H] (sign follows the strand
     /// orientation, terminal at the low-x end).
     pub mutual_inductance_h: f64,
+    /// Trace-only copper partial-inductance matrix, in `phases` order.
+    /// Excludes stack screening, external series inductors and terminal returns.
+    pub phase_inductance_matrix_h: Vec<Vec<f64>>,
     /// Line-to-line inductance an LCR meter reads between two terminals [H].
     pub line_inductance_h: f64,
     /// Effective per-phase (synchronous) inductance `L_LL / 2` [H].
@@ -397,12 +403,20 @@ fn is_inner(layer: u32, num_layers: u32) -> bool {
     num_layers > 2 && layer != 0 && layer + 1 != num_layers
 }
 
-fn copper_m(layer: u32, num_layers: u32, settings: &DriveSettings) -> f64 {
-    if is_inner(layer, num_layers) {
+pub fn copper_thickness_m(layer: u32, sim: &SimulationInput, settings: &DriveSettings) -> f64 {
+    if let Some(stack) = &sim.pcb_stackup {
+        return stack.copper_m.get(layer as usize).copied().unwrap_or(f64::NAN);
+    }
+    if is_inner(layer, sim.num_layers) {
         oz_to_m(settings.inner_copper_oz)
     } else {
         oz_to_m(settings.outer_copper_oz)
     }
+}
+
+pub fn maximum_copper_thickness_m(sim: &SimulationInput, settings: &DriveSettings) -> f64 {
+    sim.pcb_stackup.as_ref().map(|s| s.copper_m.iter().copied().fold(0., f64::max))
+        .unwrap_or_else(|| oz_to_m(settings.outer_copper_oz.max(settings.inner_copper_oz)))
 }
 
 /// Run the driver suitability analysis.
@@ -421,8 +435,8 @@ pub fn analyze_drive(
 /// Extra geometry known for imported copper.
 #[derive(Debug, Clone, Default)]
 pub struct DriveGeometryHints {
-    /// Copper plane heights per layer index [m]; evenly spaced through
-    /// `pcb_thickness_m` when empty.
+    /// Copper center heights per layer index [m]. When empty, use the custom
+    /// stackup or the legacy uniform placement through `pcb_thickness_m`.
     pub layer_z_m: Vec<f64>,
     /// Picked IN/OUT terminals per phase net.
     pub terminals: std::collections::BTreeMap<String, Vec<TerminalPair>>,
@@ -433,6 +447,7 @@ impl DriveGeometryHints {
     /// negative depths; imported copper retains its explicit layer heights.
     pub fn layer_z(&self, sim: &SimulationInput, layer: u32) -> f64 {
         self.layer_z_m.get(layer as usize).copied().unwrap_or_else(|| {
+            if let Some(stack) = &sim.pcb_stackup { return stack.layer_z_m(layer); }
             -(layer as f64) * sim.pcb_thickness_m / sim.num_layers.saturating_sub(1).max(1) as f64
         })
     }
@@ -448,6 +463,7 @@ impl DriveGeometryHints {
 /// or finite geometry model; never flatten it or silently relocate the stack.
 pub fn validate_copper_placement(sim: &SimulationInput, routing: &RoutingResult, hints: &DriveGeometryHints) -> Result<(), crate::params::SimulationError> {
     use crate::params::SimulationError;
+    if let Some(stack) = &sim.pcb_stackup { stack.validate(sim.num_layers, sim.pcb_thickness_m).map_err(SimulationError)?; }
     let Some(stack) = &sim.backplane else { return Ok(()) };
     stack.validate().map_err(SimulationError)?;
     let mut depth = sim.pcb_thickness_m;
@@ -498,7 +514,7 @@ pub fn analyze_drive_with(
     let width = sim.min_trace_m;
     let rho_hot = rho_cu_at(settings.winding_temp_c);
     let rho_20 = rho_cu_at(RHO_REF_C);
-    let via_len = sim.pcb_thickness_m;
+    let via_len = sim.pcb_stackup.as_ref().map(|s| (s.layer_z_m(0) - s.layer_z_m(sim.num_layers - 1)).abs()).unwrap_or(sim.pcb_thickness_m);
     let r_via_hot = via_resistance_ohm(sim.min_via_drill_m, settings.via_plating_m, via_len, rho_hot);
     let networks = extract_phase_networks_with_terminals(routing, &hints.terminals);
     let layer_z = |l: u32| hints.layer_z(sim, l);
@@ -516,7 +532,7 @@ pub fn analyze_drive_with(
             .iter()
             .map(|e| match &e.kind {
                 EdgeKind::Trace { layer, length_m, .. } => {
-                    rho_hot * length_m / (width * copper_m(*layer, num_layers, settings))
+                    rho_hot * length_m / (width * copper_thickness_m(*layer, sim, settings))
                 }
                 EdgeKind::Via { layers, .. } => via_resistance_ohm(sim.min_via_drill_m, settings.via_plating_m, hints.via_length_m(sim, *layers), rho_hot),
             })
@@ -563,7 +579,7 @@ pub fn analyze_drive_with(
                         max_share = max_share.max(share);
                         ipc2221_ampacity_a(
                             width,
-                            copper_m(*layer, num_layers, settings),
+                            copper_thickness_m(*layer, sim, settings),
                             settings.allowed_rise_c,
                             is_inner(*layer, num_layers),
                         )
@@ -600,7 +616,7 @@ pub fn analyze_drive_with(
     }
 
     // --- Inductance -----------------------------------------------------
-    let thickness_for_gmd = oz_to_m(settings.outer_copper_oz.max(settings.inner_copper_oz));
+    let thickness_for_gmd = maximum_copper_thickness_m(sim, settings);
     let filaments: Vec<Vec<inductance::Filament>> = networks
         .iter()
         .zip(solutions.iter())
@@ -614,14 +630,19 @@ pub fn analyze_drive_with(
         ph.self_inductance_h = *l;
     }
     let mut mutuals = Vec::new();
+    let mut phase_inductance_matrix_h = vec![vec![0.0; filaments.len()]; filaments.len()];
     for i in 0..filaments.len() {
+        phase_inductance_matrix_h[i][i] = self_l[i];
         for j in (i + 1)..filaments.len() {
-            mutuals.push(inductance::phase_mutual_inductance(
+            let mutual = inductance::phase_mutual_inductance(
                 &filaments[i],
                 &filaments[j],
                 width,
                 thickness_for_gmd,
-            ));
+            );
+            mutuals.push(mutual);
+            phase_inductance_matrix_h[i][j] = mutual;
+            phase_inductance_matrix_h[j][i] = mutual;
         }
     }
     let mean = |v: &[f64]| if v.is_empty() { 0.0 } else { v.iter().sum::<f64>() / v.len() as f64 };
@@ -991,28 +1012,40 @@ pub fn analyze_drive_with(
                 }
             })
             .collect();
-        // First crossing of drag over thrust on the curve, refined by bisection.
+        // Search independently of the goal-dependent voltage plot. This finite
+        // logarithmic scan brackets the first sampled crossing, not a proof
+        // that no crossing exists outside the scan or between sample points.
+        const DRAG_SEARCH_TOP_M_S: f64 = 1e3;
         bp.drag_limited_speed_m_s = thrust.and_then(|f| {
-            let hit = bp.drag_curve.iter().position(|p| p.drag_n >= f)?;
-            let (mut lo, mut hi) = (
-                bp.drag_curve[hit.saturating_sub(1)].speed_m_s,
-                bp.drag_curve[hit].speed_m_s,
-            );
-            for _ in 0..40 {
-                let mid = 0.5 * (lo + hi);
-                if drag(mid).drag_n >= f {
-                    hi = mid;
-                } else {
-                    lo = mid;
-                }
+            if !f.is_finite() || f < 0.0 {
+                return None;
             }
-            Some(hi)
+            let mut lo = 0.0;
+            if drag(lo).drag_n >= f {
+                return Some(lo);
+            }
+            for k in 0..=512 {
+                let mut hi = 1e-6 * (DRAG_SEARCH_TOP_M_S / 1e-6).powf(k as f64 / 512.0);
+                if drag(hi).drag_n >= f {
+                    for _ in 0..40 {
+                        let mid = 0.5 * (lo + hi);
+                        if drag(mid).drag_n >= f {
+                            hi = mid;
+                        } else {
+                            lo = mid;
+                        }
+                    }
+                    return Some(hi);
+                }
+                lo = hi;
+            }
+            None
         });
         if s.conducts() {
             let v = settings.target_speed_m_s;
             let limit = match bp.drag_limited_speed_m_s {
                 Some(v_lim) => format!("The screening model reaches full-current thrust at {v_lim:.2} m/s."),
-                None => format!("The screening model stays below full-current thrust up to {top:.1} m/s."),
+                None => format!("No drag/thrust crossing was bracketed by the screening scan from 0 to {DRAG_SEARCH_TOP_M_S:.0} m/s; this is not proof that no crossing exists."),
             };
             checks.push(DriveCheck {
                 id: "eddy_drag".into(),
@@ -1065,10 +1098,12 @@ pub fn analyze_drive_with(
         trace_width_m: width,
         outer_copper_m: oz_to_m(settings.outer_copper_oz),
         inner_copper_m: oz_to_m(settings.inner_copper_oz),
+        layer_copper_m: sim.pcb_stackup.as_ref().map(|s| s.copper_m.clone()),
         via_resistance_each_ohm: r_via_hot,
         phase_resistance_ohm: r_phase,
         phase_inductance_h: l_self,
         mutual_inductance_h: m_mut,
+        phase_inductance_matrix_h,
         line_inductance_h: l_ll,
         synchronous_inductance_h: l_s,
         series_inductance_h: settings.series_inductance_h.max(0.0),

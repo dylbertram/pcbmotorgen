@@ -1,5 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
-import { gotoDesignApp, selectDesignPanel } from "./helpers";
+import { gotoDesignApp, selectDesignPanel, openCoilPreview } from "./helpers";
 import { readFileSync } from "node:fs";
 
 /** UI fixtures exercise rendering/lifecycle only, not magnetic/thermal validation. */
@@ -10,6 +10,7 @@ async function nativeFixture(page: Page) {
     const { generatedTerminalGeometry } = await import(/* @vite-ignore */ "/src/lib/generatedTerminalGeometry.ts");
     w.vizCalls = []; w.vizMode = "ready";
     w.__TAURI_INTERNALS__ = { invoke: async (command: string, args: any) => {
+      if (command === "set_view_menu_state") return;
       if (command === "generate_coils") return mocks.mockCoils(args.config);
       if (command === "evaluate_force_sweep") return mocks.mockForceSweep(args.config);
       if (command === "compute_height_stack") return mocks.mockHeightStack(args.config);
@@ -50,7 +51,8 @@ async function nativeFixture(page: Page) {
 
 async function show3D(page: Page, pm = true) {
   await page.getByRole("tab", { name: /^Simulate/i }).click();
-  await page.getByRole("button", { name: "Show 3D fields and heat", exact: true }).click();
+  await openCoilPreview(page);
+  await page.getByRole("button", { name: "3D fields and heat", exact: true }).click();
   const viewer = page.getByTestId("coil-iso");
   await expect(viewer.getByRole("group", { name: "3D simulation overlays", exact: true })).toBeVisible();
   if (pm) {
@@ -216,7 +218,7 @@ test("real WebGL draws both scoped overlays and Z scale never resamples physics"
   await expect.poll(async () => (await canvas.screenshot()).equals(before)).toBe(false);
   expect(await page.evaluate(() => (window as any).vizCalls.length)).toBe(calls);
   await page.screenshot({ path: info.outputPath("ui-fixture-3d-fields-and-loss.png") });
-  await viewer.getByRole("button", { name: "Reset 3D view", exact: true }).click();
+  await page.getByRole("button", { name: "Reset view", exact: true }).click();
   await expect(viewer).toHaveAttribute("data-field-samples", "700");
   await viewer.getByRole("combobox", { name: "3D simulation overlay", exact: true }).selectOption("off");
   await expect(viewer).toHaveAttribute("data-field-samples", "0"); await expect(viewer).toHaveAttribute("data-heat-paths", "0");
@@ -310,10 +312,19 @@ test("mobile overlays stay inside the viewer and use scrollable explicit legends
   await viewer.getByRole("button", { name: "Legends and model limits", exact: true }).click();
   await expect(viewer.getByLabel("Copper loss legend")).toBeHidden();
   const box = (await viewer.boundingBox())!, controls = (await viewer.getByRole("group", { name: "3D simulation overlays" }).boundingBox())!;
+  const viewSwitch = (await page.getByRole("group", { name: "Viewport view", exact: true }).boundingBox())!;
+  expect(viewSwitch.y).toBeCloseTo(box.y + 8, 0);
+  expect(controls.y).toBeGreaterThanOrEqual(viewSwitch.y + viewSwitch.height + 6);
   expect(controls.x).toBeGreaterThanOrEqual(box.x); expect(controls.x + controls.width).toBeLessThanOrEqual(box.x + box.width + 1);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   const legend = (await viewer.getByLabel("Simulation overlay legend").boundingBox())!;
   expect(legend.y - (controls.y + controls.height)).toBeGreaterThan(100);
+  const axes = (await viewer.getByRole("img", { name: "Viewport axes: X travel, Y across board, Z up", exact: true }).boundingBox())!;
+  expect(axes.y).toBeCloseTo(box.y + 8, 0);
+  expect(controls.y).toBeGreaterThanOrEqual(axes.y + axes.height + 6);
+  expect(legend.y).toBeGreaterThan(axes.y + axes.height);
+  const navigation = (await page.getByRole("group", { name: "Zoom controls", exact: true }).boundingBox())!;
+  expect(legend.y + legend.height).toBeLessThanOrEqual(navigation.y - 6);
   for (const colorScheme of ["light", "dark"] as const) {
     await page.emulateMedia({ colorScheme });
     await expect(page.locator("html")).toHaveAttribute("data-theme", colorScheme);
@@ -390,10 +401,13 @@ test("field inspector aligns inputs and stays clear of the camera and Z rail", a
   await expect(viewer).toHaveAttribute("data-field-samples", "240");
   const panel = viewer.getByRole("group", { name: "3D simulation overlays", exact: true });
   const bounds = (await viewer.boundingBox())!, box = (await panel.boundingBox())!;
-  const camera = (await viewer.getByRole("group", { name: "3D camera controls", exact: true }).boundingBox())!;
+  const camera = (await page.getByRole("group", { name: "Zoom controls", exact: true }).boundingBox())!;
   const zRail = (await viewer.getByRole("group", { name: "Z height", exact: true }).boundingBox())!;
+  const axes = (await viewer.getByRole("img", { name: "Viewport axes: X travel, Y across board, Z up", exact: true }).boundingBox())!;
   expect(box.x).toBeGreaterThanOrEqual(bounds.x); expect(box.x + box.width).toBeLessThanOrEqual(bounds.x + bounds.width);
-  expect(box.x).toBeGreaterThan(camera.x + camera.width); expect(box.x).toBeGreaterThan(zRail.x + zRail.width);
+  expect(box.x).toBeGreaterThan(zRail.x + zRail.width);
+  expect(box.y + box.height).toBeLessThanOrEqual(camera.y);
+  expect(box.x + box.width).toBeLessThanOrEqual(axes.x - 6);
   const selects = await panel.getByRole("combobox").all();
   const boxes = await Promise.all(selects.map(select => select.boundingBox()));
   for (const other of boxes.slice(1)) { expect(other!.x).toBeCloseTo(boxes[0]!.x, 0); expect(other!.width).toBeCloseTo(boxes[0]!.width, 0); }
@@ -407,15 +421,16 @@ test("field inspector aligns inputs and stays clear of the camera and Z rail", a
 test("XZ section changes the actual camera view, not just the selected button", async ({ page }, info) => {
   await gotoDesignApp(page); await nativeFixture(page); const viewer = await show3D(page);
   await expect(viewer).toHaveAttribute("data-field-samples", "240");
-  // Isolate the flat PCB so a section camera must make the copper almost
-  // horizontal. A changed bitmap alone also passes for a stale isometric fit.
+  // Isolate the flat PCB and verify the actual camera axis as well as pixels.
+  // Physical rectangular copper can be subpixel-thin in an XZ section, so a
+  // hue-threshold bounding box can accidentally measure only the via barrels.
   await viewer.getByRole("checkbox", { name: "Include magnets in B-field", exact: true }).uncheck();
   await viewer.getByRole("checkbox", { name: "Show magnets in 3D", exact: true }).uncheck();
   await expect(viewer).toHaveAttribute("data-field-samples", "0");
   const canvas = viewer.locator("canvas");
   // An element screenshot includes HTML controls layered over the canvas.
   // Mask those so slider accents cannot masquerade as copper geometry.
-  const masks = [viewer.getByRole("group", { name: "3D camera controls", exact: true }),
+  const masks = [page.getByRole("group", { name: "Zoom controls", exact: true }),
     viewer.getByRole("group", { name: "3D simulation overlays", exact: true }),
     viewer.getByRole("group", { name: "Z height", exact: true }), viewer.getByLabel("Simulation overlay legend")];
   const bitmap = () => canvas.screenshot({ mask: masks, maskColor: "#ffffff" });
@@ -425,19 +440,11 @@ test("XZ section changes the actual camera view, not just the selected button", 
   await viewer.getByRole("button", { name: "XZ field section", exact: true }).click();
   await expect(viewer.getByRole("button", { name: "XZ field section", exact: true })).toHaveAttribute("aria-pressed", "true");
   await expect.poll(async () => (await bitmap()).equals(isometric)).toBe(false);
-  await expect.poll(async () => page.evaluate(async image => {
-    const img = new Image(); img.src = `data:image/png;base64,${image}`; await img.decode();
-    const flat = document.createElement("canvas"); flat.width = img.width; flat.height = img.height;
-    const context = flat.getContext("2d")!; context.drawImage(img, 0, 0);
-    const { data } = context.getImageData(0, 0, flat.width, flat.height);
-    let minX = flat.width, maxX = -1, minY = flat.height, maxY = -1;
-    for (let y = 0; y < flat.height; y++) for (let x = 0; x < flat.width; x++) {
-      const i = (y * flat.width + x) * 4, rgb = [data[i], data[i + 1], data[i + 2]];
-      if (Math.max(...rgb) - Math.min(...rgb) < 35) continue;
-      minX = Math.min(minX, x); maxX = Math.max(maxX, x); minY = Math.min(minY, y); maxY = Math.max(maxY, y);
-    }
-    return maxX > minX ? (maxY - minY) / (maxX - minX) : Infinity;
-  }, (await bitmap()).toString("base64"))).toBeLessThan(.08);
+  await expect.poll(async () => {
+    const camera=JSON.parse((await viewer.getAttribute("data-camera"))!);
+    const d=camera.position.map((v:number,i:number)=>v-camera.target[i]);
+    return Math.abs(d[2])/Math.hypot(...d);
+  }).toBeCloseTo(1,10);
   await viewer.screenshot({ path: info.outputPath("projected-xz-section.png") });
 });
 

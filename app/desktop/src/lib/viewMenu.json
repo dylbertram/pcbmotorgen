@@ -1,0 +1,32 @@
+[
+  [
+    { "id": "view:top", "label": "Top-down", "property": "viewMode", "value": "top" },
+    { "id": "view:front", "label": "Front", "property": "viewMode", "value": "front" },
+    { "id": "view:left", "label": "Left", "property": "viewMode", "value": "left" },
+    { "id": "view:3d", "label": "3D fields & heat", "property": "viewMode", "value": "iso" }
+  ],
+  [
+    { "id": "view:traces", "label": "Traces", "property": "traceMode", "value": "traces" },
+    { "id": "view:centerlines", "label": "Centerlines", "property": "traceMode", "value": "centerlines" }
+  ],
+  [
+    { "id": "view:terminals", "label": "Coil-end markers", "property": "showTerminals" },
+    { "id": "view:vias", "label": "Vias", "property": "showVias" },
+    { "id": "view:pcb", "label": "PCB body preview", "property": "showPcb" }
+  ],
+  [
+    { "id": "view:pole-pitch", "label": "Pole pitch", "property": "showPolePitch", "capability": "polePitch" },
+    { "id": "view:band-widths", "label": "Conductor band widths", "property": "showBandWidths", "capability": "bandWidths" },
+    { "id": "view:pole-regions", "label": "Pole regions", "property": "showPoleRegions", "capability": "poleRegions" }
+  ],
+  [
+    { "id": "view:waveform", "label": "Phase waveform", "property": "showWaveform" }
+  ],
+  [
+    { "id": "view:one-period", "label": "One electrical period", "property": "oneSection" }
+  ],
+  [
+    { "id": "view:zoom-extents", "label": "Zoom extents", "action": "fitExtents", "submenu": "Zoom" },
+    { "id": "view:zoom-window", "label": "Zoom window", "property": "zoomWindow", "submenu": "Zoom" }
+  ]
+]

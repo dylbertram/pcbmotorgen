@@ -24,7 +24,12 @@ import {
 } from "../layerConstraints";
 import { mm, listRoutingPatterns, routingPatternParameters, loadInstalledPlugins, fetchMagnetGrades } from "../ipc";
 import { readPreferences } from "../preferences";
+import { generatorConnection } from "../routingSources";
 import { MAX_PCB_LAYERS } from "../types/simulationLimits";
+import type { RoutedMoveRequest } from "../types/movePower";
+import { magnetMass } from "../carriageMass";
+import { pcbStackupThicknessMm, pcbStackupToSi, type PcbStackupMm } from "../pcbStackup";
+import { DEFAULT_ROUTING_ORIENTATION, type RoutingOrientation, type RoutingFlip } from "../routingOrientation";
 
 export class ConfigStore {
   constructor() {
@@ -81,16 +86,19 @@ export class ConfigStore {
   /** User-editable routing-pattern parameter values, keyed by `def.key`
    *  (e.g. `num_strands`, `n_periods`). Empty = pattern defaults. Sent to
    *  the backend as `routing_params`. */
-  routing_params = $state<Record<string, number>>({});
+  routing_params = $state<Record<string, number>>({ connection: 2 });
   /** Declared user-editable parameter definitions for the currently
    *  selected routing pattern (`routing_pattern_parameters`). */
   routing_param_defs = $state<RoutingParamDef[]>([]);
+  generatorEndType = $derived(this.routing_patterns.find((pattern) => pattern.id === this.routing_pattern)?.end_type ?? null);
+  generatorConnection = $derived(generatorConnection(this.generatorEndType, this.routing_params));
   /** Monotonic bump counter for `routing_params` edits. `$state` proxies
    *  only track the exact property read, so mutating `routing_params[key]`
    *  in place would NOT re-trigger dependent scheduling `$effect`s. Bumping
    *  this counter after every param write gives the debounced preview and
    *  simulation effects a stable signal to react to. */
   routing_params_version = $state(0);
+  routing_orientation = $state<RoutingOrientation>({ ...DEFAULT_ROUTING_ORIENTATION });
   phases = $state(3);
   num_layers = $state(4);
 
@@ -102,7 +110,19 @@ export class ConfigStore {
   target_force_n = $state(0.5);
   peak_force_n = $state(1.0);
   friction_n = $state(0.05);
-  carriage_mass_kg = $state(0.015);
+  carriage_mass_source = $state<"magnets" | "assembly">("magnets");
+  private assembly_mass_kg = $state(0.015);
+  magnet_mass = $derived(magnetMass(
+    [this.magnet_width_mm, this.magnet_cross_width_mm, this.magnet_height_mm], this.magnet_grade,
+  ));
+  magnet_total_mass_kg = $derived(this.magnet_mass.massG * this.magnet_count / 1000);
+  get carriage_mass_kg(): number {
+    return this.carriage_mass_source === "magnets" ? this.magnet_total_mass_kg : this.assembly_mass_kg;
+  }
+  set carriage_mass_kg(value: number) {
+    this.assembly_mass_kg = value;
+    this.carriage_mass_source = "assembly";
+  }
   max_accel_m_s2 = $state(2.0);
   capacitor_bank_uf = $state(1000);
 
@@ -117,7 +137,10 @@ export class ConfigStore {
   min_space_mm = $state(0.127);
   min_via_drill_mm = $state(0.2);
   min_via_annular_ring_mm = $state(0.1);
-  pcb_thickness_mm = $state(1.6);
+  private legacy_pcb_thickness_mm = $state(1.6);
+  pcb_stackup_mm = $state<PcbStackupMm | null>(null);
+  get pcb_thickness_mm(): number { return this.pcb_stackup_mm ? pcbStackupThicknessMm(this.pcb_stackup_mm) : this.legacy_pcb_thickness_mm; }
+  set pcb_thickness_mm(value: number) { this.legacy_pcb_thickness_mm = value; }
   max_layers = $state<number>(MAX_PCB_LAYERS);
   drive_frequency_hz = $state(500);
   max_temperature_rise_c = $state(20);
@@ -126,6 +149,8 @@ export class ConfigStore {
   /** Driver limits and operating assumptions for `analyze_drive`. Replace
    *  the whole object to edit it, so dependents see one change. */
   drive = $state<DriveSettings>(structuredClone(DEFAULT_DRIVE_SETTINGS));
+  /** No move exists until explicitly specified by the user. */
+  power_move = $state<RoutedMoveRequest | null>(null);
 
   // --- Backplane and housing (t707) ------------------------------------
   /** Layers below the PCB and an optional housing. `null` = none, which
@@ -309,7 +334,9 @@ export class ConfigStore {
     // pattern's declared range before (and regardless of) the IPC fetch.
     this.constrainLayersToPattern();
     try {
-      this.routing_param_defs = await routingPatternParameters(patternId);
+      const defs = await routingPatternParameters(patternId);
+      if (this.routing_pattern !== patternId) return;
+      this.routing_param_defs = defs;
     } catch {
       // backend unavailable or errored — leave current defs in place
       this.routing_param_defs = [];
@@ -317,6 +344,10 @@ export class ConfigStore {
     }
     const userSet = new Set(Object.keys(this.routing_params));
     for (const def of this.routing_param_defs) {
+      // An absent termination parameter can mean legacy closed copper, even
+      // when the editable schema's default is Delta. Leave it absent so the
+      // generator's declared missing-value behavior remains authoritative.
+      if (this.generatorEndType?.kind === "parameter" && def.key === this.generatorEndType.key) continue;
       if (!userSet.has(def.key)) {
         this.routing_params[def.key] = def.default;
       }
@@ -335,12 +366,24 @@ export class ConfigStore {
     this.routing_params_version += 1;
   }
 
+  toggleRoutingFlip(key: RoutingFlip): void {
+    this.routing_orientation = { ...this.routing_orientation, [key]: !this.routing_orientation[key] };
+    if (key === "reverse_layers") this.reversePcbStackup();
+  }
+
+  reversePcbStackup(): void {
+    if (this.pcb_stackup_mm) {
+      this.pcb_stackup_mm = { copper_mm: [...this.pcb_stackup_mm.copper_mm].reverse(), dielectric_mm: [...this.pcb_stackup_mm.dielectric_mm].reverse() };
+    }
+  }
+
   /** Build the SI LinearMotorConfig for the Tauri backend. */
   toIpc(): LinearMotorConfig {
     return {
       active_area_length_m: mm(this.active_area_length_mm),
       board_width_m: mm(this.active_area_width_mm),
       pcb_thickness_m: mm(this.pcb_thickness_mm),
+      ...(this.pcb_stackup_mm ? { pcb_stackup: pcbStackupToSi(this.pcb_stackup_mm) } : {}),
       strands_per_phase: this.strands_per_phase,
 
       magnet_count: this.magnet_count,
@@ -356,6 +399,7 @@ export class ConfigStore {
 
       routing_pattern: this.routing_pattern,
       routing_params: this.routing_params,
+      routing_orientation: { ...this.routing_orientation },
       phases: this.phases,
       spacing_ratio: this.spacing_ratio,
 

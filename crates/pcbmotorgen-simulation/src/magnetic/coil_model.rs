@@ -144,6 +144,7 @@ mod tests {
             pattern_id: "infinity-braid".to_string(),
             layer_pair: None,
             center_via_positions: vec![],
+            routed_vias: vec![],
             corner_arcs: vec![],
             segments: vec![
                 CoilSegment { start: (0.0, 0.0), end: (0.0, 20.0), is_active: true },
