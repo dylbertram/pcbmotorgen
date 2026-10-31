@@ -77,7 +77,7 @@ test.describe("Workspace layout geometry", () => {
   test("switching workflow tabs preserves the selected drawer and simulation scroll", async ({ page }) => {
     await gotoDesignApp(page);
     await selectDesignPanel(page, "Routing");
-    await page.getByRole("button", { name: "Display", exact: true }).click();
+    await page.getByRole("button", { name: "Layers", exact: true }).click();
     await page.getByRole("tab", { name: /^Simulate/i }).click();
     const dock = page.getByRole("region", { name: "Simulation results", exact: true });
     await dock.getByRole("tab", { name: "Driver suitability", exact: true }).click();
@@ -93,7 +93,7 @@ test.describe("Workspace layout geometry", () => {
     }).toBeGreaterThan(0);
     expect(position).toBeGreaterThan(0);
     await page.getByRole("tab", { name: /^Design/i }).click();
-    await expect(page.getByRole("dialog", { name: "Coil preview display", exact: true })).toBeVisible();
+    await expect(page.getByRole("dialog", { name: "Coil preview layers", exact: true })).toBeVisible();
     await page.getByRole("tab", { name: /^Simulate/i }).click();
     await expect(simulation.getByRole("heading", { name: "Voltage & speed", exact: true })).toBeVisible();
     await expect.poll(() => simulation.evaluate((el) => el.scrollTop)).toBe(position);

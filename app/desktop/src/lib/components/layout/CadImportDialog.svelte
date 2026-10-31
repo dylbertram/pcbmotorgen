@@ -575,7 +575,6 @@
             <div class="absolute inset-y-0 right-0 z-20 w-11">
             <PreviewSideRail
               label="CAD import layers"
-              displayLabel="CAD import display"
               {terminalTool} onStartTerminals={startTerminals} terminalsDisabled={busy || !previewIsCurrent}
               geometry={imported.geometry} {selection} assignmentDisabled={busy || !previewIsCurrent || measure.mode || terminalTool.active}
               view={previewView}

@@ -42,8 +42,9 @@ for (const layers of [2, 4, 6, 8]) {
           const geometry = generatedTerminalGeometry(JSON.parse(coils), layers, 1.6, .2, 2);
           return geometry.routing.vias.filter(via => Math.min(via.from_layer, via.to_layer) <= 1 && Math.max(via.from_layer, via.to_layer) >= 1).length;
         }, { coils, layers });
-        await page.getByRole("button", { name: "Display", exact: true }).click();
-        const display = page.getByRole("dialog", { name: "Coil preview display", exact: true });
+        await page.getByRole("button", { name: "Layers", exact: true }).click();
+        const display = page.getByRole("dialog", { name: "Coil preview layers", exact: true });
+        await display.getByRole("radio", { name: "Layers", exact: true }).check();
         for (let index = 0; index < layers; index++) {
           if (index !== 1) await display.getByRole("checkbox", { name: `Show layer ${index}`, exact: true }).uncheck();
         }

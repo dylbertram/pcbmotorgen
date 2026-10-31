@@ -1,10 +1,10 @@
 <script lang="ts">
   /**
    * Motor settings, coil ends and driver controls use the left rail; Layers
-   * and Display stay on the right. CAD import retains its single right rail.
+   * stays on the right. CAD import retains its single right rail.
    *
     * Each toggle pulls a panel out from the rail: the
-    * Layers panel (coil/phase/layer tree) and the Display panel (copper layers),
+     * Layers panel (phases containing layers or layers containing phases),
      * with global visibility options in View. Import previews keep local options,
      * terminals,
     * and optional driver settings in the expanded coil preview.
@@ -16,13 +16,12 @@
    */
   import { fly } from "svelte/transition";
   import { onDestroy } from "svelte";
-  import { Layers, SlidersHorizontal, X, Plug, CircuitBoard, Route, Magnet, Gauge } from "@lucide/svelte";
+  import { Layers, X, Plug, CircuitBoard, Route, Magnet, Gauge } from "@lucide/svelte";
   import type { Snippet } from "svelte";
   import { DESIGN_PANELS, isDesignPanel, isLeftPanel, type DesignPanelId, type PreviewPanelId } from "./previewPanels";
   import CoilTerminalPanel from "./CoilTerminalPanel.svelte";
   import type { CoilTerminalTool } from "../../utils/coilTerminalTool.svelte";
   import CoilPreviewVisibilityPanel from "./CoilPreviewVisibilityPanel.svelte";
-  import CoilPreviewDisplayPanel from "./CoilPreviewDisplayPanel.svelte";
   import type { CoilPreviewViewState } from "./coilPreviewViewState.svelte";
   import type { CadGeometry, DriveAnalysis } from "../../types";
   import DriverSelector from "../simulate/DriverSelector.svelte";
@@ -33,7 +32,7 @@
   import type { ConfigStore } from "../../stores/config.svelte";
   import NumberField from "../ui/NumberField.svelte";
 
-  let { view, layers, coils = [], isCoilVisible, onToggleCoil, label, displayLabel,
+  let { view, layers, coils = [], isCoilVisible, onToggleCoil, label,
     phases = [], showMotorControls = false, hasPolePitchData = false,
     hasBandWidthData = false, hasPoleRegionData = false, poleRegionPhases = [],
     geometry, selection, assignmentDisabled = false, terminalTool, onStartTerminals,
@@ -58,8 +57,6 @@
     onToggleCoil?: (name: string) => void;
     /** Accessible name of the Layers panel. */
     label: string;
-    /** Accessible name of the Display panel. */
-    displayLabel: string;
     phases?: { idx: number; name: string; colorIdx: number }[];
     showMotorControls?: boolean;
     /** Global display options live in the motor document's native View menu. */
@@ -147,13 +144,8 @@
     {/if}
     {#if !designOnly}<button type="button" bind:this={triggers.layers} aria-label="Layers" aria-expanded={open === "layers"} onclick={() => toggle("layers")}
       class="flex h-8 w-8 items-center justify-center rounded-md border border-transparent text-slate-300 hover:bg-slate-800 aria-expanded:border-emerald-500 aria-expanded:text-emerald-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
-      title="Show the coil, phase and layer tree.">
+      title="Show visibility by phase or layer.">
       <Layers size={16} aria-hidden="true" />
-    </button>
-    <button type="button" bind:this={triggers.display} aria-label="Display" aria-expanded={open === "display"} onclick={() => toggle("display")}
-      class="flex h-8 w-8 items-center justify-center rounded-md border border-transparent text-slate-300 hover:bg-slate-800 aria-expanded:border-emerald-500 aria-expanded:text-emerald-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
-      title={viewControlsInMenu ? "Show copper-layer visibility." : "Show display options: traces, copper layers and vias."}>
-      <SlidersHorizontal size={16} aria-hidden="true" />
     </button>
     {/if}
     {#if !drawingOnly}
@@ -260,18 +252,5 @@
     </div>
   {/if}
 
-  {#if open === "display"}
-    <div role="dialog" aria-label={displayLabel} aria-modal="false" class={`${panelClass} ${showMotorControls ? 'max-lg:bottom-14' : ''}`} transition:fly={{ x: 16, duration: 140 }}>
-      <header class="flex shrink-0 items-center justify-between border-b border-slate-700 px-3 py-2">
-        <h3 class="text-sm font-semibold">Display</h3>
-        <button type="button" aria-label="Close display panel" onclick={close} class="rounded p-1 text-slate-400 hover:bg-slate-800 hover:text-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500">
-          <X size={16} aria-hidden="true" />
-        </button>
-      </header>
-      <div class="min-h-0 overflow-y-auto overscroll-contain p-3">
-        <CoilPreviewDisplayPanel {view} uniqueLayers={layers} {viewControlsInMenu} />
-      </div>
-    </div>
-  {/if}
   {/if}
 </div>

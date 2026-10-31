@@ -80,6 +80,8 @@ export class CoilPreviewViewState {
   // layers visible (empty record → everything on).
   layerVisibility = $state<Record<number, boolean>>({});
   coilLayerVisibility = $state<Record<string, boolean>>({});
+  /** Changes only the organization of the Layers drawer, never its filters. */
+  layerSortMode = $state<"phases" | "layers">("phases");
 
   isCoilLayerVisible(coil: string, layer: number): boolean {
     return this.coilLayerVisibility[JSON.stringify([coil, layer])] !== false;

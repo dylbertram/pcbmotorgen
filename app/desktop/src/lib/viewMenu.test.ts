@@ -5,12 +5,26 @@ import { ViewMenuController } from "./viewMenuController";
 
 const capabilities = { active: true, polePitch: true, bandWidths: true, poleRegions: true };
 describe("shared View menu", () => {
-  it("uses six separated groups without any phase/layer filters", () => {
-    expect(VIEW_MENU_GROUPS).toHaveLength(6);
+  it("uses six separated groups and a Zoom submenu without any phase/layer filters", () => {
+    expect(VIEW_MENU_GROUPS).toHaveLength(7);
     expect(VIEW_MENU_GROUPS[3].map((item) => item.id)).toEqual(["view:pole-pitch", "view:band-widths", "view:pole-regions"]);
     expect(VIEW_MENU_GROUPS.flat().map((item) => item.property)).not.toContain("layerVisibility");
     expect(VIEW_MENU_GROUPS.flat().map((item) => item.property)).not.toContain("phaseVisibility");
     expect(VIEW_MENU_GROUPS.flat().map((item) => item.property)).not.toContain("poleRegionPhase");
+    expect(VIEW_MENU_GROUPS[6].map(item => [item.id, item.submenu])).toEqual([["view:zoom-extents", "Zoom"], ["view:zoom-window", "Zoom"]]);
+  });
+  it("dispatches extents as a repeatable command and synchronizes the window tool", () => {
+    const view = new CoilPreviewViewState();
+    const actions = { fitExtents: vi.fn(), toggleZoomWindow: vi.fn(() => { view.zoomWindow = !view.zoomWindow; }) };
+    applyViewMenuAction(view, "view:zoom-extents", actions);
+    applyViewMenuAction(view, "view:zoom-extents", actions);
+    expect(actions.fitExtents).toHaveBeenCalledTimes(2);
+    expect(viewMenuItems(view, capabilities).find(item => item.id === "view:zoom-extents")).toEqual({ id: "view:zoom-extents", checked: false, enabled: true });
+    applyViewMenuAction(view, "view:zoom-window", actions);
+    expect(actions.toggleZoomWindow).toHaveBeenCalledOnce();
+    expect(viewMenuItems(view, capabilities).find(item => item.id === "view:zoom-window")?.checked).toBe(true);
+    applyViewMenuAction(view, "view:zoom-window", actions);
+    expect(view.zoomWindow).toBe(false);
   });
   it("mirrors checks both ways and keeps view/trace choices exclusive", () => {
     const view = new CoilPreviewViewState();

@@ -1,10 +1,15 @@
 //! Native checkmarks mirror the active viewport; they never own design state.
 use std::sync::Mutex;
-use tauri::{menu::{CheckMenuItem, PredefinedMenuItem, Submenu}, Manager, Wry};
+use tauri::{menu::{CheckMenuItem, MenuItem, PredefinedMenuItem, Submenu}, Manager, Wry};
 
 pub const VIEW_EVENT: &str = "menu:view";
 #[derive(serde::Deserialize)]
-pub struct Definition { pub id: String, pub label: String }
+pub struct Definition {
+    pub id: String,
+    pub label: String,
+    pub submenu: Option<String>,
+    pub action: Option<String>,
+}
 pub fn groups() -> Vec<Vec<Definition>> {
     serde_json::from_str(include_str!("../../src/lib/viewMenu.json")).expect("bundled View menu schema")
 }
@@ -21,9 +26,17 @@ pub fn submenu(app: &tauri::AppHandle) -> tauri::Result<Submenu<Wry>> {
     let menu = Submenu::with_id(app, "view", "View", true)?;
     for (index, group) in groups().iter().enumerate() {
         if index > 0 { menu.append(&PredefinedMenuItem::separator(app)?)?; }
+        let nested = group.first().and_then(|item| item.submenu.as_ref())
+            .map(|label| Submenu::with_id(app, "view:zoom", label, true)).transpose()?;
+        let target = nested.as_ref().unwrap_or(&menu);
         for item in group {
-            menu.append(&CheckMenuItem::with_id(app, &item.id, &item.label, false, false, None::<&str>)?)?;
+            if item.action.is_some() {
+                target.append(&MenuItem::with_id(app, &item.id, &item.label, false, None::<&str>)?)?;
+            } else {
+                target.append(&CheckMenuItem::with_id(app, &item.id, &item.label, false, false, None::<&str>)?)?;
+            }
         }
+        if let Some(nested) = nested { menu.append(&nested)?; }
     }
     Ok(menu)
 }
@@ -54,11 +67,22 @@ pub fn set_view_menu_state(app: tauri::AppHandle, state: ViewMenuState) -> Resul
     let root = app.menu().ok_or("Application menu missing")?;
     let kind = root.get("view").ok_or("View menu missing")?;
     let menu = kind.as_submenu().ok_or("View menu is not a submenu")?;
+    let definitions = groups().into_iter().flatten().collect::<Vec<_>>();
     for item in &state.items {
-        let kind = menu.get(&item.id).ok_or("View menu item missing")?;
-        let check = kind.as_check_menuitem().ok_or("View item is not checkable")?;
-        check.set_checked(item.checked).map_err(|e| e.to_string())?;
-        check.set_enabled(item.enabled).map_err(|e| e.to_string())?;
+        let definition = definitions.iter().find(|entry| entry.id == item.id).ok_or("View definition missing")?;
+        let nested = if definition.submenu.is_some() {
+            let kind = menu.get("view:zoom").ok_or("Zoom submenu missing")?;
+            Some(kind.as_submenu().ok_or("Zoom item is not a submenu")?.clone())
+        } else { None };
+        let kind = nested.as_ref().unwrap_or(menu).get(&item.id).ok_or("View menu item missing")?;
+        if definition.action.is_some() {
+            kind.as_menuitem().ok_or("View action is not a command")?
+                .set_enabled(item.enabled).map_err(|e| e.to_string())?;
+        } else {
+            let check = kind.as_check_menuitem().ok_or("View item is not checkable")?;
+            check.set_checked(item.checked).map_err(|e| e.to_string())?;
+            check.set_enabled(item.enabled).map_err(|e| e.to_string())?;
+        }
     }
     *app.state::<ActiveViewMenu>().0.lock().map_err(|e| e.to_string())? = state;
     Ok(())
@@ -74,12 +98,15 @@ mod tests {
     #[test]
     fn menu_groups_include_display_controls_but_no_layer_or_phase_filters() {
         let groups = groups();
-        assert_eq!(groups.len(), 6);
+        assert_eq!(groups.len(), 7);
         assert_eq!(groups[3].iter().map(|item| item.id.as_str()).collect::<Vec<_>>(),
             ["view:pole-pitch", "view:band-widths", "view:pole-regions"]);
         let ids: Vec<_> = groups.iter().flatten().map(|item| item.id.as_str()).collect();
-        assert_eq!(ids.len(), 14);
+        assert_eq!(ids.len(), 16);
         assert!(ids.contains(&"view:pcb"));
+        assert_eq!(groups[6].iter().map(|item| item.submenu.as_deref()).collect::<Vec<_>>(), [Some("Zoom"), Some("Zoom")]);
+        assert_eq!(groups[6][0].action.as_deref(), Some("fitExtents"));
+        assert_eq!(groups[6][1].action, None);
         assert!(!ids.iter().any(|id| id.contains("layer") || id.contains("phase")));
         assert!(validate(&snapshot()).is_ok());
     }

@@ -2,6 +2,17 @@ import { describe, expect, it } from "vitest";
 import { CoilPreviewViewState } from "./coilPreviewViewState.svelte";
 
 describe("nested coil/layer visibility", () => {
+  it("switches layer organization without changing visibility or camera state", () => {
+    const view = new CoilPreviewViewState();
+    expect(view.layerSortMode).toBe("phases");
+    view.toggleLayer(1); view.toggleCoilLayer("A", 0); view.phaseVisibility[0] = false;
+    view.viewMode = "iso"; view.spatialZoom = 3;
+    const before = JSON.stringify([view.layerVisibility, view.coilLayerVisibility, view.phaseVisibility, view.viewMode, view.spatialZoom]);
+    view.layerSortMode = "layers";
+    expect(JSON.stringify([view.layerVisibility, view.coilLayerVisibility, view.phaseVisibility, view.viewMode, view.spatialZoom])).toBe(before);
+    view.layerSortMode = "phases";
+    expect(JSON.stringify([view.layerVisibility, view.coilLayerVisibility, view.phaseVisibility, view.viewMode, view.spatialZoom])).toBe(before);
+  });
   it("defaults to layers on entering coil ends but preserves a manual switch while picking", () => {
     const view = new CoilPreviewViewState();
     expect(view.positionBarMode).toBe("position");

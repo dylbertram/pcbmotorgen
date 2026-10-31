@@ -1,11 +1,35 @@
 import { expect, test } from "@playwright/test";
-import { gotoDesignApp } from "./helpers";
+import { gotoDesignApp, openCoilPreview } from "./helpers";
 import { readFileSync } from "node:fs";
 import { installViewMenu, nativeViewAction as nativeAction, viewMenuSnapshot as snapshot, viewMenuChecked as checked } from "./view-menu-helpers";
 const groups = JSON.parse(readFileSync(new URL("../src/lib/viewMenu.json", import.meta.url), "utf8")) as { id: string; label: string }[][];
 
 // Exercise the real state/ownership bridge at its native IPC boundary.
 test.beforeEach(async ({ page }) => { await installViewMenu(page); });
+
+test("View Zoom submenu owns extents while window stays synchronized with its viewport button", async ({ page }) => {
+  await gotoDesignApp(page); await openCoilPreview(page);
+  expect(groups[6].map(item => item.id)).toEqual(["view:zoom-extents", "view:zoom-window"]);
+  const controls = page.getByRole("group", { name: "Zoom controls", exact: true });
+  await expect(controls.getByRole("button", { name: "Zoom extents", exact: true })).toHaveCount(0);
+  for (const [label, id] of [["Top-down", "top"], ["Front", "front"], ["Left", "left"], ["3D fields and heat", "iso"]]) {
+    await page.getByRole("button", { name: label, exact: true }).click();
+    const viewer = page.getByTestId(`coil-${id}`);
+    await expect(viewer).toHaveAttribute("data-camera", /position/);
+    await controls.getByRole("button", { name: "Reset view", exact: true }).click();
+    const initial = JSON.parse((await viewer.getAttribute("data-camera"))!);
+    await nativeAction(page, "view:zoom-window");
+    await expect(controls.getByRole("button", { name: "Zoom window", exact: true })).toHaveAttribute("aria-pressed", "true");
+    await expect.poll(() => checked(page, "view:zoom-window")).toBe(true);
+    await controls.getByRole("button", { name: "Zoom window", exact: true }).click();
+    await expect.poll(() => checked(page, "view:zoom-window")).toBe(false);
+    await controls.getByRole("button", { name: "Zoom in", exact: true }).click();
+    await expect.poll(async () => JSON.parse((await viewer.getAttribute("data-camera"))!).zoom).toBeGreaterThan(initial.zoom);
+    await nativeAction(page, "view:zoom-extents");
+    await expect.poll(async () => JSON.parse((await viewer.getAttribute("data-camera"))!).zoom).toBeCloseTo(initial.zoom, 6);
+    await expect.poll(() => checked(page, "view:zoom-extents")).toBe(false);
+  }
+});
 
 test("view choices live at the viewport top-left and survive both views", async ({ page }, testInfo) => {
   await gotoDesignApp(page);
@@ -20,8 +44,8 @@ test("view choices live at the viewport top-left and survive both views", async 
   const routing = (await workspace.getByRole("dialog", { name: "Routing", exact: true }).boundingBox())!;
   expect(box.x).toBeCloseTo(routing.x + routing.width + 8, 0);
   expect(box.y).toBeCloseTo(tools.y + tools.height + 8, 0);
-  await workspace.getByRole("button", { name: "Display", exact: true }).click();
-  const display = workspace.getByRole("dialog", { name: "Coil preview display", exact: true });
+  await workspace.getByRole("button", { name: "Layers", exact: true }).click();
+  const display = workspace.getByRole("dialog", { name: "Coil preview layers", exact: true });
   await expect(display.getByRole("radio", { name: "Top-down", exact: true })).toHaveCount(0);
   await expect(display.getByRole("radio", { name: "3D", exact: true })).toHaveCount(0);
   await iso.click();
@@ -47,9 +71,12 @@ test("View owns global controls while the side panels retain phase and layer fil
   expect(groups[3].map(item => item.label)).toEqual(["Pole pitch", "Conductor band widths", "Pole regions"]);
   const workspace = page.getByRole("region", { name: "Coil design workspace", exact: true });
   const canvas = workspace.getByTestId("coil-annotations");
-  await workspace.getByRole("button", { name: "Display", exact: true }).click();
-  const display = workspace.getByRole("dialog", { name: "Coil preview display", exact: true });
-  await expect(display.getByRole("radio")).toHaveCount(0);
+  await expect(workspace.getByRole("button", { name: "Display", exact: true })).toHaveCount(0);
+  await workspace.getByRole("button", { name: "Layers", exact: true }).click();
+  const display = workspace.getByRole("dialog", { name: "Coil preview layers", exact: true });
+  await expect(display.getByRole("radio", { name: "Traces", exact: true })).toHaveCount(0);
+  await expect(display.getByRole("radio", { name: "Centerlines", exact: true })).toHaveCount(0);
+  await display.getByRole("radio", { name: "Layers", exact: true }).check();
   await expect(display.getByRole("checkbox", { name: "Show vias", exact: true })).toHaveCount(0);
   await expect(display.getByRole("checkbox", { name: "Show terminal arrows", exact: true })).toHaveCount(0);
   const copper = display.getByRole("checkbox", { name: "Show layer 0", exact: true });
@@ -67,8 +94,7 @@ test("View owns global controls while the side panels retain phase and layer fil
   await expect.poll(() => checked(page, "view:traces")).toBe(false);
   await nativeAction(page, "view:terminals");
   await expect.poll(() => checked(page, "view:terminals")).toBe(false);
-  await workspace.getByRole("button", { name: "Layers", exact: true }).click();
-  await expect(display).toHaveCount(0);
+  await display.getByRole("radio", { name: "Phases", exact: true }).check();
   const layers = workspace.getByRole("dialog", { name: "Coil preview layers", exact: true });
   for (const [id, label] of [["view:pole-pitch", "Show pole-pitch dimension ruler"], ["view:band-widths", "Show band-width diagnostics"], ["view:pole-regions", "Show pole regions"], ["view:waveform", "Show phase waveform"], ["view:one-period", "Show only one repeating section of the pattern"]]) {
     await expect(layers.getByRole("checkbox", { name: label, exact: true })).toHaveCount(0);

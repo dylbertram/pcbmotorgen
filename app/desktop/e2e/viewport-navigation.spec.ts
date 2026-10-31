@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { gotoDesignApp, openCoilPreview } from "./helpers";
-import { installViewMenu } from "./view-menu-helpers";
+import { installViewMenu, nativeViewAction } from "./view-menu-helpers";
 
 test.beforeEach(async ({ page }) => { await installViewMenu(page); });
 
@@ -38,7 +38,8 @@ test("all views share bottom-right navigation and top-left view presets", async 
         expect(box.y).toBeCloseTo(previous.y,0);
       }
       previous=box;
-      for(const name of ["Zoom out","Reset zoom","Zoom in","Zoom window","Zoom extents","Reset view"])
+      await expect(controls.getByRole("button",{name:"Zoom extents",exact:true})).toHaveCount(0);
+      for(const name of ["Zoom out","Reset zoom","Zoom in","Zoom window","Reset view"])
         await expect(controls.getByRole("button",{name,exact:true})).toBeVisible();
       await expect(controls.getByRole("button",{name:"Zoom window",exact:true}).locator("svg circle")).toHaveCount(1);
       const initial=JSON.parse((await viewer.getAttribute("data-camera"))!);
@@ -94,7 +95,7 @@ test("off-center window sets a copper-depth pivot and orbit stays around it", as
       previous=next; stable=delta<1e-7?stable+1:0; return stable;
     },{timeout:10000}).toBeGreaterThanOrEqual(2);
     const orbited=await snapshot();
-    await controls.getByRole("button",{name:"Zoom extents",exact:true}).click();
+    await nativeViewAction(page,"view:zoom-extents");
     await expect.poll(async()=>Math.hypot(...(await snapshot()).target)).toBeLessThan(.1);
     await expect.poll(async()=>(await snapshot()).zoom).toBeLessThan(fitted.zoom);
     // OrbitControls stops emitting below its change-event epsilon even while
