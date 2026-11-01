@@ -10,7 +10,9 @@ export function validateVisualization(report: VisualizationReport, request: Visu
   }
   if (request.fields) {
     const field = report.field;
-    if (!field || field.method !== "analytical-pm-only-xyz" || field.samples.length !== request.counts.reduce((a, b) => a * b, 1)
+    const expectedMethod = request.field_source === "coils" ? "routed-current-biot-savart-xyz"
+      : request.field_source === "coils-and-pm" ? "routed-current-plus-pm-xyz" : "analytical-pm-only-xyz";
+    if (!field || field.method !== expectedMethod || (request.field_source === "coils" && field.magnets.length !== 0) || field.samples.length !== request.counts.reduce((a, b) => a * b, 1)
       || field.samples.length > 2048 || field.magnets.length > 12) throw new Error("Missing bounded XYZ field samples");
     for (let i = 0; i < field.samples.length; i++) {
       const sample = field.samples[i];

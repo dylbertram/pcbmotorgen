@@ -295,6 +295,14 @@
   // gates both the debounce callback and all result writes, including work
   // that was already in flight when the user changed tabs.
   let simulationGeneration = 0;
+  let autoSimulation = $state(true);
+
+  function runSimulationManually(): void {
+    if (loading || !active || activeTab !== "simulate") return;
+    scheduleSimulation.cancel();
+    clearSimulationResults();
+    void runSimulation(++simulationGeneration);
+  }
 
   /** An active import is always authoritative, even while its mapping is incomplete. */
   function simulationCad(): CadGeometry | null {
@@ -454,8 +462,7 @@
     // Driver-only work is debounced for 120ms, before the 150ms replacement
     // sweep starts. Invalidate its Kf now, not only when that sweep settles.
     // Otherwise an old sweep can be paired with the newly edited IPC inputs.
-    sweep = null;
-    drive = null;
+    clearSimulationResults();
     if (!active || activeTab !== "simulate") {
       scheduleSimulation.cancel();
       loading = false;
@@ -464,7 +471,8 @@
       // isCurrentSimulation().
       return;
     }
-    scheduleSimulation(generation);
+    if (autoSimulation) scheduleSimulation(generation);
+    else { scheduleSimulation.cancel(); loading = false; }
   });
 
   // Driver suitability runs after each sweep (it needs the thrust constant)
@@ -731,6 +739,8 @@
                 onGeometryChange={(geometry) => projects.setCadGeometry(geometry)} />
             </div>
               <SimulateTab
+                bind:autoSimulation {loading} onRun={runSimulationManually}
+                canRun={valid && (!projects.cadGeometry || !cadMappingProblems(projects.cadGeometry, config.phases, config.min_trace_mm).length)}
                 powerInput={{ config: config.toIpc(), driveSettings: config.drive, desiredTravelMm: config.desired_travel_mm, topology: config.topology, cadGeometry: projects.cadGeometry, sweep: powerSweep, drive: powerDrive, native: isTauriAvailable() }}
                 open={activeTab === "simulate"}
                 availableHeight={Math.max(0, motorWorkspaceHeight - motorStatusHeight)}

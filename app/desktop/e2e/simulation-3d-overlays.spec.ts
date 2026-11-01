@@ -8,11 +8,16 @@ async function nativeFixture(page: Page) {
     const w = window as any;
     const mocks = await import(/* @vite-ignore */ "/src/lib/ipc/mocks.ts");
     const { generatedTerminalGeometry } = await import(/* @vite-ignore */ "/src/lib/generatedTerminalGeometry.ts");
-    w.vizCalls = []; w.vizMode = "ready";
+    w.vizCalls = []; w.vizMode = "ready"; w.simulationCalls = [];
     w.__TAURI_INTERNALS__ = { invoke: async (command: string, args: any) => {
       if (command === "set_view_menu_state") return;
       if (command === "generate_coils") return mocks.mockCoils(args.config);
-      if (command === "evaluate_force_sweep") return mocks.mockForceSweep(args.config);
+      if (command === "evaluate_force_sweep") {
+        w.simulationCalls.push(args);
+        const result = mocks.mockForceSweep(args.config);
+        if (w.delaySweep) return new Promise(resolve => { w.resolveSweep = () => resolve(result); });
+        return result;
+      }
       if (command === "compute_height_stack") return mocks.mockHeightStack(args.config);
       if (command === "compute_friction") return mocks.mockFriction(args.config);
       if (command === "travel_envelope") return mocks.mockTravelEnvelope(args.config);
@@ -36,8 +41,8 @@ async function nativeFixture(page: Page) {
       });
       const total = edges.reduce((sum: number, edge: any) => sum + edge.loss_w, 0);
       const report = { schema: "simulation-visualization-v1", request_id: r.request_id, input_sha256: "a".repeat(64), implementation_sha256:"b".repeat(64),app_version:"ui-fixture-only",coordinate_convention: "UI fixture XYZ, not numerical evidence",
-        field: r.fields ? { method: "analytical-pm-only-xyz", scope: "UI fixture data only", samples,
-          magnets: Array.from({ length: config.magnet_count }, (_, i) => ({ center_m: [r.mover_position_m + i * config.magnet_pitch_m, config.board_width_m / 2, config.air_gap_m + config.magnet_height_m / 2],
+        field: r.fields ? { method: r.field_source === "coils" ? "routed-current-biot-savart-xyz" : r.field_source === "coils-and-pm" ? "routed-current-plus-pm-xyz" : "analytical-pm-only-xyz", scope: "UI fixture data only", samples,
+          magnets: Array.from({ length: r.field_source === "coils" ? 0 : config.magnet_count }, (_, i) => ({ center_m: [r.mover_position_m + i * config.magnet_pitch_m, config.board_width_m / 2, config.air_gap_m + config.magnet_height_m / 2],
             size_m: [config.magnet_width_m, config.magnet_cross_width_m, config.magnet_height_m], positive_z: i % 2 === 0 })) } : null,
         heat: r.heat ? { method: "native-resistor-graph-rms-i2r", scope: "UI fixture data only", phase_peak_a: r.phase_peak_a, phase_rms_a: r.phase_peak_a / Math.SQRT2,
           winding_temperature_c: args.driveSettings.winding_temp_c, total_loss_w: total, power_balance_relative_error: 0, edges } : null, heat_unavailable_reason: null };
@@ -65,12 +70,52 @@ async function show3D(page: Page, pm = true) {
   return viewer;
 }
 
-test("coil-generated B is primary and never substitutes a PM field for an unqualified design", async ({ page }) => {
+test("manual simulations rerun active geometry with auto-run disabled and reject late results", async ({ page }) => {
+  await gotoDesignApp(page); await nativeFixture(page);
+  await page.getByRole("tab", { name: /^Simulate/i }).click();
+  const run = page.getByRole("button", { name: "Run simulations", exact: true });
+  await expect(run).toBeEnabled();
+  await page.getByRole("checkbox", { name: "Auto-run on edits", exact: true }).uncheck();
+  const count = await page.evaluate(() => (window as any).simulationCalls.length);
+  await selectDesignPanel(page, "Drive & force targets");
+  await page.getByRole("spinbutton", { name: "Phase current (A)", exact: true }).fill("2");
+  await page.getByRole("spinbutton", { name: "Phase current (A)", exact: true }).blur();
+  await expect(page.getByLabel("Simulation run controls")).toContainText("Run to calculate");
+  expect(await page.evaluate(() => (window as any).simulationCalls.length)).toBe(count);
+  await run.click();
+  await expect.poll(() => page.evaluate(() => (window as any).simulationCalls.length)).toBe(count + 1);
+  expect(await page.evaluate(() => (window as any).simulationCalls.at(-1).config.max_current_a)).toBe(2);
+  await expect(page.getByLabel("Simulation run controls")).toContainText("Results for the active geometry");
+  await page.evaluate(() => { (window as any).delaySweep = true; });
+  await run.click();
+  await expect(page.getByRole("button", { name: "Running simulations…", exact: true })).toBeDisabled();
+  await expect.poll(() => page.evaluate(() => typeof (window as any).resolveSweep)).toBe("function");
+  await page.getByRole("tab", { name: /^Design/i }).click();
+  await page.evaluate(() => { (window as any).resolveSweep(); });
+  await page.getByRole("tab", { name: /^Simulate/i }).click();
+  await expect(page.getByLabel("Simulation run controls")).toContainText("Run to calculate");
+  expect(await page.evaluate(() => (window as any).simulationCalls.length)).toBe(count + 2);
+});
+
+test("active geometry coil estimate works without an audited source and can be rerun manually", async ({ page }) => {
   await gotoDesignApp(page); await nativeFixture(page); const viewer = await show3D(page, false);
   await expect(viewer).toHaveAttribute("data-field-source", "coils");
+  await expect(viewer).toHaveAttribute("data-field-samples", "240");
+  await expect(viewer).toContainText("Routed-current estimate");
+  await expect(viewer.getByRole("combobox", { name: "Audited coil source", exact: true })).toHaveCount(0);
+  const first = await page.evaluate(() => (window as any).vizCalls.at(-1));
+  expect(first.request.field_source).toBe("coils");
+  expect(first.request.phase_angle_deg).toBe(0);
+  const count = await page.evaluate(() => (window as any).vizCalls.length);
+  await viewer.getByRole("button", { name: "Sample active geometry", exact: true }).click();
+  await expect.poll(() => page.evaluate(() => (window as any).vizCalls.length)).toBe(count + 1);
+  await viewer.getByRole("spinbutton", { name: "Coil field electrical angle", exact: true }).fill("180");
+  await expect.poll(() => page.evaluate(() => (window as any).vizCalls.at(-1).request.phase_angle_deg)).toBe(180);
+  await viewer.getByRole("spinbutton", { name: "Coil field electrical angle", exact: true }).fill("");
   await expect(viewer).toHaveAttribute("data-field-samples", "0");
-  await expect(viewer).toContainText("No magnet field or wire substitute is shown");
-  expect(await page.evaluate(() => (window as any).vizCalls.length)).toBe(0);
+  await expect(viewer).toContainText("Enter a finite electrical angle");
+  await viewer.getByRole("combobox", { name: "3D simulation overlay", exact: true }).selectOption("heat");
+  await expect(viewer.getByLabel("Copper loss legend")).toBeVisible();
 });
 
 test("qualified coil controls bind the DC loop, render winding-only data and clear it on current edits", async ({ page }) => {
@@ -93,6 +138,8 @@ test("qualified coil controls bind the DC loop, render winding-only data and cle
     };
   });
   const viewer=await show3D(page,false);
+  await viewer.getByRole("combobox", { name: "Magnetic field source", exact: true }).selectOption("qualified");
+  await page.evaluate(() => { (window as any).vizCalls = []; });
   await viewer.getByRole("combobox",{name:"Audited coil source",exact:true}).selectOption("ui-only");
   await expect(viewer.getByRole("button",{name:"Sample coil B-field",exact:true})).toBeDisabled();
   await viewer.getByRole("checkbox",{name:/I acknowledge this audited placement/}).check();

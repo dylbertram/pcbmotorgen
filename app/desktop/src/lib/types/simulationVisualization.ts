@@ -15,9 +15,11 @@ export interface VisualizationRequest {
   phase_peak_a: number;
   fields: boolean;
   heat: boolean;
+  field_source?: "pm" | "coils" | "coils-and-pm";
+  phase_angle_deg?: number;
 }
 export interface FieldPreview {
-  method: "analytical-pm-only-xyz" | "qualified-finite-copper-winding-xyz" | "coil-plus-pm-free-space-superposition";
+  method: "analytical-pm-only-xyz" | "qualified-finite-copper-winding-xyz" | "coil-plus-pm-free-space-superposition" | "routed-current-biot-savart-xyz" | "routed-current-plus-pm-xyz";
   scope: string;
   samples: { position_m: [number, number, number]; b_t: [number, number, number]; magnitude_t: number }[];
   magnets: { center_m: [number, number, number]; size_m: [number, number, number]; positive_z: boolean }[];

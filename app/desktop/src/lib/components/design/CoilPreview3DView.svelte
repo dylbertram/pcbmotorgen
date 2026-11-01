@@ -66,6 +66,8 @@
   const settingsExpanded = $derived(settingsOpen ?? viewerWidth > 760);
   let legendsOpen = $state(false);
   let fieldSource = $state("coils");
+  let phaseAngle = $state(0);
+  let sampleRevision = $state(0);
   let coilField = $state<DcWindingFieldResult | null>(null);
   let showMagnets = $state(true);
   let includeMagnets = $state(false);
@@ -75,6 +77,8 @@
   const controller = new SimulationVisualizationController(sampleSimulationVisualization, next => { visualization = next; });
   const field = $derived.by(() => {
     if (!simulation || view.viewMode === "top") return null;
+    if (mode !== "fields" && mode !== "both") return null;
+    if (fieldSource === "coils") return visualization.report?.field ?? null;
     if (fieldSource === "pm") return includeMagnets ? visualization.report?.field ?? null : null;
     if (!coilField) return null;
     if (!includeMagnets) return coilField.field;
@@ -111,10 +115,15 @@
     // display-only Z scaling do not resample physics. Edits clear colors now.
     const input = simulation ? $state.snapshot(simulation) : null;
     const physical = geometry ? $state.snapshot(geometry) : null;
-    const selected = mode, resolution = density, source = fieldSource, pmEnabled = includeMagnets;
+    const selected = mode, resolution = density, source = fieldSource, pmEnabled = includeMagnets, angle = phaseAngle;
+    void sampleRevision;
     untrack(() => controller.invalidate());
     if (!input || !physical || selected === "off") return;
-    if (source === "coils" && selected === "fields") return;
+    if (source === "coils" && selected !== "heat" && !Number.isFinite(angle)) {
+      untrack(() => { visualization = { phase: "failed", report: null, error: "Enter a finite electrical angle in degrees." }; });
+      return;
+    }
+    if (source === "qualified" && selected === "fields") return;
     if (source === "pm" && !pmEnabled && selected === "fields") return;
     const positions = [...physical.routing.segments.flatMap(s => [s.start, s.end]), ...physical.routing.curves.flatMap(c => [c.start, c.mid, c.end])];
     if (!positions.length) return;
@@ -129,14 +138,15 @@
       bounds_m: [[Math.min(...xs, magnetStart) - pitch * .6, Math.max(...xs, magnetEnd) + pitch * .6], [Math.min(...ys) - .001, Math.max(...ys) + .001],
         [Math.min(...physical.layer_z_mm) * .001 - pitch * .6, input.config.air_gap_m + input.config.magnet_height_m + pitch * .6]],
       counts: resolution === "fine" ? [28, 4, 18] : resolution === "dense" ? [20, 5, 7] : [12, 4, 5], phase_peak_a: input.config.max_current_a,
-      fields: source === "pm" && pmEnabled && (selected === "fields" || selected === "both"), heat: selected === "heat" || selected === "both" };
+      field_source: source === "coils" ? pmEnabled ? "coils-and-pm" : "coils" : "pm", phase_angle_deg: source === "coils" && selected !== "heat" ? angle : 0,
+      fields: (source === "coils" || (source === "pm" && pmEnabled)) && (selected === "fields" || selected === "both"), heat: selected === "heat" || selected === "both" };
     const timer = setTimeout(() => { void controller.sample(input, request); }, 150);
     return () => { clearTimeout(timer); controller.invalidate(); };
   });
   $effect.pre(() => {
     const input = simulation ? $state.snapshot(simulation) : null;
     const coil = coilField ? $state.snapshot(coilField) : null;
-    const enabled = includeMagnets && fieldSource === "coils" && (mode === "fields" || mode === "both");
+    const enabled = includeMagnets && fieldSource === "qualified" && (mode === "fields" || mode === "both");
     untrack(() => magnetController.invalidate());
     if (!enabled || !input || !coil) return;
     const request: VisualizationRequest = { request_id: crypto.randomUUID(), mover_position_m: input.moverPositionM,
@@ -186,9 +196,15 @@
         <label class="check-row"><input type="checkbox" aria-label="Show magnets in 3D" bind:checked={showMagnets} /> <span>Show magnets in 3D</span></label>
         {#if mode === "fields" || mode === "both"}
           <fieldset class="control-section"><legend>Source</legend>
-            <label class="control-row"><span>Calculate B</span><select aria-label="Magnetic field source" bind:value={fieldSource} onchange={event => { if (event.currentTarget.value === "pm") includeMagnets = true; }} class="rounded border border-slate-600 bg-slate-800 p-1"><option value="coils">Coil currents, qualified DC</option><option value="pm">Permanent magnets only</option></select></label>
+            <label class="control-row"><span>Calculate B</span><select aria-label="Magnetic field source" bind:value={fieldSource} onchange={event => { if (event.currentTarget.value === "pm") includeMagnets = true; }} class="rounded border border-slate-600 bg-slate-800 p-1"><option value="coils">Coil currents, routed estimate</option><option value="qualified">Coil currents, audited finite copper</option><option value="pm">Permanent magnets only</option></select></label>
             <label class="check-row"><input type="checkbox" aria-label="Include magnets in B-field" bind:checked={includeMagnets} /> <span>Include magnets in B-field</span></label>
-            {#if fieldSource === "pm"}<label class="control-row"><span>Native samples</span><select aria-label="Field sample density" bind:value={density} class="rounded border border-slate-600 bg-slate-800 p-1"><option value="sparse">240</option><option value="dense">700</option><option value="fine">2016</option></select></label>{/if}
+            {#if fieldSource !== "qualified"}<label class="control-row"><span>Native samples</span><select aria-label="Field sample density" bind:value={density} class="rounded border border-slate-600 bg-slate-800 p-1"><option value="sparse">240</option><option value="dense">700</option><option value="fine">2016</option></select></label>
+              {#if fieldSource === "coils"}
+                <label class="control-row"><span>Electrical angle (°)</span><input aria-label="Coil field electrical angle" type="number" min="-360" max="360" step="15" bind:value={phaseAngle} class="min-w-0 rounded border border-slate-600 bg-slate-800 p-1" /></label>
+                <p class="control-hint">Active copper at {simulation.config.max_current_a} A phase peak. Sorted phase nets use cos(θ − 360° k/N), input to output. External leads and return wiring omitted. Estimate, not audited FEM.</p>
+              {/if}
+              <button type="button" disabled={visualization.phase === "loading"} onclick={() => sampleRevision++} class="section-button rounded border border-emerald-600 text-emerald-200 disabled:opacity-40">Sample active geometry</button>
+            {/if}
           </fieldset>
           <fieldset class="control-section"><legend>Display</legend>
             <label class="control-row"><span>Rendering</span><select aria-label="Field rendering style" bind:value={fieldStyle} class="rounded border border-slate-600 bg-slate-800 p-1"><option value="lines-slice">Projected lines + slice</option><option value="lines">Projected lines</option><option value="slice">Magnitude slice</option><option value="lines-3d">3D field lines</option><option value="arrows">3D sample arrows</option></select></label>
@@ -201,7 +217,7 @@
             <label class="range-control"><span>Opacity</span><output>{Math.round(opacity * 100)}%</output><input aria-label="Field overlay opacity" type="range" min="0.15" max="1" step="0.05" bind:value={opacity} class="accent-emerald-400" /></label>
             <button class="section-button rounded border border-slate-600 text-slate-300 hover:bg-slate-800 hover:text-emerald-300" type="button" aria-pressed={sectionView} onclick={() => sectionView = !sectionView}>XZ field section</button>
           </fieldset>
-          {#if fieldSource === "coils" && geometry}
+          {#if fieldSource === "qualified" && geometry}
             <details open={!coilField} class="basis-full"><summary class="cursor-pointer">Qualified coil source and DC drive</summary>
               <QualifiedCoilFieldControls input={simulation} {geometry} active={true} onResult={value => { coilField = value; }} />
             </details>
@@ -216,21 +232,24 @@
           {#if magnetContribution.phase === "loading"}<p role="status" class="rounded bg-slate-900/95 p-2 text-slate-300">Sampling magnet contribution on the coil observation grid. Combined field cleared.</p>{/if}
           {#if magnetContribution.error}<p role="status" class="rounded bg-slate-900/95 p-2 text-amber-200">Combined field unavailable: {magnetContribution.error}</p>{/if}
           {#if fieldSource === "pm" && !includeMagnets}<p role="status" class="rounded bg-slate-900/95 p-2 text-slate-300">Magnets excluded from calculation. No active field source.</p>{/if}
-          {#if fieldSource === "coils" && (mode === "fields" || mode === "both") && !coilField}<p role="status" class="rounded bg-slate-900/95 p-2 text-slate-300">Coil B-field requires an exact qualified source. Open field settings, choose the audited source and acknowledge its finite return, then sample. No magnet-field substitute is shown.</p>{/if}
+          {#if fieldSource === "qualified" && (mode === "fields" || mode === "both") && !coilField}<p role="status" class="rounded bg-slate-900/95 p-2 text-slate-300">Audited finite-copper fields require an exact qualified source and its declared return. For other designs choose "Coil currents, routed estimate" in field settings.</p>{/if}
           {#if visualization.report?.heat_unavailable_reason || heatMapping.error}
             <p role="status" class="max-w-md rounded bg-slate-900/95 p-2 text-amber-200">Heat/loss unavailable: {heatMapping.error ?? visualization.report?.heat_unavailable_reason}</p>
           {/if}
           <div class="compact-overlay-toggle w-full rounded border border-slate-700 bg-slate-900/95 p-1 text-slate-300">
-            <p>{mode === "heat" ? "Loss W/m, not temperature" : `${fieldSource === "coils" ? includeMagnets ? "Coils + PM, free-space sum" : "DC coil-current" : "PM-only"} field · |B| in T${mode === "both" ? " · Loss W/m" : ""}`}</p>
+            <p>{mode === "heat" ? "Loss W/m, not temperature" : `${fieldSource !== "pm" ? includeMagnets ? "Coils + PM, free-space sum" : fieldSource === "coils" ? "Routed coil estimate" : "Audited DC coil-current" : "PM-only"} field · |B| in T${mode === "both" ? " · Loss W/m" : ""}`}</p>
             <button type="button" aria-expanded={legendsOpen} onclick={() => legendsOpen = !legendsOpen}>Legends and model limits</button>
           </div>
           <div class="overlay-legends-body flex flex-wrap gap-2">
           {#if field}
             <div class="max-w-64 space-y-1 rounded border border-slate-700 bg-slate-900/95 p-2 text-slate-300" aria-label="Magnetic field legend">
-              <p>{fieldSource === "coils" ? includeMagnets ? "Coils + magnets, free-space sum" : "Coil-current" : "PM"} field magnitude |B| · T</p><div class="h-1.5 rounded" style:background={`linear-gradient(to right, ${FIELD_PALETTE.join(",")})`}></div>
+              <p>{fieldSource !== "pm" ? includeMagnets ? "Coils + magnets, free-space sum" : "Coil-current" : "PM"} field magnitude |B| · T</p><div class="h-1.5 rounded" style:background={`linear-gradient(to right, ${FIELD_PALETTE.join(",")})`}></div>
               <p class="flex justify-between font-mono"><span>0 T</span><span>{maximumField.toPrecision(3)} T</span></p>
               <p>{fieldDescription}</p>
               {#if fieldSource === "coils"}
+                <p>Routed-current estimate, {simulation.config.max_current_a} A phase peak, {phaseAngle}° electrical.</p>
+                <details><summary class="cursor-pointer">Routed-current model limits</summary><p>Biot-Savart contribution from active routed traces, arc chords and vias, using signed resistor-graph branch currents. Softened filament core radius is half the actual trace width. External leads, terminal buses and return wiring are omitted, so this is not the complete drive-loop field. No magnetic-material response, audited FEM accuracy or holding-force prediction. {includeMagnets ? "Analytical PM vectors added in free space." : "No magnet contribution."}</p></details>
+              {:else if fieldSource === "qualified"}
                 {#if includeMagnets}<p>Vector superposition of native coil and PM samples at identical XYZ points. No magnetic-material reaction or coupled FEM solution.</p>{/if}
                 <p>{coilField?.loop_current_a} A audited DC loop, including declared finite return. {Object.entries(coilField?.phase_currents_a ?? {}).map(([net, amps]) => `${net}: ${amps} A`).join(", ")}</p>
                 <details><summary class="cursor-pointer">Finite-copper coil-field limits</summary><p>Direct exterior integration of the exact audited finite-copper current basis. {includeMagnets ? "Analytical PM field added in free space." : "No magnet contribution."} No material reaction, independent AC phase drive, wire substitute or newly qualified field-refinement claim. Projected lines follow Bx/Bz on the selected XZ plane; a purely normal field has no in-plane line. Colors use full |B|. Explicit 3D lines follow XYZ. Seed density is not flux density. Heat uses a separate cycle-average phase-current model. Magnet visibility does not change calculated values.</p></details>

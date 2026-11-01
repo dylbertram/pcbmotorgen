@@ -93,5 +93,34 @@ pnpm run tauri dev
 Configure your motor in the UI, preview the magnetic field and force plots,
 then click **Write to KiCad** when ready.
 
+### Simulation controls and model scope
+
+In **Simulate**, use **Run simulations** to calculate the active generated or
+imported geometry. **Auto-run on edits** can be turned off for manual operation.
+Imported copper needs phase mapping and confirmed coil ends. Editing inputs
+clears old results; late responses cannot populate another design or tab.
+
+The **3D fields and heat** view defaults to **Coil currents, routed estimate**.
+It does not require a previously audited design. It calculates the routed
+copper's Biot-Savart contribution from signed resistor-graph branch currents,
+including arc chords and vias. Set the electrical angle and phase peak current;
+**Sample active geometry** reruns the field calculation. Sorted phase nets use
+`I_k = I_peak cos(theta - 2 pi k/N)`, positive from input to output. This is an
+imposed winding-current snapshot, not a voltage-driven delta circuit solution.
+
+This estimate omits external leads, terminal buses and return wiring. Its
+softened filament core radius is half the actual trace width, not a solved
+finite copper cross-section. It has no magnetic-material reaction or FEM
+accuracy claim. Optional analytical magnet vectors are added in free space.
+The separate **audited finite copper** source retains its exact geometry,
+placement and finite-return requirements. Neither source silently substitutes
+a magnet-only field when coil calculation fails.
+
+**Thrust vs. position** is the general Lorentz-force sweep using the configured
+commutation. **Audited DC force** is a different, restricted material-coupled
+calculation at one fixed current and magnet offset. It is not a holding-force
+curve over travel or a closed-loop holding-stiffness calculation. Copper loss
+colors show cycle-average I²R in W/m, not predicted temperature.
+
 All generated tracks and vias appear as **one undo step** — `Ctrl+Z` rolls
 back the entire layout cleanly.
