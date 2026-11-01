@@ -517,7 +517,7 @@ mod coreless_envelope_tests {
             tauri::async_runtime::block_on(super::super::dxf::editable_coil_geometry(config.clone())).unwrap_err(),
             tauri::async_runtime::block_on(super::super::dxf::export_coils_dxf(config)).unwrap_err(),
         ];
-        assert!(errors.iter().all(|e| e.contains("9 braid periods")), "{errors:?}");
+        assert!(errors.iter().all(|e| e.contains("8 braid periods")), "{errors:?}");
     }
 
     #[test]

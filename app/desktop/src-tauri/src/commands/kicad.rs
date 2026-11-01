@@ -215,7 +215,7 @@ mod motor_spacing_limits {
         config.magnet_count = 2;
         config.num_layers = 8;
         config.active_area_length_m = 0.025;
-        assert!(board_source(&config.to_core(), None).unwrap_err().contains("9 braid periods"));
+        assert!(board_source(&config.to_core(), None).unwrap_err().contains("8 braid periods"));
     }
 }
 

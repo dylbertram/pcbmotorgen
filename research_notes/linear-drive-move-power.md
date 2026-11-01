@@ -7,6 +7,242 @@ remain as a record of what was implemented and tested, not current requirements.
 
 ## Supported model
 
+### Compact scalable star routing, revised examples, 2026-11-01
+
+The user replaced `star-wye_2-layer.dxf`, `star-wye_4-layer.dxf` and
+`star-wye_6-layer.dxf` with compact examples and corrected B/C names. These
+are new inputs, not the earlier files described in historical receipts below.
+Their SHA-256 values are respectively
+`feac5cbcdb364dc9d597830ce79dd51b76f2a5623dbd672a587ca4f0079c396a`,
+`5bb745e28af4bfa960a81b6654dd26a4ebce0bafb54d89ccfd299f3adcc4156f`, and
+`c93b70b5495cc6a4285f60d64c8ecd82cccd277f129393b37affe933e2c19639`.
+All supplied bytes are preserved in this task.
+
+`pole_matched = 1` now opens physical belts at braid periods 0/1/0 instead
+of 0/1/2, then sorts their resulting openings along X before assigning driver
+lead heights and building the neutral. The active XY copper is unchanged.
+For the supplied three-strand, 6 mm pole-pitch example, controller A/B/C
+openings are X=4.333333/8.333333/12.333333 mm, with an 8 mm span instead of
+16 mm. The native read-only reference test matches **every** conductor of the
+revised two-layer DXF to generated copper at 1e-5 mm, including the driver
+leads, three legacy neutral POLYLINE stubs and all vias. No extra B/C exchange
+is needed beyond the generator's existing physical-belt-to-controller naming.
+CAD layer numbers run bottom-to-top while generated physical Z runs
+top-to-bottom. The existing `reverse_layers` option puts the generated driver
+at Z=0 as drawn; the reference test checks that physical orientation too.
+Saved orientation settings are not changed. The force-scaling cases below
+use an explicit unreflected 1.6 mm stack, not the drawings' 1.6 mm spacing
+between every copper plane.
+
+Successive generated pairs still advance by **two** pole pitches, 12 mm in
+this example. This intentionally differs from the new 4/6-layer drawings:
+their one-pitch, 6 mm shift makes the next pair's directed currents opposite
+to the two-layer reference. Independent raw-DXF resistor reconstruction finds
+pair correlations +1/-1 for all three four-layer windings, and +1/-1/+1 for
+the connected A/C six-layer windings. This diagnostic assigns the drawings'
+net-0 barrels to their uniquely determined physical phase only in a test copy;
+it changes no current signs or geometry. The six-layer B winding still has
+two gaps at body endpoints. Neither the routing nor importer silently
+repairs source files. `audit_compact_star_scaling.py` records original and
+barrel-assigned connectivity separately and never bridges missing traces.
+
+Reference/absent `pole_matched`, delta and closed generation are unchanged.
+No phase/strand bundle is translated, no lead angle or via row is widened to
+satisfy DFM, and no firmware-only phase inversion is used. The required period
+count for pole-matched stacks falls from `2*pairs+1` to `2*pairs`.
+This updates the existing pole-matched mode, not the explicitly selected
+historical reference mode. DFM warnings remain warnings, not fabrication
+approval.
+
+Fresh independent R/current/Magpylib checks at conductor meshes 20/40 pass for
+generated 2/4/6/8/10 layers, the actual revised two-layer DXF, and a four-layer
+source diagnostic with only the net-0 barrel labels assigned and physical
+driver/star terminals explicitly selected. The generated cases hold total
+PCB thickness at 1.6 mm, uniform assumed trace width at 0.2 mm, 1 oz copper at
+75 C, and the same five 5x5x3 mm, 1.34 T magnets at 6 mm N/S pitch and 0.5 mm
+gap. Balanced 1 A phase-peak mean interior thrust is respectively
+63.02/119.36/177.02/234.87/292.78 mN. Individual pair force curves align with
+cosine at least 0.9999776; maximum directed-axis error is 0.004516 degrees.
+Independent signed layer-force error is at most 7.4e-11 N/A. All 193 map
+positions per phase pass the unchanged 2% mesh-refinement gate; maximum
+relative change is 0.01248%. These are imposed-current free-space force
+results, not efficiency or driver/power qualification.
+
+The actual four-layer drawing's adjacent pair force curves oppose, with
+cosines below -0.99985 for all three phases. At its supplied 4.8 mm total
+span, layer-force amplitude retention is about 74.5%. This is distinct from
+the generated fixed-1.6-mm scaling experiment, and must not be presented as
+a same-depth thrust comparison. The actual six-layer drawing receives no
+powered-force acceptance: its B endpoint graph is still disconnected after
+the explicit barrel-label-only diagnostic. The original blank-terminal
+source-2 audit attempt and the first workspace run's stale nine-period
+assertion are preserved as failed attempts. Successful runs have separate
+`picked`/`verified` paths, not overwritten receipts.
+
+Validation completed: `cargo test --workspace` passes 764 tests, with 28
+optional unit tests and three doc tests ignored. The revised supplied-reference
+test passes separately, including physical layer orientation. Frontend tests
+pass 651 with 12 optional skips, Python audit regressions pass 21, and
+`svelte-check` reports zero errors/warnings. Native preview/freeze/DXF roundtrip
+coverage includes 2/4/6/8/10 layers; the signed-force regressions cover 2/3/5
+strands, 2/4/6/8 layers and all eight orientation combinations. DFM tests cover
+both legacy and compact modes without geometry mutation. The six-layer native
+fan-outs were also plotted and inspected per plane. No live board operation,
+commit or push was performed.
+
+Evidence directory: approved temp `compact-scalable-star-20261101`.
+Raw-source current receipt: `raw-current-audit-verified.json`.
+Versioned summary: `scripts/solvers/results/compact-scalable-star-2026-11-01.json`.
+Issue: pcbmotorgen#apcz.
+
+### More compact supplied spread-2 DXF, 2026-11-01
+
+The user's `star-wye_2-layer-spread-2.dxf` passes the winding-direction check.
+The source is unchanged, SHA-256
+`1902efee76f3f189290705d8af6275d2bf2e17356cd70035bca1cab781e726e5`.
+Its three opening positions occupy only 8 mm, versus 16 mm in the verified
+spread reference. The new file retains the earlier B/C names rather than the
+corrected reference names, so compare controller A/B/C with file A/C/B. This
+is a normal B/C output-phase permutation, **not** inversion of one current.
+Controller PWM and current-sense phase identities must use the same mapping.
+No labels or copper in the supplied file were edited.
+
+With that phase assignment, currents through all 918 shared geometric
+conductors have the same sense as the spread reference, with at most
+6.21e-12 A/A discrepancy. All three windings are connected; explicit physical
+driver/star picks agree with native inference. Every native imported edge and
+electrical graph node/edge matches independent raw-DXF reconstruction. The
+533 traces include all three legacy neutral POLYLINE stubs; all 393 vias use
+the physical 0/-1.6 mm planes. No unmodeled centerline junction or interphase
+contact outside the intended star point was found. This is not a pad/trace
+clearance acceptance.
+
+Using the same explicit assumptions as the two-layer comparison below, balanced
+1 A phase-peak drive gives interior thrust min/mean/max 62.87/62.94/63.02 mN,
+versus 62.80/62.93/63.02 mN for the earlier spread reference. Mapped directed-axis
+error from balanced 120 degrees is at most 0.00335 degrees. No winding-end
+reversal or special winding-specific current law is needed for this variant.
+As supplied, driving file A/B/C with the reference's unchanged A/B/C assignment
+instead gives alternating force, because the phase sequence is reversed.
+
+Independent current/resistance/Magpylib force checks pass at conductor meshes
+20 and 40. All 193 signed-map positions per phase pass the unchanged 2% mesh
+gate; variant maximum relative change is 0.01048%. Independent signed layer
+force agrees within 4.14e-13 N/A. All 17 existing Python audit regressions pass.
+No production physics/routing code, supplied geometry, live board, commit or
+push was changed by this review. The new `audit_dxf_variant.py` records explicit
+phase permutations without changing winding-current signs.
+
+Receipt: `scripts/solvers/results/compact-spread-2-dxf-2026-11-01.json`.
+Full source snapshots, native imported project, actual graph/force fixtures,
+independent receipts and unchanged input copy are in approved temp
+`compact-spread-2-dxf-20261101`. Its `comparison.json` SHA-256 is
+`51527cde1f6d043a4410e9959b6aa781b485ce8e27c0a4b723d2d59a32aecd1b`.
+Tracked as pcbmotorgen#es1y. This demonstrates that correct compact connections
+can preserve the spread version's behavior; physical spreading is not required.
+
+### Actual compact versus spread two-layer DXFs, 2026-11-01
+
+The user supplied `star-wye_2-layer.dxf` as the old compact design and
+`star-wye_2-layer-spread.dxf` as the new spread design, and requested B/C names
+be swapped in both before testing the claimed conflict. This is a new test of
+the actual supplied copper, not regenerated variants and not the four-layer
+series-stack evidence below. Tracked as pcbmotorgen#hjp5.
+
+Both DXFs now have B/C layer definitions, entity references, via-layer names
+and legacy neutral-polyline references swapped. Geometry, numeric fields and
+every other byte are unchanged. Exact originals and per-file SHA-256 receipts
+are preserved under approved temp `compact-spread-dxf-20261101/originals`.
+Applying the same name swap to the corrected bytes reproduces the originals.
+The other supplied motor and multilayer DXF files are untouched.
+
+Native import follows physical copper Z of -1.6 and 0 mm, despite legacy
+L1/L5/L6 names. Each file has 533 planar trace segments, including three classic
+POLYLINE neutral stubs, and 393 vertical vias. An independent raw-DXF decoder
+matches every native imported segment/via and every native electrical graph
+node/edge. Centerline crossing checks find no omitted planar junctions or
+interphase contacts outside the intended neutral. Each phase has two external
+ends and 42 independent graph cycles: continuous copper, but a branched braid,
+not one unbranched series wire. Explicit driver leads at left-hand top-plane
+ends and the physical common bottom-plane neutral agree with native inference.
+
+The signed current comparison settles the cause. On every shared conductor,
+after the requested B/C relabeling, A and B have the **same** current sense in
+both files. C has the **opposite** current sense, to within 9.2e-12 A per applied
+ampere. Individual phase force amplitudes remain about 0.04196 N/A in both.
+Layer-force retention is 98.73..98.74% compact and 98.55..98.73% spread. Neither
+file has the severe within-phase layer cancellation previously found in the
+four-layer series stack. The older result must not be applied to these files.
+
+Using the same zero-sum sinusoidal ABC drive, 1 A phase peak, the same common
+electrical reference, and a geometry-selected three-cycle interior interval:
+
+| Actual imported design | Minimum thrust | Mean thrust | Maximum thrust |
+| --- | ---: | ---: | ---: |
+| Compact, corrected labels | -20.47 mN | 21.18 mN | 62.88 mN |
+| Spread, corrected labels | 62.80 mN | 62.93 mN | 63.02 mN |
+
+Compact C's directed force axis is about 180 degrees wrong for that balanced
+law. Optimizing only the common controller reference does not remove the
+reversing-force interval. A separate **hypothetical physical C terminal-reversal
+sign diagnostic**, with compact geometry unchanged, gives 62.88..63.02 mN and
+62.94 mN mean. This isolates winding polarity from physical opening separation.
+It is not a fabricated or routed replacement design, and does not authorize a
+software sign inversion of one inverter current, which would violate zero-sum
+star current. A compact reconnection would have to exchange the appropriate
+driver/neutral winding ends without shorting or bypassing the braid. No such
+generator/routing change was requested or made in this task.
+
+Assumptions reused explicitly: five 5 x 5 x 3 mm magnets, 6 mm adjacent N/S
+pitch, 12 mm electrical period, 1.34 T remanence, 0.5 mm top-plane air gap,
+magnet centers at Y=4 mm, physical copper depths 0/-1.6 mm, uniform 1 oz copper
+at 75 C, 0.3 mm via drill and 0.025 mm plating. LINE entities do not declare
+copper width. The model explicitly assumes uniform 0.2 mm traces, rather than
+borrowing an unrelated CAD default or `$TRACEWID`. Independent sensitivity
+checks at 0.127/0.2/0.35 mm leave branch fractions/directions unchanged within
+1.6e-11 A/A for these graphs. Force numbers are imposed-current free-space
+predictions, not measured thrust, a power result, or manufacturing clearance
+approval.
+
+Both imports pass independent current/resistance/Magpylib force checks at
+conductor meshes 20 and 40, including the unchanged refinement gate. Per-phase
+signed layer sums agree with native force within 4.13e-13 N/A. All 193 signed-map
+positions are also checked for mesh refinement on all
+three phases, with at most 0.01048% relative force-vector change versus the
+unchanged 2% limit, retained in `all-phase-refinement.json`. The raw topology
+comparison and current-direction match rule out a terminal-inference or import
+defect as the cause here. Export-crate tests pass 187 cases with three explicit
+ignores; 17 Python audit tests pass. Intermediate audit-harness failures remain
+preserved separately, not counted as physics results. Production simulation,
+import and generator behavior were not changed, only opt-in test instrumentation.
+
+Accepted summary is
+`scripts/solvers/results/compact-spread-dxf-2026-11-01.json`. Full evidence is in
+approved temp `compact-spread-dxf-20261101`; `comparison-verified.json` SHA-256
+is `8fc4621a7091efaddc905567519c3bbb18e2af6638cbe9d234c62ed0d4fc47e9`.
+Source snapshots, source/backup hashes, imported projects, explicit terminals,
+native graph/force fixtures, independent force receipts and both mesh levels
+are retained there. No live board operation, commit or push was performed.
+
+To reproduce using already-corrected input files, first run the ignored native
+`export_actual_dxf_audit_project` test separately for each DXF with
+`PCB_MOTOR_DXF_PATH`, `PCB_MOTOR_DXF_PROJECT_OUTPUT`,
+`PCB_MOTOR_DXF_TRACE_WIDTH_MM=0.2` and `PCB_MOTOR_DXF_CONFIG_REFERENCE` set to the
+supplied Fader archive. Use exclusive new output paths. Then run:
+
+```sh
+PCB_MOTOR_SIGNED_FORCE_MAP=1 python3 scripts/solvers/check_winding_oracle.py \
+  --project <new-directory>/compact.pmmotor --meshes 20 40 \
+  --work <new-directory>/compact
+PCB_MOTOR_SIGNED_FORCE_MAP=1 python3 scripts/solvers/check_winding_oracle.py \
+  --project <new-directory>/spread.pmmotor --meshes 20 40 \
+  --work <new-directory>/spread
+python3 scripts/solvers/audit_compact_spread_dxf.py <new-directory>
+```
+
+Do not blindly repeat the relabel operation: B/C swapping is an involution and
+running it again would undo the requested correction.
+
 ### Pole-matched star termination and magnet limits, 2026-10-31
 
 Work tracked as pcbmotorgen#vw89, following the user's request to resolve the

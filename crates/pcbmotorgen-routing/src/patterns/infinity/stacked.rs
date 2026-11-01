@@ -1,7 +1,8 @@
 //! Even-layer star/wye stack. Only the opening moves between pairs, by one
 //! complete braid period per pair in reference mode, or two in pole-matched
 //! mode, from the driver side toward the neutral. Pole-matched mode also
-//! staggers phase cuts to alternate phase-belt polarity.
+//! moves only the middle phase-belt cut to reverse its polarity. Sorting the
+//! resulting openings keeps the driver leads and neutral bus compact.
 //! The XY braid itself is copied without translation or terminal reversal.
 
 use super::{BraidGeometry, Connection};
@@ -18,10 +19,10 @@ pub(super) fn stack_and_terminate(
     let pairs = ctx.num_layers / 2;
     let matched = connection == Connection::Star && ctx.param("pole_matched", 0.0) == 1.0;
     let pair_step = if matched { 2 } else { 1 };
-    // Consecutive physical phase belts open at periods 0/1/2. The middle
-    // belt therefore reverses its winding sense without moving any trace.
+    // Physical phase belts open at periods 0/1/0. Only the middle belt
+    // needs reversal; moving the third by two periods only wastes space.
     // Successive layer pairs advance by two pole pitches, not one half-cycle.
-    let phase_step = if matched { ends.len() as u32 - 1 } else { 0 };
+    let phase_step = if matched { 1 } else { 0 };
     let required_periods = pair_step * (pairs - 1) + phase_step + 1;
     if connection != Connection::Closed && required_periods as i64 > periods {
         return Err(RoutingError::new(0, "num_layers", RoutingErrorKind::Generation,
@@ -30,9 +31,17 @@ pub(super) fn stack_and_terminate(
     let base_segments = std::mem::take(&mut geometry.segments);
     let base_vias = std::mem::take(&mut geometry.vias);
     let base_bands = std::mem::take(&mut geometry.phase_bands);
-    let shifted = |p: Point, stage: u32, phase: usize| {
-        let phase_periods = if matched { phase as u32 } else { 0 };
-        Point::new(p.x + (stage * pair_step + phase_periods) as f64 * period, p.y)
+    // Keep the original cut for restoring its via, separately from the new
+    // phase opening. After the move, physical A/C/B belts open in A/B/C order.
+    // Lead heights and neutral ownership must follow this geometric order,
+    // not the old belt order, or nested leads can cross.
+    let mut openings: Vec<_> = ends.iter().enumerate().map(|(phase, (net, brk, outward))| {
+        let phase_periods = if matched { phase % 2 } else { 0 };
+        (net, *brk, Point::new(brk.x + phase_periods as f64 * period, brk.y), *outward)
+    }).collect();
+    if matched { openings.sort_by(|a, b| a.2.x.total_cmp(&b.2.x)); }
+    let shifted = |p: Point, stage: u32| {
+        Point::new(p.x + (stage * pair_step) as f64 * period, p.y)
     };
     for pair in 0..pairs {
         let stage = pairs - 1 - pair;
@@ -50,12 +59,12 @@ pub(super) fn stack_and_terminate(
         if connection != Connection::Closed {
             // Restore the first-period cut before opening this pair at its
             // own period. Leaving both out splits a winding into two pieces.
-            for (phase, (net, brk, _)) in ends.iter().enumerate() {
-                let target = shifted(*brk, stage, phase);
+            for (net, brk, opening, _) in &openings {
+                let target = shifted(*opening, stage);
                 if target == *brk { continue; }
-                vias.push(Via { position: *brk, from_layer: 0, to_layer: 1, net: net.clone() });
+                vias.push(Via { position: *brk, from_layer: 0, to_layer: 1, net: (*net).clone() });
                 let before = vias.len();
-                vias.retain(|v| v.net != *net || v.position.distance_to(target) > 1e-9);
+                vias.retain(|v| v.net != **net || v.position.distance_to(target) > 1e-9);
                 if vias.len() + 1 != before {
                     return Err(RoutingError::new(0, "series_opening", RoutingErrorKind::Generation,
                         "could not locate exactly one braid via at the staggered opening"));
@@ -92,8 +101,8 @@ pub(super) fn stack_and_terminate(
             "cannot resolve the braid's top-to-next-via Y pitch"))?;
     let extend = |p: Point, dx_dy: f64, y: f64| Point::new(p.x + dx_dy * (y - p.y), y);
     let last = ctx.num_layers - 1;
-    for (i, (net, brk, outward)) in ends.iter().enumerate() {
-        let driver_break = shifted(*brk, 0, i);
+    for (i, (net, _, brk, outward)) in openings.iter().enumerate() {
+        let driver_break = shifted(*brk, 0);
         let k = (outward.x / outward.y).abs();
         let y = brk.y + (i + 1) as f64 * row_pitch;
         // Driver trace bends left on the top layer. Each series step bends
@@ -103,8 +112,8 @@ pub(super) fn stack_and_terminate(
         trace(geometry, net, last, driver_break, driver);
         trace(geometry, net, last, driver, Point::new(0.0, y));
         for stage in 0..pairs - 1 {
-            let from = shifted(*brk, stage, i);
-            let to = shifted(*brk, stage + 1, i);
+            let from = shifted(*brk, stage);
+            let to = shifted(*brk, stage + 1);
             let join = extend(from, k, y);
             let corner = extend(to, -k, y);
             if join.x >= corner.x {
@@ -115,14 +124,14 @@ pub(super) fn stack_and_terminate(
             trace(geometry, net, layer, from, join);
             trace(geometry, net, layer - 1, to, corner);
             trace(geometry, net, layer - 1, corner, join);
-            geometry.vias.push(Via { position: join, from_layer: 0, to_layer: last, net: net.clone() });
+            geometry.vias.push(Via { position: join, from_layer: 0, to_layer: last, net: (*net).clone() });
         }
-        let end = shifted(*brk, pairs - 1, i);
+        let end = shifted(*brk, pairs - 1);
         let neutral = Point::new(end.x, end.y + row_pitch);
         trace(geometry, net, 0, end, neutral);
-        if i + 1 < ends.len() {
-            let next = shifted(ends[i + 1].1, pairs - 1, i + 1);
-            let owner = if i == 0 { net } else { &ends[i + 1].0 };
+        if i + 1 < openings.len() {
+            let next = shifted(openings[i + 1].2, pairs - 1);
+            let owner = if i == 0 { *net } else { openings[i + 1].0 };
             trace(geometry, owner, 0, neutral, Point::new(next.x, neutral.y));
         }
     }

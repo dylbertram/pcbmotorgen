@@ -1,0 +1,80 @@
+{
+  "schema": "actual-compact-spread-2-dxf-verification-v1",
+  "issue": "pcbmotorgen#es1y",
+  "status": "winding-direction-passed-controller-phase-assignment-must-match",
+  "source": "star-wye_2-layer-spread-2.dxf",
+  "source_sha256": "1902efee76f3f189290705d8af6275d2bf2e17356cd70035bca1cab781e726e5",
+  "source_modified": false,
+  "reference": "star-wye_2-layer-spread.dxf, with the previously requested B/C correction",
+  "reference_sha256": "86120053891d556a76a19964d25865c847a3ecc12953a4d79412e3c48775e901",
+  "scope": "Actual imported copper, physical driver/star terminals, independent DC branch currents and prescribed-PM force. Not regenerated geometry, manufacturing clearance approval, driver dynamics, measured performance or power qualification.",
+  "topology": {
+    "physical_copper_z_mm": [-1.6, 0.0],
+    "planar_trace_segments": 533,
+    "vertical_vias": 393,
+    "legacy_POLYLINE_neutral_stubs_preserved": 3,
+    "all_three_windings_connected": true,
+    "independent_DXF_and_native_import_graph_match": true,
+    "explicit_physical_terminal_picks_match_native_inference": true,
+    "unmodeled_planar_junctions": 0,
+    "cross_phase_centerline_contacts_only_at_star": true,
+    "star_xyz_mm": [8.333333, 8.444444, -1.6],
+    "opening_x_by_supplied_label_mm": {"A": 4.333333, "B": 12.333333, "C": 8.333333},
+    "opening_span_mm": 8,
+    "reference_opening_span_mm": 16
+  },
+  "phase_assignment": {
+    "controller_A_connects_to_file_label": "A",
+    "controller_B_connects_to_file_label": "C",
+    "controller_C_connects_to_file_label": "B",
+    "winding_polarity_inversion_required": false,
+    "explanation": "The new file still uses B/C names opposite to the corrected reference. A B/C output-phase permutation matches all winding directions. This is a phase-order permutation, not negation of one phase current. No file names or physical paths were changed for the check."
+  },
+  "shared_conductor_current_check_after_phase_assignment": {
+    "edges_compared_in_controller_ABC_order": [308, 304, 306],
+    "same_current_direction_fraction": [1, 1, 1],
+    "max_current_error_a_per_a": [2.7187141427020833e-12, 6.205702618444775e-12, 2.90878432451791e-12]
+  },
+  "force": {
+    "phase_axes_deg_as_supplied_ABC": [69.5407232727925, -170.45696846825686, -50.46313513305597],
+    "phase_axes_deg_after_controller_assignment": [69.5407232727925, -50.46313513305597, -170.45696846825686],
+    "axis_residual_from_balanced_120deg_deg": [0.0005167629825802472, -0.003341642865904765, 0.0028250219332068126],
+    "retained_layer_force_amplitude_fraction_as_supplied_ABC": [0.9873401680043644, 0.9873276408766228, 0.9873603498425642],
+    "same_reference_balanced_drive_1A_phase_peak": {
+      "as_supplied_ABC_without_output_remapping_n": {"min": -0.0629776338518735, "mean": 0.00010694120446010127, "max": 0.06290956956494428},
+      "new_compact_with_BC_output_assignment_matched_n": {"min": 0.06286663884235025, "mean": 0.06293826491522367, "max": 0.06302009638152793},
+      "previous_spread_reference_n": {"min": 0.06279820419482907, "mean": 0.06292774059932092, "max": 0.06302006206500974}
+    },
+    "interpretation": "With matching phase order, the new compact option has the same constructive winding sense and essentially the same force as the verified spread reference. Its opening span is half as large. Keeping this compact arrangement does not require a custom one-phase polarity compensation law."
+  },
+  "assumptions": {
+    "magnet_count": 5,
+    "magnet_dimensions_mm": [5, 5, 3],
+    "adjacent_N_S_pole_pitch_mm": 6,
+    "electrical_period_mm": 12,
+    "remanence_t": 1.34,
+    "air_gap_mm": 0.5,
+    "magnet_center_y_mm": 4,
+    "uniform_assumed_trace_width_mm": 0.2,
+    "copper_oz": 1,
+    "winding_temperature_c": 75,
+    "via_drill_mm": 0.3,
+    "via_plating_mm": 0.025,
+    "comparison_interior_bounds_mm": [14.499999, 50.499999],
+    "common_reference_deg": 69.53134031338297,
+    "width_note": "Uniform trace width is an explicit modeling assumption, not inferred from DXF LINE entities."
+  },
+  "verification": {
+    "native_actual_DXF_import_and_terminal_check": "passed",
+    "independent_current_resistance_and_Magpylib_force_checks": "passed at meshes 20 and 40",
+    "all_phase_193_position_force_map_mesh_refinement": "passed unchanged 2% gate",
+    "max_variant_relative_mesh_force_change": 0.00010471829443233891,
+    "maximum_independent_signed_force_error_n_per_a": 4.133568487496575e-13,
+    "python_audit_regressions_passed": 17,
+    "full_evidence_directory": "/private/var/folders/5h/nqd6sd8963q4vl5yff2mcbf40000gn/T/opencode/compact-spread-2-dxf-20261101",
+    "comparison_receipt": "comparison.json",
+    "comparison_sha256": "51527cde1f6d043a4410e9959b6aa781b485ce8e27c0a4b723d2d59a32aecd1b",
+    "variant_oracle_summary_sha256": "f87188a5b5a1cdb591e7279147ac57d8928fdbeac0f4d8f8cd654ff9099b2dec",
+    "reference_oracle_summary_sha256": "d88771e066cc7ed228bbfc25e7d816df6dd571585e9c2ab6e340dbfbd0f666c4"
+  }
+}

@@ -1,0 +1,115 @@
+{
+  "schema": "actual-compact-spread-two-layer-dxf-comparison-v1",
+  "status": "passed-actual-DXF-topology-current-and-signed-force-comparison",
+  "issue": "pcbmotorgen#hjp5",
+  "physics_base_commit": "c7468c5",
+  "scope": "Actual supplied two-layer DXFs, not regenerated geometry. Prescribed permanent-magnet free-space force at imposed balanced currents. Not measured performance, manufacturing acceptance or a new power calculation.",
+  "files": {
+    "compact": {
+      "path": "star-wye_2-layer.dxf",
+      "original_sha256": "d2957c805e330421d434031d5a33b141f7fa02ad811e682bf2e09ab18b81cc25",
+      "corrected_sha256": "6f2fd0737108fb67f611f6da39a858f710e6156251bbcd60daf081c929aaae81"
+    },
+    "spread": {
+      "path": "star-wye_2-layer-spread.dxf",
+      "original_sha256": "48966c8c8e69db66d2735470616272774f44f598b2e07e16a2cf23f973f9b1ef",
+      "corrected_sha256": "86120053891d556a76a19964d25865c847a3ecc12953a4d79412e3c48775e901"
+    },
+    "changes": "Swap B/C consistently in string groups, including layer definitions, LINE/VERTEX/POLYLINE references and via layers. Numeric groups and every other byte remain unchanged. Reverse swap reproduces original bytes exactly.",
+    "backup_directory": "/private/var/folders/5h/nqd6sd8963q4vl5yff2mcbf40000gn/T/opencode/compact-spread-dxf-20261101/originals"
+  },
+  "topology": {
+    "physical_copper_z_mm": [-1.6, 0.0],
+    "planar_traces_per_file": 533,
+    "vertical_vias_per_file": 393,
+    "preserved_legacy_polylines_per_file": 3,
+    "phase_order": ["A", "B", "C"],
+    "nodes_per_phase": [268, 268, 267],
+    "edges_per_phase": [309, 309, 308],
+    "independent_cycles_per_phase": [42, 42, 42],
+    "dangling_ends_per_phase": [2, 2, 2],
+    "all_phases_connected": true,
+    "actual_DXF_and_imported_edge_multisets_match": true,
+    "independent_raw_DXF_graph_and_native_graph_match": true,
+    "explicit_physical_driver_and_neutral_match_native_inference": true,
+    "unmodeled_planar_junctions": 0,
+    "cross_phase_centerline_contacts_only_at_star_neutral": true,
+    "compact_shared_neutral_xyz_mm": [6.333333, 8.444444, -1.6],
+    "spread_shared_neutral_xyz_mm": [12.333333, 8.444444, -1.6],
+    "interpretation": "Each phase is continuous but is a resistor mesh, not one unbranched wire. Crossing vias join the parallel braid paths. Physical Z, not L1/L5/L6 name suffixes, sets copper planes."
+  },
+  "assumptions": {
+    "magnet_count": 5,
+    "magnet_dimensions_mm": [5, 5, 3],
+    "adjacent_N_S_pole_pitch_mm": 6,
+    "electrical_period_mm": 12,
+    "remanence_t": 1.34,
+    "air_gap_mm": 0.5,
+    "magnet_center_y_mm": 4,
+    "uniform_assumed_trace_width_mm": 0.2,
+    "copper_oz": 1,
+    "winding_temperature_c": 75,
+    "via_drill_mm": 0.3,
+    "via_plating_mm": 0.025,
+    "phase_peak_current_a": 1,
+    "current_law": "I_j = sin(2*pi*x/12mm + reference - j*120deg), j=0,1,2 for A,B,C; currents sum to zero",
+    "same_common_reference_deg": 69.53134031338297,
+    "interior_comparison_bounds_mm": [14.499999, 50.499999],
+    "trace_width_caveat": "LINE entities contain centerlines, not physical trace widths. Uniform 0.2mm is declared, not inferred from unrelated defaults or DXF TRACEWID. Width sensitivity 0.127/0.2/0.35mm changes branch fractions by less than 1.6e-11A/A for these networks."
+  },
+  "results": {
+    "compact": {
+      "phase_fundamental_amplitude_n_per_a": [0.041958933914421626, 0.0419594673823566, 0.04196258279527204],
+      "phase_sine_offset_deg": [69.5407232727952, -50.46312244868223, 9.539025671061077],
+      "phase_axis_residual_from_balanced_120deg_deg": [0.002148180509907593, -0.0016975409675362748, -179.99954942122423],
+      "retained_layer_force_amplitude_fraction": [0.9873401680043639, 0.9873602001193684, 0.9873804233340476],
+      "same_balanced_drive_interior_force_n": {"min": -0.02046728849915045, "mean": 0.021182600990174685, "max": 0.06288135266503826},
+      "best_common_reference_interior_min_force_n": -0.02046720963278869
+    },
+    "spread": {
+      "phase_fundamental_amplitude_n_per_a": [0.04195893391440753, 0.04193915327243407, 0.041957467227374395],
+      "phase_sine_offset_deg": [69.54072327279499, -50.49081224525868, -170.45590008512596],
+      "phase_axis_residual_from_balanced_120deg_deg": [0.009382959412028134, -0.022152558641640913, 0.01275960149107484],
+      "retained_layer_force_amplitude_fraction": [0.9873401680043615, 0.9854630086199149, 0.9873273059115298],
+      "same_balanced_drive_interior_force_n": {"min": 0.06279820419482907, "mean": 0.06292774059932092, "max": 0.06302006206500974}
+    },
+    "same_geometric_edges_current_direction": {
+      "A": {"edges_compared": 308, "same_direction_fraction": 1, "max_same_direction_error_a_per_a": 2.3278046157315657e-12},
+      "B": {"edges_compared": 304, "same_direction_fraction": 1, "max_same_direction_error_a_per_a": 5.899725152858082e-12},
+      "C": {"edges_compared": 304, "same_direction_fraction": 0, "max_opposite_direction_error_a_per_a": 9.128142686165575e-12}
+    },
+    "hypothetical_compact_C_terminal_reversal": {
+      "scope": "Force-sign diagnostic only. Requires physical winding-end reconnection, NOT negating one inverter phase command. No compact replacement routing was built or validated.",
+      "same_balanced_drive_interior_force_n": {"min": 0.06288355388466371, "mean": 0.06294044185107382, "max": 0.06301999973223982}
+    }
+  },
+  "conclusions": [
+    "The compact file as connected conflicts with conventional balanced ABC drive because C winding polarity is reversed relative to the spread file, even after the requested B/C relabeling.",
+    "This is not severe cancellation inside either supplied two-layer phase. Their individual phase force amplitudes are almost unchanged.",
+    "Opening displacement changes C circulation. Spreading is one way to get the required polarity, not an electromagnetic spacing requirement. A compact series-aiding reconnection remains possible in principle but is not implemented here.",
+    "Simply swapping B/C labels, or moving the controller's common electrical zero, does not reverse one winding's terminal polarity.",
+    "The four-layer cancellation receipts do not describe these two-layer DXFs."
+  ],
+  "verification": {
+    "native_import_projects_checked": 2,
+    "conductor_mesh_levels": [20, 40],
+    "independent_current_resistance_force_and_mesh_checks_passed": true,
+    "signed_native_force_map_positions_per_mesh": 193,
+    "independently_recomputed_layer_force_positions_per_mesh": 25,
+    "maximum_independent_signed_force_error_n_per_a": 4.1242703696653393e-13,
+    "maximum_phase_A_mesh_refinement_norm_change_n": 8.931683203625731e-06,
+    "unchanged_mesh_refinement_limit_n": 0.0017056252290872471,
+    "all_phase_full_signed_map_refinement_passed": true,
+    "maximum_all_phase_full_map_relative_mesh_change": 0.00010474569252027476,
+    "all_phase_refinement_receipt": "all-phase-refinement.json in the full evidence directory",
+    "export_crate_tests_passed": 187,
+    "export_crate_tests_ignored": 3,
+    "python_audit_tests_passed": 17,
+    "full_evidence_directory": "/private/var/folders/5h/nqd6sd8963q4vl5yff2mcbf40000gn/T/opencode/compact-spread-dxf-20261101",
+    "comparison_receipt": "comparison-verified.json",
+    "comparison_sha256": "8fc4621a7091efaddc905567519c3bbb18e2af6638cbe9d234c62ed0d4fc47e9",
+    "compact_oracle_summary_sha256": "1abcdbc36fc558fddd21592254a5e1db5f9c32fb0f0ea105d76e1709cdd242d9",
+    "spread_oracle_summary_sha256": "d88771e066cc7ed228bbfc25e7d816df6dd571585e9c2ab6e340dbfbd0f666c4",
+    "preserved_intermediate_failures": "Initial audit-only harness compile error, expected physical-Z/name-index import notices, and integer-input audit regression. Corrected receipts are separate; no physics/import behavior was changed."
+  }
+}

@@ -7,6 +7,10 @@ use pcbmotorgen_export::cad_dxf::{
 };
 use pcbmotorgen_routing::SensorConfig;
 
+#[cfg(test)]
+#[path = "dxf_audit_tests.rs"]
+mod audit_tests;
+
 // ===========================================================================
 // export_coils_dxf — REAL (pcbmotorgen-export pure DXF R12 ASCII export)
 // ===========================================================================
