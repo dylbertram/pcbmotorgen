@@ -52,6 +52,7 @@
     embedded = false,
     active = true,
     simulation = null,
+    onRequestSimulation,
     designSettings,
     sidePanel = $bindable<PreviewPanelId | null>(null),
     height = PREVIEW_H,
@@ -91,6 +92,7 @@
     embedded?: boolean;
     active?: boolean;
     simulation?: VisualizationInput | null;
+    onRequestSimulation?: () => void;
     designSettings?: Snippet<[DesignPanelId]>;
     sidePanel?: PreviewPanelId | null;
     height?: number;
@@ -134,6 +136,12 @@
   const H = $derived(height);
   const selection = new CadSelectionTool({ getGeometry: () => importedGeometry, onChange: (geometry) => onGeometryChange?.(geometry) });
   const measure3d = new SpatialMeasure();
+  let fieldSettings = $state<Snippet | null>(null);
+  function setFieldSettings(next: Snippet | null) { fieldSettings = next; }
+  function openFields() {
+    if (view.viewMode === "top") view.viewMode = "iso";
+    onRequestSimulation?.();
+  }
   $effect(() => { void terminalGeometry; untrack(() => measure3d.clear()); });
   function toggleZoomWindow() {
     measure.mode = false; measure3d.mode = false; terminalTool?.cancel(); selection.setMode("pan");
@@ -256,13 +264,13 @@
           <PreviewFrame bind:frame={modalFrameRef} bind:width={frameWidth} {gestures} {measure} navigationEnabled={view.viewMode === "top"} interactive={view.viewMode === "top" && (terminalTool?.active ?? false)}
             label={embedded ? "Coil preview" : "Coil preview — expanded"}>
             <!-- Controls reserve overlay space, never a full-width drawing gap. -->
-            <div class="absolute bottom-0" style:--coil-overlay-inset={`${view.viewMode === "top" ? 0 : viewDockHeight + 12}px`}
+            <div class="absolute bottom-0" style:--coil-overlay-inset={`${view.viewMode === "top" ? 0 : Math.max(viewDockHeight + 12, view.positionBarHeight + (frameWidth < 1024 ? 64 : 12))}px`}
               style:--coil-preset-inset={`${viewPresetHeight + 16}px`}
               style:--coil-axis-top={`${(view.viewMode === "top" ? toolbarHeight : 0) + (frameWidth - leftDockWidth - dockWidth - 44 < 300 ? viewPresetHeight + 16 : 8)}px`}
               style:top={`${view.viewMode === "top" ? 0 : toolbarHeight}px`}
               style:left={`${view.viewMode === "top" ? 0 : leftDockWidth}px`} style:right={`${view.viewMode === "top" ? 0 : dockWidth + 44}px`}>
               <CoilPreviewIsoView geometry={terminalGeometry ?? importedGeometry} pcbThicknessMm={config.pcb_thickness_mm} pcbStackup={config.pcb_stackup_mm} copperThicknessMm={{ outer: config.drive.outer_copper_oz * .035, inner: config.drive.inner_copper_oz * .035 }} viaSizeMm={{diameter:config.min_via_drill_mm + 2 * config.min_via_annular_ring_mm,drill:config.min_via_drill_mm,plating:config.drive.via_plating_m * 1000}} {view} {visibleCopperKeys} {onRenderStatus}
-                axisRightInset={view.viewMode === "top" ? dockWidth + 44 : 0}
+                onFieldSettings={setFieldSettings} axisRightInset={view.viewMode === "top" ? dockWidth + 44 : 0}
                 topCamera={{transform:worldTransform,panX:gestures.panX,panY:gestures.panY,width:W,height:H}} isVisible={isTerminalVisible} showTerminals={view.viewMode !== "top"} {simulation} measure={view.viewMode === "top" ? null : measure3d} />
             </div>
             {#if view.viewMode === "top"}
@@ -308,7 +316,7 @@
         {#if designSettings}
           <div class="absolute bottom-0 left-0 z-20 w-11" style:top={`${toolbarHeight}px`}>
             <PreviewSideRail designOnly {designSettings} bind:open={sidePanel} {active} {view} {config} {drive} {driveError} {drivePending}
-              {terminalTool} {onStartTerminals} generated={!importedGeometry} terminalsDisabled={!onGeometryChange || view.viewMode !== "top"}
+              {terminalTool} {onStartTerminals} generated={!importedGeometry} terminalsDisabled={!onGeometryChange}
               geometry={terminalGeometry ?? importedGeometry} selection={importedGeometry ? selection : undefined}
               showMotorControls={true} layers={[]} label="Design settings" dismissOnOutsideClick={false} />
           </div>
@@ -317,8 +325,8 @@
         <!-- Right rail: hangs from the bottom of the top toolbar down to the
               status bar, so the Layers panel pulls out under it. -->
         <div class="absolute bottom-0 right-0 z-20 w-11" style:top={`${toolbarHeight}px`}>
-             <PreviewSideRail viewControlsInMenu drawingOnly={!!designSettings} generated={!importedGeometry} {config} {drive} {driveError} {drivePending} {view} bind:open={sidePanel} {active} layers={importedGeometry ? importedGeometry.layer_z_mm.map((_, idx) => ({ idx })) : uniqueLayers} phases={importedGeometry ? [] : uniquePhases}
-            {terminalTool} {onStartTerminals} terminalsDisabled={!onGeometryChange || view.viewMode !== "top"}
+              <PreviewSideRail viewControlsInMenu drawingOnly={!!designSettings} {fieldSettings} onOpenFields={onRequestSimulation ? openFields : undefined} generated={!importedGeometry} {config} {drive} {driveError} {drivePending} {view} bind:open={sidePanel} {active} layers={importedGeometry ? importedGeometry.layer_z_mm.map((_, idx) => ({ idx })) : uniqueLayers} phases={importedGeometry ? [] : uniquePhases}
+             {terminalTool} {onStartTerminals} terminalsDisabled={!onGeometryChange}
            geometry={terminalGeometry ?? importedGeometry} selection={importedGeometry ? selection : undefined} assignmentDisabled={view.viewMode !== "top" || !importedGeometry || !onGeometryChange || measure.mode || !!terminalTool?.active || view.oneSection}
           coils={importedGeometry ? uniquePhases.map((phase) => ({ name: phase.name, colorIdx: phase.colorIdx })) : []}
           isCoilVisible={(name) => view.isPhaseVisible(uniquePhases.find((phase) => phase.name === name)?.idx ?? -1)}
@@ -348,8 +356,7 @@
              shared MotionStore, so the slider lives next to the strip it
              moves inside the lightbox. The phase-waveform popover is anchored
              directly above this box at the same width, so it cannot be moved. -->
-        {#if view.viewMode === "top"}
-        <div bind:clientHeight={view.positionBarHeight} class="position-bar absolute bottom-24 lg:bottom-3 z-20 flex w-[min(420px,calc(100%-4rem))] flex-col gap-2 {sidePanel && !terminalPanelOpen ? 'max-lg:hidden' : ''}" class:terminal-position-bar={terminalPanelOpen} style:left={`${leftDockWidth + 8}px`} style:max-width={`calc(100% - ${leftDockWidth + dockWidth + 60}px)`}>
+        <div bind:clientHeight={view.positionBarHeight} class="position-bar absolute bottom-16 lg:bottom-3 z-20 flex w-[min(420px,calc(100%-4rem))] flex-col gap-2 {sidePanel && !terminalPanelOpen ? 'max-lg:hidden' : ''}" class:terminal-position-bar={terminalPanelOpen} style:left={`${leftDockWidth + 8}px`} style:max-width={`calc(100% - ${leftDockWidth + dockWidth + 60}px)`}>
           {#if view.positionBarMode === "position" && !embedded && view.showWaveform}
             <div role="dialog" aria-label="Phase waveform" class="relative">
               <button type="button" aria-label="Close phase waveform"
@@ -371,7 +378,6 @@
           {/if}
           </div>
         </div>
-        {/if}
       </div>
 
       {#if !embedded}

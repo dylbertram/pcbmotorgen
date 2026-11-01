@@ -26,14 +26,6 @@ describe("nested coil/layer visibility", () => {
     view.setTerminalPanelOpen(true);
     expect(view.positionBarMode).toBe("layers");
   });
-  it("defaults to physical Z height and keeps its display scale independent of visibility", () => {
-    const view = new CoilPreviewViewState();
-    expect(view.zScale).toBe(1);
-    view.zScale = 10;
-    view.toggleLayer(0);
-    expect(view.zScale).toBe(10);
-  });
-
   it("keeps detailed diagnostic overlays off until requested", () => {
     const view = new CoilPreviewViewState();
     expect(view.showBandWidths).toBe(false);

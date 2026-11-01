@@ -29,8 +29,6 @@ test("all views share bottom-right navigation and top-left view presets", async 
       expect(presets.y+presets.height).toBeLessThan(drawing.y+drawing.height);
       if(id!=="top") {
         expect(presets.x).toBeCloseTo(drawing.x+8,0); expect(presets.y).toBeCloseTo(drawing.y+8,0);
-        const zRail=(await viewer.getByRole("group",{name:"Z height",exact:true}).boundingBox())!;
-        expect(zRail.y).toBeGreaterThanOrEqual(presets.y+presets.height+6);
       }
       expect(box.x+box.width).toBeCloseTo(frame.x+frame.width-56,0);
       expect(box.y+box.height).toBeCloseTo(frame.y+frame.height-12,0);

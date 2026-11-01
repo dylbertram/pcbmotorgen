@@ -25,7 +25,7 @@ describe("native sampled-field interpolation and bounded rendering", () => {
   });
   it("integrates straight lines parallel to a uniform field, within the native domain", () => {
     const f = field(() => [1, 0, 0]), before = structuredClone(f);
-    const lines = fieldLineGeometry(f, scene, 1, .5), points = lines.getAttribute("position");
+    const lines = fieldLineGeometry(f, scene, .5), points = lines.getAttribute("position");
     expect(points.count).toBeGreaterThan(0); expect(points.count).toBeLessThanOrEqual(144 * 2 * 240 * 6);
     for (let i = 0; i < points.count; i += 2) {
       expect(points.getX(i)).toBeGreaterThanOrEqual(0); expect(points.getX(i)).toBeLessThanOrEqual(2);
@@ -39,7 +39,7 @@ describe("native sampled-field interpolation and bounded rendering", () => {
   it("keeps every line and arrowhead on the selected XZ plane, even with a large normal field", () => {
     const f = field(() => [1, 100, 1]), before = structuredClone(f);
     for (const fraction of [0, .25, .75, 1]) {
-      const lines = fieldLineGeometry(f, scene, 1, fraction), slice = fieldSliceGeometry(f, scene, 1, fraction);
+      const lines = fieldLineGeometry(f, scene, fraction), slice = fieldSliceGeometry(f, scene, fraction);
       const points = lines.getAttribute("position"), plane = slice.getAttribute("position").getZ(0);
       expect(points.count).toBeGreaterThan(0);
       for (let i = 0; i < points.count; i++) expect(points.getZ(i)).toBeCloseTo(plane, 6);
@@ -49,21 +49,21 @@ describe("native sampled-field interpolation and bounded rendering", () => {
   });
   it("integrates the in-plane vector, rather than flattening a 3D trajectory afterward", () => {
     // The normal component cannot change the in-plane trajectory or its reach.
-    const a = fieldLineGeometry(field(() => [1, 0, 1]), scene, 1, .25);
-    const b = fieldLineGeometry(field(() => [1, 100, 1]), scene, 1, .25);
+    const a = fieldLineGeometry(field(() => [1, 0, 1]), scene, .25);
+    const b = fieldLineGeometry(field(() => [1, 100, 1]), scene, .25);
     expect(Array.from(a.getAttribute("position").array)).toEqual(Array.from(b.getAttribute("position").array));
     a.dispose(); b.dispose();
   });
   it("draws no projected direction for a purely normal field, without losing slice magnitude", () => {
     const f = field(() => [0, 5, 0]), before = structuredClone(f);
-    const lines = fieldLineGeometry(f, scene, 1, .5), slice = fieldSliceGeometry(f, scene, 1, .5);
+    const lines = fieldLineGeometry(f, scene, .5), slice = fieldSliceGeometry(f, scene, .5);
     expect(lines.getAttribute("position").count).toBe(0);
     expect(slice.getAttribute("position").count).toBeGreaterThan(0);
     expect(f).toEqual(before);
     lines.dispose(); slice.dispose();
   });
   it("only follows the normal component in explicitly requested 3D mode", () => {
-    const lines = fieldLineGeometry(field(() => [0, 5, 0]), scene, 1, .5, "3d");
+    const lines = fieldLineGeometry(field(() => [0, 5, 0]), scene, .5, "3d");
     const points = lines.getAttribute("position");
     expect(points.count).toBeGreaterThan(0);
     expect(new Set(Array.from({ length: points.count }, (_, i) => points.getZ(i))).size).toBeGreaterThan(1);
@@ -71,25 +71,23 @@ describe("native sampled-field interpolation and bounded rendering", () => {
   });
   it("draws no lines through a null field and does not invent magnitude", () => {
     const f = field(() => [0, 0, 0]);
-    const lines = fieldLineGeometry(f, scene, 1, .5), slice = fieldSliceGeometry(f, scene, 1, .5);
+    const lines = fieldLineGeometry(f, scene, .5), slice = fieldSliceGeometry(f, scene, .5);
     expect(lines.getAttribute("position").count).toBe(0);
     expect(slice.getAttribute("position").count).toBeGreaterThan(0);
     const colors = slice.getAttribute("color");
     expect(new Set(Array.from(colors.array).map((v, i) => `${i % 3}:${v}`)).size).toBe(3);
     lines.dispose(); slice.dispose();
   });
-  it("keeps color values invariant under display Z scaling and moves the physical Y slice", () => {
+  it("moves the physical Y slice and its magnitude colors without altering the samples", () => {
     const f = field(), before = structuredClone(f);
-    const a = fieldSliceGeometry(f, scene, 1, .25), b = fieldSliceGeometry(f, scene, 20, .25), c = fieldSliceGeometry(f, scene, 1, .75);
-    expect(Array.from(a.getAttribute("color").array)).toEqual(Array.from(b.getAttribute("color").array));
-    expect(a.getAttribute("position").getY(2) * 20).toBeCloseTo(b.getAttribute("position").getY(2), 5);
+    const a = fieldSliceGeometry(f, scene, .25), c = fieldSliceGeometry(f, scene, .75);
     expect(a.getAttribute("position").getZ(0)).toBe(-.5); expect(c.getAttribute("position").getZ(0)).toBe(-1.5);
     expect(Array.from(a.getAttribute("color").array)).not.toEqual(Array.from(c.getAttribute("color").array));
-    expect(f).toEqual(before); [a, b, c].forEach(g => g.dispose());
+    expect(f).toEqual(before); [a, c].forEach(g => g.dispose());
   });
   it("leaves magnet interiors unpainted and stops field trajectories at their boundaries", () => {
     const f = field(() => [1, 0, 0]); f.magnets = [{ center_m: [1, 1, 1], size_m: [.4, .4, .4], positive_z: true }];
-    const grid = sampledFieldGrid(f), lines = fieldLineGeometry(f, scene, 1, .5), slice = fieldSliceGeometry(f, scene, 1, .5);
+    const grid = sampledFieldGrid(f), lines = fieldLineGeometry(f, scene, .5), slice = fieldSliceGeometry(f, scene, .5);
     for (const g of [lines, slice]) {
       const p = g.getAttribute("position");
       for (let i = 0; i < p.count; i++) expect(grid.insideMagnet([p.getX(i), -p.getZ(i), p.getY(i)])).toBe(false);
@@ -103,17 +101,5 @@ describe("native sampled-field interpolation and bounded rendering", () => {
     expect(grid.crossesMagnet([.99, 1, 1], [1.01, 1, 1])).toBe(true);
     expect(grid.crossesMagnet([1.01, 1, 1], [.99, 1, 1])).toBe(true);
     expect(grid.crossesMagnet([.99, 0, 1], [1.01, 0, 1])).toBe(false);
-  });
-  it("integrates physical trajectories once, independently of display Z exaggeration", () => {
-    const f = field(() => [1, 0, 1]);
-    const a = fieldLineGeometry(f, scene, 1, .5), b = fieldLineGeometry(f, scene, 20, .5);
-    expect(Array.from(a.getAttribute("color").array)).toEqual(Array.from(b.getAttribute("color").array));
-    const first = a.getAttribute("position"), second = b.getAttribute("position");
-    expect(first.count).toBe(second.count);
-    for (let i = 0; i < first.count; i++) {
-      expect(first.getX(i)).toBe(second.getX(i)); expect(first.getZ(i)).toBe(second.getZ(i));
-      expect(first.getY(i) * 20).toBeCloseTo(second.getY(i), 4);
-    }
-    a.dispose(); b.dispose();
   });
 });

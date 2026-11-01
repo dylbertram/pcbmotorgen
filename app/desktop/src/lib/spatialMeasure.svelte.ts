@@ -1,4 +1,4 @@
-export interface PhysicalPoint { x: number; y: number; z: number; copperLayerZ?: number }
+export interface PhysicalPoint { x: number; y: number; z: number }
 
 export class SpatialMeasure {
   mode = $state(false);

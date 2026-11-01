@@ -26,7 +26,7 @@ test("3D copper draws into the bottom control row instead of clipping above it",
     return Math.abs(drawing.y+drawing.height-workspace.y-workspace.height);
   }).toBeLessThanOrEqual(1);
   const rect=(await canvas.boundingBox())!;
-  const masks=[viewer.getByRole("group",{name:"Z height",exact:true}),page.getByRole("group",{name:"Zoom controls",exact:true}),
+   const masks=[page.getByRole("group",{name:"Zoom controls",exact:true}),page.getByRole("group",{name:"Position bar mode",exact:true}).locator(".."),
     page.getByRole("group",{name:"Viewport view",exact:true}),viewer.getByLabel("Simulation overlay legend"),viewer.getByRole("img",{name:"Viewport axes: X travel, Y across board, Z up",exact:true})];
   const bottom=()=>canvas.screenshot({mask:masks,maskColor:"#ffffff"}).then(image=>copperBottom(page,image));
   const initial=await bottom();expect(initial).toBeGreaterThan(0);

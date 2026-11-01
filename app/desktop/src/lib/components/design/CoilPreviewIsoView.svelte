@@ -5,8 +5,10 @@
   import type { SpatialMeasure } from "../../spatialMeasure.svelte";
   import type { PcbStackupMm } from "../../pcbStackup";
   import type { TopCameraTransform } from "../../fitCoilCamera";
+  import type { Snippet } from "svelte";
 
-  let { geometry, pcbThicknessMm, pcbStackup = null, copperThicknessMm = { outer: .035, inner: .035 }, viaSizeMm = {diameter:.4,drill:.2}, view, isVisible = () => true, showTerminals = true, simulation = null, measure = null, topCamera = null, visibleCopperKeys = null, onRenderStatus, axisRightInset = 0 }: {
+  let { geometry, pcbThicknessMm, pcbStackup = null, copperThicknessMm = { outer: .035, inner: .035 }, viaSizeMm = {diameter:.4,drill:.2}, view, isVisible = () => true, showTerminals = true, simulation = null, measure = null, topCamera = null, visibleCopperKeys = null, onRenderStatus, onFieldSettings, axisRightInset = 0 }: {
+    onFieldSettings?: (settings: Snippet | null) => void;
     geometry: CadGeometry | null;
     pcbThicknessMm: number;
     pcbStackup?: PcbStackupMm | null;
@@ -33,7 +35,7 @@
 {#await viewer}
   <div class="flex h-full items-center justify-center text-sm text-slate-400" role="status">Loading viewer…</div>
 {:then { default: Viewer }}
-  <Viewer {geometry} {pcbThicknessMm} {pcbStackup} {copperThicknessMm} {viaSizeMm} {view} {topCamera} {visibleCopperKeys} {onRenderStatus} {isVisible} {showTerminals} {simulation} {measure} {axisRightInset} />
+  <Viewer {geometry} {pcbThicknessMm} {pcbStackup} {copperThicknessMm} {viaSizeMm} {view} {topCamera} {visibleCopperKeys} {onRenderStatus} {onFieldSettings} {isVisible} {showTerminals} {simulation} {measure} {axisRightInset} />
 {:catch}
   <div class="pointer-events-none absolute bottom-2 left-2 right-2 text-xs text-slate-400" role="status">Could not load the shared viewer. Top-down uses the 2D fallback.</div>
 {/await}

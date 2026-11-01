@@ -19,33 +19,31 @@ describe("physical via copper",()=>{
       segments:[0,2,5].map(layer=>({start:{x:0,y:0},end:{x:1,y:0},layer,net:"A",is_active:true})),curves:[],
       vias:[{position:{x:0,y:0},from_layer:0,to_layer:5,net:"A"}]}})!;
     const pads=connectedViaPads(scene,scene.paths,.4*scene.scale);
-    for(const zScale of [1,20]){
-      const rings=annularPadsGeometry(pads,.4*scene.scale,.2*scene.scale,zScale);
-      const barrel=viaBarrelsGeometry(scene.vias,.2*scene.scale,.025*scene.scale,zScale);
-      for(let layer=0;layer<6;layer++){
-        const origin=scene.vias[0].points[0].clone().setX(scene.vias[0].points[0].x+.3*scene.scale).setY(scene.layerY[layer]*zScale);
-        const ringHits=hits(rings,origin,new Vector3(-1,0,0));
-        expect(ringHits.length>0,`annulus on layer ${layer}, Z scale ${zScale}`).toBe([0,2,5].includes(layer));
-        if(![0,2,5].includes(layer)){
-          const wall=hits(barrel,origin,new Vector3(-1,0,0))[0];
-          expect(wall).toBeDefined();
-          expect((wall.point.x-scene.vias[0].points[0].x)/scene.scale).toBeCloseTo(.125,6);
-        }
+    const rings=annularPadsGeometry(pads,.4*scene.scale,.2*scene.scale);
+    const barrel=viaBarrelsGeometry(scene.vias,.2*scene.scale,.025*scene.scale);
+    for(let layer=0;layer<6;layer++){
+      const origin=scene.vias[0].points[0].clone().setX(scene.vias[0].points[0].x+.3*scene.scale).setY(scene.layerY[layer]);
+      const ringHits=hits(rings,origin,new Vector3(-1,0,0));
+      expect(ringHits.length>0,`annulus on layer ${layer}`).toBe([0,2,5].includes(layer));
+      if(![0,2,5].includes(layer)){
+        const wall=hits(barrel,origin,new Vector3(-1,0,0))[0];
+        expect(wall).toBeDefined();
+        expect((wall.point.x-scene.vias[0].points[0].x)/scene.scale).toBeCloseTo(.125,6);
       }
-      rings.dispose();barrel.dispose();
     }
+    rings.dispose();barrel.dispose();
   });
 
   it("gives each annulus the layer copper thickness, including top/bottom and inner/outer walls",()=>{
-    for(const thickness of [.018,.035,.07]) for(const zScale of [1,20]){
-      const p=pad(-.3,thickness),g=annularPadsGeometry([p],.4,.2,zScale);
+    for(const thickness of [.018,.035,.07]){
+      const p=pad(-.3,thickness),g=annularPadsGeometry([p],.4,.2);
       g.computeBoundingBox();
       expect(g.boundingBox!.getSize(new Vector3()).y).toBeCloseTo(thickness,6);
-      expect(g.boundingBox!.getCenter(new Vector3()).y).toBeCloseTo(-.3*zScale,6);
+      expect(g.boundingBox!.getCenter(new Vector3()).y).toBeCloseTo(-.3,6);
       expect(hits(g,new Vector3(0,1,0))).toHaveLength(0);
-      expect(hits(g,new Vector3(.15,1,0))[0].point.y).toBeCloseTo(-.3*zScale+thickness/2,6);
-      expect(hits(g,new Vector3(0,-.3*zScale,0),new Vector3(1,0,0))[0].point.x).toBeCloseTo(.1,6);
-      expect(hits(g,new Vector3(.3,-.3*zScale,0),new Vector3(-1,0,0))[0].point.x).toBeCloseTo(.2,6);
+      expect(hits(g,new Vector3(.15,1,0))[0].point.y).toBeCloseTo(-.3+thickness/2,6);
+      expect(hits(g,new Vector3(0,-.3,0),new Vector3(1,0,0))[0].point.x).toBeCloseTo(.1,6);
+      expect(hits(g,new Vector3(.3,-.3,0),new Vector3(-1,0,0))[0].point.x).toBeCloseTo(.2,6);
       g.dispose();
     }
   });
@@ -54,7 +52,7 @@ describe("physical via copper",()=>{
     // Crossing the center, rather than only ending there, exercises two cut ends.
     const paths=[{points:[new Vector3(-1,0,0),new Vector3(1,0,0)]}];
     const before=JSON.stringify(paths),p=pad();
-    const trace=rectangularCopperGeometry(paths,.2,.035,1,paths,[p],.4);
+    const trace=rectangularCopperGeometry(paths,.2,.035,paths,[p],.4);
     for(let x=-.16;x<=.16;x+=.04) for(let z=-.08;z<=.08;z+=.04){
       expect(hits(trace,new Vector3(x,1,z)),`no trace inside pad at ${x}, ${z}`).toHaveLength(0);
     }
@@ -72,7 +70,7 @@ describe("physical via copper",()=>{
     const b={points:[new Vector3(0,0,0),new Vector3(1,0,0)]};
     const before=JSON.stringify([a,b]);
     for(const paths of [[a,b],[a],[b]]){
-      const g=rectangularCopperGeometry(paths,.2,.07,20,[a,b],[pad()],.4);
+      const g=rectangularCopperGeometry(paths,.2,.07,[a,b],[pad()],.4);
       expect(hits(g,new Vector3(0,1,0))).toHaveLength(0);
       const positions=g.getAttribute("position");
       for(let i=0;i<positions.count;i++) expect(Math.hypot(positions.getX(i),positions.getZ(i))).toBeGreaterThan(.198);
@@ -83,22 +81,20 @@ describe("physical via copper",()=>{
 
   it("does not clip copper on a different layer",()=>{
     const paths=[{points:[new Vector3(-1,-.3,0),new Vector3(1,-.3,0)]}];
-    const g=rectangularCopperGeometry(paths,.2,.035,1,paths,[pad()],.4);
+    const g=rectangularCopperGeometry(paths,.2,.035,paths,[pad()],.4);
     expect(hits(g,new Vector3(0,1,0))).not.toHaveLength(0);
     g.dispose();
   });
 
   it("makes a hollow plated barrel with the configured bore, plating and physical span",()=>{
     const paths=[{points:[new Vector3(0,-.3,0),new Vector3(0,0,0)]}];
-    for(const zScale of [1,20]){
-      const g=viaBarrelsGeometry(paths,.2,.025,zScale);
-      g.computeBoundingBox();
-      expect(g.boundingBox!.getSize(new Vector3()).x).toBeCloseTo(.25,6);
-      expect(g.boundingBox!.getSize(new Vector3()).y).toBeCloseTo(.3*zScale,6);
-      expect(hits(g,new Vector3(0,1,0))).toHaveLength(0);
-      expect(hits(g,new Vector3(.1125,1,0))).not.toHaveLength(0);
-      expect(hits(g,new Vector3(.15,1,0))).toHaveLength(0);
-      g.dispose();
-    }
+    const g=viaBarrelsGeometry(paths,.2,.025);
+    g.computeBoundingBox();
+    expect(g.boundingBox!.getSize(new Vector3()).x).toBeCloseTo(.25,6);
+    expect(g.boundingBox!.getSize(new Vector3()).y).toBeCloseTo(.3,6);
+    expect(hits(g,new Vector3(0,1,0))).toHaveLength(0);
+    expect(hits(g,new Vector3(.1125,1,0))).not.toHaveLength(0);
+    expect(hits(g,new Vector3(.15,1,0))).toHaveLength(0);
+    g.dispose();
   });
 });

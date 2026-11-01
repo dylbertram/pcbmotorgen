@@ -44,7 +44,7 @@ describe("coil viewer camera fitting", () => {
     const first = new Vector3(-6, 0, 0).project(camera), last = new Vector3(6, 0, 0).project(camera);
     expect(first.y).toBeCloseTo(last.y, 12);
   });
-  it("fits all corners in wide and narrow viewers, including exaggerated display height", () => {
+  it("fits all corners in wide and narrow viewers across different physical extents", () => {
     const before = box.clone();
     for (const [width, height] of [[1000, 300], [240, 600]]) for (const direction of [new Vector3(0, 0, 1), new Vector3(12, 10, 14)]) {
       const camera = new OrthographicCamera();

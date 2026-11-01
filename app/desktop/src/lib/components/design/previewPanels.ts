@@ -6,7 +6,7 @@ export const DESIGN_PANELS = [
 ] as const;
 
 export type DesignPanelId = (typeof DESIGN_PANELS)[number]["id"];
-export type PreviewPanelId = DesignPanelId | "layers" | "terminals" | "driver";
+export type PreviewPanelId = DesignPanelId | "layers" | "terminals" | "driver" | "fields";
 
 export function isDesignPanel(panel: PreviewPanelId | null): panel is DesignPanelId {
   return DESIGN_PANELS.some(({ id }) => id === panel);

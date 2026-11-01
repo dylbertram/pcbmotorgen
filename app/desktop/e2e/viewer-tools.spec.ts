@@ -25,7 +25,7 @@ test("3D keeps the toolbar, renders flat copper and toggles the PCB without chan
   await expect(viewer).toHaveAttribute("data-pcb-visible", "false");
 });
 
-test("3D picks physical spatial distances and keeps the result through display height changes", async ({ page }, info) => {
+test("3D picks physical spatial distances and keeps the result through orbiting", async ({ page }, info) => {
   await gotoDesignApp(page); await openCoilPreview(page);
   await page.getByRole("button", { name: "3D fields and heat", exact: true }).click();
   await nativeViewAction(page, "view:pcb");
@@ -44,10 +44,6 @@ test("3D picks physical spatial distances and keeps the result through display h
   await page.mouse.move(rect.x + rect.width * .8, rect.y + rect.height * .2);
   await page.mouse.down(); await page.mouse.move(rect.x + rect.width * .85, rect.y + rect.height * .25, { steps: 8 }); await page.mouse.up();
   await expect(viewer).toHaveAttribute("data-measure-points", "2");
-  await expect(viewer).toHaveAttribute("data-measure-mm", distance!);
-  const slider = viewer.getByRole("slider", { name: "Z height scale", exact: true });
-  await slider.focus(); await page.keyboard.press("End");
-  await expect(viewer).toHaveAttribute("data-z-scale", "20");
   await expect(viewer).toHaveAttribute("data-measure-mm", distance!);
   await page.screenshot({ path: info.outputPath("3d-measure-physical-distance.png") });
   await page.getByRole("button", { name: "Clear measurement", exact: true }).click();

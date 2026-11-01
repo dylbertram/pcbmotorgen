@@ -5,11 +5,11 @@
   import type { SpatialMeasure } from "../../spatialMeasure.svelte";
   import { physicalMmToScene, sceneToPhysicalMm } from "../../spatialMeasureGeometry";
   import { terminalMarkerPickRadius } from "../../terminalMarkers";
-  let { scene, measure, zScale }: { scene: CoilScene; measure: SpatialMeasure; zScale: number } = $props();
+  let { scene, measure }: { scene: CoilScene; measure: SpatialMeasure } = $props();
   const { canvas, dom, scene: world, camera, invalidate } = useThrelte();
   const raycaster = new Raycaster();
   // Pointer bookkeeping is deliberately non-reactive; it never drives markup.
-  const endpoints = $derived(measure.mode && measure.p1 ? [measure.p1, measure.p2 ?? measure.cursor].filter(p => p !== null).map(p => physicalMmToScene(p, scene, zScale)) : []);
+  const endpoints = $derived(measure.mode && measure.p1 ? [measure.p1, measure.p2 ?? measure.cursor].filter(p => p !== null).map(p => physicalMmToScene(p, scene)) : []);
   const line = $derived(new BufferGeometry().setFromPoints(endpoints));
   $effect(() => { const current = line; invalidate(); return () => current.dispose(); });
   $effect(() => {
@@ -33,7 +33,7 @@
       const hit = hits.find(hit => hit.object.userData.terminalPointsMm) ?? hits[0];
       if (!hit) return null;
       return hit.object.userData.terminalPointsMm?.[hit.index ?? -1] ?? hit.object.userData.physicalPoint
-        ?? sceneToPhysicalMm(hit.point, scene, zScale, hit.object.userData.copperLayerY);
+        ?? sceneToPhysicalMm(hit.point, scene);
     };
     const down = (e: PointerEvent) => { if (e.button !== 0) return; downs.set(e.pointerId, { x: e.clientX, y: e.clientY }); if (downs.size > 1) multi = true; };
     const move = (e: PointerEvent) => { if (measure.p1 && !measure.p2 && !downs.size) measure.cursor = pick(e); };

@@ -59,13 +59,10 @@ async function show3D(page: Page, pm = true) {
   await openCoilPreview(page);
   await page.getByRole("button", { name: "3D fields and heat", exact: true }).click();
   const viewer = page.getByTestId("coil-iso");
-  await expect(viewer.getByRole("group", { name: "3D simulation overlays", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Field and loss settings", exact: true }).click();
+  await expect(page.getByRole("dialog", { name: "Field and loss settings", exact: true })).toBeVisible();
   if (pm) {
-    const compact = viewer.getByRole("button", { name: "Field and loss settings", exact: true });
-    const narrow = await compact.getAttribute("aria-expanded") === "false";
-    if (narrow) await compact.click();
-    await viewer.getByRole("combobox", { name: "Magnetic field source", exact: true }).selectOption("pm");
-    if (narrow) await compact.click();
+    await page.getByRole("combobox", { name: "Magnetic field source", exact: true }).selectOption("pm");
   }
   return viewer;
 }
@@ -102,19 +99,19 @@ test("active geometry coil estimate works without an audited source and can be r
   await expect(viewer).toHaveAttribute("data-field-source", "coils");
   await expect(viewer).toHaveAttribute("data-field-samples", "240");
   await expect(viewer).toContainText("Routed-current estimate");
-  await expect(viewer.getByRole("combobox", { name: "Audited coil source", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("combobox", { name: "Audited coil source", exact: true })).toHaveCount(0);
   const first = await page.evaluate(() => (window as any).vizCalls.at(-1));
   expect(first.request.field_source).toBe("coils");
   expect(first.request.phase_angle_deg).toBe(0);
   const count = await page.evaluate(() => (window as any).vizCalls.length);
-  await viewer.getByRole("button", { name: "Sample active geometry", exact: true }).click();
+  await page.getByRole("button", { name: "Sample active geometry", exact: true }).click();
   await expect.poll(() => page.evaluate(() => (window as any).vizCalls.length)).toBe(count + 1);
-  await viewer.getByRole("spinbutton", { name: "Coil field electrical angle", exact: true }).fill("180");
+  await page.getByRole("spinbutton", { name: "Coil field electrical angle", exact: true }).fill("180");
   await expect.poll(() => page.evaluate(() => (window as any).vizCalls.at(-1).request.phase_angle_deg)).toBe(180);
-  await viewer.getByRole("spinbutton", { name: "Coil field electrical angle", exact: true }).fill("");
+  await page.getByRole("spinbutton", { name: "Coil field electrical angle", exact: true }).fill("");
   await expect(viewer).toHaveAttribute("data-field-samples", "0");
   await expect(viewer).toContainText("Enter a finite electrical angle");
-  await viewer.getByRole("combobox", { name: "3D simulation overlay", exact: true }).selectOption("heat");
+  await page.getByRole("combobox", { name: "3D simulation overlay", exact: true }).selectOption("heat");
   await expect(viewer.getByLabel("Copper loss legend")).toBeVisible();
 });
 
@@ -138,14 +135,14 @@ test("qualified coil controls bind the DC loop, render winding-only data and cle
     };
   });
   const viewer=await show3D(page,false);
-  await viewer.getByRole("combobox", { name: "Magnetic field source", exact: true }).selectOption("qualified");
+  await page.getByRole("combobox", { name: "Magnetic field source", exact: true }).selectOption("qualified");
   await page.evaluate(() => { (window as any).vizCalls = []; });
-  await viewer.getByRole("combobox",{name:"Audited coil source",exact:true}).selectOption("ui-only");
-  await expect(viewer.getByRole("button",{name:"Sample coil B-field",exact:true})).toBeDisabled();
-  await viewer.getByRole("checkbox",{name:/I acknowledge this audited placement/}).check();
-  await viewer.getByRole("button",{name:"Sample coil B-field",exact:true}).click();
+  await page.getByRole("combobox",{name:"Audited coil source",exact:true}).selectOption("ui-only");
+  await expect(page.getByRole("button",{name:"Sample coil B-field",exact:true})).toBeDisabled();
+  await page.getByRole("checkbox",{name:/I acknowledge this audited placement/}).check();
+  await page.getByRole("button",{name:"Sample coil B-field",exact:true}).click();
   await expect(viewer).toHaveAttribute("data-field-samples","96");
-  const settings = viewer.getByRole("button", { name: "Field and loss settings", exact: true });
+  const settings = page.getByRole("button", { name: "Field and loss settings", exact: true });
   await settings.click(); await expect(settings).toHaveAttribute("aria-expanded", "false");
   await expect(viewer).toHaveAttribute("data-field-samples", "96");
   await settings.click(); await expect(settings).toHaveAttribute("aria-expanded", "true");
@@ -154,23 +151,23 @@ test("qualified coil controls bind the DC loop, render winding-only data and cle
   await expect(viewer.getByLabel("Magnetic field legend")).toContainText("C: -0.1 A");
   expect(await page.evaluate(()=>(window as any).vizCalls.length)).toBe(0);
   const starts = await page.evaluate(() => (window as any).coilStarts.length);
-  await viewer.getByRole("checkbox", { name: "Show magnets in 3D", exact: true }).uncheck();
+  await page.getByRole("checkbox", { name: "Show magnets in 3D", exact: true }).uncheck();
   await expect(viewer).toHaveAttribute("data-visible-magnets", "0");
   await expect(viewer).toHaveAttribute("data-field-samples", "96");
   expect(await page.evaluate(() => (window as any).vizCalls.length)).toBe(0);
-  await viewer.getByRole("checkbox", { name: "Include magnets in B-field", exact: true }).check();
+  await page.getByRole("checkbox", { name: "Include magnets in B-field", exact: true }).check();
   await expect(viewer.getByLabel("Magnetic field legend")).toContainText("Coils + magnets, free-space sum");
   await expect(viewer).toHaveAttribute("data-visible-magnets", "0");
   expect(await page.evaluate(() => (window as any).coilStarts.length)).toBe(starts);
   const pmCalls = await page.evaluate(() => (window as any).vizCalls.length);
-  await viewer.getByRole("checkbox", { name: "Show magnets in 3D", exact: true }).check();
+  await page.getByRole("checkbox", { name: "Show magnets in 3D", exact: true }).check();
   await expect(viewer).toHaveAttribute("data-visible-magnets", "12");
   expect(await page.evaluate(() => (window as any).vizCalls.length)).toBe(pmCalls);
-  await viewer.getByRole("checkbox", { name: "Include magnets in B-field", exact: true }).uncheck();
+  await page.getByRole("checkbox", { name: "Include magnets in B-field", exact: true }).uncheck();
   await expect(viewer.getByLabel("Magnetic field legend")).not.toContainText("Coils + magnets");
   await expect(viewer).toHaveAttribute("data-field-samples", "96");
-  await viewer.getByText("Qualified coil source and DC drive",{exact:true}).click();
-  await viewer.getByRole("combobox",{name:"Coil DC loop current",exact:true}).selectOption("-0.1");
+  await page.getByText("Qualified coil source and DC drive",{exact:true}).click();
+  await page.getByRole("combobox",{name:"Coil DC loop current",exact:true}).selectOption("-0.1");
   await expect(viewer).toHaveAttribute("data-field-samples","0");
   expect(await page.evaluate(()=>(window as any).coilStarts.length)).toBe(1);
 });
@@ -186,7 +183,7 @@ if(process.env.PCB_MOTOR_NATIVE_WINDING_FIELD_REPORT && process.env.PCB_MOTOR_NA
       const {buildCoilScene}=await import(/* @vite-ignore */ "/src/lib/coilScene.ts");
       const c=snapshot.config,g=snapshot.cad_geometry??generatedTerminalGeometry(snapshot.coils,c.num_layers,c.pcb_thickness_m*1000,c.trace_width_m*1000),scene=buildCoilScene(g);
       sampledFieldGrid(winding.field);
-      const lines=fieldLineGeometry(winding.field,scene,1,.5),slice=fieldSliceGeometry(winding.field,scene,1,.5);
+      const lines=fieldLineGeometry(winding.field,scene,.5),slice=fieldSliceGeometry(winding.field,scene,.5);
       const stats={lineVertices:lines.getAttribute("position").count,sliceVertices:slice.getAttribute("position").count,magnetCount:winding.field.magnets.length,maxB:Math.max(...winding.field.samples.map((s:any)=>s.magnitude_t)),phases:winding.phase_currents_a};
       lines.dispose();slice.dispose();
       const {renderFrozenNativeWindingReport}=await import(/* @vite-ignore */ "/e2e/fixtures/nativeVisualizationHarness.ts");
@@ -221,35 +218,35 @@ if (process.env.PCB_MOTOR_NATIVE_PAIRED_PM_REPORT && process.env.PCB_MOTOR_NATIV
 test("PM contribution can be disabled while magnet solids remain visible", async ({ page }) => {
   await gotoDesignApp(page); await nativeFixture(page); const viewer = await show3D(page);
   await expect(viewer).toHaveAttribute("data-field-samples", "240");
-  await viewer.getByRole("checkbox", { name: "Include magnets in B-field", exact: true }).uncheck();
+  await page.getByRole("checkbox", { name: "Include magnets in B-field", exact: true }).uncheck();
   await expect(viewer).toHaveAttribute("data-field-samples", "0");
   await expect(viewer).toHaveAttribute("data-visible-magnets", "12");
   await expect(viewer).toContainText("No active field source");
-  await viewer.getByRole("checkbox", { name: "Show magnets in 3D", exact: true }).uncheck();
+  await page.getByRole("checkbox", { name: "Show magnets in 3D", exact: true }).uncheck();
   await expect(viewer).toHaveAttribute("data-visible-magnets", "0");
-  await viewer.getByRole("checkbox", { name: "Include magnets in B-field", exact: true }).check();
+  await page.getByRole("checkbox", { name: "Include magnets in B-field", exact: true }).check();
   await expect(viewer).toHaveAttribute("data-field-samples", "240");
   await expect(viewer).toHaveAttribute("data-visible-magnets", "0");
 });
 
 test("3D simulation overlays never fabricate browser fields or heat", async ({ page }) => {
   await gotoDesignApp(page); const viewer = await show3D(page);
-  await expect(viewer.getByRole("group", { name: "3D simulation overlays" })).toBeVisible();
+  await expect(page.getByRole("group", { name: "3D simulation overlays" })).toBeVisible();
   await expect(viewer).toContainText("No browser substitute is shown");
   await expect(viewer).toHaveAttribute("data-field-samples", "0");
   await expect(viewer.getByLabel("Magnetic field legend")).toHaveCount(0);
   await page.getByRole("tab", { name: /^Design/i }).click();
-  await expect(viewer.getByRole("group", { name: "3D simulation overlays" })).toHaveCount(0);
+  await expect(page.getByRole("group", { name: "3D simulation overlays" })).toHaveCount(0);
 });
 
-test("real WebGL draws both scoped overlays and Z scale never resamples physics", async ({ page }, info) => {
+test("real WebGL draws both scoped overlays and opacity never resamples physics", async ({ page }, info) => {
   await gotoDesignApp(page); await nativeFixture(page); const viewer = await show3D(page);
   await expect(viewer).toHaveAttribute("data-field-samples", "240");
-  await viewer.getByRole("combobox", { name: "3D simulation overlay", exact: true }).selectOption("both");
+  await page.getByRole("combobox", { name: "3D simulation overlay", exact: true }).selectOption("both");
   await expect(viewer.getByLabel("Copper loss legend")).toContainText("not a temperature");
   await expect(viewer).toHaveAttribute("data-heat-paths", /^[1-9]\d*$/);
   await expect(viewer.getByLabel("Magnetic field legend")).toContainText("No winding or nonlinear material response");
-  await viewer.getByRole("combobox", { name: "Field sample density", exact: true }).selectOption("dense");
+  await page.getByRole("combobox", { name: "Field sample density", exact: true }).selectOption("dense");
   await expect(viewer).toHaveAttribute("data-field-samples", "700");
   await expect(viewer).toHaveAttribute("data-field-style", "lines-slice");
   await expect(viewer.getByLabel("Copper loss legend")).toContainText("W/m");
@@ -260,14 +257,13 @@ test("real WebGL draws both scoped overlays and Z scale never resamples physics"
   await viewer.getByLabel("Copper loss legend").getByText("Loss estimate, not a temperature map", { exact: true }).click();
   const calls = await page.evaluate(() => (window as any).vizCalls.length);
   const canvas = viewer.locator("canvas"); const before = await canvas.screenshot();
-  await viewer.getByRole("slider", { name: "Z height scale", exact: true }).focus(); await page.keyboard.press("End");
-  await expect(viewer).toHaveAttribute("data-z-scale", "20");
+   await page.getByRole("slider", { name: "Field overlay opacity", exact: true }).fill("0.3");
   await expect.poll(async () => (await canvas.screenshot()).equals(before)).toBe(false);
   expect(await page.evaluate(() => (window as any).vizCalls.length)).toBe(calls);
   await page.screenshot({ path: info.outputPath("ui-fixture-3d-fields-and-loss.png") });
   await page.getByRole("button", { name: "Reset view", exact: true }).click();
   await expect(viewer).toHaveAttribute("data-field-samples", "700");
-  await viewer.getByRole("combobox", { name: "3D simulation overlay", exact: true }).selectOption("off");
+  await page.getByRole("combobox", { name: "3D simulation overlay", exact: true }).selectOption("off");
   await expect(viewer).toHaveAttribute("data-field-samples", "0"); await expect(viewer).toHaveAttribute("data-heat-paths", "0");
 });
 
@@ -275,7 +271,7 @@ test("late samples cannot survive tab departure or launch queued work after unmo
   await gotoDesignApp(page); await nativeFixture(page); await page.evaluate(() => { (window as any).vizMode = "delayed"; });
   const viewer = await show3D(page);
   await expect.poll(() => page.evaluate(() => typeof (window as any).resolveVisualization)).toBe("function");
-  await viewer.getByRole("combobox", { name: "Field sample density", exact: true }).selectOption("dense");
+  await page.getByRole("combobox", { name: "Field sample density", exact: true }).selectOption("dense");
   await page.getByRole("tab", { name: /^Design/i }).click();
   const calls = await page.evaluate(() => (window as any).vizCalls.length);
   await page.evaluate(() => { (window as any).resolveVisualization(); });
@@ -288,7 +284,7 @@ test("late samples cannot survive tab departure or launch queued work after unmo
 
 test("current edits invalidate old colors and rebind RMS-equivalent I-squared losses", async ({ page }) => {
   await gotoDesignApp(page); await nativeFixture(page); const viewer = await show3D(page);
-  await viewer.getByRole("combobox", { name: "3D simulation overlay", exact: true }).selectOption("heat");
+  await page.getByRole("combobox", { name: "3D simulation overlay", exact: true }).selectOption("heat");
   await expect(viewer.getByLabel("Copper loss legend")).toBeVisible();
   const before = await page.evaluate(() => (window as any).vizLastReport.heat.total_loss_w);
   await selectDesignPanel(page, "Drive & force targets");
@@ -323,7 +319,7 @@ if (process.env.PCB_MOTOR_NATIVE_VISUALIZATION_REPORT) {
       }
       const perLayerRelativeSpread = Object.values(resistancePerLength).map(values => (Math.max(...values) - Math.min(...values)) / Math.max(...values));
       const scene = buildCoilScene(geometry);
-      const lines = fieldLineGeometry(value.report.field, scene, 1, .5), slice = fieldSliceGeometry(value.report.field, scene, 1, .5);
+      const lines = fieldLineGeometry(value.report.field, scene, .5), slice = fieldSliceGeometry(value.report.field, scene, .5);
       const lineVertices = lines.getAttribute("position").count, sliceVertices = slice.getAttribute("position").count;
       const finite = [lines, slice].every(g => ["position", "color"].every(name => Array.from(g.getAttribute(name).array).every(Number.isFinite)));
       lines.dispose(); slice.dispose();
@@ -351,25 +347,24 @@ if (process.env.PCB_MOTOR_NATIVE_VISUALIZATION_REPORT) {
 test("mobile overlays stay inside the viewer and use scrollable explicit legends", async ({ page }, info) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await gotoDesignApp(page); await nativeFixture(page); const viewer = await show3D(page);
-  await viewer.getByRole("button", { name: "Field and loss settings", exact: true }).click();
-  await viewer.getByRole("combobox", { name: "3D simulation overlay", exact: true }).selectOption("both");
-  await viewer.getByRole("button", { name: "Field and loss settings", exact: true }).click();
+  await page.getByRole("combobox", { name: "3D simulation overlay", exact: true }).selectOption("both");
+  await page.getByRole("button", { name: "Field and loss settings", exact: true }).click();
   await viewer.getByRole("button", { name: "Legends and model limits", exact: true }).click();
   await expect(viewer.getByLabel("Copper loss legend")).toBeVisible();
   await viewer.getByRole("button", { name: "Legends and model limits", exact: true }).click();
   await expect(viewer.getByLabel("Copper loss legend")).toBeHidden();
-  const box = (await viewer.boundingBox())!, controls = (await viewer.getByRole("group", { name: "3D simulation overlays" }).boundingBox())!;
+  const box = (await viewer.boundingBox())!;
   const viewSwitch = (await page.getByRole("group", { name: "Viewport view", exact: true }).boundingBox())!;
   expect(viewSwitch.y).toBeCloseTo(box.y + 8, 0);
-  expect(controls.y).toBeGreaterThanOrEqual(viewSwitch.y + viewSwitch.height + 6);
-  expect(controls.x).toBeGreaterThanOrEqual(box.x); expect(controls.x + controls.width).toBeLessThanOrEqual(box.x + box.width + 1);
+  const rail = page.getByRole("toolbar", { name: "Preview side tools", exact: true });
+  await expect(rail.getByRole("button", { name: "Field and loss settings", exact: true })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   const legend = (await viewer.getByLabel("Simulation overlay legend").boundingBox())!;
-  expect(legend.y - (controls.y + controls.height)).toBeGreaterThan(100);
   const axes = (await viewer.getByRole("img", { name: "Viewport axes: X travel, Y across board, Z up", exact: true }).boundingBox())!;
   expect(axes.y).toBeCloseTo(box.y + 8, 0);
-  expect(controls.y).toBeGreaterThanOrEqual(axes.y + axes.height + 6);
-  expect(legend.y).toBeGreaterThan(axes.y + axes.height);
+   expect(legend.y).toBeGreaterThan(axes.y + axes.height);
+   const scrubber = (await page.getByRole("group", { name: "Position bar mode", exact: true }).locator("..").boundingBox())!;
+   expect(legend.y + legend.height).toBeLessThanOrEqual(scrubber.y);
   const navigation = (await page.getByRole("group", { name: "Zoom controls", exact: true }).boundingBox())!;
   expect(legend.y + legend.height).toBeLessThanOrEqual(navigation.y - 6);
   for (const colorScheme of ["light", "dark"] as const) {
@@ -378,9 +373,9 @@ test("mobile overlays stay inside the viewer and use scrollable explicit legends
     await page.screenshot({ path: info.outputPath(`mobile-field-slice-and-loss-${colorScheme}.png`) });
   }
   await page.evaluate(() => { (window as any).vizMode = "failed"; });
-  await viewer.getByRole("button", { name: "Field and loss settings", exact: true }).click();
-  await viewer.getByRole("combobox", { name: "Field sample density", exact: true }).selectOption("fine");
-  await viewer.getByRole("button", { name: "Field and loss settings", exact: true }).click();
+  await page.getByRole("button", { name: "Field and loss settings", exact: true }).click();
+  await page.getByRole("combobox", { name: "Field sample density", exact: true }).selectOption("fine");
+  await page.getByRole("button", { name: "Field and loss settings", exact: true }).click();
   await expect(viewer.getByRole("status").filter({ hasText: "Native visualization refused" })).toBeVisible();
   await expect(viewer).toHaveAttribute("data-field-samples", "0");
 });
@@ -390,26 +385,26 @@ test("field style, Y slice and opacity redraw native samples without requesting 
   await expect(viewer).toHaveAttribute("data-field-samples", "240");
   const calls = await page.evaluate(() => (window as any).vizCalls.length);
   const canvas = viewer.locator("canvas"), initial = await canvas.screenshot();
-  await viewer.getByRole("combobox", { name: "Field rendering style", exact: true }).selectOption("slice");
+  await page.getByRole("combobox", { name: "Field rendering style", exact: true }).selectOption("slice");
   await expect(viewer).toHaveAttribute("data-field-style", "slice");
   await expect.poll(async () => (await canvas.screenshot()).equals(initial)).toBe(false);
-  await viewer.getByRole("slider", { name: "Field slice position", exact: true }).fill("0.25");
+  await page.getByRole("slider", { name: "Field slice position", exact: true }).fill("0.25");
   await expect(viewer).toHaveAttribute("data-field-slice", "0.25");
-  await viewer.getByRole("combobox", { name: "Field rendering style", exact: true }).selectOption("lines");
+  await page.getByRole("combobox", { name: "Field rendering style", exact: true }).selectOption("lines");
   await expect(viewer).toHaveAttribute("data-field-style", "lines");
   await expect(viewer.getByLabel("Magnetic field legend")).toContainText("XZ-projected Bx/Bz");
   await expect(viewer.getByRole("status").filter({ hasText: "3D rendering is unavailable" })).toHaveCount(0);
-  await viewer.getByRole("combobox", { name: "Field rendering style", exact: true }).selectOption("lines-3d");
+  await page.getByRole("combobox", { name: "Field rendering style", exact: true }).selectOption("lines-3d");
   await expect(viewer).toHaveAttribute("data-field-style", "lines-3d");
   await expect(viewer.getByLabel("Magnetic field legend")).toContainText("3D trajectories");
-  await expect(viewer.getByText("Seed plane Y", { exact: true })).toBeVisible();
-  await viewer.getByRole("combobox", { name: "Field rendering style", exact: true }).selectOption("arrows");
+  await expect(page.getByText("Seed plane Y", { exact: true })).toBeVisible();
+  await page.getByRole("combobox", { name: "Field rendering style", exact: true }).selectOption("arrows");
   await expect(viewer).toHaveAttribute("data-field-style", "arrows");
-  await expect(viewer.getByRole("slider", { name: "Field slice position", exact: true })).toHaveCount(0);
-  await viewer.getByRole("combobox", { name: "Field rendering style", exact: true }).selectOption("lines-slice");
-  await viewer.getByRole("slider", { name: "Field overlay opacity", exact: true }).fill("0.5");
-  await viewer.getByRole("button", { name: "XZ field section", exact: true }).click();
-  await expect(viewer.getByRole("button", { name: "XZ field section", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByRole("slider", { name: "Field slice position", exact: true })).toHaveCount(0);
+  await page.getByRole("combobox", { name: "Field rendering style", exact: true }).selectOption("lines-slice");
+  await page.getByRole("slider", { name: "Field overlay opacity", exact: true }).fill("0.5");
+  await page.getByRole("button", { name: "XZ field section", exact: true }).click();
+  await expect(page.getByRole("button", { name: "XZ field section", exact: true })).toHaveAttribute("aria-pressed", "true");
   expect(await page.evaluate(() => (window as any).vizCalls.length)).toBe(calls);
   await page.screenshot({ path: info.outputPath("ui-fixture-field-lines-and-slice.png") });
 });
@@ -419,12 +414,12 @@ test("slice lines and direction cues stay coplanar at every slider position with
   await expect(viewer).toHaveAttribute("data-field-samples", "240");
   const calls = await page.evaluate(() => (window as any).vizCalls.length);
   for (const fraction of [0, .25, .75, 1]) {
-    await viewer.getByRole("slider", { name: "Field slice position", exact: true }).fill(String(fraction));
+    await page.getByRole("slider", { name: "Field slice position", exact: true }).fill(String(fraction));
     const checked = await page.evaluate(async fraction => {
       const { fieldLineGeometry, fieldSliceGeometry } = await import(/* @vite-ignore */ "/src/lib/simulationFieldGeometry.ts");
       const field = (window as any).vizLastReport.field, before = JSON.stringify(field);
       const scene = { centerMm: [0, 0, 0], scale: .001 };
-      const lines = fieldLineGeometry(field, scene, 1, fraction), slice = fieldSliceGeometry(field, scene, 1, fraction);
+      const lines = fieldLineGeometry(field, scene, fraction), slice = fieldSliceGeometry(field, scene, fraction);
       const positions = lines.getAttribute("position"), plane = slice.getAttribute("position").getZ(0);
       let maxDistance = 0;
       for (let i = 0; i < positions.count; i++) maxDistance = Math.max(maxDistance, Math.abs(positions.getZ(i) - plane));
@@ -433,9 +428,9 @@ test("slice lines and direction cues stay coplanar at every slider position with
       lines.dispose(); slice.dispose(); return result;
     }, fraction);
     expect(checked.vertices).toBeGreaterThan(0); expect(checked.maxDistance).toBeLessThan(1e-7); expect(checked.unchanged).toBe(true);
-    await expect(viewer.getByLabel("Field slice readout", { exact: true })).toHaveText(`${checked.yMm.toFixed(2)} mm`);
+    await expect(page.getByLabel("Field slice readout", { exact: true })).toHaveText(`${checked.yMm.toFixed(2)} mm`);
   }
-  const toggle = viewer.getByRole("button", { name: "Field and loss settings", exact: true });
+  const toggle = page.getByRole("button", { name: "Field and loss settings", exact: true });
   await toggle.click(); await expect(toggle).toHaveAttribute("aria-expanded", "false");
   await toggle.click(); await expect(toggle).toHaveAttribute("aria-expanded", "true");
   await expect(viewer).toHaveAttribute("data-field-slice", "1");
@@ -443,18 +438,14 @@ test("slice lines and direction cues stay coplanar at every slider position with
   await page.screenshot({ path: info.outputPath("projected-field-inspector.png") });
 });
 
-test("field inspector aligns inputs and stays clear of the camera and Z rail", async ({ page }, info) => {
+test("field inspector is a scrollable right-rail panel instead of a viewport overlay", async ({ page }, info) => {
   await gotoDesignApp(page); await nativeFixture(page); const viewer = await show3D(page);
   await expect(viewer).toHaveAttribute("data-field-samples", "240");
-  const panel = viewer.getByRole("group", { name: "3D simulation overlays", exact: true });
+  const panel = page.getByRole("dialog", { name: "Field and loss settings", exact: true });
   const bounds = (await viewer.boundingBox())!, box = (await panel.boundingBox())!;
-  const camera = (await page.getByRole("group", { name: "Zoom controls", exact: true }).boundingBox())!;
-  const zRail = (await viewer.getByRole("group", { name: "Z height", exact: true }).boundingBox())!;
-  const axes = (await viewer.getByRole("img", { name: "Viewport axes: X travel, Y across board, Z up", exact: true }).boundingBox())!;
-  expect(box.x).toBeGreaterThanOrEqual(bounds.x); expect(box.x + box.width).toBeLessThanOrEqual(bounds.x + bounds.width);
-  expect(box.x).toBeGreaterThan(zRail.x + zRail.width);
-  expect(box.y + box.height).toBeLessThanOrEqual(camera.y);
-  expect(box.x + box.width).toBeLessThanOrEqual(axes.x - 6);
+  expect(box.x).toBeGreaterThanOrEqual(bounds.x + bounds.width - 1);
+  const rail = (await page.getByRole("toolbar", { name: "Preview side tools", exact: true }).boundingBox())!;
+  expect(box.x + box.width).toBeCloseTo(rail.x, 0);
   const selects = await panel.getByRole("combobox").all();
   const boxes = await Promise.all(selects.map(select => select.boundingBox()));
   for (const other of boxes.slice(1)) { expect(other!.x).toBeCloseTo(boxes[0]!.x, 0); expect(other!.width).toBeCloseTo(boxes[0]!.width, 0); }
@@ -471,21 +462,21 @@ test("XZ section changes the actual camera view, not just the selected button", 
   // Isolate the flat PCB and verify the actual camera axis as well as pixels.
   // Physical rectangular copper can be subpixel-thin in an XZ section, so a
   // hue-threshold bounding box can accidentally measure only the via barrels.
-  await viewer.getByRole("checkbox", { name: "Include magnets in B-field", exact: true }).uncheck();
-  await viewer.getByRole("checkbox", { name: "Show magnets in 3D", exact: true }).uncheck();
+  await page.getByRole("checkbox", { name: "Include magnets in B-field", exact: true }).uncheck();
+  await page.getByRole("checkbox", { name: "Show magnets in 3D", exact: true }).uncheck();
   await expect(viewer).toHaveAttribute("data-field-samples", "0");
   const canvas = viewer.locator("canvas");
   // An element screenshot includes HTML controls layered over the canvas.
   // Mask those so slider accents cannot masquerade as copper geometry.
   const masks = [page.getByRole("group", { name: "Zoom controls", exact: true }),
-    viewer.getByRole("group", { name: "3D simulation overlays", exact: true }),
-    viewer.getByRole("group", { name: "Z height", exact: true }), viewer.getByLabel("Simulation overlay legend")];
+    page.getByRole("group", { name: "3D simulation overlays", exact: true }),
+    page.getByRole("group", { name: "Position bar mode", exact: true }).locator(".."), viewer.getByLabel("Simulation overlay legend")];
   const bitmap = () => canvas.screenshot({ mask: masks, maskColor: "#ffffff" });
   // Settle initial Bounds/camera work before comparing canvas pixels only.
   await page.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
   const isometric = await bitmap();
-  await viewer.getByRole("button", { name: "XZ field section", exact: true }).click();
-  await expect(viewer.getByRole("button", { name: "XZ field section", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await page.getByRole("button", { name: "XZ field section", exact: true }).click();
+  await expect(page.getByRole("button", { name: "XZ field section", exact: true })).toHaveAttribute("aria-pressed", "true");
   await expect.poll(async () => (await bitmap()).equals(isometric)).toBe(false);
   await expect.poll(async () => {
     const camera=JSON.parse((await viewer.getAttribute("data-camera"))!);
@@ -497,7 +488,7 @@ test("XZ section changes the actual camera view, not just the selected button", 
 
 test("phase visibility filters the heat overlay without recalculating the physical loss", async ({ page }) => {
   await gotoDesignApp(page); await nativeFixture(page); const viewer = await show3D(page);
-  await viewer.getByRole("combobox", { name: "3D simulation overlay", exact: true }).selectOption("heat");
+  await page.getByRole("combobox", { name: "3D simulation overlay", exact: true }).selectOption("heat");
   await expect(viewer.getByLabel("Copper loss legend")).toBeVisible();
   const segments = Number(await viewer.getAttribute("data-segments"));
   const legend = await viewer.getByLabel("Copper loss legend").textContent();
