@@ -1,6 +1,6 @@
 //! Bounded visualization data from native models, never FEM qualification.
 //! Coordinates are SI, in the routing frame, with PCB top z=0. Field samples
-//! are actual XYZ observations of the PMs only. Heat is resistor-graph I²R,
+//! are XYZ observations of analytical PMs or an explicit routed-current estimate. Heat is resistor-graph I²R,
 //! averaged at an explicit RMS-equivalent winding-phase current, not temperature.
 use crate::{
     drive::{
@@ -15,6 +15,15 @@ use serde::{Deserialize, Serialize};
 pub const SAMPLE_CAP: usize = 2048;
 pub const EDGE_CAP: usize = 10_000;
 
+#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "kebab-case")]
+pub enum FieldSource {
+    #[default]
+    Pm,
+    Coils,
+    CoilsAndPm,
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct VisualizationRequest {
@@ -25,6 +34,10 @@ pub struct VisualizationRequest {
     pub phase_peak_a: f64,
     pub fields: bool,
     pub heat: bool,
+    #[serde(default)]
+    pub field_source: FieldSource,
+    #[serde(default)]
+    pub phase_angle_deg: f64,
 }
 
 impl VisualizationRequest {
@@ -35,6 +48,8 @@ impl VisualizationRequest {
             || self.mover_position_m.abs() > 1.
             || !self.phase_peak_a.is_finite()
             || !(0. ..=1000.).contains(&self.phase_peak_a)
+            || !self.phase_angle_deg.is_finite()
+            || self.phase_angle_deg.abs() > 360.
         {
             return Err("Invalid bounded visualization identity, pose or phase current".into());
         }
@@ -83,6 +98,58 @@ pub struct FieldPreview {
     pub scope: &'static str,
     pub samples: Vec<FieldSample>,
     pub magnets: Vec<MagnetBox>,
+}
+
+/// Analytically integrated softened Biot-Savart kernel for a finite straight
+/// filament. The core radius is explicit, not a finite-cross-section solution.
+fn filament_b(a: [f64; 3], b: [f64; 3], p: [f64; 3], current: f64, radius: f64) -> nalgebra::Vector3<f64> {
+    let a = nalgebra::Vector3::from(a);
+    let dl = nalgebra::Vector3::from(b) - a;
+    let length = dl.norm();
+    if length <= 0. { return nalgebra::Vector3::zeros(); }
+    let u = dl / length;
+    let r = nalgebra::Vector3::from(p) - a;
+    let s = r.dot(&u);
+    let cross = u.cross(&r);
+    let q = cross.norm_squared() + radius * radius;
+    let integral = (s / (q + s * s).sqrt() - (s - length) / (q + (s - length).powi(2)).sqrt()) / q;
+    cross * (1e-7 * current * integral)
+}
+
+/// Routed copper contribution only. No external lead, neutral bus or return is
+/// invented. Signed branch currents come from the same resistor graph as I²R.
+pub fn coil_field(sim: &SimulationInput, graph: &CopperLossPreview, request: &VisualizationRequest) -> Result<FieldPreview, String> {
+    use rayon::prelude::*;
+    request.validate()?;
+    let nets = graph.edges.iter().map(|e| e.net.clone()).collect::<std::collections::BTreeSet<_>>().into_iter().collect::<Vec<_>>();
+    if nets.is_empty() { return Err("No mapped winding currents for the coil-field estimate".into()); }
+    let radius = sim.min_trace_m / 2.;
+    if !radius.is_finite() || radius <= 0. { return Err("A positive actual trace width is required".into()); }
+    let mut filaments = Vec::new();
+    for edge in &graph.edges {
+        // Sorted phase nets use cos(theta - 2 pi k/N), positive from the
+        // confirmed input terminal to output. This is an imposed winding
+        // current snapshot, not a voltage-driven delta circuit solution.
+        let phase = nets.binary_search(&edge.net).unwrap();
+        let factor = std::f64::consts::SQRT_2 * (request.phase_angle_deg.to_radians() - std::f64::consts::TAU * phase as f64 / nets.len() as f64).cos();
+        for pair in edge.points_m.windows(2) {
+            filaments.push((pair[0], pair[1], edge.rms_current_a * factor));
+        }
+    }
+    let count: usize = request.counts.iter().product();
+    if filaments.len().saturating_mul(count) > 25_000_000 {
+        return Err("Coil-field estimate exceeds 25 million filament/sample pairs. Reduce sample density.".into());
+    }
+    let samples = (0..count).into_par_iter().map(|i| {
+        let indices = [i % request.counts[0], (i / request.counts[0]) % request.counts[1], i / (request.counts[0] * request.counts[1])];
+        let p = std::array::from_fn(|axis| request.bounds_m[axis][0] + (request.bounds_m[axis][1] - request.bounds_m[axis][0]) * indices[axis] as f64 / (request.counts[axis] - 1) as f64);
+        let b = filaments.iter().fold(nalgebra::Vector3::zeros(), |sum, &(a, b, amps)| sum + filament_b(a, b, p, amps, radius));
+        FieldSample { position_m: p, b_t: [b.x, b.y, b.z], magnitude_t: b.norm() }
+    }).collect::<Vec<_>>();
+    if samples.iter().any(|s| !s.magnitude_t.is_finite() || s.b_t.iter().any(|v| !v.is_finite())) {
+        return Err("Nonfinite coil-field estimate; no substitute returned".into());
+    }
+    Ok(FieldPreview { method: "routed-current-biot-savart-xyz", scope: "Estimate of routed copper contribution. Resistor-graph signed branch currents, sorted phase nets with cos(theta - 2 pi k/N), arc chords and vias. Softened filament core radius = trace width/2. External leads, terminal buses and return wiring omitted. No material reaction, FEM qualification or holding-force prediction.", samples, magnets: vec![] })
 }
 
 pub fn pm_field(
@@ -327,6 +394,58 @@ pub fn copper_loss(
 mod tests {
     use super::*;
     use pcbmotorgen_routing::{Point, RouteSegment};
+    #[test]
+    fn filament_matches_independent_midpoint_integration_and_right_hand_rule() {
+        let (a, b, p, amps, radius) = ([-0.02, 0., 0.], [0.03, 0., 0.], [0.002, 0.004, 0.006], 2., 0.0001);
+        let actual = filament_b(a, b, p, amps, radius);
+        let mut reference = nalgebra::Vector3::zeros();
+        let n = 20_000;
+        let dl = nalgebra::Vector3::new((b[0] - a[0]) / n as f64, 0., 0.);
+        for i in 0..n {
+            let source = nalgebra::Vector3::from(a) + dl * (i as f64 + 0.5);
+            let r = nalgebra::Vector3::from(p) - source;
+            reference += dl.cross(&r) * (1e-7 * amps / (r.norm_squared() + radius * radius).powf(1.5));
+        }
+        assert!((actual - reference).norm() / reference.norm() < 1e-8);
+        assert!(actual.y < 0. && actual.z > 0.);
+        assert!((filament_b(b, a, p, amps, radius) + actual).norm() < 1e-15);
+        assert!(filament_b(a, b, [0., 0., 0.], amps, radius).norm().is_finite());
+    }
+
+    #[test]
+    fn arbitrary_routed_coil_estimate_binds_geometry_current_angle_and_depth() {
+        let sim = SimulationInput::default();
+        let mut routing = RoutingResult::default();
+        routing.segments.push(RouteSegment { start: Point::new(0., 0.), end: Point::new(10., 0.), layer: 0, net: "A".into(), is_active: true });
+        let settings = DriveSettings::default();
+        let hints = DriveGeometryHints::default();
+        let mut r = request();
+        r.field_source = FieldSource::Coils;
+        let sample = |route: &RoutingResult, hints: &DriveGeometryHints, r: &VisualizationRequest| {
+            let graph = copper_loss(&sim, route, &settings, hints, r.phase_peak_a).unwrap();
+            coil_field(&sim, &graph, r).unwrap()
+        };
+        let initial = sample(&routing, &hints, &r);
+        assert_eq!(initial.method, "routed-current-biot-savart-xyz");
+        assert!(initial.magnets.is_empty());
+        assert!(initial.samples.iter().any(|s| s.magnitude_t > 0.));
+        r.phase_peak_a = 2.;
+        let doubled = sample(&routing, &hints, &r);
+        for (a, b) in initial.samples.iter().zip(&doubled.samples) { assert!((b.magnitude_t - 2. * a.magnitude_t).abs() < 1e-15); }
+        r.phase_angle_deg = 180.;
+        let reversed = sample(&routing, &hints, &r);
+        for (a, b) in doubled.samples.iter().zip(&reversed.samples) { for axis in 0..3 { assert!((a.b_t[axis] + b.b_t[axis]).abs() < 1e-15); } }
+        r.phase_peak_a = 0.;
+        assert!(sample(&routing, &hints, &r).samples.iter().all(|s| s.magnitude_t == 0.));
+        r.phase_peak_a = 1.; r.phase_angle_deg = 0.;
+        routing.segments[0].end.y = 3.;
+        assert_ne!(sample(&routing, &hints, &r).samples[0].b_t, initial.samples[0].b_t);
+        let mut deeper = hints.clone();
+        deeper.layer_z_m = (0..sim.num_layers).map(|i| -0.001 - i as f64 * 0.0001).collect();
+        assert_ne!(sample(&routing, &deeper, &r).samples[0].b_t, sample(&routing, &hints, &r).samples[0].b_t);
+        r.phase_angle_deg = f64::NAN;
+        assert!(r.validate().is_err());
+    }
     fn request() -> VisualizationRequest {
         VisualizationRequest {
             request_id: "view".into(),
@@ -336,6 +455,8 @@ mod tests {
             phase_peak_a: 1.,
             fields: true,
             heat: true,
+            field_source: FieldSource::Pm,
+            phase_angle_deg: 0.,
         }
     }
     #[test]

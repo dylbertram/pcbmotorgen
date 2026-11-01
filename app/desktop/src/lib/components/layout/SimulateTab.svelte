@@ -17,7 +17,11 @@
 
   let { config, active, open, availableHeight, sweep, friction, height, drive,
     driveError = null, error, cadGeometry = null, onConfigureWinding,
-    onSelectEnds, onUseInferredEnds, powerInput }: {
+    onSelectEnds, onUseInferredEnds, powerInput, autoSimulation = $bindable(true), loading = false, onRun, canRun = true }: {
+    autoSimulation?: boolean;
+    loading?: boolean;
+    onRun?: () => void;
+    canRun?: boolean;
     config: ConfigStore;
     active: boolean;
     open: boolean;
@@ -41,7 +45,7 @@
     { id: "driver", label: "Driver suitability" },
     { id: "summary", label: "Summary (live metrics)" },
     { id: "power", label: "Power requirements" },
-    { id: "dc", label: "Static DC (experimental)" },
+    { id: "dc", label: "Audited DC force" },
   ];
   let selected = $state("flux");
   let requestedHeight = $state(320);
@@ -151,6 +155,12 @@
       </button>
     </div>
     <div id={`${dockId}-content`} hidden={collapsed} class="min-h-0 flex-1 flex-col {collapsed ? 'hidden' : 'flex'}">
+    <div class="flex shrink-0 flex-wrap items-center gap-3 border-b border-slate-700 px-3 py-2 text-xs text-slate-300" aria-label="Simulation run controls">
+      <button type="button" onclick={onRun} disabled={!active || !canRun || loading || !onRun}
+        class="rounded border border-emerald-600 px-3 py-1.5 text-emerald-200 hover:bg-emerald-950 disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400">{loading ? "Running simulations…" : "Run simulations"}</button>
+      <label class="flex items-center gap-2"><input type="checkbox" bind:checked={autoSimulation} class="accent-emerald-400" /> Auto-run on edits</label>
+      <p role="status">{!canRun ? "Resolve the design and coil-end warnings to run." : loading ? "Calculating the active geometry." : sweep ? "Results for the active geometry." : "Run to calculate thrust over travel, friction and stack height."}</p>
+    </div>
     <Tabs.Content value="flux" data-dock-panel="flux" class="min-h-0 flex-1 overflow-auto p-3">
       {@render warnings()}
       <div class="h-full min-h-40"><FluxDiagram {config} active={active && open && !collapsed && selected === "flux"} embedded /></div>
