@@ -17,8 +17,6 @@
 export class CoilPreviewViewState {
   /** Shared copper renderer with orthographic presets and an orbitable 3D view. */
   viewMode = $state<"top" | "front" | "left" | "iso">("top");
-  /** Display-only Z magnification, shared by the inline and expanded viewer. */
-  zScale = $state(1);
   zoomWindow = $state(false);
   /** Shared viewport controls dispatch to the spatial camera when not in Top. */
   cameraCommand = $state({ id: 0, zoom: 1 });

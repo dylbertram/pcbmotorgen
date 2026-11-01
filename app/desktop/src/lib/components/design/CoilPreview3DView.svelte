@@ -4,7 +4,6 @@
   import { buildCoilScene, connectedViaPads, isViaVisible } from "../../coilScene";
   import type { CoilPreviewViewState } from "./coilPreviewViewState.svelte";
   import CoilPreviewScene from "./CoilPreviewScene.svelte";
-  import Slider from "../ui/Slider.svelte";
   import { untrack, onDestroy } from "svelte";
   import type { VisualizationInput, VisualizationMode, VisualizationRequest } from "../../types/simulationVisualization";
   import { SimulationVisualizationController, type VisualizationView } from "../../simulationVisualizationController";
@@ -21,8 +20,10 @@
   import type { PcbStackupMm } from "../../pcbStackup";
   import type { TopCameraTransform } from "../../fitCoilCamera";
   import ViewportAxes from "./ViewportAxes.svelte";
+  import type { Snippet } from "svelte";
 
-  let { geometry: sourceGeometry, pcbThicknessMm, pcbStackup = null, copperThicknessMm = { outer: .035, inner: .035 }, viaSizeMm = {diameter:.4,drill:.2}, view, isVisible = () => true, showTerminals = true, simulation = null, measure = null, topCamera = null, visibleCopperKeys = null, onRenderStatus, axisRightInset = 0 }: {
+  let { geometry: sourceGeometry, pcbThicknessMm, pcbStackup = null, copperThicknessMm = { outer: .035, inner: .035 }, viaSizeMm = {diameter:.4,drill:.2}, view, isVisible = () => true, showTerminals = true, simulation = null, measure = null, topCamera = null, visibleCopperKeys = null, onRenderStatus, onFieldSettings, axisRightInset = 0 }: {
+    onFieldSettings?: (settings: Snippet | null) => void;
     geometry: CadGeometry | null;
     pcbThicknessMm: number;
     pcbStackup?: PcbStackupMm | null;
@@ -45,7 +46,7 @@
   });
   const geometry = $derived(placement.geometry);
   let scene = $derived(buildCoilScene(geometry, { ...copperThicknessMm, layers: pcbStackup?.copper_mm }));
-  const board = $derived(geometry && scene ? pcbBody(geometry, scene, pcbThicknessMm, view.zScale, pcbStackup ? 0 : undefined) : null);
+  const board = $derived(geometry && scene ? pcbBody(geometry, scene, pcbThicknessMm, pcbStackup ? 0 : undefined) : null);
   $effect(() => { void geometry; untrack(() => measure?.clear()); });
   let paths = $derived(scene?.paths.filter(p => view.isLayerVisible(p.layer) && isVisible(p.net, p.layer) && (!visibleCopperKeys || visibleCopperKeys.has(p.key))) ?? []);
   let vias = $derived(view.showVias ? scene?.vias.filter(v =>
@@ -61,9 +62,6 @@
   let fieldStyle = $state<FieldStyle>("lines-slice");
   let sliceFraction = $state(.5);
   let sectionView = $state(false);
-  let settingsOpen = $state<boolean | null>(null);
-  let viewerWidth = $state(0);
-  const settingsExpanded = $derived(settingsOpen ?? viewerWidth > 760);
   let legendsOpen = $state(false);
   let fieldSource = $state("coils");
   let phaseAngle = $state(0);
@@ -112,7 +110,7 @@
 
   $effect.pre(() => {
     // Immutable snapshots bind every physical/current/pose input. Opacity and
-    // display-only Z scaling do not resample physics. Edits clear colors now.
+    // display controls do not resample physics. Edits clear colors now.
     const input = simulation ? $state.snapshot(simulation) : null;
     const physical = geometry ? $state.snapshot(geometry) : null;
     const selected = mode, resolution = density, source = fieldSource, pmEnabled = includeMagnets, angle = phaseAngle;
@@ -155,18 +153,67 @@
     return () => magnetController.invalidate();
   });
   onDestroy(() => { controller.invalidate(); magnetController.invalidate(); });
+  // The right rail renders these controls against this same mounted renderer.
+  // Register only the snippet identity, never sampling state or display inputs.
+  $effect(() => {
+    onFieldSettings?.(fieldSettingsContent);
+    return () => onFieldSettings?.(null);
+  });
 </script>
 
-<div class="coil-3d relative h-full w-full bg-slate-900" bind:clientWidth={viewerWidth} role="img" aria-label={`Coil preview — ${view.viewMode}`}
+{#snippet fieldSettingsContent()}
+  {#if simulation}
+    <div class="overlay-control-fields text-xs text-slate-300" role="group" aria-label="3D simulation overlays">
+      <label class="control-row"><span>Overlay</span>
+        <select aria-label="3D simulation overlay" bind:value={mode} class="rounded border border-slate-600 bg-slate-800 px-1 py-1 text-slate-100">
+          <option value="off">Off</option><option value="fields">Magnetic fields</option><option value="heat">Copper heat / loss</option><option value="both">Fields and heat</option>
+        </select>
+      </label>
+      <label class="check-row"><input type="checkbox" aria-label="Show magnets in 3D" bind:checked={showMagnets} /> <span>Show magnets in 3D</span></label>
+      {#if mode === "fields" || mode === "both"}
+        <fieldset class="control-section"><legend>Source</legend>
+          <label class="control-row"><span>Calculate B</span><select aria-label="Magnetic field source" bind:value={fieldSource} onchange={event => { if (event.currentTarget.value === "pm") includeMagnets = true; }} class="rounded border border-slate-600 bg-slate-800 p-1"><option value="coils">Coil currents, routed estimate</option><option value="qualified">Coil currents, audited finite copper</option><option value="pm">Permanent magnets only</option></select></label>
+          <label class="check-row"><input type="checkbox" aria-label="Include magnets in B-field" bind:checked={includeMagnets} /> <span>Include magnets in B-field</span></label>
+          {#if fieldSource !== "qualified"}
+            <label class="control-row"><span>Native samples</span><select aria-label="Field sample density" bind:value={density} class="rounded border border-slate-600 bg-slate-800 p-1"><option value="sparse">240</option><option value="dense">700</option><option value="fine">2016</option></select></label>
+            {#if fieldSource === "coils"}
+              <label class="control-row"><span>Electrical angle (°)</span><input aria-label="Coil field electrical angle" type="number" min="-360" max="360" step="15" bind:value={phaseAngle} class="min-w-0 rounded border border-slate-600 bg-slate-800 p-1" /></label>
+              <p class="control-hint">Active copper at {simulation.config.max_current_a} A phase peak. Sorted phase nets use cos(θ − 360° k/N), input to output. External leads and return wiring omitted. Estimate, not audited FEM.</p>
+            {/if}
+            <button type="button" disabled={visualization.phase === "loading"} onclick={() => sampleRevision++} class="section-button rounded border border-emerald-600 text-emerald-200 disabled:opacity-40">Sample active geometry</button>
+          {/if}
+        </fieldset>
+        <fieldset class="control-section"><legend>Display</legend>
+          <label class="control-row"><span>Rendering</span><select aria-label="Field rendering style" bind:value={fieldStyle} class="rounded border border-slate-600 bg-slate-800 p-1"><option value="lines-slice">Projected lines + slice</option><option value="lines">Projected lines</option><option value="slice">Magnitude slice</option><option value="lines-3d">3D field lines</option><option value="arrows">3D sample arrows</option></select></label>
+          <p class="control-hint">{fieldDescription}. Display interpolation only.</p>
+          {#if fieldStyle !== "arrows"}
+            <label class="range-control"><span>{fieldStyle === "lines-3d" ? "Seed plane Y" : "Slice Y"}</span><output aria-label="Field slice readout">{sliceYmm === null ? `${Math.round(sliceFraction * 100)}%` : `${sliceYmm.toFixed(2)} mm`}</output>
+              <input aria-label="Field slice position" aria-valuetext={sliceYmm === null ? `${Math.round(sliceFraction * 100)}%` : `${sliceYmm.toFixed(2)} millimeters, ${Math.round(sliceFraction * 100)}%`} type="range" min="0" max="1" step="0.01" bind:value={sliceFraction} class="accent-emerald-400" />
+            </label>
+          {/if}
+          <label class="range-control"><span>Opacity</span><output>{Math.round(opacity * 100)}%</output><input aria-label="Field overlay opacity" type="range" min="0.15" max="1" step="0.05" bind:value={opacity} class="accent-emerald-400" /></label>
+          <button class="section-button rounded border border-slate-600 text-slate-300 hover:bg-slate-800 hover:text-emerald-300" type="button" aria-pressed={sectionView} onclick={() => sectionView = !sectionView}>XZ field section</button>
+        </fieldset>
+        {#if fieldSource === "qualified" && geometry}
+          <details open={!coilField}><summary class="cursor-pointer">Qualified coil source and DC drive</summary>
+            <QualifiedCoilFieldControls input={simulation} {geometry} active={view.viewMode !== "top"} onResult={value => { coilField = value; }} />
+          </details>
+        {/if}
+      {/if}
+    </div>
+  {:else}<p class="p-3 text-xs text-slate-400">Open this panel in Simulate to configure fields and losses.</p>{/if}
+{/snippet}
+
+<div class="coil-3d relative h-full w-full bg-slate-900" role="img" aria-label={`Coil preview — ${view.viewMode}`}
   data-testid={`coil-${view.viewMode}`} data-renderer={glAvailable === false ? "canvas2d-fallback" : "shared-three"} data-layers={geometry?.layer_z_mm.filter((_, i) => view.isLayerVisible(i)).length ?? 0}
   data-layer-z-mm={JSON.stringify(geometry?.layer_z_mm ?? [])} data-pcb-thickness-mm={pcbThicknessMm}
   data-trace-width-mm={scene ? scene.width / scene.scale : 0} data-trace-width-px={view.traceMode === "centerlines" ? 1 : (scene?.width ?? 0) * (cameraSnapshot?.zoom ?? 0)} data-via-diameter-mm={viaSizeMm.diameter} data-via-drill-mm={viaSizeMm.drill}
-  data-segments={paths.length} data-vias={vias.length} data-via-pads={vias.length ? pads.length : 0} data-terminals={terminals.length} data-trace-mode={view.traceMode} data-z-scale={view.zScale} data-pcb-visible={view.showPcb} data-copper-section="rectangular" data-measure-points={measure?.p2 ? 2 : measure?.p1 ? 1 : 0} data-measure-mm={measure?.distanceMm ?? ""} data-camera={cameraSnapshot ? JSON.stringify(cameraSnapshot) : ""}
-  data-field-samples={field?.samples.length ?? 0} data-visible-magnets={visibleMagnets.length} data-include-magnets={includeMagnets} data-field-source={fieldSource} data-field-style={fieldStyle} data-field-slice={sliceFraction} data-heat-unit="W/m" data-settings-open={settingsExpanded} data-legends-open={legendsOpen} data-heat-paths={heatMapping.values?.size ?? 0} data-visualization-state={visualization.phase}>
+  data-segments={paths.length} data-vias={vias.length} data-via-pads={vias.length ? pads.length : 0} data-terminals={terminals.length} data-trace-mode={view.traceMode} data-pcb-visible={view.showPcb} data-copper-section="rectangular" data-measure-points={measure?.p2 ? 2 : measure?.p1 ? 1 : 0} data-measure-mm={measure?.distanceMm ?? ""} data-camera={cameraSnapshot ? JSON.stringify(cameraSnapshot) : ""}
+  data-field-samples={field?.samples.length ?? 0} data-visible-magnets={visibleMagnets.length} data-include-magnets={includeMagnets} data-field-source={fieldSource} data-field-style={fieldStyle} data-field-slice={sliceFraction} data-heat-unit="W/m" data-legends-open={legendsOpen} data-heat-paths={heatMapping.values?.size ?? 0} data-visualization-state={visualization.phase}>
   {#if scene}
     <svelte:boundary onerror={() => { glAvailable=false; onRenderStatus?.(false); }}>
       <Canvas renderMode="on-demand">
-         <CoilPreviewScene {scene} {paths} {vias} {pads} viaSize={{diameter:viaSizeMm.diameter*scene.scale,drill:viaSizeMm.drill*scene.scale,plating:(viaSizeMm.plating ?? .025)*scene.scale}} {terminals} reset={view.cameraReset} fit={view.cameraFit} command={view.cameraCommand} {windowCommand} {board} {measure} {topCamera} viewMode={view.viewMode} onCamera={snapshot => {cameraSnapshot = snapshot; if(view.viewMode !== "top") view.spatialZoom=snapshot.zoom/snapshot.fitZoom; glAvailable=true; onRenderStatus?.(true);}} showPcb={view.showPcb} zScale={view.zScale} traceMode={view.traceMode}
+         <CoilPreviewScene {scene} {paths} {vias} {pads} viaSize={{diameter:viaSizeMm.diameter*scene.scale,drill:viaSizeMm.drill*scene.scale,plating:(viaSizeMm.plating ?? .025)*scene.scale}} {terminals} reset={view.cameraReset} fit={view.cameraFit} command={view.cameraCommand} {windowCommand} {board} {measure} {topCamera} viewMode={view.viewMode} onCamera={snapshot => {cameraSnapshot = snapshot; if(view.viewMode !== "top") view.spatialZoom=snapshot.zoom/snapshot.fitZoom; glAvailable=true; onRenderStatus?.(true);}} showPcb={view.showPcb} traceMode={view.traceMode}
            {field} heat={heatMapping.values} {opacity} {fieldStyle} {sliceFraction} {sectionView} magnets={visibleMagnets} />
       </Canvas>
       {#snippet failed()}
@@ -183,50 +230,8 @@
     {/if}
     {#if view.viewMode !== "top"}
     {#if simulation}
-      <div class="simulation-controls absolute right-2 top-2 z-20 rounded border border-slate-700 bg-slate-900/95 text-xs text-slate-300" role="group" aria-label="3D simulation overlays">
-        <button type="button" class="inspector-toggle" aria-expanded={settingsExpanded} onclick={() => settingsOpen = !settingsExpanded}>
-          <span>Field and loss settings</span><span aria-hidden="true">{settingsExpanded ? "−" : "+"}</span>
-        </button>
-        <div class="overlay-control-fields" hidden={!settingsExpanded}>
-        <label class="control-row"><span>Overlay</span>
-          <select aria-label="3D simulation overlay" bind:value={mode} class="rounded border border-slate-600 bg-slate-800 px-1 py-1 text-slate-100">
-            <option value="off">Off</option><option value="fields">Magnetic fields</option><option value="heat">Copper heat / loss</option><option value="both">Fields and heat</option>
-          </select>
-        </label>
-        <label class="check-row"><input type="checkbox" aria-label="Show magnets in 3D" bind:checked={showMagnets} /> <span>Show magnets in 3D</span></label>
-        {#if mode === "fields" || mode === "both"}
-          <fieldset class="control-section"><legend>Source</legend>
-            <label class="control-row"><span>Calculate B</span><select aria-label="Magnetic field source" bind:value={fieldSource} onchange={event => { if (event.currentTarget.value === "pm") includeMagnets = true; }} class="rounded border border-slate-600 bg-slate-800 p-1"><option value="coils">Coil currents, routed estimate</option><option value="qualified">Coil currents, audited finite copper</option><option value="pm">Permanent magnets only</option></select></label>
-            <label class="check-row"><input type="checkbox" aria-label="Include magnets in B-field" bind:checked={includeMagnets} /> <span>Include magnets in B-field</span></label>
-            {#if fieldSource !== "qualified"}<label class="control-row"><span>Native samples</span><select aria-label="Field sample density" bind:value={density} class="rounded border border-slate-600 bg-slate-800 p-1"><option value="sparse">240</option><option value="dense">700</option><option value="fine">2016</option></select></label>
-              {#if fieldSource === "coils"}
-                <label class="control-row"><span>Electrical angle (°)</span><input aria-label="Coil field electrical angle" type="number" min="-360" max="360" step="15" bind:value={phaseAngle} class="min-w-0 rounded border border-slate-600 bg-slate-800 p-1" /></label>
-                <p class="control-hint">Active copper at {simulation.config.max_current_a} A phase peak. Sorted phase nets use cos(θ − 360° k/N), input to output. External leads and return wiring omitted. Estimate, not audited FEM.</p>
-              {/if}
-              <button type="button" disabled={visualization.phase === "loading"} onclick={() => sampleRevision++} class="section-button rounded border border-emerald-600 text-emerald-200 disabled:opacity-40">Sample active geometry</button>
-            {/if}
-          </fieldset>
-          <fieldset class="control-section"><legend>Display</legend>
-            <label class="control-row"><span>Rendering</span><select aria-label="Field rendering style" bind:value={fieldStyle} class="rounded border border-slate-600 bg-slate-800 p-1"><option value="lines-slice">Projected lines + slice</option><option value="lines">Projected lines</option><option value="slice">Magnitude slice</option><option value="lines-3d">3D field lines</option><option value="arrows">3D sample arrows</option></select></label>
-            <p class="control-hint">{fieldDescription}. Display interpolation only.</p>
-            {#if fieldStyle !== "arrows"}
-              <label class="range-control"><span>{fieldStyle === "lines-3d" ? "Seed plane Y" : "Slice Y"}</span><output aria-label="Field slice readout">{sliceYmm === null ? `${Math.round(sliceFraction * 100)}%` : `${sliceYmm.toFixed(2)} mm`}</output>
-                <input aria-label="Field slice position" aria-valuetext={sliceYmm === null ? `${Math.round(sliceFraction * 100)}%` : `${sliceYmm.toFixed(2)} millimeters, ${Math.round(sliceFraction * 100)}%`} type="range" min="0" max="1" step="0.01" bind:value={sliceFraction} class="accent-emerald-400" />
-              </label>
-            {/if}
-            <label class="range-control"><span>Opacity</span><output>{Math.round(opacity * 100)}%</output><input aria-label="Field overlay opacity" type="range" min="0.15" max="1" step="0.05" bind:value={opacity} class="accent-emerald-400" /></label>
-            <button class="section-button rounded border border-slate-600 text-slate-300 hover:bg-slate-800 hover:text-emerald-300" type="button" aria-pressed={sectionView} onclick={() => sectionView = !sectionView}>XZ field section</button>
-          </fieldset>
-          {#if fieldSource === "qualified" && geometry}
-            <details open={!coilField} class="basis-full"><summary class="cursor-pointer">Qualified coil source and DC drive</summary>
-              <QualifiedCoilFieldControls input={simulation} {geometry} active={true} onResult={value => { coilField = value; }} />
-            </details>
-          {/if}
-        {/if}
-        </div>
-      </div>
       {#if mode !== "off"}
-        <div class="overlay-legends pointer-events-auto absolute bottom-8 left-16 right-3 flex flex-wrap gap-2 overflow-y-auto text-[10px]" aria-label="Simulation overlay legend">
+        <div class="overlay-legends pointer-events-auto absolute bottom-8 left-2 right-3 flex flex-wrap gap-2 overflow-y-auto text-[10px]" aria-label="Simulation overlay legend">
           {#if visualization.phase === "loading"}<p role="status" class="rounded bg-slate-900/95 p-2 text-slate-300">Sampling the active design. Previous visualization cleared.</p>{/if}
           {#if visualization.error}<p role="status" class="rounded bg-slate-900/95 p-2 text-amber-200">{visualization.error}</p>{/if}
           {#if magnetContribution.phase === "loading"}<p role="status" class="rounded bg-slate-900/95 p-2 text-slate-300">Sampling magnet contribution on the coil observation grid. Combined field cleared.</p>{/if}
@@ -271,11 +276,6 @@
         </div>
       {/if}
     {/if}
-    <div class="z-height absolute bottom-8 left-2 top-12 flex w-12 flex-col items-center gap-2 rounded border border-slate-700 bg-slate-900/95 px-2 py-2" role="group" aria-label="Z height">
-      <span class="z-label text-xs text-slate-400">Z</span>
-      <Slider orientation="vertical" min={1} max={20} step={0.1} bind:value={view.zScale} ariaLabel="Z height scale" class="min-h-0 flex-1" />
-      <output class="font-mono text-[10px] text-emerald-300" aria-label="Z height multiplier">{view.zScale}×</output>
-    </div>
     <div class="layer-depths pointer-events-none absolute right-12 top-2 text-right font-mono text-[10px] text-slate-400" class:simulation-depths={simulation !== null}>
       {#each geometry?.layer_z_mm ?? [] as z, idx (idx)}
         {#if view.isLayerVisible(idx)}<div>L{idx + 1} · {z.toFixed(2)} mm</div>{/if}
@@ -290,14 +290,9 @@
 <style>
   .coil-3d { container-type: size; }
   .axis-indicator { top: var(--coil-axis-top, .5rem); }
-  .overlay-legends { bottom: calc(2rem + var(--coil-overlay-inset, 0px)); max-height: 40cqh; right: auto; max-width: min(26rem, calc(100% - 4.75rem)); }
-  .z-height { top: var(--coil-preset-inset, 3rem); bottom: calc(2rem + var(--coil-overlay-inset, 0px)); }
-  .simulation-controls { right: 6.25rem; width: 22rem; max-width: calc(100% - 4.5rem); }
+  .overlay-legends { bottom: calc(2rem + var(--coil-overlay-inset, 0px)); max-height: 40cqh; right: auto; max-width: min(26rem, calc(100% - 1rem)); }
   .layer-depths { right: 6.25rem; }
-  .inspector-toggle { display: flex; justify-content: space-between; align-items: center; width: 100%; min-height: 2rem; text-align: left; padding: 0.5rem 0.75rem; }
-  .inspector-toggle:hover { background: rgb(var(--slate-800)); }
-  .overlay-control-fields { display: grid; gap: 0.625rem; padding: 0.625rem; max-height: calc(100cqh - 5rem - var(--coil-overlay-inset, 0px)); overflow-y: auto; border-top: 1px solid rgb(var(--slate-700)); }
-  .overlay-control-fields[hidden] { display: none; }
+  .overlay-control-fields { display: grid; gap: 0.625rem; padding: 0.625rem; }
   .control-row { display: grid; grid-template-columns: 5.75rem minmax(0, 1fr); align-items: center; gap: 0.5rem; }
   .control-row select { width: 100%; min-width: 0; min-height: 2rem; }
   .check-row { display: flex; align-items: start; gap: 0.5rem; line-height: 1.4; }
@@ -313,22 +308,15 @@
   .simulation-depths { display: none; }
   .compact-overlay-toggle { display: none; line-height: 1.4; }
   .compact-overlay-toggle button { padding: .25rem; font-size: inherit; line-height: 1.2; }
-  @container (max-width: 760px) {
-    .simulation-controls { right: .5rem; top: max(calc(var(--coil-axis-top, .5rem) + 5.5rem), var(--coil-preset-inset, 0px)); }
-    .overlay-control-fields { max-height: min(calc(65cqh - 4rem), calc(100cqh - var(--coil-axis-top, .5rem) - 8rem - var(--coil-overlay-inset, 0px))); }
-  }
   @container (max-width: 520px) {
-    .overlay-legends { bottom: calc(.5rem + var(--coil-overlay-inset, 0px)); }
+    .overlay-legends { top: max(calc(var(--coil-axis-top, .5rem) + 5.5rem), var(--coil-preset-inset, 0px)); bottom: auto; left: .5rem; right: .5rem; max-width: none; max-height: 45cqh; }
+    .coil-3d[data-legends-open="true"] .overlay-legends { left: .5rem; top: max(calc(var(--coil-axis-top, .5rem) + 8.5rem), calc(var(--coil-preset-inset, 0px) + 3rem)); z-index: 30; }
     .compact-overlay-toggle { display: block; }
+    .compact-overlay-toggle p { display: none; }
+    .compact-overlay-toggle button { width: 100%; min-height: 2rem; }
     .overlay-legends-body { display: none; }
     .coil-3d[data-legends-open="true"] .overlay-legends-body { display: flex; }
     .layer-depths { display: none; }
-    .overlay-control-fields { padding: 0.5rem; }
-    .control-row { grid-template-columns: 4.75rem minmax(0, 1fr); }
-  }
-  @container (max-height: 180px) {
-    .z-height { top: var(--coil-preset-inset, 2.75rem); bottom: calc(.25rem + var(--coil-overlay-inset, 0px)); padding: 0.25rem; gap: 0.25rem; }
-    .z-label { display: none; }
   }
   button { padding: 0.25rem 0.5rem; border-radius: 0.25rem; font-size: 0.75rem; }
   button:focus-visible { outline: 2px solid #10b981; }

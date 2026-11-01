@@ -4,14 +4,14 @@ import { copperRibbonShape, joinCopperPaths, rectangularCopperGeometry } from ".
 
 const p = (x: number, z: number, y = 0) => new Vector3(x, y, z);
 describe("rectangular copper", () => {
-  it("uses independent physical width and thickness without stretching copper at exaggerated Z", () => {
-    const geometry = rectangularCopperGeometry([{ points: [p(0, 0, -2), p(5, 0, -2)] }], .2, .035, 20);
+  it("uses physical layer position, width and thickness", () => {
+    const geometry = rectangularCopperGeometry([{ points: [p(0, 0, -2), p(5, 0, -2)] }], .2, .035);
     geometry.computeBoundingBox();
     const box = geometry.boundingBox!;
     expect(box.min.x).toBeCloseTo(0); expect(box.max.x).toBeCloseTo(5);
     expect(box.getSize(new Vector3()).z).toBeCloseTo(.2);
     expect(box.getSize(new Vector3()).y).toBeCloseTo(.035, 4);
-    expect(box.getCenter(new Vector3()).y).toBeCloseTo(-40);
+    expect(box.getCenter(new Vector3()).y).toBeCloseTo(-2);
     geometry.dispose();
   });
   it("stitches shuffled and reversed line/curve endpoints without internal caps", () => {
@@ -37,7 +37,7 @@ describe("rectangular copper", () => {
   });
   it("shares the same miter profile across differently colored heat batches", () => {
     const a = { points: [p(0, 0), p(1, 0)] }, b = { points: [p(1, 0), p(1, 1)] };
-    const geometries = [a, b].map(path => rectangularCopperGeometry([path], .2, .035, 1, [a, b]));
+    const geometries = [a, b].map(path => rectangularCopperGeometry([path], .2, .035, [a, b]));
     const profile = (geometry: typeof geometries[number]) => {
       const position = geometry.getAttribute("position"), points = new Set<string>();
       for (let i = 0; i < position.count; i++) {

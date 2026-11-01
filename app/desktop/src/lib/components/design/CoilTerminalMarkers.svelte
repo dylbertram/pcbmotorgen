@@ -6,11 +6,11 @@
   import { sceneToPhysicalMm } from "../../spatialMeasureGeometry";
   import { TERMINAL_MARKER_SIZE_PX, terminalMarkerTexture } from "../../terminalMarkers";
 
-  let { terminals, scene, zScale }: { terminals:CoilScene["terminals"];scene:CoilScene;zScale:number } = $props();
+  let { terminals, scene }: { terminals:CoilScene["terminals"];scene:CoilScene } = $props();
   const { invalidate } = useThrelte();
   const texture = terminalMarkerTexture();
-  const geometry = $derived(new BufferGeometry().setFromPoints(terminals.map(t => t.point.clone().setY(t.point.y * zScale))));
-  const physicalPoints = $derived(terminals.map(t => sceneToPhysicalMm(t.point, scene, 1)));
+  const geometry = $derived(new BufferGeometry().setFromPoints(terminals.map(t => t.point)));
+  const physicalPoints = $derived(terminals.map(t => sceneToPhysicalMm(t.point, scene)));
   $effect(() => { const current = geometry; invalidate(); return () => current.dispose(); });
   onDestroy(() => texture.dispose());
 </script>

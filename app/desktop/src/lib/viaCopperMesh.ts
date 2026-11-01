@@ -35,18 +35,18 @@ function mergeAndDispose(parts: BufferGeometry[]): BufferGeometry {
   return result;
 }
 
-/** Copper thickness stays physical while the layer centers are magnified. */
-export function annularPadsGeometry(pads: CopperPad[], diameter: number, drill: number, zScale = 1): BufferGeometry {
+/** Annuli use their actual copper thickness and layer positions. */
+export function annularPadsGeometry(pads: CopperPad[], diameter: number, drill: number): BufferGeometry {
   return mergeAndDispose(pads.map(({ point, thickness }) => annularSolid(point.x, point.z,
-    drill / 2, diameter / 2, point.y * zScale - thickness / 2, thickness)));
+    drill / 2, diameter / 2, point.y - thickness / 2, thickness)));
 }
 
 /** Hollow plated barrel, rather than an opaque tube spanning the bore. */
-export function viaBarrelsGeometry(paths: { points: Vector3[] }[], drill: number, plating: number, zScale = 1): BufferGeometry {
+export function viaBarrelsGeometry(paths: { points: Vector3[] }[], drill: number, plating: number): BufferGeometry {
   const parts = paths.flatMap(({ points }) => {
     const a = points[0], b = points.at(-1);
     if (!a || !b || Math.abs(a.y - b.y) < 1e-12) return [];
-    return [annularSolid(a.x, a.z, drill / 2, drill / 2 + plating, Math.min(a.y, b.y) * zScale, Math.abs(a.y - b.y) * zScale)];
+    return [annularSolid(a.x, a.z, drill / 2, drill / 2 + plating, Math.min(a.y, b.y), Math.abs(a.y - b.y))];
   });
   return mergeAndDispose(parts);
 }

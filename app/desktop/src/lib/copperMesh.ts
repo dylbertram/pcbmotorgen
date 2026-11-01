@@ -84,7 +84,7 @@ export function copperRibbonShape(points: Vector3[], width: number, neighbors?: 
   return shape;
 }
 
-export function rectangularCopperGeometry(paths: { points: Vector3[] }[], width: number, thickness: number, zScale = 1, contextPaths = paths, pads: CopperPad[] = [], padDiameter = 0): BufferGeometry {
+export function rectangularCopperGeometry(paths: { points: Vector3[] }[], width: number, thickness: number, contextPaths = paths, pads: CopperPad[] = [], padDiameter = 0): BufferGeometry {
   if (!Number.isFinite(thickness) || thickness <= 0) throw new Error("Copper thickness must be positive and finite.");
   const ribbons: BufferGeometry[] = [];
   const neighbors = endpointDirections(contextPaths);
@@ -113,7 +113,7 @@ export function rectangularCopperGeometry(paths: { points: Vector3[] }[], width:
     for (const ribbon of shapes) {
       const geometry = new ExtrudeGeometry(ribbon, { depth: thickness, bevelEnabled: false, steps: 1, curveSegments: 1 });
       geometry.rotateX(-Math.PI / 2);
-      geometry.translate(0, points[0].y * zScale - thickness / 2, 0);
+      geometry.translate(0, points[0].y - thickness / 2, 0);
       ribbons.push(geometry);
     }
   }

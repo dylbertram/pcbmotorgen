@@ -5,12 +5,11 @@
   import { rectangularCopperGeometry } from "../../copperMesh";
   import { viaBarrelsGeometry, type CopperPad } from "../../viaCopperMesh";
 
-  let { paths, width, color, centerlines = false, zScale = 1, thickness = .0035, barrels = false, contextPaths, pads = [], padDiameter = 0, plating = .0025 }: {
+  let { paths, width, color, centerlines = false, thickness = .0035, barrels = false, contextPaths, pads = [], padDiameter = 0, plating = .0025 }: {
     paths: { points: Vector3[] }[];
     width: number;
     color: string;
     centerlines?: boolean;
-    zScale?: number;
     thickness?: number;
     barrels?: boolean;
     contextPaths?: { points: Vector3[] }[];
@@ -20,18 +19,15 @@
   } = $props();
   const { invalidate } = useThrelte();
 
-  // Magnify layer positions, not the copper's physical cross-section.
-  let scaledPaths = $derived(paths.map(path => path.points.map(p => p.clone().setY(p.y * zScale))));
-
   // Batch by coil rather than creating a Svelte component/draw call per segment.
   let geometry = $derived.by(() => {
     if (centerlines) {
       const positions: number[] = [];
-      for (const points of scaledPaths) for (let i = 1; i < points.length; i++) positions.push(...points[i - 1].toArray(), ...points[i].toArray());
+      for (const { points } of paths) for (let i = 1; i < points.length; i++) positions.push(...points[i - 1].toArray(), ...points[i].toArray());
       return new BufferGeometry().setAttribute("position", new Float32BufferAttribute(positions, 3));
     }
-    if (!barrels) return rectangularCopperGeometry(paths, width, thickness, zScale, contextPaths ?? paths, pads, padDiameter);
-    return viaBarrelsGeometry(paths, width, plating, zScale);
+    if (!barrels) return rectangularCopperGeometry(paths, width, thickness, contextPaths ?? paths, pads, padDiameter);
+    return viaBarrelsGeometry(paths, width, plating);
   });
   $effect(() => {
     const current = geometry;

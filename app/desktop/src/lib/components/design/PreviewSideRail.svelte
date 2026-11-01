@@ -1,7 +1,7 @@
 <script lang="ts">
   /**
    * Motor settings, coil ends and driver controls use the left rail; Layers
-   * stays on the right. CAD import retains its single right rail.
+   * and field/loss settings stay on the right. CAD import retains its single right rail.
    *
     * Each toggle pulls a panel out from the rail: the
      * Layers panel (phases containing layers or layers containing phases),
@@ -16,7 +16,7 @@
    */
   import { fly } from "svelte/transition";
   import { onDestroy } from "svelte";
-  import { Layers, X, Plug, CircuitBoard, Route, Magnet, Gauge } from "@lucide/svelte";
+  import { Layers, X, Plug, CircuitBoard, Route, Magnet, Gauge, Waves } from "@lucide/svelte";
   import type { Snippet } from "svelte";
   import { DESIGN_PANELS, isDesignPanel, isLeftPanel, type DesignPanelId, type PreviewPanelId } from "./previewPanels";
   import CoilTerminalPanel from "./CoilTerminalPanel.svelte";
@@ -38,7 +38,9 @@
     geometry, selection, assignmentDisabled = false, terminalTool, onStartTerminals,
     terminalsDisabled = false, dismissOnOutsideClick = true, viewControlsInMenu = false, config, generated = false,
     drive = null, driveError = null, drivePending = false,
-    designSettings, designOnly = false, drawingOnly = false, open = $bindable<PreviewPanelId | null>(null), active = true }: {
+    designSettings, fieldSettings, onOpenFields, designOnly = false, drawingOnly = false, open = $bindable<PreviewPanelId | null>(null), active = true }: {
+    fieldSettings?: Snippet | null;
+    onOpenFields?: () => void;
     designOnly?: boolean;
     drawingOnly?: boolean;
     active?: boolean;
@@ -96,6 +98,8 @@
     if (open === "terminals") terminalTool?.cancel();
     open = open === panel ? null : panel;
     view.setTerminalPanelOpen(open === "terminals");
+    if (open === "terminals") view.viewMode = "top";
+    if (open === "fields") onOpenFields?.();
   }
   function close() {
     const panel = open;
@@ -148,10 +152,15 @@
       <Layers size={16} aria-hidden="true" />
     </button>
     {/if}
+    {#if !designOnly && onOpenFields}
+      <button type="button" bind:this={triggers.fields} aria-label="Field and loss settings" aria-expanded={open === "fields"} onclick={() => toggle("fields")}
+        class="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-transparent text-slate-300 hover:bg-slate-800 aria-expanded:border-emerald-500 aria-expanded:text-emerald-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
+        title="Field and loss settings. Opens Simulate in a spatial view."><Waves size={16} aria-hidden="true" /></button>
+    {/if}
     {#if !drawingOnly}
     {#if geometry && terminalTool && onStartTerminals}
       <button type="button" bind:this={triggers.terminals} aria-label="Set coil terminals" aria-expanded={open === "terminals"} disabled={terminalsDisabled} onclick={() => toggle("terminals")}
-        class="flex h-8 w-8 items-center justify-center rounded-md border border-transparent text-slate-300 hover:bg-slate-800 aria-expanded:border-emerald-500 aria-expanded:text-emerald-300 disabled:opacity-40 focus-visible:ring-2 focus-visible:ring-emerald-500" title="Select the driver end of each coil.">
+        class="flex h-8 w-8 items-center justify-center rounded-md border border-transparent text-slate-300 hover:bg-slate-800 aria-expanded:border-emerald-500 aria-expanded:text-emerald-300 disabled:opacity-40 focus-visible:ring-2 focus-visible:ring-emerald-500" title="Select the driver end of each coil. Opens Top-down view.">
         <Plug size={16} aria-hidden="true" />
       </button>
     {/if}
@@ -237,6 +246,20 @@
 
   {/if}
   {#if !designOnly}
+  {#if onOpenFields}
+    <!-- Keep the controls mounted while the drawer is closed. Closing a drawer
+         must not discard an audited field or restart its owned worker. -->
+    <div role="dialog" aria-label="Field and loss settings" aria-modal="false" hidden={open !== "fields"} inert={open !== "fields"}
+      class={`${panelClass} ${open !== 'fields' ? 'hidden' : ''} ${showMotorControls ? 'max-lg:bottom-14' : ''}`}>
+      <header class="flex shrink-0 items-center justify-between border-b border-slate-700 px-3 py-2">
+        <h3 class="text-sm font-semibold">Field and loss settings</h3>
+        <button type="button" aria-label="Close field and loss settings panel" onclick={close} class="rounded p-1 text-slate-400 hover:bg-slate-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400"><X size={16} aria-hidden="true" /></button>
+      </header>
+      <div class="min-h-0 overflow-y-auto overscroll-contain">
+        {#if fieldSettings}{@render fieldSettings()}{:else}<p role="status" class="p-3 text-xs text-slate-400">Preparing field controls…</p>{/if}
+      </div>
+    </div>
+  {/if}
   {#if open === "layers"}
     <div role="dialog" aria-label={label} aria-modal="false" class={`${panelClass} ${showMotorControls ? 'max-lg:bottom-14' : ''}`} transition:fly={{ x: 16, duration: 140 }}>
       <header class="flex shrink-0 items-center justify-between border-b border-slate-700 px-3 py-2">

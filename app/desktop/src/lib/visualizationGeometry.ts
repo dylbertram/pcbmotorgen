@@ -10,10 +10,9 @@ export function heatColor(value: number, maximum: number): string {
 }
 
 /** Physics metres, XYZ up, to the existing centered mm, Y-up scene. */
-export function physicalToScene(positionM: number[], scene: Pick<CoilScene, "centerMm" | "scale">, zScale = 1): Vector3 {
+export function physicalToScene(positionM: number[], scene: Pick<CoilScene, "centerMm" | "scale">): Vector3 {
   const p = new Vector3(positionM[0] * 1000, positionM[2] * 1000, -positionM[1] * 1000);
   p.sub(new Vector3(...scene.centerMm)).multiplyScalar(scene.scale);
-  p.y *= zScale;
   return p;
 }
 
@@ -69,7 +68,7 @@ export function mapCopperLoss(geometry: CadGeometry, heat: CopperLossPreview, qu
 }
 
 /** Batched shafts and heads: one draw call, magnitude color in physical tesla. */
-export function fieldGlyphGeometry(field: FieldPreview, scene: CoilScene, zScale: number): BufferGeometry {
+export function fieldGlyphGeometry(field: FieldPreview, scene: CoilScene): BufferGeometry {
   const positions: number[] = [], colors: number[] = [];
   const maximum = Math.max(0, ...field.samples.map(v => v.magnitude_t));
   const length = .32;
@@ -80,8 +79,8 @@ export function fieldGlyphGeometry(field: FieldPreview, scene: CoilScene, zScale
     if (sample.magnitude_t === 0) continue;
     const fraction = maximum > 0 ? sample.magnitude_t / maximum : 0;
     const color = new Color(FIELD_PALETTE[Math.min(FIELD_PALETTE.length - 1, Math.floor(fraction * (FIELD_PALETTE.length - 1)))]);
-    const start = physicalToScene(sample.position_m, scene, zScale);
-    const direction = new Vector3(sample.b_t[0], sample.b_t[2] * zScale, -sample.b_t[1]).normalize();
+    const start = physicalToScene(sample.position_m, scene);
+    const direction = new Vector3(sample.b_t[0], sample.b_t[2], -sample.b_t[1]).normalize();
     const end = start.clone().addScaledVector(direction, length * (.2 + .8 * fraction));
     const side = direction.clone().cross(Math.abs(direction.y) > .9 ? new Vector3(1, 0, 0) : new Vector3(0, 1, 0)).normalize();
     const head = end.clone().addScaledVector(direction, -length * .23);

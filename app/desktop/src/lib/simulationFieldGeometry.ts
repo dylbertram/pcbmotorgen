@@ -62,7 +62,7 @@ function geometry(positions: number[], colors: number[]): BufferGeometry {
 
 /** XZ slice at a selectable physical Y. Magnitude is the norm of the
  * interpolated vector, not an invented scalar texture or a thermal map. */
-export function fieldSliceGeometry(field: FieldPreview, scene: SceneTransform, zScale: number, sliceFraction: number): BufferGeometry {
+export function fieldSliceGeometry(field: FieldPreview, scene: SceneTransform, sliceFraction: number): BufferGeometry {
   const grid = sampledFieldGrid(field), positions: number[] = [], colors: number[] = [];
   const maximum = Math.max(0, ...field.samples.map(s => s.magnitude_t));
   const y = grid.bounds[1][0] + Math.max(0, Math.min(1, sliceFraction)) * (grid.bounds[1][1] - grid.bounds[1][0]);
@@ -80,7 +80,7 @@ export function fieldSliceGeometry(field: FieldPreview, scene: SceneTransform, z
     const values = corners.map(p => grid.sample(p));
     if (values.some(v => !v)) continue;
     for (const i of [0, 1, 2, 0, 2, 3]) {
-      positions.push(...physicalToScene(corners[i], scene, zScale).toArray());
+      positions.push(...physicalToScene(corners[i], scene).toArray());
       colors.push(...fieldColor(Math.hypot(...values[i]!), maximum).toArray());
     }
   }
@@ -91,14 +91,14 @@ export function fieldSliceGeometry(field: FieldPreview, scene: SceneTransform, z
  * 3D trajectory. Color still shows full |B| at that observation. Explicit 3D
  * mode follows XYZ from the same seed plane. Both stop at magnets, domain
  * exits, projected nulls, loops or the fixed step/length cap. */
-export function fieldLineGeometry(field: FieldPreview, scene: SceneTransform, zScale: number, sliceFraction: number, space: "slice" | "3d" = "slice"): BufferGeometry {
+export function fieldLineGeometry(field: FieldPreview, scene: SceneTransform, sliceFraction: number, space: "slice" | "3d" = "slice"): BufferGeometry {
   const grid = sampledFieldGrid(field), positions: number[] = [], colors: number[] = [];
   const maximum = Math.max(0, ...field.samples.map(s => s.magnitude_t));
   const step = Math.min(...grid.spacing) / 6;
   const y = grid.bounds[1][0] + Math.max(0, Math.min(1, sliceFraction)) * (grid.bounds[1][1] - grid.bounds[1][0]);
   const segment = (a: Point, b: Point) => {
     for (const p of [a, b]) {
-      positions.push(...physicalToScene(p, scene, zScale).toArray());
+      positions.push(...physicalToScene(p, scene).toArray());
       colors.push(...fieldColor(Math.hypot(...grid.sample(p)!), maximum).toArray());
     }
   };

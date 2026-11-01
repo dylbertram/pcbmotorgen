@@ -5,21 +5,22 @@ import { physicalMmToScene, sceneToPhysicalMm } from "./spatialMeasureGeometry";
 
 describe("physical 3D measurements", () => {
   const scene = { centerMm: [23, -.4, -4] as [number, number, number], scale: .125 };
-  it("includes physical layer height, not display magnification or scene scale", () => {
-    for (const zScale of [1, 2, 20]) {
+  it("includes physical layer height independently of scene scale", () => {
+    for (const scale of [.01, .125, 2]) {
+      const transform = { ...scene, scale };
       const measure = new SpatialMeasure(); measure.toggleMode();
       const a = { x: 3, y: 4, z: -.8 }, b = { x: 6, y: 8, z: 0 };
-      measure.pick(sceneToPhysicalMm(physicalMmToScene(a, scene, zScale), scene, zScale));
-      measure.pick(sceneToPhysicalMm(physicalMmToScene(b, scene, zScale), scene, zScale));
+      measure.pick(sceneToPhysicalMm(physicalMmToScene(a, transform), transform));
+      measure.pick(sceneToPhysicalMm(physicalMmToScene(b, transform), transform));
       expect(measure.distanceMm).toBeCloseTo(Math.hypot(3, 4, .8), 12);
     }
   });
-  it("does not divide the unexaggerated copper cross-section by the height multiplier", () => {
+  it("preserves picked copper surface heights in a centered scene", () => {
     const layerY = -.4 * scene.scale;
-    const picked = new Vector3(.1, layerY * 20 + .0175 * scene.scale, .5);
-    const physical = sceneToPhysicalMm(picked, scene, 20, layerY);
+    const picked = new Vector3(.1, layerY + .0175 * scene.scale, .5);
+    const physical = sceneToPhysicalMm(picked, scene);
     expect(physical.z).toBeCloseTo(-.8 + .0175, 12);
-    expect(physicalMmToScene(physical, scene, 20).distanceTo(picked)).toBeLessThan(1e-12);
+    expect(physicalMmToScene(physical, scene).distanceTo(picked)).toBeLessThan(1e-12);
   });
   it("supports hover, lock, clear, and does not pick outside measure mode", () => {
     const measure = new SpatialMeasure();

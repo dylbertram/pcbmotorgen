@@ -30,7 +30,7 @@ describe("board XYZ orientation", () => {
     expect(viewportAxes("iso", camera).map(a => a.name)).toContain("Z");
     expect(viewportAxes("iso", null)).toHaveLength(3);
   });
-  it("follows the actual camera orientation but ignores zoom, translation and display Z scale", () => {
+  it("follows the actual camera orientation but ignores zoom and translation", () => {
     const a = viewportAxes("iso", { position: [12, 10, 14], target: [0, 0, 0], up: [0, 1, 0] });
     const b = viewportAxes("iso", { position: [24, 20, 28], target: [12, 10, 14], up: [0, 1, 0] });
     expect(a).toEqual(b);

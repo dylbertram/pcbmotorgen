@@ -17,7 +17,7 @@
   <div style="height:520px">
     <Canvas renderMode="on-demand">
       <CoilPreviewScene {scene} paths={scene.paths} vias={scene.vias} terminals={[]} traceMode="traces" reset={0}
-        command={{ id: 0, zoom: 1 }} zScale={1} {field} {heat} opacity={1} fieldStyle="lines-slice" sliceFraction={.5} sectionView={true} magnets={field?.magnets ?? []} />
+        command={{ id: 0, zoom: 1 }} {field} {heat} opacity={1} fieldStyle="lines-slice" sliceFraction={.5} sectionView={true} magnets={field?.magnets ?? []} />
     </Canvas>
   </div>
   <p style="margin:12px 24px">Actual saved-design {field?.method === "qualified-finite-copper-winding-xyz" ? "finite-copper winding-current samples, including declared return, no magnets" : field?.method === "routed-current-biot-savart-xyz" ? "routed coil-current estimate, external returns omitted, no magnets" : field?.method === "routed-current-plus-pm-xyz" ? "routed coil-current estimate plus analytical PM samples" : "native PM samples"}. Interpolated field lines and XZ magnitude slice in Tesla.</p>

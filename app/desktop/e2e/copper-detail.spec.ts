@@ -36,7 +36,7 @@ test("coil-end markers stay small through zoom while solid annuli and trace cuto
   const fixture=page.getByTestId("physical-copper-detail"),viewer=fixture.getByTestId("coil-iso"),canvas=viewer.locator("canvas");
   await expect(viewer).toHaveAttribute("data-camera",/position/);
   await expect(viewer).toHaveAttribute("data-terminals","2");
-  const masks=[viewer.getByRole("group",{name:"Z height",exact:true}),fixture.getByRole("group",{name:"Zoom controls",exact:true}),viewer.getByRole("img",{name:"Viewport axes: X travel, Y across board, Z up",exact:true})];
+   const masks=[fixture.getByRole("group",{name:"Zoom controls",exact:true}),viewer.getByRole("img",{name:"Viewport axes: X travel, Y across board, Z up",exact:true})];
   const sizes=()=>canvas.screenshot({mask:masks,maskColor:"#ffffff"}).then(image=>markerPixels(page,image));
   await expect.poll(async()=> (await sizes()).length).toBe(2);
   // Center the end annotations before magnifying them. Correct extents no
@@ -69,16 +69,12 @@ test("small terminal annotations still pick exact physical centers rather than c
   const fixture=page.getByTestId("physical-copper-detail"),viewer=fixture.getByTestId("coil-iso"),canvas=viewer.locator("canvas");
   await expect(viewer).toHaveAttribute("data-camera",/position/);
   await fixture.getByRole("button",{name:"Measure terminal centers",exact:true}).click();
-  const masks=[viewer.getByRole("group",{name:"Z height",exact:true}),viewer.getByRole("img",{name:"Viewport axes: X travel, Y across board, Z up",exact:true})];
+   const masks=[viewer.getByRole("img",{name:"Viewport axes: X travel, Y across board, Z up",exact:true})];
   const markers=await markerPixels(page,await canvas.screenshot({mask:masks,maskColor:"#ffffff"}));
   expect(markers).toHaveLength(2);
   const rect=(await canvas.boundingBox())!;
   for(const marker of markers)await page.mouse.click(rect.x+marker.x,rect.y+marker.y);
   await expect(viewer).toHaveAttribute("data-measure-points","2");
-  await expect.poll(async()=>Number(await viewer.getAttribute("data-measure-mm"))).toBeCloseTo(.2475,10);
-  await viewer.getByRole("slider",{name:"Z height scale",exact:true}).focus();
-  await page.keyboard.press("End");
-  await expect(viewer).toHaveAttribute("data-z-scale","20");
   await expect.poll(async()=>Number(await viewer.getAttribute("data-measure-mm"))).toBeCloseTo(.2475,10);
   await page.evaluate(async()=>{await (window as any).closeCopperDetail();});
 });
@@ -113,11 +109,6 @@ test("through-via pads follow trace connections while plating crosses unconnecte
   await page.emulateMedia({ colorScheme: "dark" });
   await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
   await page.screenshot({ path: info.outputPath("connected-annuli-physical-height.png") });
-  await viewer.getByRole("slider", { name: "Z height scale", exact: true }).focus();
-  await page.keyboard.press("End");
-  await expect(viewer).toHaveAttribute("data-z-scale", "20");
-  await expect(viewer).toHaveAttribute("data-via-pads", "3");
-  await page.screenshot({ path: info.outputPath("connected-annuli-continuous-barrel.png") });
   expect(errors).toEqual([]);
   await page.evaluate(async () => { await (window as any).closeConnectedViaPads(); });
 });
