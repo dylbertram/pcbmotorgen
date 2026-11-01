@@ -611,6 +611,7 @@
 
   function selectTab(tab: TabId): void {
     activeTab = tab;
+    if (tab !== "simulate" && previewPanel === "fields") previewPanel = null;
     if (tab !== "simulate") loading = false;
   }
 
@@ -733,6 +734,7 @@
             <div class="min-h-0 flex-1">
               <CoilPreview bind:this={coilPreview} workspace {config} coils={activeCoils} {motion}
                 simulationActive={active && activeTab === "simulate"}
+                onRequestSimulation={() => selectTab("simulate")}
                 active={active && !externalDialogOpen} designSettings={motorSettings}
                 bind:sidePanel={previewPanel} bind:expanded={coilPreviewExpanded} {drive} {driveError} {drivePending}
                 camera={session.camera} view={session.previewView} importedGeometry={projects.cadGeometry}

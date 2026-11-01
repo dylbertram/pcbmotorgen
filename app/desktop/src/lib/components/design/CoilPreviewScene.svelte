@@ -20,7 +20,7 @@
   import CoilTerminalMarkers from "./CoilTerminalMarkers.svelte";
   import type { CopperPad } from "../../viaCopperMesh";
 
-  let { scene, paths, vias, pads = [], viaSize = {diameter:.04,drill:.02}, terminals, traceMode, reset, fit = 0, command, windowCommand = {id:0,a:[0,0],b:[1,1]}, zScale, onCamera, viewMode = "iso", topCamera = null, board = null, showPcb = false, measure = null, field = null, heat = null, opacity = .8, fieldStyle = "lines-slice", sliceFraction = .5, sectionView = false, magnets = [] }: {
+  let { scene, paths, vias, pads = [], viaSize = {diameter:.04,drill:.02}, terminals, traceMode, reset, fit = 0, command, windowCommand = {id:0,a:[0,0],b:[1,1]}, onCamera, viewMode = "iso", topCamera = null, board = null, showPcb = false, measure = null, field = null, heat = null, opacity = .8, fieldStyle = "lines-slice", sliceFraction = .5, sectionView = false, magnets = [] }: {
     scene: CoilScene;
     paths: CopperPath[];
     vias: CoilScene["vias"];
@@ -35,7 +35,6 @@
     onCamera?: (snapshot: { position: number[]; target: number[]; up: number[]; zoom: number; fitZoom: number }) => void;
     viewMode?: "top" | "front" | "left" | "iso";
     topCamera?: TopCameraTransform | null;
-    zScale: number;
     board?: ReturnType<typeof pcbBody> | null;
     showPcb?: boolean;
     measure?: SpatialMeasure | null;
@@ -66,7 +65,6 @@
   let lastFit = 0;
   let fitZoom = 1;
   let lastScene: CoilScene | null = null;
-  let lastZScale = 1;
   let lastField: FieldPreview | null = null;
   let lastSectionView = false;
   // Camera snapshots are imperative navigation state, not reactive geometry.
@@ -108,7 +106,7 @@
   // One controller owns the camera. A separate Bounds controller retains old
   // angles and can silently restore isometric view after selecting XZ.
   $effect(() => {
-    const physicalScene=scene, physicalZScale=zScale, currentField=field, sectional=sectionView, currentReset=reset, currentFit=fit;
+    const physicalScene=scene, currentField=field, sectional=sectionView, currentReset=reset, currentFit=fit;
     const mode = viewMode;
     if (mode === "top" && topCamera) return;
     const viewKey = `${currentReset}:${mode}:${sectional}`;
@@ -121,7 +119,7 @@
       if (cancelled || !camera || !controls || !content) return;
       const width = dom.clientWidth, height = dom.clientHeight;
       stopCoilCameraMotion(camera, controls);
-      const physicalChanged=lastScene!==physicalScene || lastZScale!==physicalZScale || lastReset!==currentReset;
+      const physicalChanged=lastScene!==physicalScene || lastReset!==currentReset;
       if (physicalChanged) cameras.clear(); else rememberPrevious(mode);
       const modeChanged=lastMode!==mode;
       const needsFit=!lastMode || physicalChanged || lastFit!==currentFit
@@ -154,25 +152,25 @@
         controls.target.copy(center); controls.update(); fittedView = viewKey; invalidate();
         reportCamera();
       }
-      lastMode=mode;lastReset=currentReset;lastFit=currentFit;lastScene=physicalScene;lastZScale=physicalZScale;lastField=currentField;lastSectionView=sectional;
+      lastMode=mode;lastReset=currentReset;lastFit=currentFit;lastScene=physicalScene;lastField=currentField;lastSectionView=sectional;
     });
     return () => { cancelled = true; };
   });
   $effect(() => {
-    const top=topCamera, physicalScene=scene, physicalZScale=zScale, width=$size.width,height=$size.height, currentReset=reset;
+    const top=topCamera, physicalScene=scene, width=$size.width,height=$size.height, currentReset=reset;
     if (viewMode !== "top" || !top || !camera || !controls) return;
     let cancelled=false;
     // OrbitControls updates once when damping is disabled. Apply the exact
     // top projection after those prop updates, then leave its frame task off.
     void tick().then(()=>{
       if(cancelled||!camera||!controls)return;
-      if (lastScene!==physicalScene || lastZScale!==physicalZScale || lastReset!==currentReset) cameras.clear();
+      if (lastScene!==physicalScene || lastReset!==currentReset) cameras.clear();
       else rememberPrevious("top");
       const target=alignTopCamera(camera,physicalScene,top,width,height);
       if (!target) return;
       controls.target.copy(target);
       reportCamera();
-      lastMode="top";lastReset=currentReset;lastScene=physicalScene;lastZScale=physicalZScale;invalidate();
+      lastMode="top";lastReset=currentReset;lastScene=physicalScene;invalidate();
     });
     return()=>{cancelled=true;};
   });
@@ -219,16 +217,16 @@
   </T.Mesh>
 {/if}
 {#each batches as batch (batch.key)}
-  <CoilCopperBatch paths={batch.paths} contextPaths={batch.contextPaths} pads={batch.pads} padDiameter={viaSize.diameter} width={scene.width} thickness={batch.thickness} color={batch.color} {zScale} centerlines={traceMode === "centerlines"} />
+  <CoilCopperBatch paths={batch.paths} contextPaths={batch.contextPaths} pads={batch.pads} padDiameter={viaSize.diameter} width={scene.width} thickness={batch.thickness} color={batch.color} centerlines={traceMode === "centerlines"} />
 {/each}
 {#each viaBatches as batch (batch.color)}
-  <CoilCopperBatch paths={batch.paths} width={viaSize.drill} plating={viaSize.plating ?? .025*scene.scale} color={batch.color} {zScale} barrels />
+  <CoilCopperBatch paths={batch.paths} width={viaSize.drill} plating={viaSize.plating ?? .025*scene.scale} color={batch.color} barrels />
 {/each}
-<ViaPadsBatch pads={vias.length ? pads : []} diameter={viaSize.diameter} drill={viaSize.drill} {zScale}/>
-{#if field}<SimulationFieldGlyphs {field} {scene} {zScale} {opacity} style={fieldStyle} {sliceFraction} />{/if}
-<SimulationMagnets {magnets} {scene} {zScale} />
+<ViaPadsBatch pads={vias.length ? pads : []} diameter={viaSize.diameter} drill={viaSize.drill}/>
+{#if field}<SimulationFieldGlyphs {field} {scene} {opacity} style={fieldStyle} {sliceFraction} />{/if}
+<SimulationMagnets {magnets} {scene} />
 </T.Group>
 {/key}
 <!-- Annotation sizes never participate in the physical camera-fit bounds. -->
-<CoilTerminalMarkers {terminals} {scene} {zScale}/>
-{#if measure}<SpatialMeasureScene {scene} {measure} {zScale} />{/if}
+<CoilTerminalMarkers {terminals} {scene}/>
+{#if measure}<SpatialMeasureScene {scene} {measure} />{/if}

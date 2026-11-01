@@ -6,10 +6,10 @@
   import { fieldGlyphGeometry } from "../../visualizationGeometry";
   import { fieldLineGeometry, fieldSliceGeometry, type FieldStyle } from "../../simulationFieldGeometry";
 
-  let { field, scene, zScale, opacity, style, sliceFraction }: { field: FieldPreview; scene: CoilScene; zScale: number; opacity: number; style: FieldStyle; sliceFraction: number } = $props();
+  let { field, scene, opacity, style, sliceFraction }: { field: FieldPreview; scene: CoilScene; opacity: number; style: FieldStyle; sliceFraction: number } = $props();
   const { invalidate } = useThrelte();
-  const geometry = $derived(style === "slice" ? null : style === "arrows" ? fieldGlyphGeometry(field, scene, zScale) : fieldLineGeometry(field, scene, zScale, sliceFraction, style === "lines-3d" ? "3d" : "slice"));
-  const slice = $derived(style === "slice" || style === "lines-slice" ? fieldSliceGeometry(field, scene, zScale, sliceFraction) : null);
+  const geometry = $derived(style === "slice" ? null : style === "arrows" ? fieldGlyphGeometry(field, scene) : fieldLineGeometry(field, scene, sliceFraction, style === "lines-3d" ? "3d" : "slice"));
+  const slice = $derived(style === "slice" || style === "lines-slice" ? fieldSliceGeometry(field, scene, sliceFraction) : null);
   $effect(() => { const current = geometry, currentSlice = slice; invalidate(); return () => { current?.dispose(); currentSlice?.dispose(); }; });
 </script>
 

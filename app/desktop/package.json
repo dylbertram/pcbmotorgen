@@ -13,7 +13,7 @@
     "test:e2e": "playwright install chromium && playwright test",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:report": "playwright show-report",
-    "test:coreless": "playwright test e2e/housing-motion.spec.ts e2e/driver-simulation.spec.ts e2e/periodic-reference.spec.ts e2e/design-workspace.spec.ts e2e/simulation-dock.spec.ts e2e/magnet-count.spec.ts e2e/coil-layers.spec.ts e2e/coil-3d-z-scale.spec.ts e2e/coil-3d-fallback.spec.ts --config playwright.coreless.config.cjs --workers=1",
+    "test:coreless": "playwright test e2e/housing-motion.spec.ts e2e/driver-simulation.spec.ts e2e/periodic-reference.spec.ts e2e/design-workspace.spec.ts e2e/simulation-dock.spec.ts e2e/magnet-count.spec.ts e2e/coil-layers.spec.ts e2e/viewport-scrubber.spec.ts e2e/coil-3d-fallback.spec.ts --config playwright.coreless.config.cjs --workers=1",
     "build:experimental:mac": "tauri build --debug --bundles app --no-sign --ci",
     "shot:mover": "playwright test e2e/mover-screenshots.spec.ts --project=desktop-tauri",
     "test": "vitest run",

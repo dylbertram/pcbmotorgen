@@ -13,10 +13,9 @@ const heat = (): CopperLossPreview => ({ method: "native-resistor-graph-rms-i2r"
     { net: "A", kind: "via", layers: [0, 1], points_m: [[.01, 0, 0], [.01, 0, -.0008]], loss_w: .25, rms_current_a: .5, resistance_ohm: 1 }] });
 
 describe("physical visualization coordinates and conservative loss mapping", () => {
-  it("uses one SI-to-mm/centered/Y-up transform and display-only Z scale", () => {
+  it("uses one physical SI-to-mm/centered/Y-up transform", () => {
     const scene = { centerMm: [5, -.4, -1] as [number, number, number], scale: 1 };
     expect(physicalToScene([.01, .002, -.0008], scene).toArray()).toEqual([5, -.4, -1]);
-    expect(physicalToScene([.01, .002, -.0008], scene, 20).toArray()).toEqual([5, -8, -1]);
     const g = geometry(), before = structuredClone(g); buildCoilScene(g); expect(g).toEqual(before);
   });
   it("maps reversed/reordered native branches onto real primitives and conserves total W", () => {
@@ -70,8 +69,12 @@ describe("physical visualization coordinates and conservative loss mapping", () 
     const scene = buildCoilScene(geometry())!;
     const field: FieldPreview = { method: "analytical-pm-only-xyz", scope: "unit-test data", magnets: [], samples: [
       { position_m: [.005, .001, 0], b_t: [0, 0, .1], magnitude_t: .1 }] };
-    const original = structuredClone(field); const a = fieldGlyphGeometry(field, scene, 1), b = fieldGlyphGeometry(field, scene, 20);
+    const original = structuredClone(field); const a = fieldGlyphGeometry(field, scene);
     expect(a.getAttribute("position").count).toBe(6); expect(a.getAttribute("color").count).toBe(6); expect(field).toEqual(original);
-    expect([...a.getAttribute("position").array]).not.toEqual([...b.getAttribute("position").array]); a.dispose(); b.dispose();
+    const start = physicalToScene(field.samples[0].position_m, scene);
+    const positions = a.getAttribute("position");
+    expect(positions.getY(0)).toBeCloseTo(start.y, 6);
+    expect(positions.getY(1)).toBeGreaterThan(positions.getY(0));
+    a.dispose();
   });
 });

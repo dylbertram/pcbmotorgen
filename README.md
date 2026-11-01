@@ -101,8 +101,11 @@ Imported copper needs phase mapping and confirmed coil ends. Editing inputs
 clears old results; late responses cannot populate another design or tab.
 
 The **3D fields and heat** view defaults to **Coil currents, routed estimate**.
-It does not require a previously audited design. It calculates the routed
-copper's Biot-Savart contribution from signed resistor-graph branch currents,
+Open **Field and loss settings** from the right-hand rail. Opening it selects
+**Simulate** and switches Top-down to 3D, while keeping an existing Front or Left
+view. Opening **Coil ends** selects Top-down so its picking controls are usable.
+The routed estimate does not require a previously audited design. It calculates
+the routed copper's Biot-Savart contribution from signed resistor-graph branch currents,
 including arc chords and vias. Set the electrical angle and phase peak current;
 **Sample active geometry** reruns the field calculation. Sorted phase nets use
 `I_k = I_peak cos(theta - 2 pi k/N)`, positive from input to output. This is an

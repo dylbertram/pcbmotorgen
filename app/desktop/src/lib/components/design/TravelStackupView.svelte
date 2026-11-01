@@ -101,13 +101,13 @@
     try { return config.pcb_stackup_mm ? pcbStackupHeightsMm(config.pcb_stackup_mm) : []; } catch { return []; }
   });
   // One scale for every part, fitted between the top and bottom padding.
-  let zScale = $derived((ORTHO_H - ORTHO_PAD_T - ORTHO_PAD_B) / Math.max(totalMm, 0.1));
+  let pixelsPerMm = $derived((ORTHO_H - ORTHO_PAD_T - ORTHO_PAD_B) / Math.max(totalMm, 0.1));
 
   // Returned top to bottom. Each part's top edge is where the part above it ends.
   let segments = $derived.by(() => {
     let edge = BASE_Y;
     const bottomUp: Segment[] = parts.map((part) => {
-      const segment = { ...part, bottom: edge, top: edge - part.mm * zScale };
+      const segment = { ...part, bottom: edge, top: edge - part.mm * pixelsPerMm };
       edge = segment.top;
       return segment;
     });
@@ -156,7 +156,7 @@
              fill={look.fill} stroke={look.stroke} stroke-width="0.6" />
       {#if seg.kind === "pcb" && config.pcb_stackup_mm}
         {#each copperHeights as z, layer (layer)}
-          <line x1={ORTHO_PAD_L} x2={ORTHO_PAD_L + RECT_W} y1={seg.top - z * zScale} y2={seg.top - z * zScale} stroke="#d99a45" stroke-width={config.pcb_stackup_mm.copper_mm[layer] * zScale} />
+          <line x1={ORTHO_PAD_L} x2={ORTHO_PAD_L + RECT_W} y1={seg.top - z * pixelsPerMm} y2={seg.top - z * pixelsPerMm} stroke="#d99a45" stroke-width={config.pcb_stackup_mm.copper_mm[layer] * pixelsPerMm} />
         {/each}
       {/if}
       {#if seg.inside && h >= MIN_INSIDE_LABEL_PX}

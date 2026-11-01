@@ -18,7 +18,6 @@
     /** Controlled value; two-way bindable (e.g. `bind:value={getter, setter}`). */
     value?: number;
     disabled?: boolean;
-    orientation?: "horizontal" | "vertical";
     /** Accessible name for the slider thumb (role="slider"). */
     ariaLabel: string;
     /** Root classes appended after the base root classes. */
@@ -35,7 +34,6 @@
     step = 1,
     value = $bindable(),
     disabled = false,
-    orientation = "horizontal",
     ariaLabel,
     class: rootClass = "",
     onValueChange,
@@ -50,15 +48,14 @@
   {step}
   bind:value
   {disabled}
-  {orientation}
   {onValueChange}
   {onValueCommit}
-  class="relative flex touch-none select-none items-center {orientation === 'vertical' ? 'h-full flex-col' : 'w-full'} {rootClass}"
+  class="relative flex w-full touch-none select-none items-center {rootClass}"
 >
   <!-- bits-ui 2.x exposes no Track part; the Range positions itself inside
        this plain relative span (shadcn-svelte pattern). -->
-  <span class="relative grow overflow-hidden rounded-full bg-slate-700 {orientation === 'vertical' ? 'h-full w-1' : 'h-1 w-full'}">
-    <Slider.Range class="absolute bg-emerald-500 {orientation === 'vertical' ? 'w-full' : 'h-full'}" />
+  <span class="relative h-1 w-full grow overflow-hidden rounded-full bg-slate-700">
+    <Slider.Range class="absolute h-full bg-emerald-500" />
   </span>
   <Slider.Thumb
     index={0}

@@ -41,7 +41,7 @@ test("magnet visualizer uses true scale and copper heading sits below its divide
   // The default X length and edited Z thickness are equal, so their projected edges must be equal.
   expect(await axisLength("Z")).toBeCloseTo(await axisLength("X"), 5);
   await page.screenshot({ path: testInfo.outputPath("magnet-visualizer.png") });
-  await tools.getByRole("button", { name: "Routing", exact: true }).click();
+  await tools.getByRole("button", { name: "Stackup", exact: true }).click();
   const copper = page.getByRole("region", { name: "Copper", exact: true });
   const heading = copper.getByRole("heading", { name: "Copper", exact: true });
   await heading.scrollIntoViewIfNeeded();
@@ -172,7 +172,7 @@ test("Escape closes only the selected panel and returns focus to its button", as
 test("returning from Simulate repaints canvas pixels and preserves the selected panel", async ({ page }) => {
   await gotoDesignApp(page);
   await page.getByRole("button", { name: "Stackup", exact: true }).click();
-  const canvas = page.locator("#panel-design canvas");
+  const canvas = page.getByTestId("coil-annotations");
   const paintedPixels = () => canvas.evaluate((node: HTMLCanvasElement) => {
     const pixels = node.getContext("2d")!.getImageData(0, 0, node.width, node.height).data;
     let painted = 0;

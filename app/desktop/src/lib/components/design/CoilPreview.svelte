@@ -91,6 +91,7 @@
     workspace = false,
     active = true,
     simulationActive = false,
+    onRequestSimulation,
     designSettings,
     sidePanel = $bindable<PreviewPanelId | null>(null),
     drive = null,
@@ -100,7 +101,7 @@
     onGeometryChange,
     camera,
     view = new CoilPreviewViewState(),
-  }: { config: ConfigStore; coils: CoilPathDto | null; motion: MotionStore; expanded?: boolean; workspace?: boolean; active?: boolean; simulationActive?: boolean; designSettings?: Snippet<[DesignPanelId]>; sidePanel?: PreviewPanelId | null; drive?: DriveAnalysis | null; driveError?: string | null; drivePending?: boolean; importedGeometry?: CadGeometry | null; onGeometryChange?: (geometry: CadGeometry) => void; camera?: PreviewCamera; view?: CoilPreviewViewState } =
+  }: { config: ConfigStore; coils: CoilPathDto | null; motion: MotionStore; expanded?: boolean; workspace?: boolean; active?: boolean; simulationActive?: boolean; onRequestSimulation?: () => void; designSettings?: Snippet<[DesignPanelId]>; sidePanel?: PreviewPanelId | null; drive?: DriveAnalysis | null; driveError?: string | null; drivePending?: boolean; importedGeometry?: CadGeometry | null; onGeometryChange?: (geometry: CadGeometry) => void; camera?: PreviewCamera; view?: CoilPreviewViewState } =
     $props();
 
   export function showDesignSettings(section: DesignPanelId = "routing"): void {
@@ -592,6 +593,7 @@
       embedded={inline}
       {active}
       simulation={visualizationInput}
+      {onRequestSimulation}
       {designSettings}
       bind:sidePanel
       bind:expanded
