@@ -188,17 +188,34 @@ fn board_source(
     cad: Option<&pcbmotorgen_export::cad_dxf::CadGeometry>,
 ) -> Result<(Vec<pcbmotorgen_routing::PhaseCoil>, u32, DesignRules, f64), String> {
     if cad.is_none() { core.design_rules().validate_trace_width()?; }
+    core.validate_for_preview().map_err(|e| e.to_string())?;
     match cad {
         Some(cad) => {
             let board = super::cad_source::CadBoard::new(cad, core)?;
             Ok((board.coils, board.num_layers, board.rules, board.placement_length_mm))
         }
-        None => Ok((
-            core.generate_coils_for_board(),
-            core.num_layers,
-            core.design_rules(),
-            core.active_area_length_m * 1e3,
-        )),
+        None => {
+            let routing = pcbmotorgen_routing::generate_routing_result(&core.routing_context(), &core.routing_pattern_id())?;
+            let coils = pcbmotorgen_routing::routing_result_to_phase_coils(&routing, &core.routing_pattern_id());
+            Ok((coils, core.num_layers, core.design_rules(), core.active_area_length_m * 1e3))
+        }
+    }
+}
+
+#[cfg(test)]
+mod motor_spacing_limits {
+    use super::*;
+
+    #[test]
+    fn board_source_rejects_bad_magnet_pitch_and_unfittable_openings_without_ipc() {
+        let mut config = crate::ipc::ProjectConfigStateIpc::default().to_linear_motor_ipc();
+        config.magnet_pitch_m = config.magnet_width_m - 1e-12;
+        assert!(board_source(&config.to_core(), None).unwrap_err().contains("magnet width"));
+        config.magnet_pitch_m = 0.006;
+        config.magnet_count = 2;
+        config.num_layers = 8;
+        config.active_area_length_m = 0.025;
+        assert!(board_source(&config.to_core(), None).unwrap_err().contains("9 braid periods"));
     }
 }
 

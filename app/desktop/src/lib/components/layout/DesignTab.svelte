@@ -108,15 +108,15 @@
                 label="About electrical pitch"
                 image={electricalPitchSvg}
                 imageAlt="One electrical cycle spans a north and south pole."
-                tip="One electrical cycle spans two alternating poles."
+                tip="A cycle spans two poles. Pitch must be at least twice the magnet X length. Generated copper follows pitch; imported copper does not."
                 equation={String.raw`\tau_p = \frac{P_e}{2}`}
               /></span
             >
             <NumberField
               id="electrical-pitch"
               value={config.electrical_pitch_mm}
-              min={0.1}
-              max={40}
+              min={Math.max(0.1, config.min_electrical_pitch_mm)}
+              max={Math.min(40, config.max_electrical_pitch_mm)}
               step={0.1}
               ariaLabel="Electrical pitch P_e (mm)"
               class="w-24 shrink-0 px-2 py-1 text-xs font-mono text-emerald-200"

@@ -15,6 +15,9 @@ async function useNativeBraid(page: Page) {
 
 test("source variants own the winding connection and preserve routing settings", async ({ page }) => {
   await gotoDesignApp(page);
+  const polarity = page.getByRole("combobox", { name: "Star winding polarity", exact: true });
+  await expect(polarity).toHaveValue("1");
+  await polarity.selectOption("0");
   const strands = page.getByRole("spinbutton", { name: "Strands per period", exact: true });
   await strands.fill("5");
   await strands.press("Enter");
@@ -26,6 +29,9 @@ test("source variants own the winding connection and preserve routing settings",
   await expect(panel.getByLabel("Generator winding connection")).toHaveText("Delta");
   await expect(panel.getByRole("combobox", { name: "Winding connection", exact: true })).toHaveCount(0);
   await selectRoutingConnection(page, "star");
+  await expect(polarity).toHaveValue("0");
+  await polarity.selectOption("1");
+  await expect(polarity).toHaveValue("1");
   await expect(strands).toHaveValue("5");
   await page.getByRole("button", { name: "Set coil terminals", exact: true }).click();
   await expect(panel.getByLabel("Generator winding connection")).toHaveText("Star (Wye)");

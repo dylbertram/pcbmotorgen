@@ -48,6 +48,12 @@
 //! `2τ_p/3` (phase_offset = 2π/3) viewed from a frame rotated 90° from the
 //! one pinned here; those currents sum to zero at every θ_e
 //! (pinned by `test_balanced_120deg_law_special_case` below).
+//!
+//! A pole-matched star explicitly sets `balanced_three_phase_drive`. Its
+//! physical belts remain 60 degrees apart but alternating terminal polarity
+//! gives directed A/B/C axes 120 degrees apart. That command uses balanced
+//! terminal offsets, not physical band centerlines. The common alignment is
+//! still obtained from the signed routed force response, not a hardware encoder.
 
 use serde::{Deserialize, Serialize};
 
@@ -136,8 +142,19 @@ pub(crate) fn commutation_currents(
     // layout, r·π/3 for a Vernier spacing ratio r.
     let theta_e = 2.0 * std::f64::consts::PI * mover_position_m / (2.0 * config.pole_pitch_m())
         + phase_shift;
-    let offsets = declared_phase_offsets(config, phase_labels)
-        .unwrap_or_else(|| analytic_phase_offsets(config, phase_labels));
+    let offsets = if config.balanced_three_phase_drive {
+        // The pole-matched generator has already connected the physical
+        // belts with alternating polarity and labeled the terminals A/B/C.
+        // Do not mistake its 60-degree physical belt pitch for directed axes.
+        phase_labels.iter().map(|label| match *label {
+            "A" => 0.0, "B" => std::f64::consts::TAU / 3.0,
+            "C" => 2.0 * std::f64::consts::TAU / 3.0,
+            _ => f64::NAN, // Invalid labels must not produce a usable command.
+        }).collect()
+    } else {
+        declared_phase_offsets(config, phase_labels)
+            .unwrap_or_else(|| analytic_phase_offsets(config, phase_labels))
+    };
 
     (0..phase_labels.len())
         .map(|p| i_pk * (theta_e - offsets[p]).cos())
@@ -196,6 +213,20 @@ fn analytic_phase_offsets(config: &SimulationInput, phase_labels: &[&str]) -> Ve
 mod tests {
     use super::*;
     use crate::params::PhaseBandPosition;
+
+    #[test]
+    fn pole_matched_terminal_command_is_balanced_independent_of_physical_belt_positions() {
+        let cfg = SimulationInput { balanced_three_phase_drive: true, ..Default::default() };
+        for n in 0..48 {
+            let x = 2.0 * cfg.pole_pitch_m() * n as f64 / 48.0;
+            let currents = commutation_currents(CommutationMode::MaxThrust, 0.3, &cfg, x,
+                &["C", "A", "B", "A", "B", "C"]);
+            assert!(currents[..3].iter().sum::<f64>().abs() < 1e-12);
+            assert_eq!(currents[1], currents[3]);
+            assert_eq!(currents[2], currents[4]);
+            assert_eq!(currents[0], currents[5]);
+        }
+    }
 
     #[test]
     fn repeated_phase_layers_share_current() {

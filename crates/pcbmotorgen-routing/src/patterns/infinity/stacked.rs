@@ -1,5 +1,7 @@
 //! Even-layer star/wye stack. Only the opening moves between pairs, by one
-//! complete braid period per pair from the driver side toward the neutral.
+//! complete braid period per pair in reference mode, or two in pole-matched
+//! mode, from the driver side toward the neutral. Pole-matched mode also
+//! staggers phase cuts to alternate phase-belt polarity.
 //! The XY braid itself is copied without translation or terminal reversal.
 
 use super::{BraidGeometry, Connection};
@@ -14,14 +16,24 @@ pub(super) fn stack_and_terminate(
     ctx: &RoutingContext,
 ) -> Result<(), RoutingError> {
     let pairs = ctx.num_layers / 2;
-    if connection != Connection::Closed && pairs as i64 > periods {
+    let matched = connection == Connection::Star && ctx.param("pole_matched", 0.0) == 1.0;
+    let pair_step = if matched { 2 } else { 1 };
+    // Consecutive physical phase belts open at periods 0/1/2. The middle
+    // belt therefore reverses its winding sense without moving any trace.
+    // Successive layer pairs advance by two pole pitches, not one half-cycle.
+    let phase_step = if matched { ends.len() as u32 - 1 } else { 0 };
+    let required_periods = pair_step * (pairs - 1) + phase_step + 1;
+    if connection != Connection::Closed && required_periods as i64 > periods {
         return Err(RoutingError::new(0, "num_layers", RoutingErrorKind::Generation,
-            "the staggered star openings need at least one braid period per layer pair; increase active length or reduce layer count"));
+            format!("the staggered star openings need {required_periods} braid periods; increase active length or reduce layer count")));
     }
     let base_segments = std::mem::take(&mut geometry.segments);
     let base_vias = std::mem::take(&mut geometry.vias);
     let base_bands = std::mem::take(&mut geometry.phase_bands);
-    let shifted = |p: Point, stage: u32| Point::new(p.x + stage as f64 * period, p.y);
+    let shifted = |p: Point, stage: u32, phase: usize| {
+        let phase_periods = if matched { phase as u32 } else { 0 };
+        Point::new(p.x + (stage * pair_step + phase_periods) as f64 * period, p.y)
+    };
     for pair in 0..pairs {
         let stage = pairs - 1 - pair;
         geometry.segments.extend(base_segments.iter().map(|s| {
@@ -35,12 +47,13 @@ pub(super) fn stack_and_terminate(
             b
         }));
         let mut vias = base_vias.clone();
-        if connection != Connection::Closed && stage != 0 {
+        if connection != Connection::Closed {
             // Restore the first-period cut before opening this pair at its
             // own period. Leaving both out splits a winding into two pieces.
-            for (net, brk, _) in ends {
+            for (phase, (net, brk, _)) in ends.iter().enumerate() {
+                let target = shifted(*brk, stage, phase);
+                if target == *brk { continue; }
                 vias.push(Via { position: *brk, from_layer: 0, to_layer: 1, net: net.clone() });
-                let target = shifted(*brk, stage);
                 let before = vias.len();
                 vias.retain(|v| v.net != *net || v.position.distance_to(target) > 1e-9);
                 if vias.len() + 1 != before {
@@ -80,17 +93,18 @@ pub(super) fn stack_and_terminate(
     let extend = |p: Point, dx_dy: f64, y: f64| Point::new(p.x + dx_dy * (y - p.y), y);
     let last = ctx.num_layers - 1;
     for (i, (net, brk, outward)) in ends.iter().enumerate() {
+        let driver_break = shifted(*brk, 0, i);
         let k = (outward.x / outward.y).abs();
         let y = brk.y + (i + 1) as f64 * row_pitch;
         // Driver trace bends left on the top layer. Each series step bends
         // right on the outgoing even layer, then reaches the next opening
         // along the following odd layer. No full barrel shares another step.
-        let driver = extend(*brk, -k, y);
-        trace(geometry, net, last, *brk, driver);
+        let driver = extend(driver_break, -k, y);
+        trace(geometry, net, last, driver_break, driver);
         trace(geometry, net, last, driver, Point::new(0.0, y));
         for stage in 0..pairs - 1 {
-            let from = shifted(*brk, stage);
-            let to = shifted(*brk, stage + 1);
+            let from = shifted(*brk, stage, i);
+            let to = shifted(*brk, stage + 1, i);
             let join = extend(from, k, y);
             let corner = extend(to, -k, y);
             if join.x >= corner.x {
@@ -103,11 +117,11 @@ pub(super) fn stack_and_terminate(
             trace(geometry, net, layer - 1, corner, join);
             geometry.vias.push(Via { position: join, from_layer: 0, to_layer: last, net: net.clone() });
         }
-        let end = shifted(*brk, pairs - 1);
+        let end = shifted(*brk, pairs - 1, i);
         let neutral = Point::new(end.x, end.y + row_pitch);
         trace(geometry, net, 0, end, neutral);
         if i + 1 < ends.len() {
-            let next = shifted(ends[i + 1].1, pairs - 1);
+            let next = shifted(ends[i + 1].1, pairs - 1, i + 1);
             let owner = if i == 0 { net } else { &ends[i + 1].0 };
             trace(geometry, owner, 0, neutral, Point::new(next.x, neutral.y));
         }

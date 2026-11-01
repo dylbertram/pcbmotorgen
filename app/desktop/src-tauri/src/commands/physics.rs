@@ -492,6 +492,35 @@ mod coreless_envelope_tests {
     use super::*;
 
     #[test]
+    fn oversized_magnets_are_rejected_before_preview_force_or_export() {
+        let mut config = crate::ipc::ProjectConfigStateIpc::default().to_linear_motor_ipc();
+        config.magnet_pitch_m = config.magnet_width_m - 1e-12;
+        let drive = pcbmotorgen_simulation::drive::DriveSettings::default();
+        let errors = [
+            tauri::async_runtime::block_on(generate_coils(config.clone())).unwrap_err(),
+            tauri::async_runtime::block_on(evaluate_force_sweep(config.clone(), None, Some(drive))).unwrap_err(),
+            tauri::async_runtime::block_on(super::super::dxf::editable_coil_geometry(config.clone())).unwrap_err(),
+            tauri::async_runtime::block_on(super::super::dxf::export_coils_dxf(config.clone())).unwrap_err(),
+        ];
+        assert!(errors.iter().all(|e| e.contains("magnet width")), "{errors:?}");
+        assert_eq!(config.magnet_pitch_m, config.magnet_width_m - 1e-12);
+    }
+
+    #[test]
+    fn unfittable_pole_matched_openings_cannot_be_frozen_or_exported_as_empty_copper() {
+        let mut config = crate::ipc::ProjectConfigStateIpc::default().to_linear_motor_ipc();
+        config.num_layers = 8;
+        config.magnet_count = 2;
+        config.active_area_length_m = 0.025;
+        let errors = [
+            tauri::async_runtime::block_on(generate_coils(config.clone())).unwrap_err(),
+            tauri::async_runtime::block_on(super::super::dxf::editable_coil_geometry(config.clone())).unwrap_err(),
+            tauri::async_runtime::block_on(super::super::dxf::export_coils_dxf(config)).unwrap_err(),
+        ];
+        assert!(errors.iter().all(|e| e.contains("9 braid periods")), "{errors:?}");
+    }
+
+    #[test]
     fn preview_updates_below_the_manufacturing_width_floor_without_approving_export_or_physics() {
         let mut config = crate::ipc::ProjectConfigStateIpc::default().to_linear_motor_ipc();
         let mut previous = None;
@@ -708,7 +737,11 @@ mod analyze_drive_tests {
         if std::env::var_os("PCB_MOTOR_PROJECT_PATH").is_none() {
             ipc.routing_params.insert("connection".into(), 2.0);
         }
-        if driver_reference { ipc.min_trace_m = 0.0005; ipc.trace_width_m = 0.0005; }
+        if driver_reference {
+            // Preserve the independently checked historical reference fixture.
+            ipc.routing_params.insert("pole_matched".into(), 0.0);
+            ipc.min_trace_m = 0.0005; ipc.trace_width_m = 0.0005;
+        }
         let core = ipc.to_core();
         let (routing, sim, hints) = if let Some(cad) = cad.as_ref() {
             let board = crate::commands::cad_source::CadBoard::new(cad, &core).unwrap();
@@ -766,8 +799,20 @@ mod analyze_drive_tests {
                 }).collect::<Vec<_>>(),
                 "rust_current_share":solution.current_share, "rust_resistance_ohm":solution.resistance_ohm})
         }).collect();
+        let signed_force_audit = std::env::var_os("PCB_MOTOR_SIGNED_FORCE_MAP").map(|_| {
+            let bounds = evaluator.sweep_center_limits_m(&sim).unwrap();
+            let map: Vec<_> = (0..193).map(|i| {
+                let x = bounds.0 + (bounds.1 - bounds.0) * i as f64 / 192.0;
+                serde_json::json!({"position_m":x,
+                    "force_n_per_a":evaluator.unit_phase_force_constants_at(&sim, x).unwrap()})
+            }).collect();
+            serde_json::json!({"phase_names":coils.iter().map(|c| &c.phase_name).collect::<Vec<_>>(),
+                "full_overlap_bounds_m":[bounds.0,bounds.1], "electrical_period_m":2.0*sim.pole_pitch_m(),
+                "meshing":meshing, "force_map":map})
+        });
         let out = serde_json::json!({"routing": routing, "sim": sim, "drive": state.drive, "geometry_hints": {"layer_z_m": hints.layer_z_m}, "field_x_m": points, "rust_b_t": b,
             "networks": networks, "force_subdivisions": evaluator.meshing,
+            "signed_force_audit":signed_force_audit,
             "phase_samples":phase_samples,"excitation_currents_a":excitation,"driver_reference":driver_analysis,
             "phase_a_samples": samples, "force_positions_m": force.positions_m, "rust_force_x_n": force.force_x_n});
         let bytes = serde_json::to_vec(&out).unwrap();
@@ -907,6 +952,7 @@ mod analyze_drive_tests {
         for width_mm in [0.5] {
             let mut ipc = crate::ipc::ProjectConfigStateIpc::default().to_linear_motor_ipc();
             ipc.routing_params.insert("connection".into(), 2.0);
+            ipc.routing_params.insert("pole_matched".into(), 0.0); // Historical geometry/excitation reference.
             ipc.min_trace_m = width_mm * 1e-3;
             ipc.trace_width_m = width_mm * 1e-3;
             ipc.n_positions = 25;

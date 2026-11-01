@@ -239,7 +239,7 @@ impl Default for ProjectConfigStateIpc {
             routing_pattern: "infinity-braid".to_string(),
             // New driver-ready projects use terminated star windings. Bare
             // routing contexts can still explicitly request closed rings.
-            routing_params: HashMap::from([("connection".into(), 2.0)]),
+            routing_params: HashMap::from([("connection".into(), 2.0), ("pole_matched".into(), 1.0)]),
             routing_orientation: Default::default(),
             phases: 3,
             num_layers: 4,

@@ -29,6 +29,7 @@ def harmonic(x, force, period):
 def audit(fixture_path, force_path):
     fixture = json.loads(fixture_path.read_text())
     native = json.loads(force_path.read_text())
+    native = native.get('signed_force_audit') or native
     if fixture['force_subdivisions'] != native['meshing']:
         raise ValueError('Conductor meshes differ')
     sim, settings, hints = fixture['sim'], fixture['drive'], fixture['geometry_hints']

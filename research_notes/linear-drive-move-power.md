@@ -7,6 +7,125 @@ remain as a record of what was implemented and tested, not current requirements.
 
 ## Supported model
 
+### Pole-matched star termination and magnet limits, 2026-10-31
+
+Work tracked as pcbmotorgen#vw89, following the user's request to resolve the
+pole mismatch and prevent destructive magnet-spacing choices.
+
+The new `infinity-braid` parameter `pole_matched = 1` changes physical star
+terminations, not simulated current signs or active trace positions:
+
+- Adjacent layer-pair openings advance by **two pole pitches**, one complete
+  electrical cycle. The reference's one-pole opening step reverses the pair's
+  force sense and causes cancellation.
+- Physical phase-belt openings advance by one pole pitch each. This reverses
+  the middle belt's terminal polarity. B/C terminal labels are exchanged to
+  obtain the conventional directed A/B/C sequence, without widening bundles.
+  Travel mirroring reverses the sequence too, so the generator compensates
+  terminal labels before the host applies an X mirror. Y mirrors and layer
+  reversal do not require that phase-order exchange.
+- The application maps this explicit option to a balanced three-phase terminal
+  command for static force. Physical 60-degree belt positions no longer stand
+  in for directed terminal axes. The common reference still comes from the
+  signed geometry response, not measured hardware calibration.
+- New project defaults explicitly select the correction. Missing/zero saved
+  parameters retain reference wiring. Delta and closed geometry are unchanged.
+  Pole-matched mode requires three phases, a magnetic pitch and sufficient
+  complete braid periods for the cuts. It never stretches or crops the body
+  to fit extra terminations. Existing supplied files are not rewritten.
+
+The electrical-pitch editor now constrains a committed pitch to the existing
+supported 0.5..1.0 pole-fill range for the actual magnet length. In particular,
+`P_e >= 2 * magnet_X_length`: a 5 mm magnet needs at least 10 mm electrical
+pitch, or 5 mm adjacent N/S pole pitch. Changing magnet length also updates
+the pitch bounds. Editing one field does not silently resize the other.
+Backend preview, simulation, move and export validation reject nonfinite
+dimensions/pitches and any negative inter-magnet gap, including overlaps that
+previously fell inside a numerical tolerance. A magnet exactly one pole long
+is not an electrical mismatch. The existing >0.85 fill warning is not promoted
+to an invented physical inhibition threshold.
+
+Model version `linear-move-demand-v12` distinguishes the new option. The old
+DRV8311 numerical fixture explicitly retains reference terminations and its
+independently verified literals. Old power receipts below do not describe the
+corrected design. No replacement move-power, electrical-efficiency or hardware
+qualification claim follows from force cancellation being fixed.
+
+Reproduce the independent comparison, preserving the original design:
+
+```sh
+CARGO_TARGET_DIR=<build-cache> RAYON_NUM_THREADS=4 OPENBLAS_NUM_THREADS=1 \
+  python3 scripts/solvers/audit_pole_matched_braid.py \
+  Fader-traces-workspace.pmmotor <new-exclusive-evidence-directory> --audit08
+```
+
+`current` keeps the actual supplied generated design's 1.6 mm PCB, 0.127 mm
+traces, layer reversal and drive settings. `audit08` explicitly repeats the
+earlier 0.8 mm / 0.2 mm / four-layer / three-strand / 1 oz scenario. Neither is
+the old imported Fader copper. Each reference/matched pair exports actual
+native resistor graphs and signed force maps at meshes 20 and 40, independently
+reconstructs currents, resistance and prescribed-PM force, and checks layer
+summation and directed phase axes. Active trace coordinates must agree after
+the explicit B/C relabeling. Manufacturing clearances remain a separate DFM
+check; the existing through-only KiCad writer guard remains.
+
+Independent results at mesh 40, with mesh-20 refinement passing the unchanged
+2% force gate:
+
+| Explicit case | Reference retained layer amplitude | Pole-matched retained amplitude | Per-phase force-amplitude gain |
+| --- | ---: | ---: | ---: |
+| Current saved 1.6 mm / 0.127 mm | 32.19..32.21% | 99.41..99.50% | 3.093..3.097 |
+| Prior 0.8 mm / 0.2 mm scenario | 16.71..16.73% | 99.67..99.72% | 5.970..5.977 |
+
+These are force-harmonic cancellation ratios, **not electrical efficiencies**.
+The corrected directed-axis sequence differs from ideal A/B/C 120 degrees by
+at most 0.042 degrees in the current case and 0.028 degrees in the thin-board
+scenario. Independent all-phase layer summation agrees with native signed
+force to at most 3.58e-12 N/A. Native regressions cover 19 geometry/orientation
+cases, balanced zero-sum commands, positive sweeps and constructive force growth
+with populated layer pairs. The original uniform finite-end grid tests remain.
+
+The requested limits audit found that generated DXF and editable-geometry
+commands previously checked trace width but skipped full physical validation.
+They and board-source preparation now validate magnet geometry before work
+and propagate routing errors instead of converting a rejected route into an
+empty coil list. Direct tests exercise invalid pitch and insufficient opening
+length without connecting to a live board. A single-phase imported stackup
+must not inherit a three-phase command from new-project defaults; the bridge
+now explicitly checks phase count, with its original copper/heat test retained.
+
+Accepted numerical evidence is in
+`scripts/solvers/results/pole-matched-braid-2026-10-31.json`. Full receipts live
+under approved temp `pole-matched-independent-verified-20261031`; aggregate
+SHA-256 is `86dc3a300d10829d2f0d37b4abdc2e3c74d150d33e5a4143fe57e7c2339c10a1`.
+The earlier `pole-matched-independent-20261031` receipt is preserved separately,
+before the final export/phase-count guard changes. The source archive hash is
+`45403b42fd70a6e4c345c20e1c6db3aecbbb27e147b42d8ecd5597d523d437ff` and remains
+unchanged. This is the currently supplied generated archive, not the older
+imported archive with SHA-256 `567d9790...` used in historical sections below.
+
+`reports/Fader-pole-matched.pmmotor` is a separate corrected copy. JSON comparison
+confirms only `pole_matched = 1` and its descriptive label differ from the source.
+The actual native end geometry was plotted and visually inspected. A separate
+conservative finite-pad distance check still finds a 0.055556 mm series-pad
+edge gap versus the 0.127 mm rule; the thin-board scenario also retains a
+0.094444 mm series-pad/trace gap. These existing exact-spacing manufacturing
+warnings are not hidden or treated as acceptance. #7744 remains open for a new
+power run and the previously named controller/material/hardware limitations.
+
+Final validation: `cargo test --workspace` passes 758 tests, with 28 explicit
+ignores and no compiler warnings. All 652 frontend unit tests pass, with 12
+optional skips; type checking has zero errors/warnings and the production build
+passes with its existing bundle-size warning. The affected browser suite passes
+22 cases at both desktop widths, with eight native-terminal-fixture cases
+explicitly skipped because those optional preview fixtures were not configured.
+All nine Python commutation/layer/pole-audit tests pass. Failed intermediate
+receipts are retained, including the export-validation bypass and the corrected
+single-phase default-policy failure. The accepted Rust log is
+`pole-matched-workspace-verified-20261031.log` in approved temp. No live board
+write, hardware measurement, nonlinear campaign, source-file overwrite or push
+was performed.
+
 ### Current generated four-layer, 0.8 mm power/alignment audit, 2026-10-31
 
 The user selected the **current generated** four-layer, three-strand Star/Wye

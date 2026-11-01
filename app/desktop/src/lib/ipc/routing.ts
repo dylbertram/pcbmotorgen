@@ -36,6 +36,12 @@ export async function listRoutingPatterns(): Promise<RoutingPatternInfo[]> {
 /** Browser-mode mirror of the bundled braid's declared parameters. */
 const MOCK_BRAID_PARAMS: RoutingParamDef[] = [
   {
+    key: "pole_matched", label: "Star winding polarity", param_type: "int",
+    description: "Pole-matched star uses a full electrical cycle between layer-pair openings and alternating phase-belt polarity. It changes the terminations and swaps B/C labels, not the active copper positions. Reference preserves the supplied termination geometry. Delta and closed windings are unchanged.",
+    default: 0, min: 0, max: 1, step: 1,
+    options: [{ value: 0, label: "Reference terminations" }, { value: 1, label: "Pole-matched terminations" }],
+  },
+  {
     key: "num_strands",
     label: "Strands per period",
     description: "Number of parallel braided paths in each period.",

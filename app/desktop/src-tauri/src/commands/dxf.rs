@@ -40,9 +40,10 @@ pub struct DxfExportSummary {
 pub async fn editable_coil_geometry(config: LinearMotorConfigIpc) -> Result<CadGeometry, String> {
     let core = config.to_core();
     core.design_rules().validate_trace_width()?;
-    if let Some(stack) = &core.pcb_stackup { stack.validate(core.num_layers, core.pcb_thickness_m)?; }
+    core.validate_for_preview().map_err(|e| e.to_string())?;
     tauri::async_runtime::spawn_blocking(move || {
-        let coils = core.generate_coils_for_board();
+        let routing = pcbmotorgen_routing::generate_routing_result(&core.routing_context(), &core.routing_pattern_id())?;
+        let coils = pcbmotorgen_routing::routing_result_to_phase_coils(&routing, &core.routing_pattern_id());
         let mut geometry = phase_coils_to_cad_geometry(
             &coils,
             core.num_layers,
@@ -68,9 +69,10 @@ pub async fn editable_coil_geometry(config: LinearMotorConfigIpc) -> Result<CadG
 pub async fn export_coils_dxf(config: LinearMotorConfigIpc) -> Result<DxfExportResult, String> {
     let core = config.to_core();
     core.design_rules().validate_trace_width()?;
-    if let Some(stack) = &core.pcb_stackup { stack.validate(core.num_layers, core.pcb_thickness_m)?; }
+    core.validate_for_preview().map_err(|e| e.to_string())?;
     tauri::async_runtime::spawn_blocking(move || {
-        let coils = core.generate_coils_for_board();
+        let routing = pcbmotorgen_routing::generate_routing_result(&core.routing_context(), &core.routing_pattern_id())?;
+        let coils = pcbmotorgen_routing::routing_result_to_phase_coils(&routing, &core.routing_pattern_id());
         let num_layers = core.num_layers;
         let rules = core.design_rules();
         let mut geometry = phase_coils_to_cad_geometry(

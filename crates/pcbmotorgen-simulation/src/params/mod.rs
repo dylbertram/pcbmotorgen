@@ -160,6 +160,12 @@ pub struct SimulationInput {
     #[serde(default)]
     pub phase_bands: Vec<PhaseBandPosition>,
 
+    /// Explicit balanced A/B/C terminal command for a pole-matched star.
+    /// Physical phase-band positions alone do not encode terminal polarity.
+    /// False preserves the legacy independent-coil law for old inputs.
+    #[serde(default)]
+    pub balanced_three_phase_drive: bool,
+
     // --- Backplane and housing (t707) ---
     /// Stack of soft or non-magnetic layers and an optional housing below the
     /// PCB. `None` (the default) leaves every result unchanged.
@@ -200,6 +206,7 @@ impl Default for SimulationInput {
             max_accel_m_s2: 2.0,
             capacitor_bank_uf: 1000.0,
             phase_bands: Vec::new(),
+            balanced_three_phase_drive: false,
             backplane: None,
         }
     }

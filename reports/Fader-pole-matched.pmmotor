@@ -1,0 +1,92 @@
+{
+  "format": "pcbmotorgen-coil",
+  "format_version": 1,
+  "document_type": "motor",
+  "app_version": "0.5.0",
+  "saved_at_unix_ms": 1793482472635,
+  "next_version_id": 2,
+  "versions": [
+    {
+      "id": 1,
+      "description": "Pole-matched star termination variant. Original magnet geometry, 1.6 mm PCB, 0.127 mm traces and layer reversal preserved. Numerical force validation only, not manufacturing or hardware qualification.",
+      "created_at_unix_ms": 1791722497331,
+      "last_edited_at_unix_ms": 1793482472635,
+      "state": {
+        "document_type": "motor",
+        "config": {
+          "topology": "linear",
+          "desired_travel_mm": 63.0,
+          "active_area_width_mm": 8.0,
+          "strands_per_phase": 2,
+          "magnet_count": 5,
+          "magnet_width_mm": 5.0,
+          "magnet_cross_width_mm": 5.0,
+          "magnet_height_mm": 3.0,
+          "magnet_grade": "N44",
+          "magnet_remanence_t": 1.34,
+          "air_gap_mm": 0.5,
+          "electrical_pitch_mm": 12.0,
+          "routing_pattern": "infinity-braid",
+          "routing_params": {
+            "connection": 2.0,
+            "num_strands": 3.0,
+            "pole_matched": 1.0
+          },
+          "routing_orientation": {
+            "mirror_x": false,
+            "mirror_y": false,
+            "reverse_layers": true
+          },
+          "phases": 3,
+          "num_layers": 4,
+          "max_current_a": 1.0,
+          "supply_voltage_v": 12.0,
+          "target_force_n": 0.5,
+          "peak_force_n": 1.0,
+          "friction_n": 0.05,
+          "carriage_mass_kg": 0.015,
+          "carriage_mass_source": "assembly",
+          "max_accel_m_s2": 2.0,
+          "capacitor_bank_uf": 1000.0,
+          "commutation": "max_thrust",
+          "n_positions": 50,
+          "meshing": 20,
+          "min_trace_mm": 0.127,
+          "trace_width_mm": 0.127,
+          "min_space_mm": 0.127,
+          "min_via_drill_mm": 0.3,
+          "min_via_annular_ring_mm": 0.1,
+          "pcb_thickness_mm": 1.6,
+          "max_layers": 12,
+          "drive_frequency_hz": 500.0,
+          "max_temperature_rise_c": 20.0,
+          "drive": {
+            "driver": {
+              "name": "DRV8311",
+              "supports_delta": false,
+              "min_supply_v": 3.0,
+              "max_supply_v": 20.0,
+              "peak_current_a": 5.0,
+              "continuous_rms_a": 1.5,
+              "rds_on_ohm": 0.21,
+              "max_pwm_hz": 200000.0
+            },
+            "pwm_hz": 100000.0,
+            "target_speed_m_s": 0.5,
+            "outer_copper_oz": 1.0,
+            "inner_copper_oz": 1.0,
+            "via_plating_m": 0.000025,
+            "winding_temp_c": 75.0,
+            "allowed_rise_c": 20.0,
+            "ripple_limit_fraction": 0.3,
+            "voltage_headroom": 0.85,
+            "series_inductance_h": 0.000047
+          },
+          "backplane": null
+        },
+        "mover_position_mm": 41.4,
+        "cad_geometry": null
+      }
+    }
+  ]
+}

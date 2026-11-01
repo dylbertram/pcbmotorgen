@@ -52,7 +52,7 @@ impl LinearMotorConfig {
                 "magnet_dims_m must be a 3-tuple (width, length, height)".into(),
             ));
         }
-        if self.magnet_dims_m.iter().any(|&d| d <= 0.0) {
+        if self.magnet_dims_m.iter().any(|&d| !d.is_finite() || d <= 0.0) {
             return Err(ConfigError(format!(
                 "All magnet dimensions must be positive, got {:?}",
                 self.magnet_dims_m
@@ -67,14 +67,14 @@ impl LinearMotorConfig {
         if self.magnet_count > pcbmotorgen_simulation::params::MAX_MAGNET_COUNT {
             return Err(ConfigError(format!("magnet_count must be ≤ {}, got {}", pcbmotorgen_simulation::params::MAX_MAGNET_COUNT, self.magnet_count)));
         }
-        if self.magnet_pitch_m <= 0.0 {
+        if !self.magnet_pitch_m.is_finite() || self.magnet_pitch_m <= 0.0 {
             return Err(ConfigError(format!(
                 "magnet_pitch_m must be positive, got {}",
                 self.magnet_pitch_m
             )));
         }
         let assembly_gap = self.magnet_pitch_m - self.magnet_dims_m[0];
-        if assembly_gap < -1e-10 {
+        if assembly_gap < 0.0 {
             return Err(ConfigError(format!(
                 "magnet_pitch_m ({:.3} mm) must be ≥ magnet width ({:.3} mm) — \
                  inter-magnet gap cannot be negative (current gap: {:.3} mm)",
@@ -290,6 +290,21 @@ impl LinearMotorConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn magnet_pitch_limits_apply_to_preview_simulation_and_move_without_repair() {
+        let mut cfg = LinearMotorConfig::default();
+        for pitch in [0.0, f64::NAN, f64::INFINITY, cfg.magnet_dims_m[0] - 1e-12] {
+            cfg.magnet_pitch_m = pitch;
+            assert!(cfg.validate_for_preview().is_err());
+            assert!(cfg.validate_for_simulation().is_err());
+            assert!(cfg.validate_for_move().is_err());
+            assert_eq!(cfg.magnet_pitch_m.to_bits(), pitch.to_bits());
+        }
+        cfg.magnet_pitch_m = cfg.magnet_dims_m[0];
+        assert!(cfg.validate_for_preview().is_ok());
+        assert!(cfg.validate_for_simulation().is_ok());
+    }
     use pcbmotorgen_simulation::units::mm;
 
     #[test]
