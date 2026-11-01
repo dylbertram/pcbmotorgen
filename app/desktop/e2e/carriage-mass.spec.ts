@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { gotoDesignApp } from "./helpers";
 
-test("carriage mass defaults to magnets, supports a complete assembly override and copies into a move draft", async ({ page }, testInfo) => {
+test("carriage mass defaults to magnets and the move form uses the complete assembly override", async ({ page }, testInfo) => {
   await gotoDesignApp(page);
   const tools = page.getByRole("toolbar", { name: "Design side tools", exact: true });
   await tools.getByRole("button", { name: "Magnets", exact: true }).click();
@@ -36,17 +36,12 @@ test("carriage mass defaults to magnets, supports a complete assembly override a
   await tools.getByRole("button", { name: "Drive & force targets", exact: true }).click();
   await expect(carriage.getByRole("spinbutton", { name: "Full carriage mass (g)", exact: true })).toHaveValue("15");
   await page.getByRole("tab", { name: /^Simulate/i }).click();
-  await page.getByRole("tab", { name: "Power requirements", exact: true }).click();
-  const power = page.getByRole("region", { name: "Power requirements", exact: true });
-  await power.locator("summary").filter({ hasText: "Move definition and calculation" }).click();
-  const editor = power.getByRole("textbox", { name: "Move model JSON", exact: true });
-  expect(JSON.parse(await editor.inputValue()).profile.moving_mass_kg).toBeNull();
-  await power.getByRole("button", { name: "Use design mass and friction", exact: true }).click();
-  const move = JSON.parse(await editor.inputValue());
-  expect(move.profile.moving_mass_kg).toBe(0.015);
-  expect(move.profile.coulomb_friction_n).toBe(0.06);
-  expect(move.profile.mass_includes).toContain("Full moving assembly estimate");
-  expect(move.profile.duration_s).toBeNull();
-  expect(move.source.accepts_regeneration).toBeNull();
-  await expect(power).toContainText("Unapplied move draft");
+  const power = page.getByRole("region", { name: "Move and power", exact: true });
+  await expect(power).toContainText("15.00 g full moving assembly");
+  await expect(power).toContainText("0.060 N sliding friction");
+  await power.getByRole("button", { name: "Edit load", exact: true }).click();
+  await expect(power.getByRole("spinbutton", { name: "Move moving mass in grams", exact: true })).toHaveValue("15");
+  await expect(power.getByRole("spinbutton", { name: "Move friction in newtons", exact: true })).toHaveValue("0.06");
+  await power.getByRole("button", { name: "Use design load", exact: true }).click();
+  await expect(power).toContainText("15.00 g full moving assembly");
 });

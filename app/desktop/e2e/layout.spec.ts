@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { DESIGN_SCROLL, gotoDesignApp, selectDesignPanel } from "./helpers";
+import { DESIGN_SCROLL, gotoDesignApp, openDriverChecks, selectDesignPanel } from "./helpers";
 
 test.describe("Workspace layout geometry", () => {
   test("Design fills the area below the workflow divider", async ({ page }) => {
@@ -37,8 +37,8 @@ test.describe("Workspace layout geometry", () => {
     await selectDesignPanel(page, "Routing");
     await page.getByRole("tab", { name: /^Simulate/i }).click();
     const dock = page.getByRole("region", { name: "Simulation results", exact: true });
-    await dock.getByRole("tab", { name: "Driver suitability", exact: true }).click();
-    const viewport = dock.getByRole("tabpanel", { name: "Driver suitability", exact: true });
+    await dock.getByRole("tab", { name: "Force", exact: true }).click();
+    const viewport = dock.getByRole("tabpanel", { name: "Force", exact: true });
     const workspace = page.getByRole("region", { name: "Coil design workspace", exact: true });
     const drawing = await workspace.boundingBox();
     const width = page.viewportSize()!.width;
@@ -80,8 +80,8 @@ test.describe("Workspace layout geometry", () => {
     await page.getByRole("button", { name: "Layers", exact: true }).click();
     await page.getByRole("tab", { name: /^Simulate/i }).click();
     const dock = page.getByRole("region", { name: "Simulation results", exact: true });
-    await dock.getByRole("tab", { name: "Driver suitability", exact: true }).click();
-    const simulation = dock.getByRole("tabpanel", { name: "Driver suitability", exact: true });
+    await openDriverChecks(page);
+    const simulation = dock.getByRole("tabpanel", { name: "Force", exact: true });
     await expect(simulation.getByRole("heading", { name: "Voltage & speed", exact: true })).toBeVisible();
     await expect.poll(() => simulation.evaluate(el => el.scrollHeight - el.clientHeight)).toBeGreaterThan(0);
     // Generation can still replace an initial result with a short pending

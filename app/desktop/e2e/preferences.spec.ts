@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { gotoDesignApp, selectDesignPanel, coilWorkspace } from "./helpers";
+import { gotoDesignApp, openDriverChecks, selectDesignPanel, coilWorkspace } from "./helpers";
 import { fileURLToPath } from "node:url";
 
 test.beforeEach(async ({ page }) => {
@@ -69,7 +69,7 @@ test("driver library edits persist and feed the Simulation selector", async ({ p
   await page.getByRole("tab", { name: /^Simulate/i }).click();
   await coilWorkspace(page).getByRole("button", { name: "Driver settings", exact: true }).click();
   await page.getByRole("combobox", { name: "Driver to evaluate" }).selectOption("Settings driver v2");
-  await page.getByRole("region", { name: "Simulation results", exact: true }).getByRole("tab", { name: "Driver suitability", exact: true }).click();
+  await openDriverChecks(page);
   await expect(page.locator('section[aria-labelledby="driver-suitability-heading"]')).toContainText("Settings driver v2");
 });
 

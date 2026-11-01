@@ -33,7 +33,7 @@ test.describe("Design constraints restructure", () => {
     await expect(coilWorkspace(page).getByRole("group", { name: "Coil terminal markers" })).toBeVisible();
     await page.getByRole("tab", { name: /^Simulate/i }).click();
     const dock = page.getByRole("region", { name: "Simulation results", exact: true });
-    await dock.getByRole("tab", { name: "Thrust vs. position", exact: true }).click();
+    await dock.getByRole("tab", { name: "Force", exact: true }).click();
     await expect(dock.getByRole("img", { name: "Thrust sweep plot", exact: true })).toBeVisible();
   });
 

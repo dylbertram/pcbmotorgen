@@ -70,6 +70,7 @@ async function show3D(page: Page, pm = true) {
 test("manual simulations rerun active geometry with auto-run disabled and reject late results", async ({ page }) => {
   await gotoDesignApp(page); await nativeFixture(page);
   await page.getByRole("tab", { name: /^Simulate/i }).click();
+  await page.getByRole("tab", { name: "Force", exact: true }).click();
   const run = page.getByRole("button", { name: "Run simulations", exact: true });
   await expect(run).toBeEnabled();
   await page.getByRole("checkbox", { name: "Auto-run on edits", exact: true }).uncheck();

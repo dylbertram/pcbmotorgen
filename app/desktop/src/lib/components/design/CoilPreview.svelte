@@ -110,6 +110,13 @@
     sidePanel = section;
   }
 
+  /** Open the field/loss rail without leaving the current viewer mode. */
+  export function showFieldSettings(): void {
+    terminalTool.cancel();
+    view.setTerminalPanelOpen(false);
+    sidePanel = "fields";
+  }
+
   const simplifyTool = new CadSimplifyTool({ getGeometry: () => importedGeometry, onChange: (geometry) => onGeometryChange?.(geometry) });
   let canUndoSimplify = $derived(simplifyTool.canUndo);
   let simplifyNotice = $derived(simplifyTool.notice);

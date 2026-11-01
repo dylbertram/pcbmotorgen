@@ -5,6 +5,52 @@ is described in **Design-goal independence, v4** below. That section supersedes
 the earlier design-limit gating and rejection interpretation. Earlier sections
 remain as a record of what was implemented and tested, not current requirements.
 
+## Simplified simulation and move report, 2026-11-01
+
+The Simulate dock now opens on **Move & power**, with **Force** and **Fields**
+as the other primary views and the restricted DC study behind **Advanced**.
+The move form takes millimetres, seconds and grams, inherits the design mass
+and friction unless the load is edited, and calculates with one action. The
+JSON move editor, separate apply/copy/estimate buttons and duplicate
+summary/driver tabs were removed. The report header, Markdown report and HTML
+report all read the same summary object; detailed ledger rows stay available
+in the report and export data.
+
+`practicalMoveEstimate` no longer accepts only 0 or 47 µH external inductance.
+The supplied Fader design's 64 µH per phase stays in the electrical and ripple
+model. No component is invented: its DCR and core loss remain listed omissions
+with zero included watts, so totals stay conditional.
+
+Verified chain for `reports/Fader-pole-matched.pmmotor` (SHA-256
+`f87f101710d02dc35e83923cb18f417ec2c1f0ac4527d02536d1c634e7d42629`), 0 to
+60 mm in 0.5 s, 15 g, 0.05 N friction, 12 V, 100 kHz DRV8311, electrical
+reference π/2, 129 force-map positions, 0.25 ms step, conductor mesh 12,
+backplane and housing explicitly excluded:
+
+| Quantity | Native engineering estimate |
+| --- | ---: |
+| Scope | `engineering_estimate` |
+| Peak source power | 1.328 W |
+| Average source power | 0.788 W |
+| Net source energy | 0.394 J |
+| Peak supply current | 0.111 A |
+| Phase peak without ripple | 0.388 A |
+| Phase peak with declared ripple | 0.495 A |
+
+Omitted: external-inductor DCR and core loss for the 64 µH part, winding
+proximity/via AC loss, board-level electronics and source wiring. This is a
+sampled estimate, not a guaranteed maximum, achieved motion or hardware
+measurement. The earlier no-loss motor-and-FET result for the same move was
+0.88 W peak and 0.46 W average; it is not a total supply figure.
+
+Frontend verification: `svelte-check` reports zero errors/warnings and the
+production build succeeds. Vitest passes 667 tests with 12 explicit skips.
+The full desktop Chromium suite reports 246 passed and 8 explicit skips. Three
+failures remain in the separate `housing-motion` and `layer-sort` specs; they
+exercise routing defaults and preview rail counting, don't touch the simulation
+dock work, and are not claimed as passing. These are browser checks, not
+observed native WKWebView interaction. No push or bundle was produced.
+
 ## Supported model
 
 ### Compact scalable star routing, revised examples, 2026-11-01

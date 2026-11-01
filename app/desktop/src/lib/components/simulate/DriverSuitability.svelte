@@ -29,6 +29,8 @@
       return { status: "fail" as const, text: `${name} can't drive these traces as configured: ${n} check${n === 1 ? "" : "s"} fail.` };
     }
     if (statuses.includes("warn")) return { status: "warn" as const, text: `${name} can drive these traces, with little margin.` };
+    const unknown = statuses.filter(s => s === "unknown").length;
+    if (unknown) return { status: "unknown" as const, text: `${name} checks are incomplete: ${unknown} not evaluated.` };
     return { status: "pass" as const, text: `${name} can drive these traces.` };
   });
 

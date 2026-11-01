@@ -1,12 +1,12 @@
 import { test, expect } from "@playwright/test";
-import { gotoDesignApp, selectRoutingConnection } from "./helpers";
+import { gotoDesignApp, openDriverChecks, openSimulationView, selectRoutingConnection } from "./helpers";
 
 async function selectPanel(page: import("@playwright/test").Page, name: string) {
   const trigger = page.getByRole("toolbar", { name: "Design side tools", exact: true }).getByRole("button", { name, exact: true });
   if (await trigger.getAttribute("aria-expanded") !== "true") await trigger.click();
 }
 
-test("Simulate opens four result tabs below the same live coil workspace", async ({ page }, testInfo) => {
+test("Simulate opens three result views below the same live coil workspace", async ({ page }, testInfo) => {
   await gotoDesignApp(page);
   const canvas = page.getByRole("region", { name: "Coil design workspace", exact: true }).getByTestId("coil-annotations");
   await expect.poll(async () => Number(await canvas.getAttribute("data-segments"))).toBeGreaterThan(0);
@@ -37,16 +37,15 @@ test("Simulate opens four result tabs below the same live coil workspace", async
   expect(results.y + results.height).toBe(statusBounds.y);
   expect(statusBounds.y + statusBounds.height).toBe(page.viewportSize()!.height);
   expect(await page.getByRole("group", { name: "Preview status", exact: true }).count()).toBe(1);
-  for (const name of ["Magnetic flux density", "Thrust vs. position", "Driver suitability", "Summary (live metrics)"]) {
-    await dock.getByRole("tab", { name, exact: true }).click();
+  for (const name of ["Move & power", "Force", "Fields"] as const) {
+    await openSimulationView(page, name);
     await expect(dock.getByRole("tab", { name, exact: true })).toHaveAttribute("aria-selected", "true");
-    await expect(dock.getByRole("tabpanel", { name, exact: true })).toBeVisible();
   }
   await expect(dock.getByRole("spinbutton")).toHaveCount(0);
   await expect(dock.getByRole("combobox")).toHaveCount(0);
-  await expect(dock.getByRole("heading", { name: "Live metrics", exact: true })).toBeVisible();
-  await page.screenshot({ path: testInfo.outputPath("simulation-summary.png") });
-  await dock.getByRole("tab", { name: "Thrust vs. position", exact: true }).click();
+  await openSimulationView(page, "Force");
+  await expect(dock.getByRole("heading", { name: "Force", exact: true })).toBeVisible();
+  await page.screenshot({ path: testInfo.outputPath("simulation-force.png") });
   await expect(dock.getByRole("img", { name: "Thrust sweep plot", exact: true })).toBeVisible();
   const plotBounds = (await dock.getByRole("img", { name: "Thrust sweep plot", exact: true }).boundingBox())!;
   const metricBounds = (await dock.getByLabel("Thrust metrics", { exact: true }).boundingBox())!;
@@ -75,12 +74,12 @@ test("Simulate opens four result tabs below the same live coil workspace", async
   expect(Math.abs(chevronBounds.x + chevronBounds.width / 2 - buttonBounds.x - buttonBounds.width / 2)).toBeLessThanOrEqual(1);
   expect(Math.abs(chevronBounds.y + chevronBounds.height / 2 - rowBounds.y - rowBounds.height / 2)).toBeLessThanOrEqual(1);
   await expect(page.getByRole("tab", { name: /^Simulate/i })).toHaveAttribute("aria-selected", "true");
-  await expect(dock.getByRole("tab", { name: "Thrust vs. position", exact: true })).toBeVisible();
+  await expect(dock.getByRole("tab", { name: "Force", exact: true })).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath("simulation-collapsed.png") });
   await dock.getByRole("button", { name: "Expand simulation panel", exact: true }).click();
   expect((await dock.boundingBox())!.height).toBe(expandedHeight);
   await expect(dock.getByRole("img", { name: "Thrust sweep plot", exact: true })).toBeVisible();
-  await expect(dock.getByRole("tab", { name: "Thrust vs. position", exact: true })).toHaveAttribute("aria-selected", "true");
+  await expect(dock.getByRole("tab", { name: "Force", exact: true })).toHaveAttribute("aria-selected", "true");
   expect((await status.boundingBox())!.y + (await status.boundingBox())!.height).toBe(page.viewportSize()!.height);
   await page.getByRole("tab", { name: /^Design/i }).click();
   await expect(dock).toBeHidden();
@@ -93,7 +92,7 @@ test("driver results use bounded meters and horizontal subsections", async ({ pa
   await selectPanel(page, "Routing");
   await page.getByRole("tab", { name: /^Simulate/i }).click();
   const dock = page.getByRole("region", { name: "Simulation results", exact: true });
-  await dock.getByRole("tab", { name: "Driver suitability", exact: true }).click();
+  await openDriverChecks(page);
   const voltage = dock.getByRole("region", { name: "Voltage and speed", exact: true });
   const checks = dock.getByRole("region", { name: "Driver checks", exact: true });
   await expect(voltage).toBeVisible();
@@ -139,9 +138,9 @@ test("the results dock resizes with pointer and keyboard and remembers its heigh
   await expect.poll(async () => (await dock.boundingBox())!.height).toBe(initial + 46);
   await dock.getByRole("button", { name: "Collapse simulation panel", exact: true }).click();
   await expect(dock.locator('[role="tab"][aria-selected="true"]')).toHaveCount(0);
-  await dock.getByRole("tab", { name: "Summary (live metrics)", exact: true }).click();
-  await expect(dock.getByRole("heading", { name: "Live metrics", exact: true })).toBeVisible();
-  await expect(dock.getByRole("tab", { name: "Summary (live metrics)", exact: true })).toHaveAttribute("aria-selected", "true");
+  await openSimulationView(page, "Force");
+  await expect(dock.getByRole("heading", { name: "Force", exact: true })).toBeVisible();
+  await expect(dock.getByRole("tab", { name: "Force", exact: true })).toHaveAttribute("aria-selected", "true");
   await expect(dock.getByRole("separator", { name: "Resize simulation panel", exact: true })).toBeVisible();
   expect((await dock.boundingBox())!.height).toBe(initial + 46);
   await page.getByRole("tab", { name: /^Design/i }).click();
@@ -170,8 +169,8 @@ test("operating and thermal settings live in the left target panel and update li
   await page.getByRole("tab", { name: /^Simulate/i }).click();
   await expect(targets).toBeVisible();
   const dock = page.getByRole("region", { name: "Simulation results", exact: true });
-  await dock.getByRole("tab", { name: "Summary (live metrics)", exact: true }).click();
-  const mean = dock.getByText("Mean thrust", { exact: true }).locator("..").locator(".font-mono");
+  await openSimulationView(page, "Force");
+  const mean = dock.getByLabel("Thrust metrics", { exact: true }).getByText("Mean", { exact: true }).locator("..").locator("dd");
   await expect(mean).not.toContainText("—");
   const previous = await mean.textContent();
   const current = targets.getByRole("spinbutton", { name: "Phase current (A)", exact: true });
@@ -231,7 +230,7 @@ test("driver results update from the target panel even when the thrust sweep fai
   await selectPanel(page, "Routing");
   await page.getByRole("tab", { name: /^Simulate/i }).click();
   const dock = page.getByRole("region", { name: "Simulation results", exact: true });
-  await dock.getByRole("tab", { name: "Driver suitability", exact: true }).click();
+  await openDriverChecks(page);
   await expect(dock.getByRole("alert").filter({ hasText: "Test sweep failure" })).toBeVisible();
   const results = dock.getByRole("region", { name: "Driver suitability", exact: true });
   await expect(results).toContainText("at 5.0 V");
@@ -266,7 +265,7 @@ test("winding connection warnings open Routing without hiding the results dock",
   await selectRoutingConnection(page, "delta");
   await page.getByRole("tab", { name: /^Simulate/i }).click();
   const dock = page.getByRole("region", { name: "Simulation results", exact: true });
-  await dock.getByRole("tab", { name: "Driver suitability", exact: true }).click();
+  await openDriverChecks(page);
   await dock.getByRole("button", { name: "Change winding connection", exact: true }).click();
   await expect(dock).toBeVisible();
   await expect(page.getByRole("tab", { name: /^Simulate/i })).toHaveAttribute("aria-selected", "true");
@@ -302,7 +301,5 @@ test("mobile keeps the preview, rails and resizable results inside the viewport"
   const icon = (await expand.locator("svg").boundingBox())!;
   expect(Math.abs(row.y + row.height / 2 - icon.y - icon.height / 2)).toBeLessThanOrEqual(1);
   expect(Math.abs(row.y + row.height - (await page.getByRole("group", { name: "Preview status", exact: true }).boundingBox())!.y)).toBeLessThanOrEqual(1);
-  await dock.getByRole("tab", { name: "Driver suitability", exact: true }).click();
-  await expect(dock.getByRole("tab", { name: "Driver suitability", exact: true })).toHaveAttribute("aria-selected", "true");
-  await expect(dock.getByRole("region", { name: "Driver suitability", exact: true })).toBeVisible();
+  await openDriverChecks(page);
 });

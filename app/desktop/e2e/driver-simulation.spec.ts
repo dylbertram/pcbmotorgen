@@ -1,5 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
-import { gotoDesignApp as gotoWorkspace, selectRoutingConnection } from "./helpers";
+import { gotoDesignApp as gotoWorkspace, openDriverChecks, openSimulationView, selectRoutingConnection } from "./helpers";
 
 async function gotoDesignApp(page: Page) {
   await gotoWorkspace(page);
@@ -7,7 +7,8 @@ async function gotoDesignApp(page: Page) {
 
 async function simulation(page: Page, plot: "driver" | "thrust", settings: "driver" | "drive" | "none" = "none") {
   await page.getByRole("tab", { name: /^Simulate/i }).click();
-  await page.getByRole("tab", { name: plot === "driver" ? "Driver suitability" : "Thrust vs. position", exact: true }).click();
+  if (plot === "driver") await openDriverChecks(page);
+  else await openSimulationView(page, "Force");
   if (settings === "driver") {
     const trigger = page.getByRole("button", { name: "Driver settings", exact: true });
     if (await trigger.getAttribute("aria-expanded") !== "true") await trigger.click();

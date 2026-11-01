@@ -95,8 +95,9 @@ then click **Write to KiCad** when ready.
 
 ### Simulation controls and model scope
 
-In **Simulate**, use **Run simulations** to calculate the active generated or
-imported geometry. **Auto-run on edits** can be turned off for manual operation.
+In **Simulate**, **Move & power** opens first. Enter the move in millimetres, seconds and grams, check the inherited mass and friction, then choose **Calculate power**. One action prepares the winding analysis, builds the documented estimate and calculates the native move demand. Backplane or housing designs require an explicit analysis-only exclusion for this calculation. **Save report** writes a standalone HTML report; Markdown, time-series and reproducibility exports are under **Export data**. **Force** holds thrust over travel and the expandable driver checks. **Fields** holds the cross-section field view. The restricted material-coupled DC analysis sits behind **Advanced**.
+
+**Run simulations** recalculates thrust over travel, friction and stack height for **Force** and **Fields**. **Auto-run on edits** can be turned off for manual operation.
 Imported copper needs phase mapping and confirmed coil ends. Editing inputs
 clears old results; late responses cannot populate another design or tab.
 

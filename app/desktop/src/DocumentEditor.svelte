@@ -761,6 +761,8 @@
                 cadGeometry={projects.cadGeometry}
                 onSelectEnds={selectCoilEnds}
                 onUseInferredEnds={useInferredEnds}
+                onOpenFieldSettings={() => coilPreview?.showFieldSettings()}
+                designName={projects.label}
               />
               <div class="shrink-0" bind:clientHeight={motorStatusHeight}>
                 <PreviewStatus {config} {motion} stats={computePreviewSummary(activeCoils)} />

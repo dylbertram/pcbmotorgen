@@ -84,6 +84,27 @@ export function designConstraintsPanel(page: Page) {
   );
 }
 
+/** The simulation results dock. */
+export function simulationDock(page: Page): Locator {
+  return page.getByRole("region", { name: "Simulation results", exact: true });
+}
+
+/** Primary simulation views. Advanced analysis is a secondary entry. */
+export async function openSimulationView(page: Page, view: "Move & power" | "Force" | "Fields"): Promise<void> {
+  const dock = simulationDock(page);
+  await dock.getByRole("tab", { name: view, exact: true }).click();
+  await expect(dock.getByRole("tabpanel", { name: view, exact: true })).toBeVisible();
+}
+
+/** The driver checks live inside the Force view's expandable detail. */
+export async function openDriverChecks(page: Page): Promise<void> {
+  const dock = simulationDock(page);
+  await openSimulationView(page, "Force");
+  const details = dock.locator("details").filter({ hasText: "Winding and driver checks at this current" });
+  if (!(await details.evaluate((el: HTMLDetailsElement) => el.open))) await details.locator("summary").click();
+  await expect(details.getByRole("region", { name: "Driver suitability" })).toBeVisible();
+}
+
 /** NumberField wrapper by aria-label. */
 export function numberField(page: Page, ariaLabel: string) {
   return page.locator(`input[aria-label="${ariaLabel}"]`);

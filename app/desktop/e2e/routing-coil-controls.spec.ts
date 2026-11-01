@@ -1,7 +1,7 @@
 import { test, expect, type Page } from "@playwright/test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { gotoDesignApp, selectRoutingConnection } from "./helpers";
+import { gotoDesignApp, openDriverChecks, selectRoutingConnection } from "./helpers";
 
 async function useNativeBraid(page: Page) {
   const directory = process.env.PCB_MOTOR_TERMINAL_FIXTURES;
@@ -118,7 +118,7 @@ test("uploaded winding warnings lead to the editable connection in Coil ends", a
   await panel.getByRole("button", { name: "Close terminals panel", exact: true }).click();
   await page.getByRole("tab", { name: /^Simulate/i }).click();
   const dock = page.getByRole("region", { name: "Simulation results", exact: true });
-  await dock.getByRole("tab", { name: "Driver suitability", exact: true }).click();
+  await openDriverChecks(page);
   await dock.getByRole("button", { name: "Change winding connection", exact: true }).click();
   await expect(panel).toBeVisible();
   await expect(panel.getByRole("combobox", { name: "Winding connection", exact: true })).toHaveValue("delta");
