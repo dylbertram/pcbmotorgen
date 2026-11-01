@@ -120,7 +120,15 @@ export function validateDesign(config: DesignConfigInput): Finding[] {
   // the electrical pitch P_e is twice the pole pitch: τp = P_e / 2.
   const polePitchMm = config.electrical_pitch_mm / 2;
   const k = polePitchMm > 0 ? config.magnet_width_mm / polePitchMm : Number.NaN;
-  if (!Number.isFinite(k) || k < 0.5 || k > 1.0) {
+  if (Number.isFinite(k) && k > 1.0) {
+    next.push({
+      id: "magnet-fill",
+      level: "error",
+      message:
+        `Magnet X length (${config.magnet_width_mm.toFixed(2)} mm) is too big for the ${polePitchMm.toFixed(2)} mm pole pitch. ` +
+        `Reduce the magnet X length to ${polePitchMm.toFixed(2)} mm or less, or increase electrical pitch to ${(2 * config.magnet_width_mm).toFixed(2)} mm or more.`,
+    });
+  } else if (!Number.isFinite(k) || k < 0.5) {
     next.push({
       id: "magnet-fill",
       level: "error",

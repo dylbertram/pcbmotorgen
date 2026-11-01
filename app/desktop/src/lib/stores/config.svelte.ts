@@ -165,9 +165,6 @@ export class ConfigStore {
   /** Upper limit on the magnet X length: a fully-filled pole pitch
    *  (k_fill = 1.0) leaves no inter-pole gap. */
   max_magnet_width_mm = $derived(Math.max(0, this.pole_pitch_mm));
-  /** Keep a committed pitch within the supported 0.5..1.0 magnet fill range. */
-  min_electrical_pitch_mm = $derived(2 * this.magnet_width_mm);
-  max_electrical_pitch_mm = $derived(4 * this.magnet_width_mm);
   /** Magnet pole fill factor, now DERIVED from the width input:
    *  k_fill = W_m / τ_p. Kept exported under its historical name because
    *  validation.ts and MagnetsPanel.svelte consume it. */
