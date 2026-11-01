@@ -163,6 +163,8 @@ fn visualization_dc_geometry_and_housing_do_not_benchmark_against_goals() {
         phase_peak_a: 1.0,
         fields: true,
         heat: true,
+        field_source: Default::default(),
+        phase_angle_deg: 0.,
     };
     let preview = |c| {
         value(

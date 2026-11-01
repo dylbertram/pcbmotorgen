@@ -49,12 +49,12 @@ async function openPanel(page: Page, bridge = true) {
       throw new Error(`UI fixture has no ${command} calculation`);
     }};
   });
-  await page.getByRole("tab", {name:"Static DC (experimental)",exact:true}).click();
-  return page.getByRole("region", {name:"Experimental static DC coupling",exact:true});
+  await page.getByRole("tab", {name:"Audited DC force",exact:true}).click();
+  return page.getByRole("region", {name:"Audited DC force at one pose",exact:true});
 }
 
 async function declare(page: Page) {
-  const panel = page.getByRole("region", {name:"Experimental static DC coupling",exact:true});
+  const panel = page.getByRole("region", {name:"Audited DC force at one pose",exact:true});
   await panel.getByRole("textbox", {name:"Explicit material placement and finite return (JSON, SI units)"})
     .fill('{"material_model":{},"return_geometry":{}}');
   await panel.getByRole("checkbox").check();

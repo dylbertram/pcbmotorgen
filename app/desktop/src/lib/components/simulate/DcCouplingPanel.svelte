@@ -114,9 +114,10 @@
   }
 </script>
 
-<section aria-label="Experimental static DC coupling" class="max-w-4xl space-y-3 text-xs text-slate-300">
+<section aria-label="Audited DC force at one pose" class="max-w-4xl space-y-3 text-xs text-slate-300">
   <div class="space-y-1">
-    <h3 class="font-semibold text-slate-100">Static DC winding–magnet–shield coupling</h3>
+    <h3 class="font-semibold text-slate-100">DC force at one fixed magnet position</h3>
+    <p class="max-w-3xl leading-relaxed">Calculates the force on the magnet array at one DC loop current and one lateral offset, including the declared magnetic materials. It is not a holding-force curve over travel. Use "Thrust vs. position" for the general routed-geometry force sweep. That sweep uses its configured commutation and does not calculate closed-loop holding stiffness.</p>
     <p class="max-w-3xl leading-relaxed text-amber-200">Restricted to designs individually qualified on this host and their sampled current/pose states. Any other design is rejected as needing qualification, not approximated. The reversible ferrite law is provisional. No temperature, hardware rating, reversal cycle or differential inductance prediction.</p>
   </div>
   {#if !capability.available}

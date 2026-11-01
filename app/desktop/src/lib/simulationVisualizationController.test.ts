@@ -14,6 +14,18 @@ function deferred<T>() { let resolve!: (v: T) => void; const promise = new Promi
 const input = {} as VisualizationInput;
 
 describe("request-bound native visualization", () => {
+  it("never accepts PM or qualified data in place of a requested routed-current estimate", () => {
+    const r = { ...request(), field_source: "coils" as const, phase_angle_deg: 0 };
+    const value = report(r);
+    expect(() => validateVisualization(value, r)).toThrow();
+    value.field!.method = "routed-current-biot-savart-xyz";
+    validateVisualization(value, r);
+    value.field!.method = "qualified-finite-copper-winding-xyz";
+    expect(() => validateVisualization(value, r)).toThrow();
+    value.field!.method = "routed-current-plus-pm-xyz";
+    expect(() => validateVisualization(value, r)).toThrow();
+    validateVisualization(value, { ...r, field_source: "coils-and-pm" });
+  });
   it("requires real XYZ locations, finite vectors and honest source scope", () => {
     validateVisualization(report(), request());
     for (const change of ["identity", "vector", "point", "magnitude", "scope", "force"]) {

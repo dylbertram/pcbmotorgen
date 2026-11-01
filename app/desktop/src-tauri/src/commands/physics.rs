@@ -1158,6 +1158,7 @@ mod cad_source_tests {
                 request_id: "z-audit".into(), mover_position_m: 0.01,
                 bounds_m: [[0., 0.02], [0., 0.008], [-0.004, 0.005]], counts: [2, 2, 2],
                 phase_peak_a: 1.0, fields: false, heat: true,
+                field_source: Default::default(), phase_angle_deg: 0.,
             };
             serde_json::to_value(tauri::async_runtime::block_on(
                 crate::commands::visualization::sample_simulation_visualization(config, Default::default(), Some(g), request)
