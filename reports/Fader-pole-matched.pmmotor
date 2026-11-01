@@ -3,14 +3,14 @@
   "format_version": 1,
   "document_type": "motor",
   "app_version": "0.5.0",
-  "saved_at_unix_ms": 1793482472635,
+  "saved_at_unix_ms": 1793564282057,
   "next_version_id": 2,
   "versions": [
     {
       "id": 1,
       "description": "Pole-matched star termination variant. Original magnet geometry, 1.6 mm PCB, 0.127 mm traces and layer reversal preserved. Numerical force validation only, not manufacturing or hardware qualification.",
       "created_at_unix_ms": 1791722497331,
-      "last_edited_at_unix_ms": 1793482472635,
+      "last_edited_at_unix_ms": 1793564282057,
       "state": {
         "document_type": "motor",
         "config": {
@@ -18,19 +18,19 @@
           "desired_travel_mm": 63.0,
           "active_area_width_mm": 8.0,
           "strands_per_phase": 2,
-          "magnet_count": 5,
-          "magnet_width_mm": 5.0,
-          "magnet_cross_width_mm": 5.0,
+          "magnet_count": 6,
+          "magnet_width_mm": 4.0,
+          "magnet_cross_width_mm": 8.0,
           "magnet_height_mm": 3.0,
           "magnet_grade": "N44",
           "magnet_remanence_t": 1.34,
           "air_gap_mm": 0.5,
-          "electrical_pitch_mm": 12.0,
+          "electrical_pitch_mm": 10.0,
           "routing_pattern": "infinity-braid",
           "routing_params": {
             "connection": 2.0,
-            "num_strands": 3.0,
-            "pole_matched": 1.0
+            "pole_matched": 1.0,
+            "num_strands": 3.0
           },
           "routing_orientation": {
             "mirror_x": false,
@@ -39,7 +39,7 @@
           },
           "phases": 3,
           "num_layers": 4,
-          "max_current_a": 1.0,
+          "max_current_a": 0.8,
           "supply_voltage_v": 12.0,
           "target_force_n": 0.5,
           "peak_force_n": 1.0,
@@ -52,11 +52,11 @@
           "n_positions": 50,
           "meshing": 20,
           "min_trace_mm": 0.127,
-          "trace_width_mm": 0.127,
+          "trace_width_mm": 0.25,
           "min_space_mm": 0.127,
-          "min_via_drill_mm": 0.3,
+          "min_via_drill_mm": 0.15,
           "min_via_annular_ring_mm": 0.1,
-          "pcb_thickness_mm": 1.6,
+          "pcb_thickness_mm": 0.8,
           "max_layers": 12,
           "drive_frequency_hz": 500.0,
           "max_temperature_rise_c": 20.0,
@@ -80,11 +80,23 @@
             "allowed_rise_c": 20.0,
             "ripple_limit_fraction": 0.3,
             "voltage_headroom": 0.85,
-            "series_inductance_h": 0.000047
+            "series_inductance_h": 0.000064
           },
-          "backplane": null
+          "backplane": {
+            "layers": [
+              {
+                "material": "flex_ferrite",
+                "thickness_m": 0.0002
+              }
+            ],
+            "housing": {
+              "material": "aluminum6061",
+              "thickness_m": 0.001,
+              "gap_m": 0.001
+            }
+          }
         },
-        "mover_position_mm": 41.4,
+        "mover_position_mm": 28.1,
         "cad_geometry": null
       }
     }
