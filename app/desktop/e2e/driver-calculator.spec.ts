@@ -33,10 +33,43 @@ test("the standalone calculator works without a motor and clears invalid checks"
   }
 });
 
-test("calculator scrolls with the wheel and keyboard at desktop and narrow widths", async ({ page }) => {
+test("calculator panes scroll independently with the wheel and keyboard", async ({ page }) => {
+  await page.goto("/?tool=driver-calculator");
+  await page.getByRole("spinbutton", { name: "Hot phase resistance (Ω)", exact: true }).fill("2");
+  await page.getByRole("spinbutton", { name: "Synchronous winding inductance (µH)", exact: true }).fill("100");
+  const calculator = page.getByRole("main", { name: "Driver calculator", exact: true });
+  const left = page.getByRole("region", { name: "Calculator input pane", exact: true });
+  const right = page.getByRole("region", { name: "Driver suitability checks", exact: true });
+  for (const width of [1100, 1280]) {
+    await page.setViewportSize({ width, height: 500 });
+    for (const pane of [left, right]) {
+      await pane.focus();
+      await page.keyboard.press("Control+Home");
+      await expect.poll(() => pane.evaluate(el => el.scrollTop)).toBe(0);
+    }
+    for (const [pane, other] of [[left, right], [right, left]]) {
+      const otherOffset = await other.evaluate(el => el.scrollTop);
+      const bounds = (await pane.boundingBox())!;
+      await page.mouse.move(bounds.x + bounds.width - 20, bounds.y + 50);
+      await page.mouse.wheel(0, 200);
+      await expect.poll(() => pane.evaluate(el => el.scrollTop)).toBeGreaterThan(0);
+      await expect.poll(() => other.evaluate(el => el.scrollTop)).toBe(otherOffset);
+      await pane.focus();
+      await page.keyboard.press("Control+End");
+      await expect.poll(() => pane.evaluate(el => Math.abs(el.scrollHeight - el.clientHeight - el.scrollTop))).toBeLessThan(2);
+      await page.mouse.wheel(0, 400);
+      await expect.poll(() => other.evaluate(el => el.scrollTop)).toBe(otherOffset);
+    }
+    await expect(page.getByRole("spinbutton", { name: "Trace ampacity, optional (A)", exact: true })).toBeInViewport();
+    expect(await calculator.evaluate(el => el.scrollTop)).toBe(0);
+    expect(await page.evaluate(() => window.scrollY)).toBe(0);
+  }
+});
+
+test("stacked calculator content still scrolls at narrow widths", async ({ page }) => {
   await page.goto("/?tool=driver-calculator");
   const calculator = page.getByRole("main", { name: "Driver calculator", exact: true });
-  for (const width of [1100, 1280, 390]) {
+  for (const width of [390, 800]) {
     await page.setViewportSize({ width, height: 500 });
     await calculator.focus();
     await page.keyboard.press("Control+Home");

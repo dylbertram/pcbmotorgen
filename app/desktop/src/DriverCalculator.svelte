@@ -61,8 +61,8 @@
 
 <!-- The scroll container must be focusable for keyboard scrolling in WebKit. -->
 <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
-<main class="h-dvh overflow-y-auto overscroll-contain bg-slate-900 p-5 text-slate-100 sm:p-8" aria-label="Driver calculator" tabindex="0">
-  <header class="mb-6 flex flex-wrap items-start justify-between gap-4 border-b border-slate-700 pb-5">
+<main class="h-dvh overflow-y-auto overscroll-contain bg-slate-900 p-5 text-slate-100 sm:p-8 lg:flex lg:flex-col lg:overflow-hidden" aria-label="Driver calculator" tabindex="0">
+  <header class="mb-6 flex shrink-0 flex-wrap items-start justify-between gap-4 border-b border-slate-700 pb-5">
     <div class="max-w-2xl space-y-2">
       <h1 class="text-xl font-semibold">Driver calculator</h1>
       <p class="text-xs leading-relaxed text-slate-400">Compare a driver with a balanced three-phase star winding. These inputs are independent. Editing them does not change a motor file, and motor edits do not update this window.</p>
@@ -72,7 +72,10 @@
   </header>
   {#if error}<p role="alert" class="mb-5 rounded border border-rose-500/40 p-3 text-xs text-rose-300">{error}</p>{/if}
   {#if source}{#each source.notes as note (note)}<p class="mb-3 text-xs text-amber-300">{note}</p>{/each}{/if}
-  <div class="grid min-w-0 gap-8 lg:grid-cols-[minmax(280px,360px)_minmax(0,1fr)]">
+  <div class="grid min-w-0 gap-8 lg:min-h-0 lg:flex-1 lg:grid-cols-[minmax(280px,360px)_minmax(0,1fr)]">
+    <!-- Independently focusable panes support keyboard scrolling in WebKit. -->
+    <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+    <section aria-label="Calculator input pane" tabindex="0" class="min-w-0 lg:min-h-0 lg:overflow-y-auto lg:overscroll-contain lg:pr-2">
     <fieldset disabled={!ready} aria-label="Calculator inputs" class="min-w-0 space-y-5">
       <DriverSelector {config} />
       <label class="flex items-center justify-between gap-4 text-xs text-slate-300">Winding connection
@@ -89,7 +92,9 @@
         {/each}
       </div>
     </fieldset>
-    <section aria-label="Driver suitability checks" class="min-w-0 space-y-5">
+    </section>
+    <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+    <section aria-label="Driver suitability checks" tabindex="0" class="min-w-0 space-y-5 lg:min-h-0 lg:overflow-y-auto lg:overscroll-contain lg:pr-2">
       <h2 class="text-base font-semibold">Suitability at this operating point</h2>
       {#if result.errors.length}
         <div role="status" class="space-y-2 rounded border border-amber-500/40 p-4 text-xs text-amber-300">{#each result.errors as message (message)}<p>{message}</p>{/each}</div>

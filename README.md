@@ -101,7 +101,7 @@ File tabs support two resizable editor groups. Right-click a file tab and choose
 
 Choose **Open driver calculator** in Force or Driver settings, or **Simulate → Driver calculator…** in the native menu, to open an independent calculator window. It starts with a snapshot of the active motor's winding analysis when available. **Import active motor** explicitly replaces the calculator inputs; subsequent source edits never update them automatically. Calculator edits never write back to the motor. Without a source, enter resistance and inductance manually. Reopening an already-open calculator focuses it without replacing its inputs.
 
-The calculator window scrolls vertically to reach all inputs and checks, including at desktop widths and reduced window heights.
+At desktop widths, calculator inputs and suitability checks scroll independently below the header. Narrow windows stack them in one scrollable page.
 
 The calculator uses constant hot phase resistance and synchronous inductance for balanced three-phase star screening: bus-voltage headroom, at-speed voltage when motor constants are supplied, RL PWM ripple, peak current, approximate phase RMS and an optional entered trace-ampacity limit. It is not a geometry or thermal solver. Delta and other phase counts are explicitly unsupported; frequency-dependent backplane/housing behavior, supply-current demand, regeneration and unentered inductor/driver losses are not inferred. The motor's saved drive assumptions remain separate inputs to move-power calculations.
 

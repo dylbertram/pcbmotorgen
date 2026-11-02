@@ -633,7 +633,7 @@
 {/snippet}
 
 <main
-  class="flex min-h-0 flex-1 flex-col bg-slate-900 text-slate-100"
+  class="document-editor flex min-h-0 flex-1 flex-col bg-slate-900 text-slate-100"
 >
   <!-- BitsConfig centralizes the portal target for every Bits portal
        (dialogs, selects, tooltips) in one place. -->
@@ -688,12 +688,11 @@
       <div
         inert={externalDialogOpen}
         aria-hidden={externalDialogOpen || undefined}
-        class="grid min-h-0 flex-1 {designType === 'sensor' ? 'items-start lg:grid-cols-[minmax(360px,0.9fr)_minmax(0,1.35fr)] lg:grid-rows-[minmax(0,1fr)] lg:items-stretch' : 'grid-cols-1 grid-rows-[minmax(0,1fr)] items-stretch'}"
+        class="grid min-h-0 flex-1 {designType === 'sensor' ? 'sensor-workspace' : 'grid-cols-1 grid-rows-[minmax(0,1fr)] items-stretch'}"
       >
-        <!-- Desktop sensor columns stretch to the remaining viewport height
-             and scroll independently. Below lg the sensor columns stack. -->
+        <!-- Reflow follows this editor's width, including split groups. -->
         {#if designType === "sensor"}<aside
-          class="relative min-w-0 min-h-0 lg:h-full"
+          class="relative min-w-0 min-h-0 h-full"
           aria-label="Coil preview panel"
         >
           <ScrollArea class="h-full min-h-0" viewportClass="p-4 lg:pr-2">
@@ -774,3 +773,17 @@
 
   </BitsConfig>
 </main>
+
+<style>
+  .document-editor { container-type: inline-size; }
+  .sensor-workspace {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 0.85fr) minmax(0, 1.15fr);
+  }
+  @container (min-width: 60rem) {
+    .sensor-workspace {
+      grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.35fr);
+      grid-template-rows: minmax(0, 1fr);
+    }
+  }
+</style>
