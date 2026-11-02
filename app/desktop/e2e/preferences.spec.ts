@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { gotoDesignApp, selectDesignPanel, coilWorkspace } from "./helpers";
+import { gotoDesignApp, openDriverChecks, selectDesignPanel, coilWorkspace } from "./helpers";
 import { fileURLToPath } from "node:url";
 
 test.beforeEach(async ({ page }) => {
@@ -66,11 +66,12 @@ test("driver library edits persist and feed the Simulation selector", async ({ p
   // The Simulation tab selects from the same library.
   await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
   await selectDesignPanel(page, "Routing");
-  await page.getByRole("tab", { name: /^Simulate/i }).click();
   await coilWorkspace(page).getByRole("button", { name: "Driver settings", exact: true }).click();
   await page.getByRole("combobox", { name: "Driver to evaluate" }).selectOption("Settings driver v2");
-  await page.getByRole("region", { name: "Simulation results", exact: true }).getByRole("tab", { name: "Driver suitability", exact: true }).click();
-  await expect(page.locator('section[aria-labelledby="driver-suitability-heading"]')).toContainText("Settings driver v2");
+  const calculator = await openDriverChecks(page);
+  await calculator.getByRole("combobox", { name: "Driver to evaluate", exact: true }).selectOption("Settings driver v2");
+  await expect(calculator.getByRole("combobox", { name: "Driver to evaluate", exact: true })).toHaveValue("Settings driver v2");
+  await calculator.close();
 });
 
 test("bundled drivers live in the library, are deletable, and leave the selectors", async ({ page }) => {
@@ -87,7 +88,6 @@ test("bundled drivers live in the library, are deletable, and leave the selector
 
   // The Simulation tab reads the same library, so the removed driver is gone.
   await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
-  await page.getByRole("tab", { name: /^Simulate/i }).click();
   await coilWorkspace(page).getByRole("button", { name: "Driver settings", exact: true }).click();
   const selector = page.getByRole("combobox", { name: "Driver to evaluate" });
   await expect(selector.locator("option", { hasText: "DRV8313" })).toHaveCount(0);

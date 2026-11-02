@@ -43,4 +43,12 @@ describe("driver suitability result states", () => {
     expect(body).toContain("check-meter");
     expect(body).toContain(`h-1 rounded-full ${status === "warn" ? "bg-amber-400" : "bg-rose-400"}`);
   });
+
+  it("does not claim success while checks remain unevaluated", () => {
+    const value = analysis();
+    value.checks = [{ ...value.checks[0], status: "unknown" }];
+    const { body } = render(DriverSuitability, { props: { analysis: value } });
+    expect(body).toContain("checks are incomplete: 1 not evaluated");
+    expect(body).not.toContain("can drive these traces.");
+  });
 });

@@ -36,7 +36,7 @@ impl SimulationInput {
                 "magnet_dims_m must be a 3-tuple (width, length, height)".into(),
             ));
         }
-        if self.magnet_dims_m.iter().any(|&d| d <= 0.0) {
+        if self.magnet_dims_m.iter().any(|&d| !d.is_finite() || d <= 0.0) {
             return Err(SimulationError(format!(
                 "All magnet dimensions must be positive, got {:?}",
                 self.magnet_dims_m
@@ -51,14 +51,14 @@ impl SimulationInput {
         if self.magnet_count > super::MAX_MAGNET_COUNT {
             return Err(SimulationError(format!("magnet_count must be ≤ {}, got {}", super::MAX_MAGNET_COUNT, self.magnet_count)));
         }
-        if self.magnet_pitch_m <= 0.0 {
+        if !self.magnet_pitch_m.is_finite() || self.magnet_pitch_m <= 0.0 {
             return Err(SimulationError(format!(
                 "magnet_pitch_m must be positive, got {}",
                 self.magnet_pitch_m
             )));
         }
         let assembly_gap = self.magnet_pitch_m - self.magnet_dims_m[0];
-        if assembly_gap < -1e-10 {
+        if assembly_gap < 0.0 {
             return Err(SimulationError(format!(
                 "magnet_pitch_m ({:.3} mm) must be ≥ magnet width ({:.3} mm) — \
                  inter-magnet gap cannot be negative (current gap: {:.3} mm)",
@@ -78,6 +78,9 @@ impl SimulationInput {
                 "phases must be ≥ 1, got {}",
                 self.phases
             )));
+        }
+        if self.balanced_three_phase_drive && self.phases != 3 {
+            return Err(SimulationError("Balanced A/B/C drive requires exactly three phases".into()));
         }
         if self.spacing_ratio <= 0.0 || self.spacing_ratio > 2.0 {
             return Err(SimulationError(format!(
@@ -254,6 +257,22 @@ impl SimulationInput {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn magnet_length_cannot_exceed_one_finite_pole_pitch() {
+        for pitch in [0.0, -0.006, f64::NAN, f64::INFINITY] {
+            let cfg = SimulationInput { magnet_pitch_m: pitch, ..Default::default() };
+            assert!(cfg.validate_for_simulation().is_err());
+            assert!(cfg.validate_for_move().is_err());
+        }
+        for width in [0.006 + 1e-12, f64::NAN, f64::INFINITY] {
+            let cfg = SimulationInput { magnet_pitch_m: 0.006, magnet_dims_m: [width, 0.005, 0.003], ..Default::default() };
+            assert!(cfg.validate_for_simulation().is_err());
+            assert!(cfg.validate_for_move().is_err());
+        }
+        let cfg = SimulationInput { magnet_pitch_m: 0.006, magnet_dims_m: [0.006, 0.005, 0.003], ..Default::default() };
+        assert!(cfg.validate_for_simulation().is_ok(), "exactly one pole, zero assembly gap, is not an electrical mismatch");
+    }
 
     #[test]
     fn coreless_magnet_and_pcb_layer_upper_bounds() {

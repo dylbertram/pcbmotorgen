@@ -95,10 +95,10 @@ test("each design section has its own left-side button and panel", async ({ page
   await expect(left.getByRole("button", { name: "Magnets", exact: true })).toBeFocused();
 });
 
-test("coil ends and driver controls dock on the left in both workflows", async ({ page }, testInfo) => {
+test("coil ends and driver controls dock on the left across result views", async ({ page }, testInfo) => {
   await gotoDesignApp(page);
-  for (const workflow of ["Design", "Simulate"]) {
-    await page.getByRole("tab", { name: new RegExp(`^${workflow}`, "i") }).click();
+  for (const workflow of ["Move & power", "Force"]) {
+    await page.getByRole("tab", { name: workflow, exact: true }).click();
     const workspace = page.getByRole("region", { name: "Coil design workspace", exact: true });
     const left = workspace.getByRole("toolbar", { name: "Design side tools", exact: true });
     const right = workspace.getByRole("toolbar", { name: "Preview side tools", exact: true });
@@ -130,7 +130,7 @@ test("coil ends and driver controls dock on the left in both workflows", async (
   }
 });
 
-test("edits survive panel changes and workflow changes", async ({ page }) => {
+test("edits survive panel and result view changes", async ({ page }) => {
   await gotoDesignApp(page);
   const left = page.getByRole("toolbar", { name: "Design side tools", exact: true });
   const travel = page.getByRole("spinbutton", { name: "Desired travel (center-to-center)", exact: true });
@@ -144,14 +144,14 @@ test("edits survive panel changes and workflow changes", async ({ page }) => {
   await expect(page.getByRole("button", { name: "Routing source", exact: true })).toHaveText("Infinity Braid - Star (Wye)");
   await page.getByRole("button", { name: "Driver settings", exact: true }).click();
   await expect(page.getByRole("dialog", { name: "Routing", exact: true })).toHaveCount(0);
-  await expect(page.getByRole("region", { name: "Preview driver simulation results" })).toContainText("Current ripple");
+  await expect(page.getByRole("button", { name: "Open driver calculator", exact: true }).first()).toBeVisible();
   await left.getByRole("button", { name: "Routing", exact: true }).click();
   await expect(travel).toHaveValue("100");
-  await page.getByRole("tab", { name: /^Simulate/i }).click();
+  await page.getByRole("tab", { name: "Force", exact: true }).click();
   await expect(page.getByRole("dialog", { name: "Routing", exact: true })).toBeVisible();
   await left.getByRole("button", { name: "Magnets", exact: true }).click();
   await expect(count).toHaveValue("10");
-  await page.getByRole("tab", { name: /^Design/i }).click();
+  await page.getByRole("tab", { name: "Move & power", exact: true }).click();
   await expect(page.getByRole("dialog", { name: "Magnets", exact: true })).toBeVisible();
   await expect(count).toHaveValue("10");
 });
@@ -169,7 +169,7 @@ test("Escape closes only the selected panel and returns focus to its button", as
   }
 });
 
-test("returning from Simulate repaints canvas pixels and preserves the selected panel", async ({ page }) => {
+test("resizing the dock repaints canvas pixels and preserves the selected panel", async ({ page }) => {
   await gotoDesignApp(page);
   await page.getByRole("button", { name: "Stackup", exact: true }).click();
   const canvas = page.getByTestId("coil-annotations");
@@ -182,8 +182,8 @@ test("returning from Simulate repaints canvas pixels and preserves the selected 
   await expect.poll(paintedPixels).toBeGreaterThan(100);
   for (let cycle = 0; cycle < 3; cycle++) {
     const revision = Number(await canvas.getAttribute("data-revision"));
-    await page.getByRole("tab", { name: /^Simulate/i }).click();
-    await page.getByRole("tab", { name: /^Design/i }).click();
+    await page.getByRole("button", { name: "Collapse simulation panel", exact: true }).click();
+    await page.getByRole("button", { name: "Expand simulation panel", exact: true }).click();
     await expect(page.getByRole("dialog", { name: "Stackup", exact: true })).toBeVisible();
     await expect.poll(() => canvas.getAttribute("data-revision").then(Number)).toBeGreaterThan(revision);
     await expect.poll(paintedPixels).toBeGreaterThan(100);

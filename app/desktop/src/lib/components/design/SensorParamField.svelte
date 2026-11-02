@@ -24,8 +24,8 @@
   } = $props();
 </script>
 
-<label class="flex min-w-0 items-center justify-between gap-2 text-xs text-slate-300">
-  <span class="min-w-0 truncate">{label}</span>
+<label class="grid min-w-0 content-start gap-1.5 text-xs text-slate-300">
+  <span class="min-h-[2.5em] min-w-0 leading-relaxed">{label}</span>
   <NumberField
     {id}
     {value}
@@ -35,7 +35,7 @@
     {integer}
     {disabled}
     ariaLabel={label}
-    class="w-24 shrink-0 px-2 py-1 text-xs font-mono text-emerald-200"
+    class="w-full min-w-0 px-2 py-1.5 text-xs font-mono text-emerald-200"
     {onCommit}
   />
 </label>

@@ -28,6 +28,14 @@
 //! polarity or controller electrical phase. Do not spread the bundles to fit
 //! a desired force-axis angle; winding polarity/commutation needs its own audit.
 //!
+//! `pole_matched = 1` selects the corrected three-phase star termination.
+//! Layer-pair cuts advance by two braid periods, a complete electrical cycle.
+//! Only the middle physical phase-belt cut advances by one period, reversing
+//! that belt. The openings are then ordered along X for compact nested leads.
+//! Terminal labels compensate phase sequence, including travel mirroring.
+//! The active XY pattern is unchanged. Missing/zero retains reference wiring
+//! for saved designs; new application projects explicitly select the correction.
+//!
 //! The geometry is split into three submodules:
 //! - [`diamonds`] — the diamond / period geometry engine,
 //! - [`peaks_valleys`] — peak / valley / braid-crossing computation,
@@ -85,7 +93,8 @@
 //!
 //! Those lead details describe legacy delta routing. Star/wye uses the
 //! staggered openings and mirrored fan-outs in [`stacked`], following the
-//! supplied 2/4/6/8-layer examples without changing the main XY braid.
+//! supplied compact examples without changing the main XY braid. Pole-matched
+//! stacks use a full electrical cycle between pairs so their forces add.
 //! Closed mode retains separate closed
 //! rings in each pair, without inventing external terminals or series links.
 
@@ -186,6 +195,12 @@ impl RoutingPattern for InfinityBraidPattern {
         vec![
             PatternParameter::int("num_strands", "Strands per period", 5.0, 2.0, 99.0)
                 .with_description("Number of parallel braided paths in each period."),
+            PatternParameter::int("pole_matched", "Star winding polarity", 0.0, 0.0, 1.0)
+                .with_description("Pole-matched star uses compact phase openings and a full electrical cycle between layer pairs so their forces add. It reverses the middle phase belt and assigns B/C labels without moving active copper. Reference preserves legacy terminations. Delta and closed windings are unchanged.")
+                .with_options(vec![
+                    ParamOption::new(0.0, "Reference terminations"),
+                    ParamOption::new(1.0, "Pole-matched terminations"),
+                ]),
             // Saved legacy closed windings explicitly use 0. The source picker
             // hides that choice for new designs, but validation must accept it.
             PatternParameter::int(
@@ -434,6 +449,11 @@ fn braid_geometry(
     lead_pitch: f64,
     ctx: &RoutingContext,
 ) -> Result<BraidGeometry, RoutingError> {
+    let matched = connection == Connection::Star && ctx.param("pole_matched", 0.0) == 1.0;
+    if matched && (phases != 3 || ctx.magnet_pitch().is_none()) {
+        return Err(RoutingError::new(0, "pole_matched", RoutingErrorKind::Generation,
+            "pole-matched star terminations require exactly three phases and a magnetic pole pitch"));
+    }
     let offset_step = -layout.o * num_strands as f64;
     let mut geometry = BraidGeometry {
         segments: Vec::new(),
@@ -447,6 +467,13 @@ fn braid_geometry(
 
     for i in 0..phases {
         let phase_idx = i as usize;
+        // A compact three-phase belt has 60-degree spatial separation. The
+        // pole-matched termination reverses the middle belt and exchanges B/C
+        // terminal names to obtain the standard A/B/C negative-120 sequence.
+        // This is a physical connection choice, never a simulation sign patch.
+        // Mirroring travel reverses electrical sequence. Compensate with the
+        // terminal names before the host mirrors the actual geometry.
+        let phase_idx = if matched && !ctx.orientation.mirror_x { [0, 2, 1][phase_idx] } else { phase_idx };
         let net = PHASE_NAMES[phase_idx % PHASE_NAMES.len()].to_string();
         let start_offset = offset_step * i as f64;
 
@@ -1398,13 +1425,132 @@ mod tests {
         let mut short = fader_ctx(2.0);
         short.active_area_length_mm = 20.0;
         short.num_layers = 8;
-        assert!(InfinityBraidPattern.generate(&short).unwrap_err().message.contains("one braid period per layer pair"));
+        assert!(InfinityBraidPattern.generate(&short).unwrap_err().message.contains("braid periods"));
         let mut large = magnet_ctx();
         large.num_layers = 64;
         large.params.insert("connection".into(), 2.0);
         let result = InfinityBraidPattern.generate(&large).unwrap();
         assert_eq!(result.phase_bands.len(), 3 * 64);
         assert_eq!(result.vias.iter().filter(|v| v.from_layer == 0 && v.to_layer == 63).count(), 3 * 31);
+    }
+
+    #[test]
+    fn pole_matched_terminations_preserve_compact_body_and_open_once_per_pair() {
+        for strands in [2, 3, 5] {
+          for layers in [2, 4, 6, 8] {
+            let mut context = fader_ctx(2.0);
+            context.num_layers = layers;
+            context.params.insert("num_strands".into(), strands as f64);
+            let reference = crate::generate_routing_result(&context, "infinity-braid").unwrap();
+            context.params.insert("pole_matched".into(), 0.0);
+            assert_eq!(reference, crate::generate_routing_result(&context, "infinity-braid").unwrap());
+            context.params.insert("pole_matched".into(), 1.0);
+            let matched = crate::generate_routing_result(&context, "infinity-braid").unwrap();
+            let mut relabeled = reference.clone();
+            for s in &mut relabeled.segments {
+                s.net = match s.net.as_str() { "B" => "C".into(), "C" => "B".into(), _ => s.net.clone() };
+            }
+            let active = |r: &RoutingResult| r.segments.iter().filter(|s| s.is_active).cloned().collect::<Vec<_>>();
+            assert_eq!(active(&matched), active(&relabeled), "only B/C names change, never active copper positions");
+            let mut closed_context = context.clone();
+            closed_context.params.insert("connection".into(), 0.0);
+            let closed = crate::generate_routing_result(&closed_context, "infinity-braid").unwrap();
+            for pair in 0..layers / 2 {
+                for (phase, net) in ["A", "C", "B"].into_iter().enumerate() {
+                    let old_net = ["A", "B", "C"][phase];
+                    let removed: Vec<_> = closed.vias.iter().filter(|v| v.net == old_net && v.from_layer == 2 * pair)
+                        .filter(|v| !matched.vias.iter().any(|m| m.net == net && m.from_layer == v.from_layer
+                            && m.position.distance_to(v.position) < 1e-9)).collect();
+                    assert_eq!(removed.len(), 1);
+                    let base_x = 3.0 + 6.0 / (3 * strands) as f64 * (strands - 1) as f64;
+                    let cut_x = base_x + 2.0 * phase as f64
+                        + 6.0 * (2 * (layers / 2 - 1 - pair) + phase as u32 % 2) as f64;
+                    assert!(approx(removed[0].position, cut_x, 8.0));
+                    assert!(connected(&net_graph(&matched, net)));
+                }
+            }
+            // Actual end-via rows are identical, up to the explicit B/C rename.
+            let end_row = |r: &RoutingResult| {
+                let mut row: Vec<_> = r.vias.iter().filter(|v| (v.position.y - 4.0).abs() < 1e-10)
+                    .map(|v| (v.from_layer, (v.position.x * 1e6).round() as i64)).collect();
+                row.sort(); row
+            };
+            assert_eq!(end_row(&matched), end_row(&reference));
+          }
+        }
+    }
+
+    #[test]
+    fn compact_pole_matched_leads_follow_opening_order_and_series_links_never_bypass_pairs() {
+        for layers in [2, 4, 6, 8, 10] {
+            let mut context = fader_ctx(2.0);
+            context.num_layers = layers;
+            context.params.insert("pole_matched".into(), 1.0);
+            let result = InfinityBraidPattern.generate(&context).unwrap();
+            let last = layers - 1;
+            let pairs = layers / 2;
+            // Golden coordinates from the corrected compact two-layer DXF.
+            // B's physical belt is to C's right, but its opening is to C's left.
+            let cuts = [4.0 + T, 8.0 + T, 12.0 + T];
+            for (i, net) in ["A", "B", "C"].into_iter().enumerate() {
+                let corner = cuts[i] - (i + 1) as f64 / 3.0;
+                assert!(has_lead(&result, net, last, (cuts[i], 8.0), (corner, LEAD[i])));
+                assert!(has_lead(&result, net, last, (corner, LEAD[i]), (0.0, LEAD[i])));
+                let neutral_x = cuts[i] + 12.0 * (pairs - 1) as f64;
+                assert!(has_lead(&result, net, 0, (neutral_x, 8.0), (neutral_x, LEAD[0])));
+                assert!(connected(&net_graph(&result, net)));
+                for stage in 0..pairs - 1 {
+                    let x = cuts[i] + 12.0 * stage as f64;
+                    let join_x = x + (i + 1) as f64 / 3.0;
+                    let corner_x = x + 12.0 - (i + 1) as f64 / 3.0;
+                    let layer = last - 1 - 2 * stage;
+                    assert!(has_lead(&result, net, layer, (x, 8.0), (join_x, LEAD[i])));
+                    assert!(has_lead(&result, net, layer - 1, (x + 12.0, 8.0), (corner_x, LEAD[i])));
+                    assert!(has_lead(&result, net, layer - 1, (corner_x, LEAD[i]), (join_x, LEAD[i])));
+                    let via = result.vias.iter().find(|v| v.net == net && approx(v.position, join_x, LEAD[i])).unwrap();
+                    assert_eq!((via.from_layer, via.to_layer), (0, last));
+                    let mut landings: Vec<_> = result.segments.iter().filter(|s|
+                        s.start.distance_to(via.position) < 1e-9 || s.end.distance_to(via.position) < 1e-9)
+                        .map(|s| (s.net.as_str(), s.layer)).collect();
+                    landings.sort(); landings.dedup();
+                    assert_eq!(landings, [(net, layer - 1), (net, layer)], "no other phase or winding pair may touch this barrel");
+                    let mut cut = result.clone();
+                    cut.vias.retain(|v| v != via);
+                    assert!(!connected(&net_graph(&cut, net)), "every series link is necessary");
+                }
+            }
+            let neutral_shift = 12.0 * (pairs - 1) as f64;
+            assert!(has_lead(&result, "A", 0, (cuts[0] + neutral_shift, LEAD[0]), (cuts[1] + neutral_shift, LEAD[0])));
+            assert!(has_lead(&result, "C", 0, (cuts[1] + neutral_shift, LEAD[0]), (cuts[2] + neutral_shift, LEAD[0])));
+            let leads: Vec<_> = result.segments.iter().filter(|s| !s.is_active && s.layer == last).collect();
+            assert_eq!(leads.len(), 6, "exactly two driver segments per phase on the outer layer");
+            // DFM still reports narrow copper; it must not widen this pattern.
+            context.via_pad_diameter_mm = Some(0.9);
+            context.trace_width_mm = 0.4;
+            context.min_space_mm = 0.3;
+            assert_eq!(result, InfinityBraidPattern.generate(&context).unwrap());
+        }
+    }
+
+    #[test]
+    fn pole_matched_scope_is_explicit_and_old_connections_are_unchanged() {
+        for connection in [0.0, 1.0] {
+            let mut context = fader_ctx(connection);
+            let original = InfinityBraidPattern.generate(&context).unwrap();
+            context.params.insert("pole_matched".into(), 1.0);
+            assert_eq!(original, InfinityBraidPattern.generate(&context).unwrap());
+        }
+        let mut context = fader_ctx(2.0);
+        context.params.insert("pole_matched".into(), 1.0);
+        context.phases = 2;
+        assert!(InfinityBraidPattern.generate(&context).unwrap_err().message.contains("three phases"));
+        context.phases = 3;
+        context.magnet_pitch_mm = None;
+        assert!(InfinityBraidPattern.generate(&context).unwrap_err().message.contains("pole pitch"));
+        context.magnet_pitch_mm = Some(6.0);
+        context.num_layers = 8;
+        context.active_area_length_mm = 45.0;
+        assert!(InfinityBraidPattern.generate(&context).unwrap_err().message.contains("8 braid periods"));
     }
 
     #[test]

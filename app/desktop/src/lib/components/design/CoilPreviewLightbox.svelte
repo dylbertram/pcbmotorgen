@@ -51,9 +51,11 @@
     expanded = $bindable(false),
     embedded = false,
     active = true,
+    focused = true,
     simulation = null,
-    onRequestSimulation,
+    onOpenDriverCalculator,
     designSettings,
+    statusContent,
     sidePanel = $bindable<PreviewPanelId | null>(null),
     height = PREVIEW_H,
     config,
@@ -91,9 +93,11 @@
     expanded?: boolean;
     embedded?: boolean;
     active?: boolean;
+    focused?: boolean;
     simulation?: VisualizationInput | null;
-    onRequestSimulation?: () => void;
+    onOpenDriverCalculator?: () => void;
     designSettings?: Snippet<[DesignPanelId]>;
+    statusContent?: Snippet;
     sidePanel?: PreviewPanelId | null;
     height?: number;
     config: ConfigStore;
@@ -140,7 +144,6 @@
   function setFieldSettings(next: Snippet | null) { fieldSettings = next; }
   function openFields() {
     if (view.viewMode === "top") view.viewMode = "iso";
-    onRequestSimulation?.();
   }
   $effect(() => { void terminalGeometry; untrack(() => measure3d.clear()); });
   function toggleZoomWindow() {
@@ -205,7 +208,7 @@
 </script>
 
 {#if embedded || expanded}
-  <NativeViewMenuBridge {view} {active} {hasPolePitchData} {hasBandWidthData} {hasPoleRegionData} onFitExtents={fitExtents} onToggleZoomWindow={toggleZoomWindow} />
+  <NativeViewMenuBridge {view} active={active && focused} {hasPolePitchData} {hasBandWidthData} {hasPoleRegionData} onFitExtents={fitExtents} onToggleZoomWindow={toggleZoomWindow} />
 {/if}
 
 {#if embedded}
@@ -298,6 +301,7 @@
              backed so the buttons stay legible over the drawing. -->
         <div class="absolute inset-x-0 top-0 z-20" bind:clientHeight={toolbarHeight}>
           <GeometryEditingToolbar label="Coil preview tools" geometry={onGeometryChange ? importedGeometry : null}
+            {statusContent}
             {selection} {measure} {terminalTool} {onSimplify} {onUndoSimplify} {simplifyNotice} borderless
             spatialMeasure={view.viewMode !== "top" ? measure3d : null}
             zoomWindow={view.zoomWindow} onToggleZoomWindow={toggleZoomWindow} showZoomWindowControl={false}
@@ -315,7 +319,7 @@
 
         {#if designSettings}
           <div class="absolute bottom-0 left-0 z-20 w-11" style:top={`${toolbarHeight}px`}>
-            <PreviewSideRail designOnly {designSettings} bind:open={sidePanel} {active} {view} {config} {drive} {driveError} {drivePending}
+            <PreviewSideRail designOnly {designSettings} {onOpenDriverCalculator} bind:open={sidePanel} active={active && focused} {view} {config} {drive} {driveError} {drivePending}
               {terminalTool} {onStartTerminals} generated={!importedGeometry} terminalsDisabled={!onGeometryChange}
               geometry={terminalGeometry ?? importedGeometry} selection={importedGeometry ? selection : undefined}
               showMotorControls={true} layers={[]} label="Design settings" dismissOnOutsideClick={false} />
@@ -325,7 +329,7 @@
         <!-- Right rail: hangs from the bottom of the top toolbar down to the
               status bar, so the Layers panel pulls out under it. -->
         <div class="absolute bottom-0 right-0 z-20 w-11" style:top={`${toolbarHeight}px`}>
-              <PreviewSideRail viewControlsInMenu drawingOnly={!!designSettings} {fieldSettings} onOpenFields={onRequestSimulation ? openFields : undefined} generated={!importedGeometry} {config} {drive} {driveError} {drivePending} {view} bind:open={sidePanel} {active} layers={importedGeometry ? importedGeometry.layer_z_mm.map((_, idx) => ({ idx })) : uniqueLayers} phases={importedGeometry ? [] : uniquePhases}
+              <PreviewSideRail viewControlsInMenu drawingOnly={!!designSettings} {fieldSettings} {onOpenDriverCalculator} onOpenFields={openFields} generated={!importedGeometry} {config} {drive} {driveError} {drivePending} {view} bind:open={sidePanel} active={active && focused} layers={importedGeometry ? importedGeometry.layer_z_mm.map((_, idx) => ({ idx })) : uniqueLayers} phases={importedGeometry ? [] : uniquePhases}
              {terminalTool} {onStartTerminals} terminalsDisabled={!onGeometryChange}
            geometry={terminalGeometry ?? importedGeometry} selection={importedGeometry ? selection : undefined} assignmentDisabled={view.viewMode !== "top" || !importedGeometry || !onGeometryChange || measure.mode || !!terminalTool?.active || view.oneSection}
           coils={importedGeometry ? uniquePhases.map((phase) => ({ name: phase.name, colorIdx: phase.colorIdx })) : []}

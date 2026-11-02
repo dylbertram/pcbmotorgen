@@ -57,7 +57,7 @@ test("sensor is a design type whose full workflow lives in the Design tab", asyn
   await page.locator("#sensor-wavelength").fill("48");
   await page.locator("#sensor-wavelength").press("Enter");
   await selectDesignType(page, "Motor coil");
-  await expect(page.getByRole("tab", { name: /^Simulate/ })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Simulation results", exact: true })).toBeVisible();
   await selectDesignType(page, "Sensor");
   await expect(page.locator("#sensor-wavelength")).toHaveValue("48");
 });
@@ -158,9 +158,9 @@ test("sensor preview supports layer visibility, zoom, pan and reset", async ({ p
 
 test("switching from motor simulation to sensor opens sensor design", async ({ page }) => {
   await gotoDesignApp(page);
-  await page.getByRole("tab", { name: /^Simulate/ }).click();
+  await page.getByRole("tab", { name: "Force", exact: true }).click();
   await selectDesignType(page, "Sensor");
-  await expect(page.getByRole("tab", { name: /^Design/ })).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByRole("region", { name: "Simulation results", exact: true })).toHaveCount(0);
   await expect(page.locator("#sensor-wavelength")).toBeVisible();
 });
 

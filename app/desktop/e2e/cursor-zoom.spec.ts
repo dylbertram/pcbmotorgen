@@ -84,7 +84,20 @@ test.describe("touch pinch", () => {
     const viewer = page.getByTestId("coil-iso");
     await expect(viewer).toHaveAttribute("data-camera", /position/);
     const rect = await drawingRect(viewer), snapshot = async () => JSON.parse((await viewer.getAttribute("data-camera"))!) as Snapshot;
-    const x = .6, y = .43, before = await snapshot(), world = worldAt(before, rect, "iso", x, y);
+    // Loading/error legends reflow while the renderer starts. Pick a clear
+    // gesture path rather than touching a transient button at a fixed fraction.
+    const x = .6;
+    let y = .25;
+    await expect.poll(async () => {
+      const candidate = await page.evaluate(({ rect, x }) => [.25, .2, .3, .35, .4, .15].find(y =>
+        [-18, 18].every(offset => [0, 1].every(end => {
+          const hit = document.elementFromPoint(rect.x + rect.width * x + offset + 24 * end, rect.y + rect.height * y + 32 * end);
+          return !!hit?.closest('[data-testid="coil-iso"]') && !hit.closest('button,input,select,[aria-label="Simulation overlay legend"]');
+        }))) ?? null, { rect, x });
+      if (candidate !== null) y = candidate;
+      return candidate !== null;
+    }).toBe(true);
+    const before = await snapshot(), world = worldAt(before, rect, "iso", x, y);
     const touch = await page.context().newCDPSession(page);
     const points = (dx: number, dy: number) => [-18, 18].map((offset, id) => ({ id, x: rect.x + rect.width * x + offset + dx, y: rect.y + rect.height * y + dy }));
     await touch.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: points(0, 0) });
@@ -107,7 +120,7 @@ test.describe("touch pinch", () => {
       await expect(viewer).toHaveAttribute("data-camera", /position/);
       const rect = await drawingRect(viewer);
       const snapshot = async () => JSON.parse((await viewer.getAttribute("data-camera"))!) as Snapshot;
-      const x = .68, y = .43, before = await snapshot(), world = worldAt(before, rect, id, x, y);
+      const x = .68, y = .25, before = await snapshot(), world = worldAt(before, rect, id, x, y);
       await page.mouse.move(rect.x + rect.width * .3, rect.y + rect.height * .7);
       // Top keeps its CAD convention: two-finger pan, three-finger zoom.
       const offsets = id === "top" ? [[-18, -9], [18, -9], [0, 18]] : [[-18, 0], [18, 0]];

@@ -65,18 +65,18 @@
   class="overflow-hidden rounded-lg border border-slate-700 bg-slate-800/40"
   aria-labelledby="sensor-preview-title"
 >
-  <div class="flex items-center justify-between gap-3 border-b border-slate-700 px-3 py-2">
-    <div>
+  <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-700 px-3 py-2">
+    <div class="min-w-0 flex-1 basis-40">
       <h2 id="sensor-preview-title" class="text-xs font-semibold uppercase tracking-wider text-slate-200">
         Induction sensor preview
       </h2>
       <p class="mt-0.5 text-[11px] text-slate-500">{store.cadGeometry ? "Imported sensor CAD · copper layers overlaid" : "Top-down · F.Cu and B.Cu overlaid"}</p>
     </div>
-    <div class="flex items-center gap-3">
+    <div class="flex shrink-0 items-center gap-3">
     {#if store.loading}
       <span class="text-[11px] text-amber-300" role="status">Generating…</span>
     {:else if geometry}
-      <span class="font-mono text-[11px] text-slate-400">
+      <span class="whitespace-nowrap font-mono text-[11px] text-slate-400">
         {geometry.nets.reduce((n, net) => n + net.segments.length + (net.curves?.length ?? 0) + (net.splines?.length ?? 0), 0)} traces
       </span>
     {/if}

@@ -105,12 +105,13 @@ mod tests {
 
     #[test]
     fn exact_generated_braid_warns_without_changing_geometry() {
+      for matched in [0.0, 1.0] {
         for layers in [4, 6, 8] {
             let ctx = pcbmotorgen_routing::RoutingContext {
                 active_area_length_mm: 92.0, board_width_mm: 8.0, num_layers: layers, phases: 3,
                 min_trace_mm: 0.2, trace_width_mm: 0.2, min_space_mm: 0.127,
                 via_pad_diameter_mm: Some(0.5), magnet_pitch_mm: Some(6.0),
-                params: std::collections::HashMap::from([("num_strands".into(), 3.0), ("connection".into(), 2.0)]),
+                params: std::collections::HashMap::from([("num_strands".into(), 3.0), ("connection".into(), 2.0), ("pole_matched".into(), matched)]),
                 ..Default::default()
             };
             let r = pcbmotorgen_routing::generate_routing_result(&ctx, "infinity-braid").unwrap();
@@ -121,6 +122,7 @@ mod tests {
             assert!(warnings.iter().any(|w| w.kind == "series_via_pad_clearance" && (w.gap_mm - 0.0555555556).abs() < 1e-8));
             assert_eq!(r, before);
         }
+      }
     }
 
     #[test]

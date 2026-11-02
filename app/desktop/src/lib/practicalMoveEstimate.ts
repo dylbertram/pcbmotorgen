@@ -5,20 +5,24 @@ import type { DeclaredLossModel, PhaseValues, PhaseMatrix } from "./types/moveLo
 export function practicalMoveEstimate(config: LinearMotorConfig, settings: DriveSettings, drive: DriveAnalysis): DeclaredLossModel {
   const external = settings.series_inductance_h;
   if (config.supply_voltage_v !== 12 || settings.pwm_hz !== 100000 || settings.driver.name !== "DRV8311"
-      || settings.driver.rds_on_ohm !== 0.21 || (external !== 0 && external !== 47e-6)
+      || settings.driver.rds_on_ohm !== 0.21 || !Number.isFinite(external) || external < 0
       || drive.bus_voltage_v !== 12 || drive.pwm_hz !== settings.pwm_hz || drive.driver_name !== settings.driver.name
       || drive.series_inductance_h !== external || drive.phases.length !== 3 || drive.phases.some(p => !p.connected)
       || new Set(drive.phases.map(p => p.net)).size !== 3
       || config.backplane && (config.backplane.layers.length > 0 || config.backplane.housing != null)) {
-    throw new Error("The estimate requires current native DRV8311 analysis at 12 V and 100 kHz, 0.21 Ω driver path, three connected phases, 0 or 47 µH per phase, and no backplane or housing.");
+    throw new Error("The engineering estimate requires current native DRV8311 analysis at 12 V and 100 kHz with a 0.21 Ω driver path, three connected phases and no backplane or housing. External series inductance may be any finite value; unspecified inductor losses stay listed as omissions.");
   }
+  // Known component data exists only for the Bourns 47 µH reference. Other
+  // values keep their inductance in the electrical model but leave DCR and
+  // core loss explicitly uncharacterised instead of assuming zero loss.
+  const knownInductor = Math.abs(external - 47e-6) < 1e-12;
   const thickness = config.pcb_stackup ? Math.max(...config.pcb_stackup.copper_m) : Math.max(drive.outer_copper_m, drive.inner_copper_m);
   const period = 2 * config.magnet_pitch_m;
   const rho = 1.724e-8 * (1 + 0.00393 * (settings.winding_temp_c - 20));
   const resistances = drive.phases.map(p => p.resistance_hot_ohm) as PhaseValues;
   if (![drive.effective_inductance_h, drive.phase_resistance_ohm, thickness, period, rho, ...resistances].every(v => Number.isFinite(v) && v > 0))
     throw new Error("A current native electrical analysis with finite copper resistance and inductance is required.");
-  const hotDcr = external ? 0.0741 * (1 + 0.00393 * (settings.winding_temp_c - 25)) : 0;
+  const hotDcr = knownInductor ? 0.0741 * (1 + 0.00393 * (settings.winding_temp_c - 25)) : 0;
   if (!Number.isFinite(hotDcr) || hotDcr < 0) throw new Error("The assumed inductor temperature is outside the model.");
   const phaseR = drive.phase_resistance_ohm + hotDcr + settings.driver.rds_on_ohm / 2;
   const pp = 12 / (2 * phaseR) * Math.tanh(phaseR / (4 * 100000 * drive.effective_inductance_h));
@@ -30,12 +34,12 @@ export function practicalMoveEstimate(config: LinearMotorConfig, settings: Drive
     return a < 0.01 ? 4 * a ** 4 / 45 : a * (Math.sinh(2 * a) + Math.sin(2 * a)) / (Math.cosh(2 * a) - Math.cos(2 * a)) - 1;
   };
   const fundamental = skin(1 / period), ripple = skin(100000);
-  const qExtra = external ? Math.max(0, 2 * Math.PI * 100000 * external / 20 - 0.0741) : 0;
+  const qExtra = knownInductor ? Math.max(0, 2 * Math.PI * 100000 * external / 20 - 0.0741) : 0;
   const qWatts = qExtra * 2 / 3 * (Math.sqrt(8) / Math.PI ** 2 * pp) ** 2;
   const phase = (v: number): PhaseValues => [v, v, v];
   const reference = "Explicit engineering estimate, not a measured or complete hardware total: TI DRV8311 SLVSFN2B sections 7.5/12.3.1, 25 °C driver, assumed SLEW=01, DEADTIME=001, 0.7 V diode drop and sinusoidal cycle-average mapping; Bourns SRP1265WA-470M 47 µH Q=20 at 100 kHz/1 V and 74.1 mΩ typical DCR at 25 °C; inductor temperature assumed equal to winding. Q excess is combined AC-loss proxy, not isolated core loss. Isolated copper slab uses full-network DC resistance as proxy; proximity and via AC distribution omitted. 12 V stiff DC-link boundary excludes upstream wiring and board-level loads. Not a guaranteed bound or hardware qualification. Sources: https://www.ti.com/document-viewer/DRV8311/datasheet/GUID-C826F7E8-19E5-47C8-9C09-E13912428538 and https://www.bourns.com/docs/product-datasheets/srp1265wa.pdf";
   return {
-    basis: "engineering_estimate", reference,
+    basis: "engineering_estimate", reference: reference + (external > 0 && !knownInductor ? ` Supplied ${(external * 1e6).toFixed(3)} µH per phase has no component identity, so its DCR and core loss are omitted rather than assumed.` : ""),
     domain: { driver_name: settings.driver.name, source_voltage_v: 12, pwm_hz: 100000, winding_temp_c: settings.winding_temp_c,
       driver_path_resistance_ohm: 0.21, max_phase_peak_a: 20, max_speed_m_s: 1,
       geometry: { phase_resistance_hot_ohm: resistances, effective_phase_inductance_h: drive.effective_inductance_h,
@@ -50,6 +54,7 @@ export function practicalMoveEstimate(config: LinearMotorConfig, settings: Drive
     controller_power_w: 12 * (0.010 + (0.012 - 0.010) * (75000 / 175000)), other_dc_link_power_w: 0,
     omitted_losses: ["Winding proximity and via-specific AC loss not represented by isolated slab approximation",
       "Inductor AC loss outside 100 kHz fundamental and bias/temperature effects not characterized",
-      "Board-level controller/regulator and source wiring consumption not specified"],
+      "Board-level controller/regulator and source wiring consumption not specified",
+      ...(external > 0 && !knownInductor ? [`External series inductor DCR and core loss are unspecified for ${(external * 1e6).toFixed(3)} µH per phase; they are excluded from the reported power`] : [])],
   };
 }

@@ -101,6 +101,15 @@ impl Default for ForceEvaluator {
 }
 
 impl ForceEvaluator {
+    fn validate_current_labels(config: &SimulationInput, coils: &[PhaseCoil]) -> Result<(), SimulationError> {
+        if config.balanced_three_phase_drive {
+            let labels: std::collections::BTreeSet<_> = coils.iter().map(|c| c.phase_name.as_str()).collect();
+            if config.phases != 3 || labels != std::collections::BTreeSet::from(["A", "B", "C"]) {
+                return Err(SimulationError("Balanced drive requires A/B/C terminal networks".into()));
+            }
+        }
+        Ok(())
+    }
     fn coils_match_routing(&self, coils: &[PhaseCoil]) -> bool {
         !coils.is_empty() && self.routed_samples.as_ref().map_or(true, |samples| {
             samples.len() == coils.len() && coils.iter().enumerate().all(|(i, coil)| {
@@ -146,6 +155,7 @@ impl ForceEvaluator {
     /// Reproduce the excitation used by a completed, calibrated force run.
     /// This records the model's command, not a validated controller waveform.
     pub fn excitation_currents_at(&self, config: &SimulationInput, coils: &[PhaseCoil], position_m: f64) -> Result<Vec<f64>, SimulationError> {
+        Self::validate_current_labels(config, coils)?;
         if !self.calibrated || !self.coils_match_routing(coils) || !position_m.is_finite() {
             return Err(SimulationError("Excitation diagnostics require a calibrated run, matching coils and finite position".into()));
         }
@@ -226,6 +236,7 @@ impl ForceEvaluator {
         if coils.is_empty() {
             return Err(SimulationError("No conductor networks available for force evaluation".into()));
         }
+        Self::validate_current_labels(config, &coils)?;
         self.routed_samples = Some(all_samples);
         self.routed_phase_names = coils.iter().map(|coil| coil.phase_name.clone()).collect();
         self.routed_x_bounds_m = Some(x_bounds);
@@ -295,6 +306,7 @@ impl ForceEvaluator {
         config: &SimulationInput,
         coils: &[PhaseCoil],
     ) -> Result<ForceResult, SimulationError> {
+        Self::validate_current_labels(config, coils)?;
         if !self.coils_match_routing(coils) {
             return Err(SimulationError("Force coils do not match the solved conductor networks".into()));
         }
@@ -426,6 +438,7 @@ impl ForceEvaluator {
         coils: &[PhaseCoil],
         mover_position_m: f64,
     ) -> Result<([f64; 3], [f64; 3]), SimulationError> {
+        Self::validate_current_labels(config, coils)?;
         if !self.coils_match_routing(coils) {
             return Err(SimulationError("Force coils do not match the solved conductor networks".into()));
         }

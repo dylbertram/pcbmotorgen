@@ -2,8 +2,6 @@ import { describe, expect, it } from "vitest";
 import { render } from "svelte/server";
 import type { DriveAnalysis, PhaseElectrical } from "../../types";
 import CurrentBudget from "./CurrentBudget.svelte";
-import MetricsPanel from "./MetricsPanel.svelte";
-import type { ConfigStore } from "../../stores/config.svelte";
 
 // Only the fields read by the current budget are needed in these render tests.
 function analysis(overrides: Partial<DriveAnalysis> = {}): DriveAnalysis {
@@ -56,22 +54,4 @@ describe("CurrentBudget", () => {
     expect(body).not.toMatch(/Infinity|NaN/);
   });
 
-  it("shows the selected input, terminal peaks and calculated ceiling in the metrics summary", () => {
-    const { body } = render(MetricsPanel, {
-      props: {
-        config: { commutation: "max_thrust", phases: 3, max_current_a: 1, supply_voltage_v: 12 } as ConfigStore,
-        sweep: null,
-        friction: null,
-        height: null,
-        drive: analysis(),
-      },
-    });
-    expect(body).toContain("Selected simulation inputs");
-    expect(body).toContain("1.00 A phase amplitude");
-    expect(body).toContain("1.25 A");
-    expect(body).toContain("Calculated continuous phase-current ceiling");
-    expect(body).toContain("2.00 A");
-    expect(body).toContain("trace ampacity");
-    expect(body).toContain("Not calculated");
-  });
 });

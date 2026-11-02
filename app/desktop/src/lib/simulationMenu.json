@@ -1,0 +1,7 @@
+[
+  { "id": "driver", "label": "Driver calculator…" },
+  { "id": "run", "label": "Run simulations" },
+  { "id": "move", "label": "Move & power" },
+  { "id": "force", "label": "Force" },
+  { "id": "advanced", "label": "Advanced analysis" }
+]

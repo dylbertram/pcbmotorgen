@@ -231,7 +231,7 @@
     {#if view.viewMode !== "top"}
     {#if simulation}
       {#if mode !== "off"}
-        <div class="overlay-legends pointer-events-auto absolute bottom-8 left-2 right-3 flex flex-wrap gap-2 overflow-y-auto text-[10px]" aria-label="Simulation overlay legend">
+        <div class="overlay-legends pointer-events-none absolute bottom-8 left-2 right-3 flex flex-wrap gap-2 overflow-y-auto text-[10px]" aria-label="Simulation overlay legend">
           {#if visualization.phase === "loading"}<p role="status" class="rounded bg-slate-900/95 p-2 text-slate-300">Sampling the active design. Previous visualization cleared.</p>{/if}
           {#if visualization.error}<p role="status" class="rounded bg-slate-900/95 p-2 text-amber-200">{visualization.error}</p>{/if}
           {#if magnetContribution.phase === "loading"}<p role="status" class="rounded bg-slate-900/95 p-2 text-slate-300">Sampling magnet contribution on the coil observation grid. Combined field cleared.</p>{/if}
@@ -241,11 +241,11 @@
           {#if visualization.report?.heat_unavailable_reason || heatMapping.error}
             <p role="status" class="max-w-md rounded bg-slate-900/95 p-2 text-amber-200">Heat/loss unavailable: {heatMapping.error ?? visualization.report?.heat_unavailable_reason}</p>
           {/if}
-          <div class="compact-overlay-toggle w-full rounded border border-slate-700 bg-slate-900/95 p-1 text-slate-300">
+          <div class="compact-overlay-toggle pointer-events-auto w-full rounded border border-slate-700 bg-slate-900/95 p-1 text-slate-300">
             <p>{mode === "heat" ? "Loss W/m, not temperature" : `${fieldSource !== "pm" ? includeMagnets ? "Coils + PM, free-space sum" : fieldSource === "coils" ? "Routed coil estimate" : "Audited DC coil-current" : "PM-only"} field · |B| in T${mode === "both" ? " · Loss W/m" : ""}`}</p>
             <button type="button" aria-expanded={legendsOpen} onclick={() => legendsOpen = !legendsOpen}>Legends and model limits</button>
           </div>
-          <div class="overlay-legends-body flex flex-wrap gap-2">
+          <div class="overlay-legends-body pointer-events-auto flex flex-wrap gap-2">
           {#if field}
             <div class="max-w-64 space-y-1 rounded border border-slate-700 bg-slate-900/95 p-2 text-slate-300" aria-label="Magnetic field legend">
               <p>{fieldSource !== "pm" ? includeMagnets ? "Coils + magnets, free-space sum" : "Coil-current" : "PM"} field magnitude |B| · T</p><div class="h-1.5 rounded" style:background={`linear-gradient(to right, ${FIELD_PALETTE.join(",")})`}></div>

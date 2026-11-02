@@ -22,7 +22,6 @@ async function nativeFixture(page: Page) {
       if (command === "compute_friction") return mocks.mockFriction(args.config);
       if (command === "travel_envelope") return mocks.mockTravelEnvelope(args.config);
       if (command === "analyze_drive") return mocks.mockDriveAnalysis(args.config, args.drive, null);
-      if (command === "sample_b_field") return mocks.mockBFieldGrid(args.config, args.nX, args.nZ, args.xExtentM, args.zExtentM);
       if (command === "dc_coupling_capability") return { available: false, reason: "No qualified coil source in this UI fixture." };
       if (command !== "sample_simulation_visualization") throw new Error(`UI fixture has no${command}`);
       w.vizCalls.push(args); const r = args.request, config = args.config;
@@ -55,11 +54,10 @@ async function nativeFixture(page: Page) {
 }
 
 async function show3D(page: Page, pm = true) {
-  await page.getByRole("tab", { name: /^Simulate/i }).click();
   await openCoilPreview(page);
   await page.getByRole("button", { name: "3D fields and heat", exact: true }).click();
   const viewer = page.getByTestId("coil-iso");
-  await page.getByRole("button", { name: "Field and loss settings", exact: true }).click();
+  await page.getByRole("toolbar", { name: "Preview side tools", exact: true }).getByRole("button", { name: "Field and loss settings", exact: true }).click();
   await expect(page.getByRole("dialog", { name: "Field and loss settings", exact: true })).toBeVisible();
   if (pm) {
     await page.getByRole("combobox", { name: "Magnetic field source", exact: true }).selectOption("pm");
@@ -69,7 +67,7 @@ async function show3D(page: Page, pm = true) {
 
 test("manual simulations rerun active geometry with auto-run disabled and reject late results", async ({ page }) => {
   await gotoDesignApp(page); await nativeFixture(page);
-  await page.getByRole("tab", { name: /^Simulate/i }).click();
+  await page.getByRole("tab", { name: "Force", exact: true }).click();
   const run = page.getByRole("button", { name: "Run simulations", exact: true });
   await expect(run).toBeEnabled();
   await page.getByRole("checkbox", { name: "Auto-run on edits", exact: true }).uncheck();
@@ -87,9 +85,12 @@ test("manual simulations rerun active geometry with auto-run disabled and reject
   await run.click();
   await expect(page.getByRole("button", { name: "Running simulations…", exact: true })).toBeDisabled();
   await expect.poll(() => page.evaluate(() => typeof (window as any).resolveSweep)).toBe("function");
-  await page.getByRole("tab", { name: /^Design/i }).click();
+  await selectDesignPanel(page, "Drive & force targets");
+  const current = page.getByRole("spinbutton", { name: "Phase current (A)", exact: true });
+  await current.fill("0.7");
+  await current.blur();
+  await expect(page.getByLabel("Simulation run controls")).toContainText("Run to calculate");
   await page.evaluate(() => { (window as any).resolveSweep(); });
-  await page.getByRole("tab", { name: /^Simulate/i }).click();
   await expect(page.getByLabel("Simulation run controls")).toContainText("Run to calculate");
   expect(await page.evaluate(() => (window as any).simulationCalls.length)).toBe(count + 2);
 });
@@ -142,7 +143,7 @@ test("qualified coil controls bind the DC loop, render winding-only data and cle
   await page.getByRole("checkbox",{name:/I acknowledge this audited placement/}).check();
   await page.getByRole("button",{name:"Sample coil B-field",exact:true}).click();
   await expect(viewer).toHaveAttribute("data-field-samples","96");
-  const settings = page.getByRole("button", { name: "Field and loss settings", exact: true });
+  const settings = page.getByRole("toolbar", { name: "Preview side tools", exact: true }).getByRole("button", { name: "Field and loss settings", exact: true });
   await settings.click(); await expect(settings).toHaveAttribute("aria-expanded", "false");
   await expect(viewer).toHaveAttribute("data-field-samples", "96");
   await settings.click(); await expect(settings).toHaveAttribute("aria-expanded", "true");
@@ -235,8 +236,8 @@ test("3D simulation overlays never fabricate browser fields or heat", async ({ p
   await expect(viewer).toContainText("No browser substitute is shown");
   await expect(viewer).toHaveAttribute("data-field-samples", "0");
   await expect(viewer.getByLabel("Magnetic field legend")).toHaveCount(0);
-  await page.getByRole("tab", { name: /^Design/i }).click();
-  await expect(page.getByRole("group", { name: "3D simulation overlays" })).toHaveCount(0);
+  await page.getByRole("button", { name: "Top-down", exact: true }).click();
+  await expect(viewer).toHaveCount(0);
 });
 
 test("real WebGL draws both scoped overlays and opacity never resamples physics", async ({ page }, info) => {
@@ -267,18 +268,18 @@ test("real WebGL draws both scoped overlays and opacity never resamples physics"
   await expect(viewer).toHaveAttribute("data-field-samples", "0"); await expect(viewer).toHaveAttribute("data-heat-paths", "0");
 });
 
-test("late samples cannot survive tab departure or launch queued work after unmount", async ({ page }) => {
+test("late samples cannot survive viewport departure or launch queued work after unmount", async ({ page }) => {
   await gotoDesignApp(page); await nativeFixture(page); await page.evaluate(() => { (window as any).vizMode = "delayed"; });
   const viewer = await show3D(page);
   await expect.poll(() => page.evaluate(() => typeof (window as any).resolveVisualization)).toBe("function");
   await page.getByRole("combobox", { name: "Field sample density", exact: true }).selectOption("dense");
-  await page.getByRole("tab", { name: /^Design/i }).click();
+  await page.getByRole("button", { name: "Top-down", exact: true }).click();
   const calls = await page.evaluate(() => (window as any).vizCalls.length);
   await page.evaluate(() => { (window as any).resolveVisualization(); });
-  await expect(viewer).toHaveAttribute("data-field-samples", "0");
+  await expect(viewer).toHaveCount(0);
   expect(await page.evaluate(() => (window as any).vizCalls.length)).toBe(calls);
   await page.evaluate(() => { (window as any).vizMode = "failed"; });
-  await page.getByRole("tab", { name: /^Simulate/i }).click();
+  await page.getByRole("button", { name: "3D fields and heat", exact: true }).click();
   await expect(viewer).toContainText("Native visualization refused"); await expect(viewer).toHaveAttribute("data-field-samples", "0");
 });
 
@@ -348,7 +349,7 @@ test("mobile overlays stay inside the viewer and use scrollable explicit legends
   await page.setViewportSize({ width: 390, height: 844 });
   await gotoDesignApp(page); await nativeFixture(page); const viewer = await show3D(page);
   await page.getByRole("combobox", { name: "3D simulation overlay", exact: true }).selectOption("both");
-  await page.getByRole("button", { name: "Field and loss settings", exact: true }).click();
+  await page.getByRole("toolbar", { name: "Preview side tools", exact: true }).getByRole("button", { name: "Field and loss settings", exact: true }).click();
   await viewer.getByRole("button", { name: "Legends and model limits", exact: true }).click();
   await expect(viewer.getByLabel("Copper loss legend")).toBeVisible();
   await viewer.getByRole("button", { name: "Legends and model limits", exact: true }).click();
@@ -373,9 +374,9 @@ test("mobile overlays stay inside the viewer and use scrollable explicit legends
     await page.screenshot({ path: info.outputPath(`mobile-field-slice-and-loss-${colorScheme}.png`) });
   }
   await page.evaluate(() => { (window as any).vizMode = "failed"; });
-  await page.getByRole("button", { name: "Field and loss settings", exact: true }).click();
+  await page.getByRole("toolbar", { name: "Preview side tools", exact: true }).getByRole("button", { name: "Field and loss settings", exact: true }).click();
   await page.getByRole("combobox", { name: "Field sample density", exact: true }).selectOption("fine");
-  await page.getByRole("button", { name: "Field and loss settings", exact: true }).click();
+  await page.getByRole("toolbar", { name: "Preview side tools", exact: true }).getByRole("button", { name: "Field and loss settings", exact: true }).click();
   await expect(viewer.getByRole("status").filter({ hasText: "Native visualization refused" })).toBeVisible();
   await expect(viewer).toHaveAttribute("data-field-samples", "0");
 });
@@ -430,7 +431,7 @@ test("slice lines and direction cues stay coplanar at every slider position with
     expect(checked.vertices).toBeGreaterThan(0); expect(checked.maxDistance).toBeLessThan(1e-7); expect(checked.unchanged).toBe(true);
     await expect(page.getByLabel("Field slice readout", { exact: true })).toHaveText(`${checked.yMm.toFixed(2)} mm`);
   }
-  const toggle = page.getByRole("button", { name: "Field and loss settings", exact: true });
+  const toggle = page.getByRole("toolbar", { name: "Preview side tools", exact: true }).getByRole("button", { name: "Field and loss settings", exact: true });
   await toggle.click(); await expect(toggle).toHaveAttribute("aria-expanded", "false");
   await toggle.click(); await expect(toggle).toHaveAttribute("aria-expanded", "true");
   await expect(viewer).toHaveAttribute("data-field-slice", "1");

@@ -3,8 +3,8 @@ import { SensorStore } from "./sensor.svelte";
 import { MotionStore } from "./motion.svelte";
 import { ProjectStore } from "./project.svelte";
 import type { RecentFilesStore } from "./recentFiles.svelte";
-import type { DocumentKind, WorkspaceLoad, ForceSweepResult, CoilPathDto, FrictionBudgetDto, HeightStackResultDto, DriveAnalysis } from "../types";
-import type { TabId } from "../ui";
+import type { DocumentKind, WorkspaceLoad, ForceSweepResult, CoilPathDto, HeightStackResultDto, DriveAnalysis } from "../types";
+import { AnalysisWorkspace } from "./analysisWorkspace.svelte";
 import { PreviewCamera } from "../utils/coilPreviewGestures.svelte";
 import { CoilPreviewViewState } from "../components/design/coilPreviewViewState.svelte";
 import { fileExists, loadWorkspace, pickProjectOpenPath, pickWorkspaceSavePath, resolveDocumentPath, saveWorkspace } from "../ipc";
@@ -14,22 +14,29 @@ export type ResolveUnsaved = (label: string) => Promise<UnsavedChoice>;
 
 let nextDocumentId = 1;
 
-/** One complete working session per file. No editable state is shared by tabs. */
-export class DocumentSession {
+/** Presentation state belongs to an editor view, not the saved file. */
+export class DocumentView {
+  readonly analysis = new AnalysisWorkspace();
+  readonly camera = new PreviewCamera();
+  readonly previewView = new CoilPreviewViewState();
+  runtime: {
+    coils: CoilPathDto | null; sweep: ForceSweepResult | null;
+    height: HeightStackResultDto | null;
+    drive: DriveAnalysis | null;
+  } = { coils: null, sweep: null, height: null, drive: null };
+}
+
+/** One saved model per file; editor groups can share it without copying it. */
+export class DocumentSession extends DocumentView {
   readonly id = nextDocumentId++;
   readonly config = new ConfigStore();
   readonly sensor = new SensorStore();
   readonly motion = new MotionStore(this.config);
   readonly projects: ProjectStore;
-  readonly camera = new PreviewCamera();
-  readonly previewView = new CoilPreviewViewState();
-  runtime: {
-    activeTab: TabId; coils: CoilPathDto | null; sweep: ForceSweepResult | null;
-    friction: FrictionBudgetDto | null; height: HeightStackResultDto | null;
-    drive: DriveAnalysis | null;
-  } = { activeTab: "design", coils: null, sweep: null, friction: null, height: null, drive: null };
+  get title(): string { return this.projects.fileName ?? `Untitled ${this.kind} ${this.id}`; }
 
   constructor(readonly kind: DocumentKind, recents?: RecentFilesStore) {
+    super();
     this.projects = new ProjectStore(this.config, this.motion, recents, this.sensor, kind);
   }
 

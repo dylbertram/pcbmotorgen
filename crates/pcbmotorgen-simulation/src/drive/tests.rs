@@ -4,6 +4,82 @@ use pcbmotorgen_routing::{
 };
 
 #[test]
+fn pole_matched_braid_has_series_aiding_balanced_terminal_force_axes() {
+    use crate::magnetic::{CommutationMode, ForceEvaluator};
+    use std::f64::consts::{PI, TAU};
+    let mut cases = Vec::new();
+    for strands in [2, 3, 5] {
+        for layers in [2, 4, 6, 8] { cases.push((strands, layers, pcbmotorgen_routing::RoutingOrientation::default())); }
+    }
+    for mask in 1..8 {
+        cases.push((3, 4, pcbmotorgen_routing::RoutingOrientation {
+            mirror_x: mask & 1 != 0, mirror_y: mask & 2 != 0, reverse_layers: mask & 4 != 0,
+        }));
+    }
+    let mut two_layer_amplitudes = std::collections::BTreeMap::new();
+    for (strands, layers, orientation) in cases {
+        let ctx = RoutingContext {
+            active_area_length_mm: 92.0, board_width_mm: 8.0, num_layers: layers, phases: 3,
+            min_trace_mm: 0.127, trace_width_mm: 0.2, min_space_mm: 0.127,
+            params: std::collections::HashMap::from([("num_strands".into(), strands as f64),
+                ("connection".into(), 2.0), ("pole_matched".into(), 1.0)]),
+            magnet_pitch_mm: Some(6.0), magnet_array_span_mm: Some(29.0), orientation, ..Default::default()
+        };
+        let routing = generate_routing_result(&ctx, "infinity-braid").unwrap();
+        let sim = SimulationInput { active_area_length_m: 0.092, board_width_m: 0.008,
+            magnet_dims_m: [0.005, 0.005, 0.003], magnet_count: 5, magnet_pitch_m: 0.006,
+            min_trace_m: 0.0002, pcb_thickness_m: 0.0008, num_layers: layers,
+            air_gap_m: 0.0005, balanced_three_phase_drive: true, ..Default::default() };
+        let (mut evaluator, coils) = ForceEvaluator::new(25, 8, CommutationMode::MaxThrust, 0.0)
+            .with_routed_currents(&routing, &sim, &DriveSettings::default(), &Default::default()).unwrap();
+        let mut sine = [0.0; 3];
+        let mut cosine = [0.0; 3];
+        for n in 0..24 {
+            let x = 0.024 + 0.012 * n as f64 / 24.0;
+            let theta = TAU * x / 0.012;
+            let force = evaluator.unit_phase_force_constants_at(&sim, x).unwrap();
+            for j in 0..3 { sine[j] += force[j] * theta.sin(); cosine[j] += force[j] * theta.cos(); }
+        }
+        let angles: [f64; 3] = std::array::from_fn(|j| cosine[j].atan2(sine[j]));
+        let amplitudes: [f64; 3] = std::array::from_fn(|j| sine[j].hypot(cosine[j]) / 12.0);
+        if layers == 2 { two_layer_amplitudes.insert(strands, amplitudes); }
+        let single_pair = two_layer_amplitudes[&strands];
+        for j in 0..3 {
+            // All cases keep the same thin 0.8 mm stack and active XY. A
+            // doubled pole-stagger bug can retain 120-degree phase axes but
+            // cancel pairs. Require force to grow with populated layer pairs,
+            // allowing a broad 10% depth/end-effect difference, not a fitted Kf.
+            assert!(amplitudes[j] > 0.9 * (layers / 2) as f64 * single_pair[j],
+                "populated layer pairs must add force, not merely keep 120-degree axes");
+        }
+        eprintln!("matched strands={strands} layers={layers} orientation={orientation:?}: angles={:?}, amplitudes={:?}",
+            angles.map(f64::to_degrees), amplitudes);
+        for j in 1..3 {
+            let error = angles[j] - angles[0] + j as f64 * TAU / 3.0;
+            assert!(error.sin().atan2(error.cos()).abs() < 0.02,
+                "strands={strands}, layers={layers}, phase={j} not 120 degrees apart");
+        }
+        // The signed map, not a fitted Kf, drives the standard balanced basis.
+        // Its common reference is obtained from phase A's fundamental.
+        for n in 0..24 {
+            let x = 0.024 + 0.012 * n as f64 / 24.0;
+            let theta = TAU * x / 0.012 + angles[0];
+            let currents: [f64; 3] = std::array::from_fn(|j| (theta - TAU * j as f64 / 3.0).sin());
+            assert!(currents.iter().sum::<f64>().abs() < 1e-12);
+            let force = evaluator.unit_phase_force_constants_at(&sim, x).unwrap();
+            assert!(force.iter().zip(currents).map(|(k, i)| k * i).sum::<f64>() > 0.0);
+        }
+        assert!(angles.iter().all(|a| a.abs() <= PI));
+        let sweep = evaluator.evaluate(&sim, &coils).unwrap();
+        assert!(sweep.force_x_n.iter().all(|f| *f > 0.0));
+        for x in &sweep.positions_m {
+            let currents = evaluator.excitation_currents_at(&sim, &coils, *x).unwrap();
+            assert!(currents.iter().sum::<f64>().abs() < 1e-12);
+        }
+    }
+}
+
+#[test]
 fn compact_braid_simulated_terminal_axes_are_diagnostic_not_a_spacing_target() {
     use crate::magnetic::{CommutationMode, ForceEvaluator};
     let period = 0.012;

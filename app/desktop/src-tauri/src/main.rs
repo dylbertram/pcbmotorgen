@@ -14,6 +14,7 @@ mod config;
 mod ipc;
 mod menu;
 mod view_menu;
+mod driver_calculator;
 mod plugins;
 
 fn main() {
@@ -25,6 +26,7 @@ fn main() {
             // menu is installed / any command resolves it.
             app.manage(menu::RecentFiles::default());
             app.manage(view_menu::ActiveViewMenu::default());
+            app.manage(driver_calculator::DriverCalculatorSeed::default());
             app.manage(commands::workspace::ExitApproval::default());
             app.manage(commands::dc_jobs::DcJobs::default());
             menu::install(app.handle())?;
@@ -32,6 +34,12 @@ fn main() {
         })
         .on_menu_event(|app, event| {
             let id = event.id().as_ref();
+            if let Some(calculator) = app.get_webview_window("driver-calculator") {
+                if calculator.is_focused().unwrap_or(false) {
+                    if id == menu::CLOSE_FILE_ID { let _ = calculator.close(); }
+                    return;
+                }
+            }
             if matches!(
                 id,
                 menu::OPEN_ID
@@ -56,6 +64,8 @@ fn main() {
                 // The "Clear Recent Files" entry is handled by the frontend
                 // recents store, the single owner of the list.
                 let _ = app.emit(id, ());
+            } else if let Some(action) = menu::simulation_event_payload(id) {
+                let _ = app.emit(menu::SIMULATE_EVENT, action);
             } else if let Some(action) = view_menu::event_payload(&app.state::<view_menu::ActiveViewMenu>(), id) {
                 let _ = app.emit(view_menu::VIEW_EVENT, action);
             } else if let Some(path) =
@@ -67,13 +77,16 @@ fn main() {
             }
         })
         .invoke_handler(tauri::generate_handler![
+            driver_calculator::open_driver_calculator,
+            driver_calculator::driver_calculator_seed,
+            driver_calculator::request_driver_calculator_import,
+            driver_calculator::provide_driver_calculator_import,
             view_menu::set_view_menu_state,
             commands::physics::get_magnet_grades,
             commands::physics::compute_height_stack,
             commands::physics::periodic_backplane_reference,
             commands::physics::generate_coils,
             commands::physics::evaluate_force_sweep,
-            commands::physics::sample_b_field,
             commands::visualization::sample_simulation_visualization,
             commands::physics::travel_envelope,
             commands::physics::compute_friction,

@@ -77,7 +77,7 @@ fn inductance_invariance_tolerance_accepts_roundoff_not_physical_changes() {
 }
 
 #[test]
-fn fields_force_electrical_and_geometry_do_not_benchmark_against_goals() {
+fn force_electrical_and_geometry_do_not_benchmark_against_goals() {
     let c = config();
     let changed = changed_goals(c.clone());
     let drive = DriveSettings::default();
@@ -92,14 +92,6 @@ fn fields_force_electrical_and_geometry_do_not_benchmark_against_goals() {
         let electrical =
             tauri::async_runtime::block_on(analyze_drive(c.clone(), drive.clone(), Some(kf), None))
                 .unwrap();
-        let field = tauri::async_runtime::block_on(sample_b_field(
-            c.clone(),
-            3,
-            3,
-            [0.0, 0.01],
-            [0.001, 0.005],
-        ))
-        .unwrap();
         let height = tauri::async_runtime::block_on(compute_height_stack(c.clone())).unwrap();
         let friction = tauri::async_runtime::block_on(compute_friction(c.clone())).unwrap();
         let geometry = tauri::async_runtime::block_on(generate_coils(c.clone())).unwrap();
@@ -107,7 +99,6 @@ fn fields_force_electrical_and_geometry_do_not_benchmark_against_goals() {
         (
             value(force),
             electrical,
-            value(field),
             value(height),
             value(friction),
             value(geometry),
@@ -118,7 +109,7 @@ fn fields_force_electrical_and_geometry_do_not_benchmark_against_goals() {
     let b = run(changed);
     assert_eq!(a.0, b.0);
     assert_electrical_equal(&a.1, &b.1);
-    assert_eq!((a.2, a.3, a.4, a.5, a.6), (b.2, b.3, b.4, b.5, b.6));
+    assert_eq!((a.2, a.3, a.4, a.5), (b.2, b.3, b.4, b.5));
 }
 
 #[test]

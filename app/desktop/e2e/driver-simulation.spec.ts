@@ -1,13 +1,12 @@
 import { test, expect, type Page } from "@playwright/test";
-import { gotoDesignApp as gotoWorkspace, selectRoutingConnection } from "./helpers";
+import { gotoDesignApp as gotoWorkspace, openDriverChecks, openSimulationView, selectRoutingConnection } from "./helpers";
 
 async function gotoDesignApp(page: Page) {
   await gotoWorkspace(page);
 }
 
 async function simulation(page: Page, plot: "driver" | "thrust", settings: "driver" | "drive" | "none" = "none") {
-  await page.getByRole("tab", { name: /^Simulate/i }).click();
-  await page.getByRole("tab", { name: plot === "driver" ? "Driver suitability" : "Thrust vs. position", exact: true }).click();
+  await openSimulationView(page, "Force");
   if (settings === "driver") {
     const trigger = page.getByRole("button", { name: "Driver settings", exact: true });
     if (await trigger.getAttribute("aria-expanded") !== "true") await trigger.click();
@@ -17,59 +16,47 @@ async function simulation(page: Page, plot: "driver" | "thrust", settings: "driv
     if (await trigger.getAttribute("aria-expanded") !== "true") await trigger.click();
     await expect(trigger).toHaveAttribute("aria-expanded", "true");
   }
+  return plot === "driver" ? openDriverChecks(page) : page;
 }
 
-test("workspace driver inductor stays synchronized with simulation results", async ({ page }) => {
+test("calculator imports saved drive assumptions without writing its edits back", async ({ page }) => {
   await gotoDesignApp(page);
-  await simulation(page, "driver", "driver");
+  const calculator = await simulation(page, "driver", "driver");
   const preview = page.getByRole("region", { name: "Coil design workspace", exact: true });
   const panel = page.getByRole("dialog", { name: "Preview driver settings", exact: true });
   const driverSelector = panel.getByRole("combobox", { name: "Driver to evaluate" });
   await driverSelector.selectOption("DRV8316");
   await expect(panel).toContainText("Adding inductance can reduce PWM current ripple");
-  const previewResults = panel.getByRole("region", { name: "Preview driver simulation results" });
-  await expect(previewResults).toContainText("DRV8316");
-  const ripple = previewResults.locator("dt", { hasText: "Current ripple" }).locator("+ dd");
-  const initialRipple = await ripple.textContent();
   const inductor = preview.getByRole("spinbutton", { name: "Series inductor per phase (µH)", exact: true });
   await expect(inductor).toHaveValue("0");
   await inductor.fill("47");
   await inductor.press("Enter");
-  await expect(ripple).not.toHaveText(initialRipple!);
-  await expect(previewResults).toContainText("Effective phase inductance");
-  await expect(previewResults).toContainText("Additional L needed");
-  await panel.getByRole("button", { name: "Close driver panel", exact: true }).click();
-
-  await simulation(page, "driver", "driver");
-  const simulationInductor = page.getByRole("spinbutton", { name: "Series inductor per phase (µH)", exact: true });
+  const simulationInductor = calculator.getByRole("spinbutton", { name: "External series inductance per phase (µH)", exact: true });
+  await expect(simulationInductor).toHaveValue("0");
+  await expect(page.getByLabel("Simulation run controls")).toContainText("Results for the active geometry");
+  await calculator.getByRole("button", { name: "Import active motor", exact: true }).click();
   await expect(simulationInductor).toHaveValue("47");
-  const simulationDriver = page.getByRole("combobox", { name: "Driver to evaluate" });
+  const simulationDriver = calculator.getByRole("combobox", { name: "Driver to evaluate" });
   await expect(simulationDriver).toHaveValue("DRV8316");
   await simulationDriver.selectOption("DRV8313");
-  const results = page.locator('section[aria-labelledby="driver-suitability-heading"]');
-  await expect(results).toContainText("with 47.0 µH series per phase");
   await simulationInductor.fill("0");
-  await simulationInductor.press("Enter");
-  await expect(results).not.toContainText("series per phase");
-
-  await page.getByRole("tab", { name: /^Design/i }).click();
-  const trigger = preview.getByRole("button", { name: "Driver settings", exact: true });
-  if (await trigger.getAttribute("aria-expanded") !== "true") await trigger.click();
-  await expect(inductor).toHaveValue("0");
-  await expect(driverSelector).toHaveValue("DRV8313");
-  await expect(previewResults).toContainText("DRV8313");
+  await expect(inductor).toHaveValue("47");
+  await expect(driverSelector).toHaveValue("DRV8316");
+  await expect(preview.getByRole("region", { name: "Preview driver simulation results" })).toHaveCount(0);
+  await calculator.close();
 });
 
 test("a defined series inductor tames the PWM ripple estimate", async ({ page }) => {
   await gotoDesignApp(page);
-  await simulation(page, "driver", "driver");
-  const results = page.locator('section[aria-labelledby="driver-suitability-heading"]');
-  await expect(results).not.toContainText("series per phase");
-  const inductor = page.getByRole("spinbutton", { name: "Series inductor per phase (µH)", exact: true });
+  const calculator = await simulation(page, "driver");
+  const ripple = calculator.getByRole("row").filter({ hasText: "PWM ripple, peak-to-peak" }).getByRole("cell").first();
+  await expect(ripple).not.toHaveText("Not evaluated");
+  const initial = Number((await ripple.innerText()).split(" ")[0]);
+  const inductor = calculator.getByRole("spinbutton", { name: "External series inductance per phase (µH)", exact: true });
   await inductor.fill("100");
   await inductor.press("Enter");
-  // The configured inductor feeds the ripple floor and the analysis notes.
-  await expect(results).toContainText("with 100 µH series per phase");
+  await expect.poll(async () => Number((await ripple.innerText()).split(" ")[0])).toBeLessThan(initial);
+  await calculator.close();
 });
 
 test("voltage updates driver results even when the force sweep fails", async ({ page }) => {
@@ -79,17 +66,19 @@ test("voltage updates driver results even when the force sweep fails", async ({ 
       export async function evaluateForceSweep() { throw new Error('Test sweep failure'); }`,
   }));
   await gotoDesignApp(page);
-  await simulation(page, "driver", "drive");
-  const results = page.locator('section[aria-labelledby="driver-suitability-heading"]');
+  const calculator = await simulation(page, "driver", "drive");
   await expect(page.getByRole("alert").filter({ hasText: "Computation error: Test sweep failure" })).toBeVisible();
-  await expect(results).toContainText("at 5.0 V");
+  const bus = calculator.getByRole("spinbutton", { name: "Bus voltage (V)", exact: true });
+  await expect(bus).toHaveValue("5");
   await page.getByRole("spinbutton", { name: "Bus voltage (V)", exact: true }).fill("12");
   await page.getByRole("spinbutton", { name: "Bus voltage (V)", exact: true }).press("Enter");
-  await expect(results).toContainText("at 12.0 V");
-  await expect(results).toContainText("10.20 V usable");
+  await calculator.getByRole("button", { name: "Import active motor", exact: true }).click();
+  await expect(bus).toHaveValue("12");
+  await expect(calculator.getByRole("spinbutton", { name: "Force constant, optional (N/A)", exact: true })).toHaveValue("");
+  await calculator.close();
 });
 
-test("driver results clear while pending, show errors without stale sections, and recover", async ({ page }) => {
+test("pending or failed source analysis cannot overwrite calculator inputs, and imports recover", async ({ page }) => {
   const pageErrors: string[] = [];
   page.on("pageerror", (error) => pageErrors.push(error.message));
   await page.route(/\/src\/lib\/ipc\/physics\.ts(?:\?t=\d+)?$/, (route) => route.fulfill({
@@ -109,29 +98,27 @@ test("driver results clear while pending, show errors without stale sections, an
       }`,
   }));
   await gotoDesignApp(page);
-  await simulation(page, "driver", "drive");
-  const results = page.locator('section[aria-labelledby="driver-suitability-heading"]');
-  const voltageSection = results.getByRole("region", { name: "Voltage and speed", exact: true });
-  await expect(results).toContainText("at 5.0 V");
-  await expect(voltageSection).toBeVisible();
+  const calculator = await simulation(page, "driver", "drive");
+  const bus = calculator.getByRole("spinbutton", { name: "Bus voltage (V)", exact: true });
+  await expect(bus).toHaveValue("5");
 
   const voltage = page.getByRole("spinbutton", { name: "Bus voltage (V)", exact: true });
   await voltage.fill("12");
   await voltage.press("Enter");
-  await expect(results).toContainText("Measuring the routed copper");
-  await expect(results).not.toContainText("at 5.0 V");
-  await expect(voltageSection).toHaveCount(0);
+  await calculator.getByRole("button", { name: "Import active motor", exact: true }).click();
+  await expect(calculator.getByRole("button", { name: "Importing…", exact: true })).toBeDisabled();
+  await expect(bus).toHaveValue("5");
   await page.evaluate(() => (window as unknown as { __failPendingDriver: () => void }).__failPendingDriver());
-  await expect(results.getByRole("alert")).toContainText("Test driver failure");
-  await expect(results).not.toContainText("Measuring the routed copper");
-  await expect(voltageSection).toHaveCount(0);
-  await expect(results.getByRole("region", { name: "Operating limits", exact: true })).toHaveCount(0);
+  await expect(calculator.getByRole("alert")).toContainText("No current motor winding analysis");
+  await expect(bus).toHaveValue("5");
 
   await voltage.fill("24");
   await voltage.press("Enter");
-  await expect(results).toContainText("at 24.0 V");
-  await expect(results.getByRole("alert")).toHaveCount(0);
-  await expect(voltageSection).toBeVisible();
+  await expect(page.getByLabel("Simulation run controls")).toContainText("Results for the active geometry");
+  await calculator.getByRole("button", { name: "Import active motor", exact: true }).click();
+  await expect(bus).toHaveValue("24");
+  await expect(calculator.getByRole("alert")).toHaveCount(0);
+  await calculator.close();
   expect(pageErrors).toEqual([]);
 });
 
@@ -230,9 +217,9 @@ test("pending replacement sweeps never send an old Kf with new settings", async 
   await expect(page.getByRole("alert").filter({ hasText: "Computation error: Pending replacement rejected" })).toBeVisible();
 });
 
-test("select drivers and add validated custom parameters in a modal", async ({ page }) => {
-  await gotoDesignApp(page);
-  await simulation(page, "driver", "driver");
+test("select drivers and add validated custom parameters in the calculator", async ({ page: workspace }) => {
+  await gotoDesignApp(workspace);
+  const page = await simulation(workspace, "driver");
   const selector = page.getByRole("combobox", { name: "Driver to evaluate" });
   await selector.selectOption("DRV8316");
   await expect(selector).toHaveValue("DRV8316");
@@ -255,35 +242,32 @@ test("select drivers and add validated custom parameters in a modal", async ({ p
   await modal.getByRole("button", { name: "Add driver", exact: true }).click();
   await expect(modal).toBeHidden();
   await expect(selector).toHaveValue("My driver");
-  const results = page.locator('section[aria-labelledby="driver-suitability-heading"]');
-  await expect(results).toContainText("My driver");
   await selector.selectOption("DRV8311");
   await selector.selectOption("My driver");
-  await expect(results).toContainText("My driver");
+  await expect(selector).toHaveValue("My driver");
   await page.reload();
-  await page.getByRole("button", { name: "New coil file", exact: true }).first().click();
-  await page.getByRole("dialog", { name: "New coil file", exact: true }).getByRole("button", { name: /^Motor coil/ }).click();
-  await simulation(page, "driver", "driver");
   await page.getByRole("combobox", { name: "Driver to evaluate" }).selectOption("My driver");
-  await expect(results).toContainText("My driver");
+  await expect(page.getByRole("combobox", { name: "Driver to evaluate" })).toHaveValue("My driver");
+  await page.close();
 });
 
-test("delta compatibility blocks stale results and returns to the connection control", async ({ page }) => {
+test("unsupported source topology cannot silently replace a calculator snapshot", async ({ page }) => {
   await gotoDesignApp(page);
-  await simulation(page, "driver");
-  const results = page.locator('section[aria-labelledby="driver-suitability-heading"]');
-  await expect(results).toContainText("at 5.0 V");
-  await page.getByRole("tab", { name: /^Design/i }).click();
+  const calculator = await simulation(page, "driver");
+  const bus = calculator.getByRole("spinbutton", { name: "Bus voltage (V)", exact: true });
+  await expect(bus).toHaveValue("5");
   await selectRoutingConnection(page, "delta");
   await page.getByRole("button", { name: "Set coil terminals", exact: true }).click();
   await expect(page.getByRole("dialog", { name: "Coil terminals", exact: true })).toBeVisible();
-  await simulation(page, "driver");
-  await expect(results.getByRole("alert")).toContainText("Star (wye) configuration is required");
-  await expect(results).not.toContainText("at 5.0 V");
-  await results.getByRole("button", { name: "Change winding connection" }).click();
-  await expect(page.getByRole("dialog", { name: "Routing", exact: true })).toBeVisible();
+  await calculator.getByRole("button", { name: "Import active motor", exact: true }).click();
+  await expect(calculator.getByRole("alert")).toContainText("No current motor winding analysis");
+  await expect(bus).toHaveValue("5");
   await selectRoutingConnection(page, "star");
-  await simulation(page, "driver");
-  await expect(results.getByRole("alert")).toHaveCount(0);
-  await expect(results).toContainText("at 5.0 V");
+  await expect(page.getByLabel("Simulation run controls")).toContainText("Results for the active geometry");
+  await calculator.getByRole("button", { name: "Import active motor", exact: true }).click();
+  await expect(calculator.getByRole("alert")).toHaveCount(0);
+  await calculator.getByRole("combobox", { name: "Calculator winding connection", exact: true }).selectOption("delta");
+  await expect(calculator.getByRole("status")).toContainText("no star substitution");
+  await expect(calculator.getByRole("table", { name: "Driver checks", exact: true })).toHaveCount(0);
+  await calculator.close();
 });

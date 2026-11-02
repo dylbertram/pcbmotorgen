@@ -90,9 +90,11 @@
     expanded = $bindable(false),
     workspace = false,
     active = true,
+    focused = true,
     simulationActive = false,
-    onRequestSimulation,
+    onOpenDriverCalculator,
     designSettings,
+    statusContent,
     sidePanel = $bindable<PreviewPanelId | null>(null),
     drive = null,
     driveError = null,
@@ -101,13 +103,20 @@
     onGeometryChange,
     camera,
     view = new CoilPreviewViewState(),
-  }: { config: ConfigStore; coils: CoilPathDto | null; motion: MotionStore; expanded?: boolean; workspace?: boolean; active?: boolean; simulationActive?: boolean; onRequestSimulation?: () => void; designSettings?: Snippet<[DesignPanelId]>; sidePanel?: PreviewPanelId | null; drive?: DriveAnalysis | null; driveError?: string | null; drivePending?: boolean; importedGeometry?: CadGeometry | null; onGeometryChange?: (geometry: CadGeometry) => void; camera?: PreviewCamera; view?: CoilPreviewViewState } =
+  }: { config: ConfigStore; coils: CoilPathDto | null; motion: MotionStore; expanded?: boolean; workspace?: boolean; active?: boolean; focused?: boolean; simulationActive?: boolean; onOpenDriverCalculator?: () => void; designSettings?: Snippet<[DesignPanelId]>; statusContent?: Snippet; sidePanel?: PreviewPanelId | null; drive?: DriveAnalysis | null; driveError?: string | null; drivePending?: boolean; importedGeometry?: CadGeometry | null; onGeometryChange?: (geometry: CadGeometry) => void; camera?: PreviewCamera; view?: CoilPreviewViewState } =
     $props();
 
   export function showDesignSettings(section: DesignPanelId = "routing"): void {
     terminalTool.cancel();
     view.setTerminalPanelOpen(false);
     sidePanel = section;
+  }
+
+  /** Open the field/loss rail without leaving the current viewer mode. */
+  export function showFieldSettings(): void {
+    terminalTool.cancel();
+    view.setTerminalPanelOpen(false);
+    sidePanel = "fields";
   }
 
   const simplifyTool = new CadSimplifyTool({ getGeometry: () => importedGeometry, onChange: (geometry) => onGeometryChange?.(geometry) });
@@ -593,8 +602,10 @@
       embedded={inline}
       {active}
       simulation={visualizationInput}
-      {onRequestSimulation}
-      {designSettings}
+       {designSettings}
+       {statusContent}
+       {onOpenDriverCalculator}
+       {focused}
       bind:sidePanel
       bind:expanded
       height={H}

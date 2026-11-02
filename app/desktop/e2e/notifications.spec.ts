@@ -31,12 +31,12 @@ async function exportDxf(page: Page) {
 }
 
 test("temporary notifications float without shifting content and expire", async ({ page }) => {
-  const before = await page.locator("#tab-design").boundingBox();
+  const before = await page.getByRole("navigation", { name: "Open files", exact: true }).boundingBox();
   await exportDxf(page);
   const notification = page.getByRole("status", { name: "Project notification" });
   await expect(notification).toContainText("Exported DXF to /exports/coils.dxf.");
   await expect(notification).toHaveCSS("position", "fixed");
-  expect(await page.locator("#tab-design").boundingBox()).toEqual(before);
+  expect(await page.getByRole("navigation", { name: "Open files", exact: true }).boundingBox()).toEqual(before);
   await page.clock.runFor(3999);
   await expect(notification).toBeVisible();
   await page.clock.runFor(1);
@@ -54,7 +54,7 @@ test("hover and keyboard focus pause timeout, replacement resets it, dismissal i
   await notification.getByRole("button", { name: "Dismiss notification" }).focus();
   await page.clock.runFor(5000);
   await expect(notification).toBeVisible();
-  await page.locator("#tab-design").focus();
+  await page.getByRole("navigation", { name: "Open files", exact: true }).getByRole("tab").first().focus();
   await page.clock.runFor(3000);
   await page.evaluate(() => (window as any).__exportPath = "/exports/another.dxf");
   await exportDxf(page);

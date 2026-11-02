@@ -8,10 +8,11 @@
   import CadSelectionToolbar from "./CadSelectionToolbar.svelte";
   import CoilPreviewMeasureToolbar from "./CoilPreviewMeasureToolbar.svelte";
   import type { SpatialMeasure } from "../../spatialMeasure.svelte";
+  import type { Snippet } from "svelte";
 
   let { label, geometry, selection, measure, terminalTool, disabled = false,
     onActivateSelection, onSimplify, onUndoSimplify,
-    simplifyNotice = "", onPrepareGeometry, borderless = false, spatialMeasure = null, zoomWindow = false, onToggleZoomWindow, showZoomWindowControl = true }: {
+    simplifyNotice = "", onPrepareGeometry, borderless = false, spatialMeasure = null, zoomWindow = false, onToggleZoomWindow, showZoomWindowControl = true, statusContent }: {
     label: string;
     geometry: CadGeometry | null;
     selection: CadSelectionTool;
@@ -28,6 +29,7 @@
     zoomWindow?: boolean;
     onToggleZoomWindow?: () => void;
     showZoomWindowControl?: boolean;
+    statusContent?: Snippet;
   } = $props();
   let preparing = $state(false);
   let error = $state("");
@@ -101,6 +103,7 @@
   {#if borderless}
     <span role="status" class="min-w-0 flex-1 self-center truncate text-xs text-slate-400" title={status}>{status}</span>
   {/if}
+  {#if statusContent}<div class="ml-auto flex self-center items-center gap-2">{@render statusContent()}</div>{/if}
   </div>
   {#if !borderless}
   <div class="flex h-5 min-w-0 items-center text-xs text-slate-400">

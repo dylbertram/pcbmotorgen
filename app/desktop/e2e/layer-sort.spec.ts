@@ -9,7 +9,8 @@ test("Layers replaces Display and sorting preserves filters and the camera in ev
   const workspace = page.getByRole("region", { name: "Coil design workspace", exact: true });
   const rail = workspace.getByRole("toolbar", { name: "Preview side tools", exact: true });
   await expect(rail.getByRole("button", { name: "Display", exact: true })).toHaveCount(0);
-  await expect(rail.getByRole("button")).toHaveCount(1);
+  await expect(rail.getByRole("button")).toHaveCount(2);
+  await expect(rail.getByRole("button", { name: "Field and loss settings", exact: true })).toBeVisible();
   await rail.getByRole("button", { name: "Layers", exact: true }).click();
   const panel = workspace.getByRole("dialog", { name: "Coil preview layers", exact: true });
   await expect(panel.getByText("Phases and coils", { exact: true })).toHaveCount(0);
@@ -78,8 +79,8 @@ test("sort choice survives closing, workflow changes and keyboard changes on mob
   await expect(trigger).toBeFocused(); await trigger.click();
   await expect(panel.getByRole("radio", { name: "Layers", exact: true })).toBeChecked();
   await expect(panel.getByRole("checkbox", { name: "Show layer 1", exact: true })).not.toBeChecked();
-  await page.getByRole("tab", { name: /^Simulate/i }).click();
-  await page.getByRole("tab", { name: /^Design/i }).click();
+  await page.getByRole("tab", { name: "Force", exact: true }).click();
+  await page.getByRole("tab", { name: "Move & power", exact: true }).click();
   await expect(panel.getByRole("radio", { name: "Layers", exact: true })).toBeChecked();
   const box = (await panel.boundingBox())!;
   expect(box.x).toBeGreaterThanOrEqual(0); expect(box.x + box.width).toBeLessThanOrEqual(390);

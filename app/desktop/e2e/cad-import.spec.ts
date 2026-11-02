@@ -3,8 +3,8 @@ import { gotoDesignApp, openCoilPreview, coilWorkspace, selectDesignPanel } from
 import { installViewMenu, setViewMenuChecked } from "./view-menu-helpers";
 
 async function revisitWorkspace(page: Page) {
-  await page.getByRole("tab", { name: /^Simulate/i }).click();
-  await page.getByRole("tab", { name: /^Design/i }).click();
+  await page.getByRole("button", { name: "Collapse simulation panel", exact: true }).click();
+  await page.getByRole("button", { name: "Expand simulation panel", exact: true }).click();
   await openCoilPreview(page);
 }
 
@@ -95,8 +95,10 @@ test("inferred ends require one acceptance and never substitute generated copper
     await route.fulfill({ response, body });
   });
   const dialog = await openImport(page);
+  // Ignore runs of the generated design before import; the pending imported
+  // geometry must block every subsequent sweep until its ends are accepted.
+  await page.evaluate(() => { (window as any).__mappingSweepCalls = []; });
   await dialog.getByRole("button", { name: "Open with this geometry" }).click();
-  await page.getByRole("tab", { name: /^Simulate/i }).click();
   const notice = page.getByRole("status", { name: "Inferred coil ends" });
   await expect(notice).toBeVisible();
   expect(await page.evaluate(() => (window as any).__mappingSweepCalls ?? [])).toEqual([]);
@@ -104,9 +106,9 @@ test("inferred ends require one acceptance and never substitute generated copper
   await expect(notice).toHaveCount(0);
   await expect.poll(async () => page.evaluate(() => (window as any).__mappingSweepCalls?.length ?? 0)).toBeGreaterThan(0);
   expect(await page.evaluate(() => (window as any).__mappingSweepCalls.every((g: any) => Object.keys(g?.coil_terminals ?? {}).length === 3 && g.routing.segments.length === 3))).toBe(true);
-  await page.getByRole("tab", { name: /^Design/i }).click();
+  await page.getByRole("tab", { name: "Force", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Imported coil phases" })).toHaveCount(0);
-  await page.getByRole("tab", { name: /^Simulate/i }).click();
+  await page.getByRole("tab", { name: "Move & power", exact: true }).click();
   await expect(notice).toHaveCount(0);
 });
 
@@ -114,13 +116,11 @@ test("review opens coil ends and dismisses the inferred notice without requiring
   await page.addInitScript(() => { (window as any).__mappingFixture = true; });
   const dialog = await openImport(page);
   await dialog.getByRole("button", { name: "Open with this geometry" }).click();
-  await page.getByRole("tab", { name: /^Simulate/i }).click();
   await page.getByRole("status", { name: "Inferred coil ends" }).getByRole("button", { name: "Review", exact: true }).click();
   const workspace = page.getByRole("region", { name: "Coil design workspace", exact: true });
   await expect(workspace).toBeVisible();
   await expect(workspace.getByRole("region", { name: "Set coil terminals", exact: true })).toBeVisible();
   await workspace.getByRole("button", { name: "Close terminals panel" }).click();
-  await page.getByRole("tab", { name: /^Simulate/i }).click();
   await expect(page.getByRole("status", { name: "Inferred coil ends" })).toHaveCount(0);
 });
 
@@ -322,8 +322,7 @@ test("ends that cannot be inferred require manual picks and the notice clears af
   await dialog.getByRole("button", { name: "Open with this geometry" }).click();
   await expect(dialog).toBeHidden();
 
-  await page.getByRole("tab", { name: /^Simulate/i }).click();
-  const panel = page.locator("#panel-simulate");
+  const panel = page.getByRole("region", { name: "Simulation results", exact: true });
   // The phase-mapping box no longer lives in Simulation.
   await expect(panel.getByRole("heading", { name: "Imported coil phases" })).toHaveCount(0);
   // Imported copper with no confirmed ends blocks the simulation and prompts.
@@ -341,7 +340,6 @@ test("ends that cannot be inferred require manual picks and the notice clears af
   await command.getByRole("button", { name: "Apply terminals", exact: true }).click();
   await workspace.getByRole("button", { name: "Close terminals panel" }).click();
 
-  await page.getByRole("tab", { name: /^Simulate/i }).click();
   await expect(alert).toHaveCount(0);
   await expect(panel.getByRole("status", { name: "Inferred coil ends" })).toHaveCount(0);
   const activeResults = panel.locator('[role="tabpanel"]:visible');
@@ -450,7 +448,7 @@ test("shared editing tools measure and edit CAD drafts, then keep those edits in
   await openCoilPreview(page);
   const motor = coilWorkspace(page);
   const motorTools = motor.getByRole("toolbar", { name: "Coil preview tools" });
-  expect(await motorTools.getByRole("button").evaluateAll(buttons => buttons.map(button => button.getAttribute("aria-label")).filter(Boolean))).toEqual(toolNames);
+  expect(await motorTools.getByRole("button").evaluateAll(buttons => buttons.map(button => button.getAttribute("aria-label")).filter(label => label && !label.startsWith("Design rule check:")))).toEqual(toolNames);
   await expect(motor.getByRole("group", { name: "Zoom controls" }).getByRole("button", { name: "Zoom window", exact: true })).toBeVisible();
   await expect(motor.getByRole("img", { name: "Coil A Driver end, L0, X 2 mm, Y 0 mm", exact: true })).toBeVisible();
   await motorTools.getByRole("button", { name: "Toggle measure tool" }).click();
@@ -1037,6 +1035,8 @@ test("touch drag selects, two fingers pan, and three-finger pinch zooms without 
   for (const viewer of ["cad", "motor"]) {
   if (viewer === "motor") {
     await dialog.getByRole("button", { name: "Open with this geometry" }).click();
+    // Keep the tiny imported trace clear of the mobile position controls.
+    await page.getByRole("button", { name: "Collapse simulation panel", exact: true }).click();
     await openCoilPreview(page);
   }
   const activeDialog = viewer === "cad" ? dialog : coilWorkspace(page);
@@ -1046,9 +1046,10 @@ test("touch drag selects, two fingers pan, and three-finger pinch zooms without 
   const group = activeDialog.locator('[aria-label="Segment selection preview"] svg > g');
   const before = await group.evaluate(g => { const m = (g as SVGGraphicsElement).getScreenCTM()!; return { s: m.a, x: m.e, y: m.f }; });
   const bounds = (await frame.boundingBox())!;
+  const touchY = viewer === "motor" ? .3 : .4;
   const points = [
-    { id: 1, x: bounds.x + bounds.width * .35, y: bounds.y + bounds.height * .4 },
-    { id: 2, x: bounds.x + bounds.width * .6, y: bounds.y + bounds.height * .4 },
+    { id: 1, x: bounds.x + bounds.width * .35, y: bounds.y + bounds.height * touchY },
+    { id: 2, x: bounds.x + bounds.width * .6, y: bounds.y + bounds.height * touchY },
   ];
   await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: points.slice(0, 1) });
   await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: points });
@@ -1058,7 +1059,7 @@ test("touch drag selects, two fingers pan, and three-finger pinch zooms without 
   await expect.poll(() => group.evaluate(g => (g as SVGGraphicsElement).getScreenCTM()!.f)).toBeCloseTo(before.y + 15, 0);
   await expect(activeDialog.getByRole("button", { name: "Reset zoom", exact: true })).toHaveText("1×");
   await expect(activeTools).toContainText(selected);
-  const triple = [...panned, { id: 3, x: bounds.x + bounds.width * .475 + 20, y: bounds.y + bounds.height * .65 + 15 }];
+  const triple = [...panned, { id: 3, x: bounds.x + bounds.width * .475 + 20, y: bounds.y + bounds.height * (viewer === "motor" ? .45 : .65) + 15 }];
   await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: triple });
   const center = { x: triple.reduce((sum, p) => sum + p.x, 0) / 3, y: triple.reduce((sum, p) => sum + p.y, 0) / 3 };
   await cdp.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: triple.map(p => ({ ...p, x: center.x + 2 * (p.x - center.x), y: center.y + 2 * (p.y - center.y) })) });
@@ -1172,7 +1173,6 @@ test("routing source shows the imported filename in its trigger and dropdown aft
   await openCoilPreview(page);
   const tools = page.getByRole("toolbar", { name: "Coil preview tools" });
   await tools.getByRole("button", { name: "Simplify lines", exact: true }).click();
-  await page.getByRole("tab", { name: /^Design/i }).click();
   await selectDesignPanel(page, "Routing");
   await expect(source).toContainText("coil-leads.dxf");
 });
@@ -1180,12 +1180,11 @@ test("routing source shows the imported filename in its trigger and dropdown aft
 test("reviewing coil ends keeps the simulation results dock open", async ({ page }) => {
   const imported = await openImport(page);
   await imported.getByRole("button", { name: "Open with this geometry" }).click();
-  await page.getByRole("tab", { name: /^Simulate/i }).click();
   const dock = page.getByRole("region", { name: "Simulation results", exact: true });
   const notice = dock.getByRole("status", { name: "Inferred coil ends", exact: true });
   await notice.getByRole("button", { name: "Review", exact: true }).click();
   await expect(dock).toBeVisible();
-  await expect(page.getByRole("tab", { name: /^Simulate/i })).toHaveAttribute("aria-selected", "true");
+  await expect(dock.getByRole("tab", { name: "Move & power", exact: true })).toHaveAttribute("aria-selected", "true");
   await expect(page.getByRole("dialog", { name: "Coil terminals", exact: true })).toBeVisible();
   await expect(page.getByRole("toolbar", { name: "Design side tools", exact: true }).getByRole("button", { name: "Set coil terminals", exact: true })).toHaveAttribute("aria-expanded", "true");
 });

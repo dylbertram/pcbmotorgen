@@ -108,7 +108,7 @@
                 label="About electrical pitch"
                 image={electricalPitchSvg}
                 imageAlt="One electrical cycle spans a north and south pole."
-                tip="One electrical cycle spans two alternating poles."
+                tip="A cycle spans two poles. Oversized magnets cause a design error. Generated copper follows pitch; imported copper does not."
                 equation={String.raw`\tau_p = \frac{P_e}{2}`}
               /></span
             >

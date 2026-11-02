@@ -29,6 +29,8 @@
       return { status: "fail" as const, text: `${name} can't drive these traces as configured: ${n} check${n === 1 ? "" : "s"} fail.` };
     }
     if (statuses.includes("warn")) return { status: "warn" as const, text: `${name} can drive these traces, with little margin.` };
+    const unknown = statuses.filter(s => s === "unknown").length;
+    if (unknown) return { status: "unknown" as const, text: `${name} checks are incomplete: ${unknown} not evaluated.` };
     return { status: "pass" as const, text: `${name} can drive these traces.` };
   });
 
@@ -211,7 +213,6 @@
           <thead class="text-slate-400">
             <tr class="border-b border-slate-700">
               <th scope="col" class="py-1.5 pr-3 font-normal">Phase</th>
-              <th scope="col" class="py-1.5 pr-3 text-right font-normal">Strands</th>
               <th scope="col" class="py-1.5 pr-3 text-right font-normal">Length each</th>
               <th scope="col" class="py-1.5 pr-3 text-right font-normal">Vias each</th>
               <th scope="col" class="py-1.5 pr-3 text-right font-normal">R 20 °C</th>
@@ -226,7 +227,6 @@
                   {p.net}
                   {#if !p.connected}<span class="ml-1 font-sans text-rose-300">open</span>{/if}
                 </th>
-                <td class="py-1.5 pr-3 text-right">{p.strands}</td>
                 <td class="py-1.5 pr-3 text-right">{(p.strand_length_m * 1e3).toFixed(0)} mm</td>
                 <td class="py-1.5 pr-3 text-right">{p.vias_per_strand.toFixed(0)}</td>
                 <td class="py-1.5 pr-3 text-right">{formatSi(p.resistance_20c_ohm, "Ω")}</td>

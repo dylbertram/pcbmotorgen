@@ -85,6 +85,21 @@ describe("validateDesign", () => {
     expect(validateDesign(validConfig())).toEqual([]);
   });
 
+  it("reports an oversized magnet after a pitch edit with both ways to fix it", () => {
+    const config = validConfig({ magnet_width_mm: 5, electrical_pitch_mm: 9 });
+    const finding = validateDesign(config).find(f => f.id === "magnet-fill");
+    expect(finding?.level).toBe("error");
+    expect(finding?.message).toContain("Magnet X length (5.00 mm) is too big for the 4.50 mm pole pitch");
+    expect(finding?.message).toContain("Reduce the magnet X length to 4.50 mm or less");
+    expect(finding?.message).toContain("increase electrical pitch to 10.00 mm or more");
+    expect(config.electrical_pitch_mm).toBe(9);
+    expect(config.magnet_width_mm).toBe(5);
+    expect(hasErrors(validateDesign(config))).toBe(true);
+    for (const fixed of [{ ...config, magnet_width_mm: 4 }, { ...config, electrical_pitch_mm: 10 }]) {
+      expect(ids(fixed)).not.toContain("magnet-fill");
+    }
+  });
+
   it("warns when the magnet cross width exceeds the active area width", () => {
     const findings = validateDesign(validConfig({ magnet_cross_width_mm: 25 }));
     expect(findings.find((f) => f.id === "magnet-cross-width")?.level).toBe("warning");

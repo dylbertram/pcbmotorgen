@@ -25,7 +25,6 @@
   import type { CoilPreviewViewState } from "./coilPreviewViewState.svelte";
   import type { CadGeometry, DriveAnalysis } from "../../types";
   import DriverSelector from "../simulate/DriverSelector.svelte";
-  import { formatSi } from "../../format";
   import HelpTag from "../ui/HelpTag.svelte";
   import seriesInductorSvg from "../../assets/series-inductor.svg";
   import type { CadSelectionTool } from "../../utils/cadSelectionTool.svelte";
@@ -37,7 +36,7 @@
     hasBandWidthData = false, hasPoleRegionData = false, poleRegionPhases = [],
     geometry, selection, assignmentDisabled = false, terminalTool, onStartTerminals,
     terminalsDisabled = false, dismissOnOutsideClick = true, viewControlsInMenu = false, config, generated = false,
-    drive = null, driveError = null, drivePending = false,
+    onOpenDriverCalculator,
     designSettings, fieldSettings, onOpenFields, designOnly = false, drawingOnly = false, open = $bindable<PreviewPanelId | null>(null), active = true }: {
     fieldSettings?: Snippet | null;
     onOpenFields?: () => void;
@@ -52,6 +51,7 @@
     drive?: DriveAnalysis | null;
     driveError?: string | null;
     drivePending?: boolean;
+    onOpenDriverCalculator?: () => void;
     view: CoilPreviewViewState;
     layers: { idx: number }[];
     coils?: { name: string; colorIdx: number }[];
@@ -81,7 +81,6 @@
     dismissOnOutsideClick?: boolean;
   } = $props();
 
-  const rippleCheck = $derived(drive?.checks.find((check) => check.id === "ripple"));
   let railEl: HTMLDivElement | null = $state(null);
   const triggers = $state<Partial<Record<PreviewPanelId, HTMLButtonElement | null>>>({});
   const panelClass = $derived(`absolute bottom-0 top-0 z-30 flex w-60 flex-col overflow-hidden border-slate-700 bg-slate-900 text-slate-200 ${designOnly ? 'left-full max-w-[calc(100vw-8.25rem)] border-r shadow-[12px_0_20px_-8px_rgba(0,0,0,0.4)] [clip-path:inset(0_-32px_0_0)]' : 'right-full max-w-[calc(100vw-6rem)] border-l shadow-xl shadow-black/40'}`);
@@ -155,7 +154,7 @@
     {#if !designOnly && onOpenFields}
       <button type="button" bind:this={triggers.fields} aria-label="Field and loss settings" aria-expanded={open === "fields"} onclick={() => toggle("fields")}
         class="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-transparent text-slate-300 hover:bg-slate-800 aria-expanded:border-emerald-500 aria-expanded:text-emerald-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
-        title="Field and loss settings. Opens Simulate in a spatial view."><Waves size={16} aria-hidden="true" /></button>
+        title="Field and loss settings. Opens a spatial view."><Waves size={16} aria-hidden="true" /></button>
     {/if}
     {#if !drawingOnly}
     {#if geometry && terminalTool && onStartTerminals}
@@ -186,7 +185,7 @@
 
   {#if !drawingOnly}
   {#if open === "terminals" && geometry && terminalTool && onStartTerminals}
-    <div role="dialog" aria-label="Coil terminals" aria-modal="false" class={`${panelClass} ${showMotorControls ? 'max-lg:bottom-44' : ''}`} transition:fly={{ x: designOnly ? -16 : 16, duration: 140 }}>
+    <div role="dialog" aria-label="Coil terminals" aria-modal="false" class={`${panelClass} ${showMotorControls ? 'max-lg:bottom-[min(11rem,35%)]' : ''}`} transition:fly={{ x: designOnly ? -16 : 16, duration: 140 }}>
       <header class="flex shrink-0 items-center justify-between border-b border-slate-700 px-3 py-2">
         <h3 class="text-sm font-semibold">Coil ends</h3>
         <button type="button" aria-label="Close terminals panel" onclick={close} class="rounded p-1 text-slate-400 hover:bg-slate-800"><X size={16} aria-hidden="true" /></button>
@@ -218,28 +217,10 @@
           <p class="text-[11px] text-slate-400">Adding inductance can reduce PWM current ripple, but needs more voltage at speed.</p>
         </fieldset>
         <div class="mt-4 border-t border-slate-700 pt-3"><DriverSelector {config} /></div>
-        <section aria-label="Preview driver simulation results" aria-busy={drivePending} class="mt-4 space-y-2 border-t border-slate-700 pt-3">
-          <h4 class="text-xs font-semibold text-slate-200">Simulation results</h4>
-          {#if drivePending}
-            <p role="status" class="text-[11px] text-slate-400">Updating driver simulation…</p>
-          {:else if driveError}
-            <p role="alert" class="text-[11px] text-rose-300">{driveError}</p>
-          {:else if drive}
-            <p class="text-[11px] text-slate-400">{drive.driver_name} · {formatSi(drive.pwm_hz, "Hz")} PWM</p>
-            <dl class="space-y-2 text-xs">
-              <div class="flex flex-wrap justify-between gap-1"><dt class="text-slate-400">Current ripple<HelpTag label="About current ripple" tip="Peak-to-peak current variation caused by PWM switching." equation={String.raw`\Delta I_{\mathrm{pp}} = I_{\max} - I_{\min}`} /></dt><dd class="font-mono text-slate-100">{formatSi(drive.ripple_pp_a, "A")}</dd></div>
-              <div class="flex flex-wrap justify-between gap-1"><dt class="text-slate-400">Effective phase inductance<HelpTag label="About effective inductance" tip="Winding inductance plus the external series inductor." equation={String.raw`L_{\mathrm{eff}} = L_{\mathrm{winding}} + L_{\mathrm{series}}`} /></dt><dd class="font-mono text-slate-100">{formatSi(drive.effective_inductance_h, "H")}</dd></div>
-              <div class="flex flex-wrap justify-between gap-1"><dt class="text-slate-400">Additional L needed<HelpTag label="About additional inductance" tip="Extra inductance still needed per phase to meet the ripple limit at this PWM frequency." /></dt><dd class="font-mono text-slate-100">{formatSi(drive.added_inductance_h, "H")}</dd></div>
-              <div class="flex flex-wrap justify-between gap-1"><dt class="text-slate-400">Minimum PWM<HelpTag label="About minimum PWM" tip="Switching frequency needed to meet the ripple limit with this total inductance." /></dt><dd class="font-mono text-slate-100">{formatSi(drive.min_pwm_hz, "Hz")}</dd></div>
-            </dl>
-            {#if rippleCheck}
-              <p class="text-xs {rippleCheck.status === 'pass' ? 'text-emerald-300' : rippleCheck.status === 'unknown' ? 'text-slate-400' : 'text-amber-300'}">Ripple check: {rippleCheck.status}<HelpTag label="Ripple check details" tip={rippleCheck.detail} /></p>
-            {/if}
-            <p class="text-[11px] text-slate-500">Full checks in Simulate.</p>
-          {:else}
-            <p role="status" class="text-[11px] text-slate-400">Driver results unavailable. Check the design and coil connections in Simulate.</p>
-          {/if}
-        </section>
+        <div class="mt-4 space-y-2 border-t border-slate-700 pt-3">
+          <p class="text-xs text-slate-400">These are the motor's saved drive assumptions. Compare other drivers independently in the calculator.</p>
+          <button type="button" onclick={onOpenDriverCalculator} disabled={!onOpenDriverCalculator} class="text-xs text-sky-300 hover:underline disabled:opacity-40">Open driver calculator</button>
+        </div>
       </div>
     </div>
   {/if}

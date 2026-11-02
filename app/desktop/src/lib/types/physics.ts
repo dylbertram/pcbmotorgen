@@ -51,22 +51,3 @@ export interface FrictionBudgetDto {
   total_n: number;
   minimum_drive_force_n: number;
 }
-
-/** One B-field sample on the X–Z sampling grid (sample_b_field). */
-export interface BFieldSampleDto {
-  x_m: number;
-  z_m: number;
-  bx_t: number;
-  by_t: number;
-  bz_t: number;
-  mag_t: number;
-}
-
-/** B-field grid (sample_b_field). */
-export interface BFieldGridDto {
-  samples: BFieldSampleDto[];
-  /** [x_min, x_max] [m] */
-  x_extent_m: [number, number];
-  /** [z_min, z_max] [m] */
-  z_extent_m: [number, number];
-}

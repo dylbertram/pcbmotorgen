@@ -3,7 +3,6 @@ import { gotoDesignApp } from "./helpers";
 
 async function openPanel(page: Page, bridge = true) {
   await gotoDesignApp(page);
-  await page.getByRole("tab", { name: /^Simulate/i }).click();
   if (bridge) await page.evaluate(() => {
     const w = window as any;
     w.dcMode = "completed"; w.dcInspectMode = "qualified"; w.dcCalls = [];
@@ -49,7 +48,7 @@ async function openPanel(page: Page, bridge = true) {
       throw new Error(`UI fixture has no ${command} calculation`);
     }};
   });
-  await page.getByRole("tab", {name:"Audited DC force",exact:true}).click();
+  await page.getByRole("tab", {name:"Advanced",exact:true}).click();
   return page.getByRole("region", {name:"Audited DC force at one pose",exact:true});
 }
 
@@ -112,7 +111,7 @@ test("leaving the DC tab cancels its active numerical job",async({page})=>{
   await page.evaluate(()=>{(window as any).dcMode="pending";});
   await panel.getByRole("button",{name:"Calculate static DC force",exact:true}).click();
   await expect(panel).toContainText("Calculating fresh fields");
-  await page.getByRole("tab",{name:"Summary (live metrics)",exact:true}).click();
+  await page.getByRole("tab",{name:"Force",exact:true}).click();
   await expect.poll(()=>page.evaluate(()=>(window as any).dcCalls.filter((c:any)=>c.command==="cancel_dc_coupling").length)).toBeGreaterThan(0);
 });
 
@@ -193,6 +192,6 @@ test("leaving a preparing source stops its owned job and clears late source stat
   await panel.getByRole("checkbox",{name:/I confirm the separate/}).check();
   await panel.getByRole("button",{name:"Prepare current source",exact:true}).click();
   await expect(panel).toContainText("Preparing actual copper and a fresh current source");
-  await page.getByRole("tab",{name:"Summary (live metrics)",exact:true}).click();
+  await page.getByRole("tab",{name:"Force",exact:true}).click();
   await expect.poll(()=>page.evaluate(()=>(window as any).dcCalls.filter((c:any)=>c.command==="cancel_dc_coupling").length)).toBeGreaterThan(0);
 });

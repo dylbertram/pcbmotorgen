@@ -5,7 +5,7 @@
 use crate::ipc::*;
 
 use pcbmotorgen_simulation::magnetic::{
-    CommutationMode as CoreCommutationMode, ForceEvaluator, MagnetArray,
+    CommutationMode as CoreCommutationMode, ForceEvaluator,
 };
 use pcbmotorgen_simulation::stackup::{FrictionEstimator, HeightStackCalculator};
 
@@ -299,84 +299,6 @@ pub async fn compute_friction(config: LinearMotorConfigIpc) -> Result<FrictionBu
 }
 
 // ===========================================================================
-// sample_b_field — REAL (MagnetArray::bfield_grid via physics adapter) — WP4
-// ===========================================================================
-
-/// Hard cap on `n_x * n_z` to prevent runaway sampling. 24×12 = 288 is
-/// the WP5 default; 4096 is the upper bound before the async runtime
-/// blocks. Configurable per-call via the JS wrapper.
-const SAMPLE_B_FIELD_GRID_CAP: usize = 4096;
-
-/// Sample the B-field on an X–Z grid at the board centre-line and return
-/// the field vectors + positions as a flat row-major array.
-///
-/// The flux-viz backend for the WP5 `FluxDiagram` Svelte component. The
-/// core `MagnetArray::bfield_grid` routes through the
-/// `pcbmotorgen_simulation::physics` magba adapter and always builds the
-/// plain alternating array.
-///
-/// **Grid cap:** `n_x * n_z` must be ≤ 4096. Returns `Err("grid too large")`
-/// otherwise. (24×12 = 288 is the recommended resolution; the cap is a
-/// safety net against runaway sliders.)
-#[tauri::command]
-pub async fn sample_b_field(
-    config: LinearMotorConfigIpc,
-    n_x: usize,
-    n_z: usize,
-    x_extent_m: [f64; 2],
-    z_extent_m: [f64; 2],
-) -> Result<BFieldGridIpc, String> {
-    if n_x < 2 || n_z < 2 {
-        return Err(format!(
-            "grid too small: n_x={n_x} n_z={n_z}, need >= 2 each"
-        ));
-    }
-    if n_x * n_z > SAMPLE_B_FIELD_GRID_CAP {
-        return Err(format!(
-            "grid too large: {n_x}×{n_z} = {} > {SAMPLE_B_FIELD_GRID_CAP}",
-            n_x * n_z
-        ));
-    }
-    let core = config.to_core();
-    core.validate_for_simulation().map_err(|e| e.to_string())?;
-    tauri::async_runtime::spawn_blocking(move || {
-        // Build linspaces from extents.
-        let x_sample: Vec<f64> = linspace(x_extent_m[0], x_extent_m[1], n_x);
-        let z_sample: Vec<f64> = linspace(z_extent_m[0], z_extent_m[1], n_z);
-        // Build MagnetArray, sample 2D grid (row-major, Z slow).
-        let sim = core.to_simulation();
-        let magnet_array = MagnetArray::new(&sim);
-        let samples_2d = magnet_array.bfield_grid(&x_sample, &z_sample, 0.0);
-        // Convert to IPC, computing magnitude.
-        let samples_ipc: Vec<BFieldSampleIpc> = samples_2d
-            .iter()
-            .map(BFieldSampleIpc::from_core)
-            .collect();
-        Ok(BFieldGridIpc {
-            samples: samples_ipc,
-            x_extent_m,
-            z_extent_m,
-        })
-    })
-    .await
-    .map_err(|e| format!("sample_b_field join error: {e}"))?
-}
-
-/// `n` evenly-spaced points in `[lo, hi]`. `n == 1` returns `[lo]`,
-/// `n == 0` returns empty. Used by `sample_b_field` to expand the
-/// extents into grid coordinates.
-fn linspace(lo: f64, hi: f64, n: usize) -> Vec<f64> {
-    if n == 0 {
-        return Vec::new();
-    }
-    if n == 1 {
-        return vec![lo];
-    }
-    let dx = (hi - lo) / (n - 1) as f64;
-    (0..n).map(|i| lo + i as f64 * dx).collect()
-}
-
-// ===========================================================================
 // analyze_drive — driver suitability from the routed copper
 // ===========================================================================
 
@@ -492,6 +414,35 @@ mod coreless_envelope_tests {
     use super::*;
 
     #[test]
+    fn oversized_magnets_are_rejected_before_preview_force_or_export() {
+        let mut config = crate::ipc::ProjectConfigStateIpc::default().to_linear_motor_ipc();
+        config.magnet_pitch_m = config.magnet_width_m - 1e-12;
+        let drive = pcbmotorgen_simulation::drive::DriveSettings::default();
+        let errors = [
+            tauri::async_runtime::block_on(generate_coils(config.clone())).unwrap_err(),
+            tauri::async_runtime::block_on(evaluate_force_sweep(config.clone(), None, Some(drive))).unwrap_err(),
+            tauri::async_runtime::block_on(super::super::dxf::editable_coil_geometry(config.clone())).unwrap_err(),
+            tauri::async_runtime::block_on(super::super::dxf::export_coils_dxf(config.clone())).unwrap_err(),
+        ];
+        assert!(errors.iter().all(|e| e.contains("magnet width")), "{errors:?}");
+        assert_eq!(config.magnet_pitch_m, config.magnet_width_m - 1e-12);
+    }
+
+    #[test]
+    fn unfittable_pole_matched_openings_cannot_be_frozen_or_exported_as_empty_copper() {
+        let mut config = crate::ipc::ProjectConfigStateIpc::default().to_linear_motor_ipc();
+        config.num_layers = 8;
+        config.magnet_count = 2;
+        config.active_area_length_m = 0.025;
+        let errors = [
+            tauri::async_runtime::block_on(generate_coils(config.clone())).unwrap_err(),
+            tauri::async_runtime::block_on(super::super::dxf::editable_coil_geometry(config.clone())).unwrap_err(),
+            tauri::async_runtime::block_on(super::super::dxf::export_coils_dxf(config)).unwrap_err(),
+        ];
+        assert!(errors.iter().all(|e| e.contains("8 braid periods")), "{errors:?}");
+    }
+
+    #[test]
     fn preview_updates_below_the_manufacturing_width_floor_without_approving_export_or_physics() {
         let mut config = crate::ipc::ProjectConfigStateIpc::default().to_linear_motor_ipc();
         let mut previous = None;
@@ -528,7 +479,6 @@ mod coreless_envelope_tests {
             tauri::async_runtime::block_on(compute_height_stack(config.clone())).unwrap_err(),
             tauri::async_runtime::block_on(compute_friction(config.clone())).unwrap_err(),
             tauri::async_runtime::block_on(generate_coils(config.clone())).unwrap_err(),
-            tauri::async_runtime::block_on(sample_b_field(config.clone(), 2, 2, [0.,0.01], [0.,0.01])).unwrap_err(),
             tauri::async_runtime::block_on(analyze_drive(config.clone(), drive.clone(), None, None)).unwrap_err(),
             tauri::async_runtime::block_on(evaluate_force_sweep(config.clone(), None, Some(drive))).unwrap_err(),
             tauri::async_runtime::block_on(travel_envelope(config.clone())).unwrap_err(),
@@ -708,7 +658,11 @@ mod analyze_drive_tests {
         if std::env::var_os("PCB_MOTOR_PROJECT_PATH").is_none() {
             ipc.routing_params.insert("connection".into(), 2.0);
         }
-        if driver_reference { ipc.min_trace_m = 0.0005; ipc.trace_width_m = 0.0005; }
+        if driver_reference {
+            // Preserve the independently checked historical reference fixture.
+            ipc.routing_params.insert("pole_matched".into(), 0.0);
+            ipc.min_trace_m = 0.0005; ipc.trace_width_m = 0.0005;
+        }
         let core = ipc.to_core();
         let (routing, sim, hints) = if let Some(cad) = cad.as_ref() {
             let board = crate::commands::cad_source::CadBoard::new(cad, &core).unwrap();
@@ -766,8 +720,20 @@ mod analyze_drive_tests {
                 }).collect::<Vec<_>>(),
                 "rust_current_share":solution.current_share, "rust_resistance_ohm":solution.resistance_ohm})
         }).collect();
+        let signed_force_audit = std::env::var_os("PCB_MOTOR_SIGNED_FORCE_MAP").map(|_| {
+            let bounds = evaluator.sweep_center_limits_m(&sim).unwrap();
+            let map: Vec<_> = (0..193).map(|i| {
+                let x = bounds.0 + (bounds.1 - bounds.0) * i as f64 / 192.0;
+                serde_json::json!({"position_m":x,
+                    "force_n_per_a":evaluator.unit_phase_force_constants_at(&sim, x).unwrap()})
+            }).collect();
+            serde_json::json!({"phase_names":coils.iter().map(|c| &c.phase_name).collect::<Vec<_>>(),
+                "full_overlap_bounds_m":[bounds.0,bounds.1], "electrical_period_m":2.0*sim.pole_pitch_m(),
+                "meshing":meshing, "force_map":map})
+        });
         let out = serde_json::json!({"routing": routing, "sim": sim, "drive": state.drive, "geometry_hints": {"layer_z_m": hints.layer_z_m}, "field_x_m": points, "rust_b_t": b,
             "networks": networks, "force_subdivisions": evaluator.meshing,
+            "signed_force_audit":signed_force_audit,
             "phase_samples":phase_samples,"excitation_currents_a":excitation,"driver_reference":driver_analysis,
             "phase_a_samples": samples, "force_positions_m": force.positions_m, "rust_force_x_n": force.force_x_n});
         let bytes = serde_json::to_vec(&out).unwrap();
@@ -907,6 +873,7 @@ mod analyze_drive_tests {
         for width_mm in [0.5] {
             let mut ipc = crate::ipc::ProjectConfigStateIpc::default().to_linear_motor_ipc();
             ipc.routing_params.insert("connection".into(), 2.0);
+            ipc.routing_params.insert("pole_matched".into(), 0.0); // Historical geometry/excitation reference.
             ipc.min_trace_m = width_mm * 1e-3;
             ipc.trace_width_m = width_mm * 1e-3;
             ipc.n_positions = 25;

@@ -3,6 +3,8 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { practicalMoveEstimate } from "./practicalMoveEstimate";
 import { validateLossInputs } from "./moveLossInputs";
+import { ConfigStore } from "./stores/config.svelte";
+import { mockDriveAnalysis } from "./ipc/mocks";
 
 const baselines = process.env.PCB_MOTOR_SCREENING_BASELINES;
 const models = process.env.PCB_MOTOR_SCREENING_MODELS;
@@ -45,5 +47,25 @@ describe("practical estimate declaration", () => {
       expect(() => practicalMoveEstimate(native.inputs.config, { ...native.inputs.drive, pwm_hz: 200000 }, native.result.drive)).toThrow("100 kHz");
       expect(() => practicalMoveEstimate({ ...native.inputs.config, backplane: { layers: [], housing: { material: "aluminum6061", thickness_m: .001, gap_m: .001 } } }, native.inputs.drive, native.result.drive)).toThrow("no backplane");
     }
+  });
+
+  it("keeps an uncharacterised 64 µH inductance and lists its unknown losses", () => {
+    const config = new ConfigStore();
+    config.supply_voltage_v = 12;
+    const settings = { ...config.drive, series_inductance_h: 64e-6 };
+    const ipc = config.toIpc();
+    const drive = mockDriveAnalysis(ipc, settings, null);
+    expect(drive.effective_inductance_h).toBeGreaterThan(settings.series_inductance_h);
+    const model = practicalMoveEstimate(ipc, settings, drive);
+    expect(validateLossInputs(model)).toEqual(model);
+    expect(model.basis).toBe("engineering_estimate");
+    expect(model.domain.geometry?.effective_phase_inductance_h).toBeCloseTo(drive.effective_inductance_h, 15);
+    // No component is invented for an arbitrary inductance: both terms stay
+    // at zero and the omission keeps the total conditional.
+    expect(model.external_series_resistance_ohm).toEqual([0, 0, 0]);
+    expect(model.external_core_loss_w).toEqual([0, 0, 0]);
+    expect(model.omitted_losses.join(" ")).toContain("64.000 µH");
+    expect(model.reference).toContain("64.000 µH");
+    expect(model.ripple.peak_deviation_a[0]).toBeGreaterThan(0);
   });
 });

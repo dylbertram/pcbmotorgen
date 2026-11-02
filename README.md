@@ -95,14 +95,23 @@ then click **Write to KiCad** when ready.
 
 ### Simulation controls and model scope
 
-In **Simulate**, use **Run simulations** to calculate the active generated or
-imported geometry. **Auto-run on edits** can be turned off for manual operation.
+The bottom simulation dock stays open alongside the design, with **Move & power** selected first. Enter the move in millimetres, seconds and grams, check the inherited mass and friction, then choose **Calculate power**. The **min** and **max** links reset the start and end independently. One action prepares the winding analysis, builds the documented estimate and calculates the native move demand. Backplane or housing designs require an explicit analysis-only exclusion for this calculation. **Save report** writes a standalone HTML report; Markdown, time-series and reproducibility exports are under **Export data**. **Force** holds thrust over travel. Field visualization and field/loss settings live in the viewport and do not change the selected simulation tab. The restricted material-coupled DC analysis sits under **Advanced**.
+
+File tabs support two resizable editor groups. Right-click a file tab and choose **Split right** to open another view of the same file. Drag tabs between groups, or onto the right half of a single editor to create the second group. A translucent rectangle previews the destination; cancelling a drag changes nothing. Views share the saved model and dirty state but keep independent cameras and simulation selections. Closing a view does not close the file while another view remains. File → Close file, Save and simulation menu actions target the focused group. DRC and calculation status sit in each drawing's editing toolbar.
+
+Choose **Open driver calculator** in Force or Driver settings, or **Simulate → Driver calculator…** in the native menu, to open an independent calculator window. It starts with a snapshot of the active motor's winding analysis when available. **Import active motor** explicitly replaces the calculator inputs; subsequent source edits never update them automatically. Calculator edits never write back to the motor. Without a source, enter resistance and inductance manually. Reopening an already-open calculator focuses it without replacing its inputs.
+
+At desktop widths, calculator inputs and suitability checks scroll independently below the header. Narrow windows stack them in one scrollable page.
+
+The calculator uses constant hot phase resistance and synchronous inductance for balanced three-phase star screening: bus-voltage headroom, at-speed voltage when motor constants are supplied, RL PWM ripple, peak current, approximate phase RMS and an optional entered trace-ampacity limit. It is not a geometry or thermal solver. Delta and other phase counts are explicitly unsupported; frequency-dependent backplane/housing behavior, supply-current demand, regeneration and unentered inductor/driver losses are not inferred. The motor's saved drive assumptions remain separate inputs to move-power calculations.
+
+**Run simulations** recalculates thrust over travel and the stack geometry used by the field view. **Auto-run on edits** can be turned off for manual operation. Force does not display an assumed friction breakdown or stack-height summary.
 Imported copper needs phase mapping and confirmed coil ends. Editing inputs
 clears old results; late responses cannot populate another design or tab.
 
 The **3D fields and heat** view defaults to **Coil currents, routed estimate**.
 Open **Field and loss settings** from the right-hand rail. Opening it selects
-**Simulate** and switches Top-down to 3D, while keeping an existing Front or Left
+**Fields** in the simulation dock and switches Top-down to 3D, while keeping an existing Front or Left
 view. Opening **Coil ends** selects Top-down so its picking controls are usable.
 The routed estimate does not require a previously audited design. It calculates
 the routed copper's Biot-Savart contribution from signed resistor-graph branch currents,

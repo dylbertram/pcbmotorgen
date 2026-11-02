@@ -99,6 +99,10 @@ impl LinearMotorConfig {
             // No config field maps to declared phase bands yet; empty keeps
             // the analytic commutation offsets (kata hzs2 fallback).
             phase_bands: Vec::new(),
+            balanced_three_phase_drive: self.routing_pattern_id() == "infinity-braid"
+                && self.phases == 3
+                && self.routing_params.get("connection") == Some(&2.0)
+                && self.routing_params.get("pole_matched") == Some(&1.0),
             backplane: self.backplane.clone(),
         }
     }
@@ -127,6 +131,18 @@ impl LinearMotorConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn balanced_drive_requires_an_explicit_three_phase_pole_matched_star() {
+        let mut cfg = LinearMotorConfig::default();
+        cfg.routing_params = std::collections::HashMap::from([("connection".into(), 2.0), ("pole_matched".into(), 1.0)]);
+        assert!(cfg.to_simulation().balanced_three_phase_drive);
+        cfg.phases = 1;
+        assert!(!cfg.to_simulation().balanced_three_phase_drive, "single-phase imported boards must not inherit a three-phase command");
+        cfg.phases = 3;
+        cfg.routing_params.remove("pole_matched");
+        assert!(!cfg.to_simulation().balanced_three_phase_drive);
+    }
 
     #[test]
     fn routing_receives_the_same_via_pad_size_as_dfm() {
