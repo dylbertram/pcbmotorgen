@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { ConfigStore } from "../stores/config.svelte";
-import { mockDriveAnalysis, mockForceSweep } from "../ipc/mocks";
+import { mockDriveAnalysis } from "../ipc/driveAnalysisMock";
+import { mockForceSweep } from "../ipc/forceSweepMock";
 import type { CadGeometry } from "../types";
 import { powerRequirements, powerRequirementsCsv, powerModelSnapshot, forceSweepCsv, phaseElectricalCsv, currentMoveResult, moveTraceCsv, type PowerRequirementsInput } from "./powerRequirements";
 import { declaredLossFixture } from "../testFixtures/moveLosses";

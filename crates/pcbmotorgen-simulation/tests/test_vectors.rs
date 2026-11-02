@@ -28,9 +28,7 @@ struct TestVectors {
     bfield: BFieldVector,
 }
 
-/// Mirrors the full `config` object of the Python-oracle fixture, including
-/// fields no assertion consumes yet, so the schema stays documented.
-#[allow(dead_code)]
+/// Mirrors the `config` object of the Python-oracle fixture.
 #[derive(Debug, Deserialize)]
 struct ConfigVector {
     active_area_length_mm: f64,
@@ -69,8 +67,11 @@ struct SegmentVector {
 #[derive(Debug, Deserialize)]
 struct BFieldVector {
     x_mm: Vec<f64>,
+    #[serde(rename = "Bx_T")]
     bx_t: Vec<f64>,
+    #[serde(rename = "By_T")]
     by_t: Vec<f64>,
+    #[serde(rename = "Bz_T")]
     bz_t: Vec<f64>,
 }
 
@@ -111,21 +112,8 @@ fn force_reference() -> ForceReference {
 
 /// Load test vectors from the fixture file.
 fn load_vectors() -> TestVectors {
-    let value: Value = serde_json::from_str(include_str!("../scripts/fixtures/test_vectors.json"))
-        .expect("invalid JSON");
-    // Use serde_json to handle key case (Python uses Bx_T, Rust expects bx_t)
-    let mut v = value;
-    // Rename B-field keys to lowercase for serde
-    if let Some(bf) = v.get_mut("bfield") {
-        if let Some(obj) = bf.as_object_mut() {
-            for (old, new) in &[("Bx_T", "bx_t"), ("By_T", "by_t"), ("Bz_T", "bz_t")] {
-                if let Some(val) = obj.remove(*old) {
-                    obj.insert(new.to_string(), val);
-                }
-            }
-        }
-    }
-    serde_json::from_value(v).expect("failed to deserialize test vectors")
+    serde_json::from_str(include_str!("../scripts/fixtures/test_vectors.json"))
+        .expect("failed to deserialize test vectors")
 }
 
 /// Build a `SimulationInput` matching the Python `default_config()` from
@@ -182,6 +170,11 @@ fn assert_close(actual: f64, expected: f64, rel_tol: f64, abs_tol: f64, label: &
 fn test_config_derived_values() {
     let v = load_vectors();
     let cfg = test_config();
+
+    assert!(
+        (cfg.active_area_length_m * 1e3 - v.config.active_area_length_mm).abs() < 1e-9,
+        "active_area_length"
+    );
 
     // Legacy oracle records pitch-cell span, including one extra gap.
     // Preserve the independent fixture while checking physical edge span.

@@ -1,13 +1,13 @@
 <script lang="ts">
-  import type { SensorStore } from "../../stores/sensor.svelte";
-  import { fitWorldToView, type WorldTransform } from "../../chart";
-  import { PreviewGestures } from "../../utils/previewGestures.svelte";
-  import type { PreviewCamera } from "../../utils/previewGestures.svelte";
+  import type { SensorStore } from "../../sensor/sensor.svelte";
+  import { fitWorldToView, type WorldTransform } from "../../geometry/viewport";
+  import { PreviewGestures } from "../../preview/previewGestures.svelte";
+  import type { PreviewCamera } from "../../preview/previewCamera.svelte";
   import { untrack } from "svelte";
-  import { CoilPreviewViewState } from "../design/coilPreviewViewState.svelte";
-  import { PREVIEW_W, PREVIEW_H } from "../design/coilPreviewCanvas";
-  import CoilPreviewControls from "../design/CoilPreviewControls.svelte";
-  import LayerVisibilityControls from "../design/LayerVisibilityControls.svelte";
+  import { CoilPreviewViewState } from "../../preview/coilPreviewViewState.svelte";
+  import { PREVIEW_W, PREVIEW_H } from "../../preview/previewStyle";
+  import PreviewZoomControls from "../preview/PreviewZoomControls.svelte";
+  import LayerVisibilityControls from "./LayerVisibilityControls.svelte";
   import { arcSvgPath, splineSvgPath } from "../../geometry/curvePaths";
   import { Dialog } from "bits-ui";
   import { attachBackdropScrollGuard, lockPageScroll } from "../../utils/pageScrollLock";
@@ -194,10 +194,10 @@
       isVisible={(layer) => previewView.isLayerVisible(layer)}
       onToggle={(layer) => previewView.toggleLayer(layer)}
     />
-    <CoilPreviewControls
+    <PreviewZoomControls
       zoomLabel={gestures.zoomLabel}
-      canZoomIn={gestures.canZoomIn}
-      canZoomOut={gestures.canZoomOut}
+      zoomInDisabled={gestures.zoomInDisabled}
+      zoomOutDisabled={gestures.zoomOutDisabled}
       onZoomIn={gestures.zoomIn}
       onZoomOut={gestures.zoomOut}
       onResetZoom={gestures.zoomReset}

@@ -1,47 +1,11 @@
 /**
- * pageScrollLock.ts
- * ============================================================================
- * Scroll discipline for modal overlays (Kata xy31 — coil preview modal
- * leaked wheel scrolling into the page behind it).
+ * Modal scroll isolation: refcounted root/body locks compose across stacked
+ * dialogs. Non-passive backdrop guards stop wheel and touch scroll chaining;
+ * scrollable panels should also use `overscroll-behavior: contain`.
  *
- * While a modal is open, EVERY scroll path into the page behind it must be
- * dead. Two layers cover all of them:
- *
- *   1. `lockPageScroll(page)` — refcounted `overflow: hidden` on <html> and
- *      <body>. Kills document scrolling below `lg` (where the columns stack
- *      and the page itself scrolls); above `lg` the stylesheet already hides
- *      the root scroller, so the inline write is redundant but harmless.
- *      Each first lock snapshots the previous inline values and the LAST
- *      release restores them, so stacked modals compose in any open/close
- *      order.
- *
- *   2. `attachBackdropScrollGuard(backdrop, scrollable)` — NON-passive
- *      wheel + touchmove listeners on the overlay itself. Events landing on
- *      the dimmed backdrop (anywhere outside the modal's own scrollable
- *      panel) are preventDefault()-ed, so the browser's scroll-chaining can
- *      never reach a container behind the modal. Events inside `scrollable`
- *      are left to the browser so the panel scrolls itself — pair this with
- *      `overscroll-behavior: contain` (Tailwind `overscroll-contain`) on the
- *      panel so its own scrolling never chains past the modal either.
- *
- * The decision (`blocksBackdropScroll`) is pure and unit-tested; the DOM
- * plumbing is a thin wrapper. Listeners are attached non-passively because
- * preventDefault() is ignored inside passive wheel/touchmove listeners.
- *
- * Bits UI interplay (assessed in kata 1jfa — keep, do not replace with
- * Bits' built-in lock): every Dialog in this app (CoilPreview lightbox,
- * PluginAuthoringGuideModal, GeneratorUploadPanel) sets
- * `preventScroll={false}` on Dialog.Content so Bits' BodyScrollLock
- * (node_modules/bits-ui/dist/internal/body-scroll-lock.svelte.js) stays
- * out of the way. Bits writes overflow/padding/pointer-events on <body>
- * only — never inline on <html> — and ships no wheel/touchmove
- * preventDefault (its touchmove guard is iOS + documentElement-target
- * only), so it cannot satisfy the xy31 e2e contract
- * (e2e/modal-scroll-lock.spec.ts pins inline root+body overflow AND
- * backdrop wheel defaultPrevented). It must also not run BESIDE this
- * helper: Bits snapshots the <body> style attribute at lock time and
- * restores it after a 24ms delay, so its reset re-applies this lock's own
- * overflow:hidden after close — measured stuck lock (spec line 190).
+ * Dialogs using this helper disable Bits UI's `preventScroll`: its body-only
+ * lock does not cover the root or backdrop and its delayed style restoration
+ * can reapply a stale overflow lock. See e2e/modal-scroll-lock.spec.ts.
  */
 
 /** Minimal structural view of `document` (real documents satisfy this). */

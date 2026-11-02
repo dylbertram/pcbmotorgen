@@ -50,12 +50,6 @@ describe("computeFootprintBox", () => {
     expect(box.maxY).toBeCloseTo(0.021, 9);
   });
 
-  it("includes corner-arc extremes", () => {
-    const box = computeFootprintBox(braidLikeFixture());
-    expect(box.maxY).toBeCloseTo(0.021, 9);
-    expect(box.maxX).toBeCloseTo(0.018, 9);
-  });
-
   it("is degenerate-safe with no coils", () => {
     const box = computeFootprintBox(null);
     expect(box.maxX).toBeGreaterThan(box.minX);
@@ -64,44 +58,30 @@ describe("computeFootprintBox", () => {
 });
 
 describe("computePreviewGeometry", () => {
-  it("overlays layers at their true coordinates (no exploded offset)", () => {
-    const g = computePreviewGeometry(braidLikeFixture(), CONFIG);
-    // contentBox == footprintBox: layers share the same coordinates.
-    expect(g.contentBox.minX).toBe(g.footprintBox.minX);
-    expect(g.contentBox.minY).toBe(g.footprintBox.minY);
-    expect(g.contentBox.maxX).toBe(g.footprintBox.maxX);
-    expect(g.contentBox.maxY).toBe(g.footprintBox.maxY);
-    expect(g.contentBox.maxY).toBeCloseTo(0.021, 9);
-    expect(g.contentBox.minY).toBeCloseTo(0, 9);
-  });
-
   it("places the magnet strip 1 mm above the tallest content", () => {
-    const g = computePreviewGeometry(braidLikeFixture(), CONFIG);
-    expect(g.magnetTop).toBeCloseTo(g.contentBox.maxY + 0.001, 9);
-    expect(g.magnetSpan).toBeCloseTo(11 * 0.006 + 0.0045, 9);
+    const coils = braidLikeFixture();
+    const content = computeFootprintBox(coils);
+    const g = computePreviewGeometry(coils, CONFIG);
+    expect(g.magnetTop).toBeCloseTo(content.maxY + 0.001, 9);
     expect(g.fitBounds.maxY).toBeCloseTo(g.magnetTop + 0.003, 9);
     // The camera fit follows the painted solids, not the unused half-gap at
     // the right end of the configured pitch span.
     expect(g.fitBounds.maxX).toBeCloseTo(0.00075 + 11 * 0.006 + 0.0045, 9);
     // fit x must cover both the winding and the painted magnet bars
-    expect(g.fitBounds.minX).toBeLessThanOrEqual(g.contentBox.minX);
-    expect(g.fitBounds.maxX).toBeGreaterThanOrEqual(g.contentBox.maxX);
+    expect(g.fitBounds.minX).toBeLessThanOrEqual(content.minX);
+    expect(g.fitBounds.maxX).toBeGreaterThanOrEqual(content.maxX);
   });
 
   it("sizes the board panel 1.5 mm around the overlaid content", () => {
-    const g = computePreviewGeometry(braidLikeFixture(), CONFIG);
-    expect(g.boardRect.x).toBeCloseTo(g.contentBox.minX - 0.0015, 9);
-    expect(g.boardRect.y).toBeCloseTo(g.contentBox.minY - 0.0015, 9);
-    expect(g.boardRect.w).toBeCloseTo(g.contentBox.maxX - g.contentBox.minX + 0.003, 9);
-    expect(g.boardRect.h).toBeCloseTo(g.contentBox.maxY - g.contentBox.minY + 0.003, 9);
+    const coils = braidLikeFixture();
+    const content = computeFootprintBox(coils);
+    const g = computePreviewGeometry(coils, CONFIG);
+    expect(g.boardRect.x).toBeCloseTo(content.minX - 0.0015, 9);
+    expect(g.boardRect.y).toBeCloseTo(content.minY - 0.0015, 9);
+    expect(g.boardRect.w).toBeCloseTo(content.maxX - content.minX + 0.003, 9);
+    expect(g.boardRect.h).toBeCloseTo(content.maxY - content.minY + 0.003, 9);
   });
 
-  it("reports only the layers actually present, not the configured total", () => {
-    const g = computePreviewGeometry(braidLikeFixture(), CONFIG);
-    expect(g.renderedLayerCount).toBe(2); // fixture config says layer_count 4
-    const empty = computePreviewGeometry(null, CONFIG);
-    expect(empty.renderedLayerCount).toBe(0);
-  });
 });
 
 describe("computeMagnets", () => {
@@ -151,6 +131,14 @@ describe("computeMagnets", () => {
       pole_regions: dimensions.pole_regions.filter((region) => region.pole_index === 0),
     };
     expect(computeMagnetStartX(CONFIG, onePeriod)).toBeCloseTo(0.005 - 0.0045 / 2, 9);
+  });
+
+  it("uses the first available neutral region when pole zero is absent", () => {
+    const dimensions: { pole_regions: PoleRegionDto[] } = { pole_regions: [
+      { phase: "A", pole_index: 0, start: [0, 0], end: [0.006, 0] },
+      { phase: "B", pole_index: 1, start: [0.008, 0], end: [0.014, 0] },
+    ] };
+    expect(computeMagnetStartX(CONFIG, dimensions)).toBeCloseTo(0.011 - 0.0045 / 2, 9);
   });
 });
 
@@ -254,7 +242,7 @@ describe("computeOverlayFitBounds", () => {
 
 describe("traceExtentMetres", () => {
   it("measures the routed traces' first-to-last X span (the routing domain)", async () => {
-    const { mockCoils } = await import("../ipc/mocks");
+    const { mockCoils } = await import("../ipc/coilPreviewMock");
     const { ConfigStore } = await import("../stores/config.svelte");
     const config = new ConfigStore();
     const coils = mockCoils(config.toIpc());
@@ -272,17 +260,16 @@ describe("traceExtentMetres", () => {
 
 describe("measureTrace", () => {
   it("returns the measured trace length and start (mock spans the domain)", async () => {
-    const { mockCoils } = await import("../ipc/mocks");
+    const { mockCoils } = await import("../ipc/coilPreviewMock");
     const { ConfigStore } = await import("../stores/config.svelte");
     const config = new ConfigStore();
-    const m = measureTrace(mockCoils(config.toIpc()), config);
+    const m = measureTrace(mockCoils(config.toIpc()));
     expect(m).not.toBeNull();
     expect(m!.traceLengthMm).toBeCloseTo(145.5, 3);
     expect(m!.traceStartMm).toBeCloseTo(0, 6);
   });
 
-  it("is null without a payload", async () => {
-    const { ConfigStore } = await import("../stores/config.svelte");
-    expect(measureTrace(null, new ConfigStore())).toBeNull();
+  it("is null without a payload", () => {
+    expect(measureTrace(null)).toBeNull();
   });
 });

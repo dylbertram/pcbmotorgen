@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { practicalMoveEstimate } from "./practicalMoveEstimate";
 import { validateDeclaredLossShape } from "../testFixtures/lossValidation";
 import { ConfigStore } from "../stores/config.svelte";
-import { mockDriveAnalysis } from "../ipc/mocks";
+import { mockDriveAnalysis } from "../ipc/driveAnalysisMock";
 
 const baselines = process.env.PCB_MOTOR_SCREENING_BASELINES;
 const models = process.env.PCB_MOTOR_SCREENING_MODELS;

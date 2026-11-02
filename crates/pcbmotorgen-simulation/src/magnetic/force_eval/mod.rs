@@ -811,7 +811,7 @@ mod tests {
     }
 
     #[test]
-    fn test_evaluate_basic() {
+    fn sweep_endpoints_match_single_position_evaluations() {
         let cfg = SimulationInput::default();
         let coils = vec![
             make_test_coil(0, "A", 0.0),
@@ -841,13 +841,13 @@ mod tests {
     }
 
     #[test]
-    fn test_linspace() {
+    fn linspace_includes_evenly_spaced_endpoints() {
         let xs = linspace(0.0, 1.0, 5);
         assert_eq!(xs, vec![0.0, 0.25, 0.5, 0.75, 1.0]);
     }
 
     #[test]
-    fn test_electrical_angle() {
+    fn electrical_angle_advances_one_turn_per_period() {
         let cfg = SimulationInput::default();
         // At p=0, θ_e=0; at p=2τ=0.024, θ_e=2π
         assert!((ForceEvaluator::electrical_angle(&cfg, 0.0)).abs() < 1e-9);
@@ -877,18 +877,16 @@ mod tests {
         );
     }
 
-    /// End-to-end: the default config (1:1 spacing, 3 phases) must run the
-    /// `ForceEvaluator` end-to-end on the infinity-braid coil set and produce
-    /// a finite, physically well-defined force sweep.
+    /// The default config (1:1 spacing, 3 phases) must run the infinity-braid
+    /// through the evaluator and produce a finite force sweep.
     ///
     /// The infinity-braid is a two-layer overlapping weave. Unlike the old
     /// single-layer serpentine (whose conductors sat directly under the
     /// magnet peaks), the braid spreads copper across both layers and every
     /// segment is marked active, so the net thrust is low and the ripple is
     /// high. The precise ripple figure is therefore not a meaningful FOC
-    /// quality bound here — what matters is that the Lorentz integrator runs,
-    /// passes the 3-point guard, and yields finite forces with positive mean
-    /// thrust.
+    /// quality bound here — the Lorentz integrator must run, pass the 3-point
+    /// guard, and yield finite forces. A positive mean is not asserted here.
     #[test]
     fn default_braid_force_is_finite_without_a_ripple_goal() {
         let cfg = SimulationInput::default();
@@ -904,14 +902,14 @@ mod tests {
     /// End-to-end robustness: the 4:5 Vernier config (spacing_ratio=0.8, 3
     /// phases) fed with infinity-braid coils must be handled gracefully by
     /// the `ForceEvaluator` — either producing a finite force sweep or
-    /// rejecting the config via the 3-point FOC guard, never panicking.
+    /// returning an error whose message mentions FOC, never panicking.
     ///
     /// The braid's staggered two-layer weave does not concentrate conductors
     /// under the Vernier magnet peaks the way the old single-layer serpentine
-    /// did, so the 3-point polarity + alignment guard may legitimately reject
-    /// the config (that is the guard doing its job, not an FOC bug).
+    /// did. A message mentioning FOC alone does not establish why evaluation
+    /// failed or that the model or guard is correct.
     #[test]
-    fn vernier_braid_force_is_finite_or_reports_controller_model_incompatibility() {
+    fn vernier_braid_force_is_finite_or_reports_foc_error() {
         let cfg = SimulationInput {
             spacing_ratio: 0.8,
             ..SimulationInput::default()
@@ -929,8 +927,8 @@ mod tests {
             Err(e) => {
                 assert!(
                     e.to_string().contains("FOC"),
-                    "4:5 Vernier + infinity-braid must either evaluate or be rejected by the \
-                     FOC guard; got unexpected error: {e}"
+                    "4:5 Vernier + infinity-braid must either evaluate or report an \
+                     FOC error; got unexpected error: {e}"
                 );
             }
         }
@@ -944,8 +942,8 @@ mod tests {
     /// `ForceEvaluator` force sweep for the default config, and the mean
     /// thrust must peak at δ ≈ 0 and be symmetric about δ = 0. A δ = ±90°
     /// peak would mean the implemented drive is in quadrature with the mover
-    /// field (a d-axis current, ~zero mean thrust); the δ = 0 peak proves the
-    /// implemented law is the pure q-axis alignment of the 90° rule.
+    /// field (a d-axis current, ~zero mean thrust). This sampled sweep checks
+    /// the q-axis alignment for the reference fixture, not arbitrary windings.
     ///
     /// The tilt is injected through the evaluator's `phase_shift` (tests may
     /// touch the private field): `commutation_currents` computes
@@ -1045,7 +1043,9 @@ mod tests {
     }
 
     // ------------------------------------------------------------------
-    // 3-point polarity + alignment guard tests (FOC spec §4.3, §8.3)
+    // 3-point polarity + alignment guard tests (FOC spec §4.3, §8.3).
+    // Rejection of injected 90° commutation and wrong coil offsets is not
+    // covered: the evaluator currently has no way to inject those faults.
     // ------------------------------------------------------------------
 
     /// The 3-point polarity + alignment guard must accept the default
@@ -1066,8 +1066,7 @@ mod tests {
             make_test_coil(2, "C", 8.0),
         ];
         let mut ev = ForceEvaluator::new(5, 5, CommutationMode::MaxThrust, 0.0);
-        let result = ev
-            .self_calibrate(&cfg, &coils)
+        ev.self_calibrate(&cfg, &coils)
             .expect("default FOC must pass 3-point guard");
         assert!(ev.calibrated);
         assert!(
@@ -1076,18 +1075,13 @@ mod tests {
             "phase_shift must be 0 or π after 3-point guard, got {}",
             ev.phase_shift
         );
-        // 3-point guard must surface a successful calibration (Result is Ok).
-        let _ = result;
     }
 
-    /// At `p = 0`, the Phase A contribution to `F_mover.x` is at its
-    /// **maximum** (over the full sweep). This locks the `cos` sign of
-    /// the FOC (spec §2.4): with `cos` FOC, Phase A's first conductor is
-    /// directly under the +Br magnet at `p = 0`, so `B_z` is at a peak
-    /// AND `I_A = cos(0) = I_pk` is at its peak → Phase A produces its
-    /// maximum forward thrust.
+    /// If the FOC guard accepts the generated braid, the resulting per-phase
+    /// sweep must be nonempty, finite and divisible by phase count. Rejection
+    /// is allowed; this does not assert phase-A alignment.
     #[test]
-    fn test_foc_alignment_phase_a_at_p0_is_max() {
+    fn accepted_braid_sweep_has_finite_per_phase_values() {
         let cfg = SimulationInput::default();
         let coils = generate_coils(&cfg);
         let mut ev = ForceEvaluator::new(50, 20, CommutationMode::MaxThrust, 0.0);
@@ -1106,18 +1100,17 @@ mod tests {
         }
     }
 
-    /// Robustness: `evaluate_at` must handle the infinity-braid coil set at
-    /// arbitrary mover positions inside the sweep range, returning finite
-    /// forces at each sample point without panicking.
+    /// Sample position pairs one period apart without panicking. Accepted
+    /// pairs must have finite forces, and at least one pair must be accepted.
     ///
     /// The old single-layer serpentine satisfied the strict periodicity
     /// identity `F(p + 2·τ_p) = F(p)` because its conductors repeated every
     /// pole pitch. The infinity-braid is a staggered two-layer weave whose
     /// conductor x-offsets do not repeat over one electrical period, so the
     /// strict 2%-periodicity bound no longer applies; instead we assert the
-    /// evaluator round-trips every sample point and yields finite forces.
+    /// accepted samples are checked for finite forces instead.
     #[test]
-    fn test_foc_periodicity() {
+    fn braid_evaluations_one_period_apart_are_finite_when_accepted() {
         let cfg = SimulationInput::default();
         let coils = generate_coils(&cfg);
         let two_tau = 2.0 * cfg.pole_pitch_m();
@@ -1159,9 +1152,9 @@ mod tests {
     /// `τ_s = 0.8·τ_p/3 = 3.2 mm`), Phase B's first conductor sat at a
     /// `B_z` peak. With the infinity-braid the weave spreads copper across
     /// both layers, so this test now verifies the evaluator handles the
-    /// Vernier config robustly (finite sweep or clean guard rejection).
+    /// Vernier config robustly (finite phase-B samples or an FOC error message).
     #[test]
-    fn test_foc_4_5_vernier_phase_b_at_p_slot_is_max() {
+    fn vernier_braid_phase_b_is_finite_or_reports_foc_error() {
         let cfg = SimulationInput {
             spacing_ratio: 0.8,
             ..SimulationInput::default()
@@ -1172,11 +1165,9 @@ mod tests {
         let p_test = rest + 0.5 * cfg.phase_band_pitch_m();
         let mut ev = ForceEvaluator::new(50, 20, CommutationMode::MaxThrust, 0.0);
         // The infinity-braid's staggered weave does not concentrate copper
-        // under the Vernier magnet peaks, so the 3-point FOC guard may
-        // legitimately reject this config. The test asserts the evaluator
-        // handles it robustly: it either evaluates to a finite sweep (in
-        // which case the phase-B alignment property is checked) or rejects
-        // via the documented guard error — never panics.
+        // under the Vernier magnet peaks. This checks finite phase-B samples
+        // on success, or an error message mentioning FOC, without attributing
+        // that error to a particular guard.
         match ev.evaluate(&cfg, &coils) {
             Ok(result) => {
                 // Find the closest sweep position to p_test.
@@ -1206,45 +1197,11 @@ mod tests {
             Err(e) => {
                 assert!(
                     e.to_string().contains("FOC"),
-                    "4:5 Vernier + infinity-braid must either evaluate or be rejected by the \
-                     FOC guard; got unexpected error: {e}"
+                    "4:5 Vernier + infinity-braid must either evaluate or report an \
+                     FOC error; got unexpected error: {e}"
                 );
             }
         }
     }
 
-    /// The 3-point guard must catch a 90° `sin`-FOC error.
-    ///
-    /// Implementation strategy: this test is `#[ignore]`d because
-    /// injecting a `sin`-FOC into the live evaluator requires either
-    /// (a) parameterising `commutation_currents` by an `foc_variant`
-    /// field, or (b) exposing a public test hook. Both are reasonable
-    /// refactors, but they expand the API surface beyond the scope of
-    /// the FOC fix. The 3-point guard's *algorithm* is fully covered by
-    /// the strict `Err`-returning path (verified by the
-    /// `test_self_calibrate_passes_for_correct_foc` test, which exercises
-    /// the same code path with a "correct" config).
-    ///
-    /// To enable: add a `foc_variant: FocVariant` field to
-    /// `ForceEvaluator` and dispatch in `commutation_currents`. Then
-    /// construct an evaluator with `FocVariant::Sin` and assert that
-    /// `self_calibrate` returns `Err`.
-    #[test]
-    #[ignore = "Requires FocVariant enum (out of scope for the FOC fix)"]
-    fn test_self_calibrate_3point_catches_90deg_error() {
-        // Placeholder: see doc comment above for the implementation strategy.
-    }
-
-    /// The 3-point guard must catch a wrong per-coil offset
-    /// (e.g., `2π/3` instead of `π·slot_pitch/pole_pitch`).
-    ///
-    /// Implementation strategy: same as
-    /// `test_self_calibrate_3point_catches_90deg_error` — requires a
-    /// `phase_offset_override` field on the evaluator or a similar
-    /// injection mechanism.
-    #[test]
-    #[ignore = "Requires phase_offset_override field (out of scope for the FOC fix)"]
-    fn test_self_calibrate_3point_catches_wrong_offset() {
-        // Placeholder: see doc comment above for the implementation strategy.
-    }
 }

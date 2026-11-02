@@ -11,7 +11,7 @@
  * 1 mm above the tallest drawn content.
  */
 
-import { unionBounds, type ViewportBBox } from "../chart";
+import { unionBounds, type ViewportBBox } from "../geometry/viewport";
 import { computePoleRegionBounds, computePoleRegionZones, type PoleRegionZone } from "./poleRegions";
 import type { PolePitchRuler } from "./polePitch";
 import type { BandWidthRow } from "./bandWidth";
@@ -37,20 +37,12 @@ export interface BoardRect {
 
 /** All layout constants the canvas viewer needs before drawing. */
 export interface PreviewGeometry {
-  /** Union of raw winding geometry bounds (true coordinates). */
-  footprintBox: ViewportBBox;
-  /** Content bounds — layers overlaid, so identical to `footprintBox`. */
-  contentBox: ViewportBBox;
   /** y of the magnet strip top edge (1 mm above the tallest content). */
   magnetTop: number;
-  /** x-extent of the magnet strip (magnet_count × pitch). */
-  magnetSpan: number;
   /** Union of content + magnet strip — what the camera must fit. */
   fitBounds: ViewportBBox;
   /** Dark PCB panel rect (contentBox + 1.5 mm margin). */
   boardRect: BoardRect;
-  /** Number of DISTINCT layer indices in the data (what actually renders). */
-  renderedLayerCount: number;
 }
 
 /** One magnet strip segment (x range + pole polarity). */
@@ -128,10 +120,7 @@ export interface TraceMeasure {
  * domain) by up to one period — previews and readouts must use THIS, not
  * the configured numbers. Null when no payload exists.
  */
-export function measureTrace(
-  coils: CoilPathDto | null,
-  _config: PreviewConfigLike,
-): TraceMeasure | null {
+export function measureTrace(coils: CoilPathDto | null): TraceMeasure | null {
   const span = traceExtentMetres(coils);
   if (!span) return null;
   return {
@@ -142,7 +131,7 @@ export function measureTrace(
 
 /**
  * Mover-strip bounds in the DOMAIN (routing) frame — THE single anchor
- * shared by the canvas overlay, the iso view, the design reflection AND the
+ * shared by the canvas overlay, the iso view, the coil preview and the
  * position readouts. The strip is centred on the MotionStore's clamped
  * position (absolute track coordinates), so drawn edges always equal
  * position ± mover_span/2 and every printed number agrees with every pixel.
@@ -163,11 +152,8 @@ export function computePreviewGeometry(
   coils: CoilPathDto | null,
   config: PreviewConfigLike,
 ): PreviewGeometry {
-  const footprintBox = computeFootprintBox(coils);
-
-  // Layers are overlaid at their true coordinates (top-down schematic,
-  // matching the DXF). contentBox == footprintBox.
-  const contentBox: ViewportBBox = { ...footprintBox };
+  // Layers are overlaid at their true coordinates, matching the DXF.
+  const contentBox = computeFootprintBox(coils);
 
   // Magnet strip sits 1 mm above the tallest drawn content.
   const magnetTop = contentBox.maxY + MAGNET_STRIP_CLEARANCE_M;
@@ -199,18 +185,10 @@ export function computePreviewGeometry(
     h: contentBox.maxY - contentBox.minY + 2 * BOARD_MARGIN_M,
   };
 
-  const renderedLayerCount = coils
-    ? new Set(coils.phases.map((p) => p.layer_idx)).size
-    : 0;
-
   return {
-    footprintBox,
-    contentBox,
     magnetTop,
-    magnetSpan,
     fitBounds,
     boardRect,
-    renderedLayerCount,
   };
 }
 
@@ -288,7 +266,7 @@ export function computeMagnetStartX(
   // margin can move the first solid bar away from the pattern-owned
   // coordinate.
   if (phaseOrder.length >= 2) {
-    const neutral = zoneAt(phaseOrder[1], 0) ?? firstZone(phaseOrder[1], 0);
+    const neutral = firstZone(phaseOrder[1], 0);
     if (neutral) {
       const neutralCentre = centreX(neutral);
       if (Number.isFinite(neutralCentre)) {

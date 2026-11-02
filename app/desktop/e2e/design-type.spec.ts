@@ -41,7 +41,7 @@ test("motor magnet settings stay visible when clicking the section heading", asy
   await expect(magnets.getByRole("button", { name: "Magnet grade", exact: true })).toBeVisible();
 });
 
-test("sensor is a design type whose full workflow lives in the Design tab", async ({ page }) => {
+test("sensor is a design type with its own editor workflow", async ({ page }) => {
   await gotoDesignApp(page);
   await expect(page.locator("#tab-sensor")).toHaveCount(0);
   // Export moved to the native File menu, so it is no longer a workflow tab.
@@ -86,7 +86,8 @@ test("sensor preview supports layer visibility, zoom, pan and reset", async ({ p
   // Stub the native geometry response, keeping the actual preview and gestures.
   await page.route("**/src/lib/ipc/sensor.ts", (route) => route.fulfill({
     contentType: "application/javascript",
-    body: `export async function generateSensorGeometry() {
+    body: `export async function generateSensorGeometry(config) {
+      (window.__sensorRequests ??= []).push(config.lambda_mm);
       return { board_bounds_mm: [0, -5, 40, 5], terminal_markers: [], nets: [{
         name: 'CL1', trace_width_mm: 0.15, via_size_mm: 0.6, vias: [],
         segments: [
@@ -154,6 +155,9 @@ test("sensor preview supports layer visibility, zoom, pan and reset", async ({ p
   await expect(transform).not.toHaveAttribute("transform", initial!);
   await preview.getByRole("button", { name: "Reset view" }).click();
   await expect(transform).toHaveAttribute("transform", initial!);
+  await page.locator("#sensor-wavelength").fill("48");
+  await page.locator("#sensor-wavelength").press("Enter");
+  await expect.poll(() => page.evaluate(() => (window as any).__sensorRequests?.at(-1))).toBe(48);
 });
 
 test("switching from motor simulation to sensor opens sensor design", async ({ page }) => {

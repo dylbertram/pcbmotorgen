@@ -16,13 +16,13 @@
   import { createLinearScale, polyline } from "../../chart";
   import {
     holdingForceAtPhase,
-    sampleHoldingForce,
+    samplePositions,
     restPositions,
     phaseStroke,
     phaseFill,
   } from "./holdingForce";
 
-  let { config, motion, flush = false }: { config: ConfigStore; motion: MotionStore; flush?: boolean } = $props();
+  let { config, motion }: { config: ConfigStore; motion: MotionStore } = $props();
 
   const W = 560;
   const H = 88;
@@ -36,7 +36,7 @@
 
   // Shared sample grid; each phase wave is evaluated on the same xs.
   let samples = $derived.by(() =>
-    sampleHoldingForce(minX, maxX, motion.restPhaseMm, motion.electricalPeriodMm, 240),
+    samplePositions(minX, maxX, 240),
   );
 
   /** Per-phase polyline point strings, indexed by phase. */
@@ -47,9 +47,9 @@
       polyline(
         sx,
         sy,
-        samples.xs,
-        samples.ys.map((_, i) =>
-          holdingForceAtPhase(samples.xs[i], p, phaseCount, motion.restPhaseMm, motion.electricalPeriodMm),
+        samples,
+        samples.map((x) =>
+          holdingForceAtPhase(x, p, phaseCount, motion.restPhaseMm, motion.electricalPeriodMm),
         ),
       ),
     );
@@ -73,7 +73,7 @@
   viewBox="0 0 {W} {H}"
   role="img"
   aria-label="Per-phase holding force versus mover position ({phaseCount} waves offset by {Math.round(360 / phaseCount)} degrees)"
-  class="block w-full rounded-md border border-slate-700/80 bg-slate-900/40 {flush ? '' : 'mt-2'}"
+  class="block w-full rounded-md border border-slate-700/80 bg-slate-900/40"
 >
   <!-- ±1 gridlines -->
   <line x1={PAD_X} x2={W - PAD_X} y1={sy(1)} y2={sy(1)} class="stroke-slate-700/60" stroke-dasharray="3 4" />

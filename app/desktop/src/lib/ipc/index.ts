@@ -1,10 +1,8 @@
 /**
- * pcbmotorgen — Tauri invoke wrappers with mock fallback.
+ * Tauri invoke wrappers for desktop operations and browser previews.
  *
- * Every call attempts the real Tauri backend command. If the Tauri runtime
- * is not available (frontend-only dev mode, e.g. `vite dev` outside of
- * `tauri dev`), a deterministic mock is returned so the dashboard stays
- * interactive.
+ * Some preview calls use deterministic mocks when the Tauri runtime is not
+ * available. Native-only operations report that they require the desktop app.
  *
  * ## Error handling
  *
@@ -16,25 +14,29 @@
  * The mock fallback is only used when the Tauri runtime itself is
  * unavailable (see `isTauriAvailable`).
  *
- * **Physics and preview calls** (force sweep, coil generation, budgets, and
- * B-field sampling) keep the mock fallback because their failure is
- * recoverable — the user just sees stale data, not a broken write. The app
- * schedules simulation calls only while the Simulation tab is active.
+ * Native errors propagate to callers; they are never replaced by a mock.
+ * Solver-backed operations such as move power and housing motion do not
+ * fabricate browser results.
  *
  * ## Module layout
- * - `core` — runtime detection, unit helpers, debounce
- * - `physics` — preview and Simulation-tab science calls
- * - `routing` — routing-pattern plugin catalog + DRC checks
+ * - `core` — runtime detection
+ * - `physics` — preview and simulation calls
+ * - `movePower` — native-only move calculation and cancellation
+ * - `routing` — routing-pattern plugin catalog
+ * - `drc` — generated and imported copper interference checks
  * - `kicad` — board connect / write / diagnostics / preview
- * - `dxf` — DXF export + native file dialog
+ * - `dxf` — DXF import, export and native file dialogs
  * - `project` — project save/load (kata 0cgm; no mock fallback — these are
  *   critical calls)
- * - `mocks` — deterministic offline implementations (internal)
+ * - feature-specific `*Mock` modules — deterministic browser previews (internal)
+ * - `sensor` — induction-sensor generation and export
  */
 
 export * from "./core";
+export * from "./drc";
 export * from "./dxf";
 export * from "./kicad";
+export * from "./movePower";
 export * from "./physics";
 export * from "./project";
 export * from "./routing";

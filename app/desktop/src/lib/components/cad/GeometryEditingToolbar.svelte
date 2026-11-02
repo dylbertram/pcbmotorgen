@@ -1,6 +1,5 @@
 <script lang="ts">
   import { GitMerge, Undo2 } from "@lucide/svelte";
-  import ZoomWindowIcon from "../design/ZoomWindowIcon.svelte";
   import type { CadGeometry } from "../../types";
   import type { CadSelectionTool } from "../../cad/cadSelectionTool.svelte";
   import type { CoilTerminalTool } from "../../cad/coilTerminalTool.svelte";
@@ -9,10 +8,11 @@
   import PreviewMeasureToolbar from "../measure/PreviewMeasureToolbar.svelte";
   import type { SpatialMeasure } from "../../measure/spatialMeasure.svelte";
   import type { Snippet } from "svelte";
+  import { errorMessage } from "../../utils/errorMessage";
 
   let { label, geometry, selection, measure, terminalTool, disabled = false,
     onActivateSelection, onSimplify, onUndoSimplify,
-    simplifyNotice = "", onPrepareGeometry, borderless = false, spatialMeasure = null, zoomWindow = false, onToggleZoomWindow, showZoomWindowControl = true, statusContent }: {
+    simplifyNotice = "", onPrepareGeometry, borderless = false, spatialMeasure = null, zoomWindow = false, onToggleZoomWindow, statusContent }: {
     label: string;
     geometry: CadGeometry | null;
     selection: CadSelectionTool;
@@ -28,7 +28,6 @@
     spatialMeasure?: SpatialMeasure | null;
     zoomWindow?: boolean;
     onToggleZoomWindow?: () => void;
-    showZoomWindowControl?: boolean;
     statusContent?: Snippet;
   } = $props();
   let preparing = $state(false);
@@ -55,7 +54,7 @@
     error = "";
     try {
       if (await onPrepareGeometry?.()) { activateSelection(); selection.setMode("select"); }
-    } catch (e) { error = e instanceof Error ? e.message : String(e); }
+    } catch (e) { error = errorMessage(e); }
     finally { preparing = false; }
   }
   /** Undo the most recent geometry edit. Only the tool that owns the live
@@ -83,9 +82,6 @@
   <!-- The bottom rule stays after the editing boxes were removed; it is the
        line between the toolbar and the viewer. -->
   <div class="flex flex-wrap items-start gap-2 border-b border-slate-700 {borderless ? 'bg-slate-900 py-1.5 pl-3 pr-1.5' : 'border-t p-2'}">
-  {#if onToggleZoomWindow && showZoomWindowControl}
-    <button type="button" class="icon-tool" aria-label="Zoom window" aria-pressed={zoomWindow} {disabled} title="Zoom window: drag a rectangle or click two opposite corners. Escape cancels." onclick={onToggleZoomWindow}><ZoomWindowIcon /></button>
-  {/if}
   {#if geometry}
     <CadSelectionToolbar tool={selection} {geometry} disabled={disabled || !!spatialMeasure} onActivate={activateSelection} />
   {:else if onPrepareGeometry}

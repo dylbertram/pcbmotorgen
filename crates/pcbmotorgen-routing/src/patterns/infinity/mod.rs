@@ -276,7 +276,7 @@ impl RoutingPattern for InfinityBraidPattern {
         // equivalent leg-pitch model of the generated segments, and each
         // strand is its own single-trace leg.
         let leg_grid = Some(LegGrid {
-            slot_count: (layout.n_periods * phases * num_strands) as u32,
+            slot_count: (layout.period_count * phases * num_strands) as u32,
             strands_per_leg: Some(num_strands as u32),
         });
 
@@ -345,9 +345,9 @@ fn validated_braid_context(ctx: &RoutingContext) -> Result<Option<f64>, RoutingE
 /// How the unrolled diamond domain maps onto the routing area.
 #[derive(Clone, Copy)]
 struct BraidLayout {
-    n_periods: i64,
-    d_phase: f64,
-    o: f64,
+    period_count: i64,
+    phase_length_mm: f64,
+    strand_offset_mm: f64,
 }
 
 /// Resolve the braid layout for the routing domain.
@@ -395,9 +395,9 @@ fn resolve_braid_layout(
             // Endpoints as well as interior repeats retain the uniform grid.
             let o = -interleave_step;
             Ok(BraidLayout {
-                n_periods,
-                d_phase: n_periods as f64 * pitch,
-                o,
+                period_count: n_periods,
+                phase_length_mm: n_periods as f64 * pitch,
+                strand_offset_mm: o,
             })
         }
         None => {
@@ -407,9 +407,9 @@ fn resolve_braid_layout(
             let o = -d_tot / (n_periods * num_strands * phases + tail_slots) as f64;
             let d_phase = n_periods as f64 * num_strands as f64 * phases as f64 * -o;
             Ok(BraidLayout {
-                n_periods,
-                d_phase,
-                o,
+                period_count: n_periods,
+                phase_length_mm: d_phase,
+                strand_offset_mm: o,
             })
         }
     }
@@ -423,8 +423,8 @@ fn resolve_braid_layout(
 /// the same spacing as the braid's own copper. Never tighter than one trace
 /// plus one clearance.
 fn lead_pitch_mm(layout: BraidLayout, amplitude_mm: f64, ctx: &RoutingContext) -> f64 {
-    let period_length = layout.d_phase / layout.n_periods as f64;
-    let crossing_depth = layout.o.abs() * amplitude_mm / period_length;
+    let period_length = layout.phase_length_mm / layout.period_count as f64;
+    let crossing_depth = layout.strand_offset_mm.abs() * amplitude_mm / period_length;
     crossing_depth.max(ctx.trace_width() + ctx.min_space_mm)
 }
 
@@ -454,7 +454,7 @@ fn braid_geometry(
         return Err(RoutingError::new(0, "pole_matched", RoutingErrorKind::Generation,
             "pole-matched star terminations require exactly three phases and a magnetic pole pitch"));
     }
-    let offset_step = -layout.o * num_strands as f64;
+    let offset_step = -layout.strand_offset_mm * num_strands as f64;
     let mut geometry = BraidGeometry {
         segments: Vec::new(),
         vias: Vec::new(),
@@ -479,10 +479,10 @@ fn braid_geometry(
 
         let diamonds = compute_diamonds(
             start_offset,
-            layout.d_phase,
-            layout.n_periods,
+            layout.phase_length_mm,
+            layout.period_count,
             num_strands,
-            layout.o,
+            layout.strand_offset_mm,
             amplitude_mm,
         );
         let (points_obj, flatlist) = compute_endpoints(&diamonds);
@@ -573,7 +573,7 @@ fn braid_geometry(
 
     if connection != Connection::Delta {
         stacked::stack_and_terminate(&mut geometry, &ends, connection,
-            layout.d_phase / layout.n_periods as f64, layout.n_periods, ctx)?;
+            layout.phase_length_mm / layout.period_count as f64, layout.period_count, ctx)?;
     } else if ctx.num_layers == 4 {
         four_layer::stack_and_terminate(&mut geometry, &ends, connection, lead_pitch, ctx)?;
     } else if connection != Connection::Closed {
@@ -840,13 +840,15 @@ mod tests {
     }
 
     #[test]
-    fn report_exposes_exact_pole_pitch_and_phase_band_width_budget() {
+    fn report_exposes_pole_pitch_and_phase_band_width_budget() {
         let report = crate::generate_routing_report(&magnet_ctx(), "infinity-braid")
             .expect("reference braid report");
         assert_eq!(report.dimensions.pole_pitch_mm, Some(12.0));
         assert_eq!(report.dimensions.magnet_array_span_mm, Some(120.0));
         assert_eq!(report.dimensions.period_pitch_mm, Some(12.0));
         assert_eq!(report.dimensions.phase_band_pitch_mm, Some(4.0));
+        // The host's context-only inference differs from the generated grid
+        // when it does not account for the coprime strand requirement below.
         assert_eq!(report.dimensions.period_count, Some(65));
         assert!(!report.dimensions.phase_band_widths.is_empty());
         assert!(report.dimensions.all_phase_bands_fit());
@@ -1591,7 +1593,7 @@ mod tests {
                     let count = (3 * strands) as usize;
                     assert_eq!(row.len(), 2 * count);
                     let uniform = |points: &[(f64, String)]| points.windows(2)
-                        .all(|p| ((p[1].0 - p[0].0) - layout.o.abs()).abs() < 1e-10);
+                        .all(|p| ((p[1].0 - p[0].0) - layout.strand_offset_mm.abs()).abs() < 1e-10);
                     assert!(uniform(&row[..count]), "left end: strands={strands}, pitch={magnet_pitch:?}, connection={connection}");
                     assert!(uniform(&row[count..]), "right end: strands={strands}, pitch={magnet_pitch:?}, connection={connection}");
                     assert!(Validator::validate(&result, &context, false).is_ok());
@@ -1600,7 +1602,7 @@ mod tests {
                     let mut widened = row.clone();
                     for (x, phase) in &mut widened {
                         let index = PHASE_NAMES.iter().position(|&name| name == phase).unwrap();
-                        *x += index as f64 * strands as f64 * layout.o.abs();
+                        *x += index as f64 * strands as f64 * layout.strand_offset_mm.abs();
                     }
                     widened.sort_by(|a, b| a.0.total_cmp(&b.0));
                     assert!(!uniform(&widened[..count]));

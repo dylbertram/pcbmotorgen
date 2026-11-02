@@ -12,9 +12,9 @@ function phase(layer: number, vias: [number, number][]): PhaseCoilDto {
   };
 }
 
-function drawnVias(visibleLayers: number[], showVias = true, annotationsOnly = false, calls?:string[]): string | undefined {
+function drawnVias(visibleLayers: number[], showVias = true, annotationsOnly = false, calls?:string[], scales?: number[][]): string | undefined {
   // Every 2D call is a no-op; the renderer reports what it drew in dataset.
-  const ctx = new Proxy({}, { get: (_,key) => () => {calls?.push(String(key));}, set: () => true });
+  const ctx = new Proxy({}, { get: (_,key) => (...args: number[]) => { calls?.push(String(key)); if (key === "scale") scales?.push(args); }, set: () => true });
   const canvas = { getContext: () => ctx, dataset: {} as DOMStringMap } as unknown as HTMLCanvasElement;
   const frame = { clientWidth: 760, clientHeight: 260 } as HTMLDivElement;
   const coils = { phases: [phase(0, [[0.0005, 0]]), phase(1, [])] } as unknown as CoilPathDto;
@@ -54,5 +54,10 @@ describe("coil preview vias", () => {
     expect(calls).not.toContain("arc");
     expect(calls).not.toContain("lineTo");
     expect(calls).toContain("strokeRect");
+  });
+  it("applies the reciprocal world-unit scale to the canvas", () => {
+    const scales: number[][] = [];
+    drawnVias([0], true, false, undefined, scales);
+    expect(scales).toContainEqual([1e-6, -1e-6]);
   });
 });

@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { gotoDesignApp, selectDesignPanel } from "./helpers";
+import { installFileActionMenu } from "./project-menu-helpers";
 
 test.beforeEach(async ({ page }) => {
   // Replace only disk/menu transport. Rust tests exercise the real archive and files.
@@ -41,13 +42,9 @@ test.beforeEach(async ({ page }) => {
         else { const v = versions.find(v => v.id === id); v.description = options.description; v.last_edited_at_unix_ms = (time += 1000); }
         window.__versions = clone(versions);
         return result(active);
-      }
-      export async function bindProjectMenuActions(handlers) {
-        const handle = event => handlers[event.detail]?.();
-        window.addEventListener('test-file-action', handle);
-        return () => window.removeEventListener('test-file-action', handle);
       }`,
   }));
+  await installFileActionMenu(page);
 });
 
 async function fileAction(page: Page, action: string) {

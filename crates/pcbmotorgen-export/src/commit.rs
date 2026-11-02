@@ -17,14 +17,8 @@ use crate::KiCadClient;
 
 /// Type URLs for the commit-related commands.
 const BEGIN_COMMIT_TYPE_URL: &str = "type.googleapis.com/kiapi.common.commands.BeginCommit";
-const BEGIN_COMMIT_RESPONSE_TYPE_URL: &str =
-    "type.googleapis.com/kiapi.common.commands.BeginCommitResponse";
 const END_COMMIT_TYPE_URL: &str = "type.googleapis.com/kiapi.common.commands.EndCommit";
-const END_COMMIT_RESPONSE_TYPE_URL: &str =
-    "type.googleapis.com/kiapi.common.commands.EndCommitResponse";
 const CREATE_ITEMS_TYPE_URL: &str = "type.googleapis.com/kiapi.common.commands.CreateItems";
-const CREATE_ITEMS_RESPONSE_TYPE_URL: &str =
-    "type.googleapis.com/kiapi.common.commands.CreateItemsResponse";
 
 /// Commit message shown in the KiCad undo stack.
 const COMMIT_MESSAGE: &str = "pcbmotorgen coil generation";
@@ -107,11 +101,3 @@ impl<'a> Commit<'a> {
         &self.commit_id
     }
 }
-
-// Keep the response type URLs around for documentation/forward-compat.
-#[allow(dead_code)]
-const _RESPONSE_TYPE_URLS: &[&str] = &[
-    BEGIN_COMMIT_RESPONSE_TYPE_URL,
-    END_COMMIT_RESPONSE_TYPE_URL,
-    CREATE_ITEMS_RESPONSE_TYPE_URL,
-];

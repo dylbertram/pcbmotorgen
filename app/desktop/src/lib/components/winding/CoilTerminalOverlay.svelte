@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { CadGeometry, CadTerminal } from "../../types";
-  import type { WorldTransform } from "../../chart";
+  import type { WorldTransform } from "../../geometry/viewport";
   import type { CoilTerminalTool } from "../../cad/coilTerminalTool.svelte";
   import { terminalDescription } from "../../cad/cadTerminals";
   import { layoutTerminalMarkers } from "../../visualization/terminalMarkerLayout";

@@ -15,8 +15,7 @@ export async function gotoDesignApp(page: Page): Promise<void> {
   await expect(dialog).toBeHidden();
 }
 
-/** Focus the persistent workspace. Retains the old helper name for callers
- * being migrated; there is no expanded viewer or modal to open. */
+/** Wait for the persistent workspace and close any open side panels. */
 export async function openCoilPreview(page: Page): Promise<void> {
   const workspace = coilWorkspace(page);
   await expect(workspace).toBeVisible();
@@ -49,18 +48,13 @@ export async function selectRoutingConnection(page: Page, connection: "star" | "
 }
 
 /**
- * Geometry of an element relative to the viewport, as integers.
+ * Geometry of an element relative to the viewport.
  * Returns null when the element is hidden/not attached.
  */
-export async function box(page: Page, locator: Locator) {
+export async function viewportBox(locator: Locator) {
   const b = await locator.boundingBox();
   if (!b) return null;
   return { x: b.x, y: b.y, w: b.width, h: b.height };
-}
-
-/** The full Design tab's outer box. */
-export function designPanel(page: Page) {
-  return coilWorkspace(page);
 }
 
 /** Active-area length readout in Design constraints. */

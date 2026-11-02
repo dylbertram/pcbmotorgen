@@ -11,7 +11,6 @@ export function firstMagnetCenterX(magnets: readonly MagnetStrip[]): number | nu
 /** Pitch choice for the dimension ruler, with an honest caption. */
 export interface PolePitchValue {
   pitchM: number;
-  source: "pole_pitch_m" | "period_pitch_m";
   /** A repeat-period fallback must not be labelled as pole pitch. */
   label: "Pole pitch" | "Repeat period";
 }
@@ -21,17 +20,16 @@ export function computePolePitchValue(
   dimensions: Partial<Pick<RoutingDimensionsDto, "pole_pitch_m" | "period_pitch_m">> | null | undefined,
 ): PolePitchValue | null {
   if (isValidMetres(dimensions?.pole_pitch_m)) {
-    return { pitchM: dimensions.pole_pitch_m, source: "pole_pitch_m", label: "Pole pitch" };
+    return { pitchM: dimensions.pole_pitch_m, label: "Pole pitch" };
   }
   if (isValidMetres(dimensions?.period_pitch_m)) {
-    return { pitchM: dimensions.period_pitch_m, source: "period_pitch_m", label: "Repeat period" };
+    return { pitchM: dimensions.period_pitch_m, label: "Repeat period" };
   }
   return null;
 }
 
 /** World-space geometry for the horizontal double-ended dimension ruler. */
 export interface PolePitchRuler {
-  source: "pole_pitch_m" | "period_pitch_m";
   label: "Pole pitch" | "Repeat period";
   pitchM: number;
   /** Start, end and baseline in world metres. */
@@ -49,7 +47,6 @@ export function computePolePitchRuler(
   const pitch = computePolePitchValue(dimensions);
   if (!pitch || firstCenterX === null) return null;
   return {
-    source: pitch.source,
     label: pitch.label,
     pitchM: pitch.pitchM,
     x1: firstCenterX,

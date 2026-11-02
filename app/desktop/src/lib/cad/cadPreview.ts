@@ -7,8 +7,37 @@ import type {
   PhaseCoilDto,
 } from "../types";
 import { sampleSpline, splinePointAt } from "../geometry/curvePaths";
+import type { ViewportBBox } from "../geometry/viewport";
 
 const M = 1e-3;
+
+/** Bounds of CAD preview points in millimetres, including trace and via padding. */
+export function cadImportPreviewBounds(
+  geometry: CadGeometry | null | undefined,
+  traceWidthOverride: number | null,
+  viaPadRadius: number,
+): ViewportBBox {
+  const fallback = { minX: 0, minY: 0, maxX: 1, maxY: 1 };
+  if (!geometry) return fallback;
+  const points = [
+    ...geometry.routing.segments.flatMap(({ start, end }) => [start, end]),
+    ...geometry.routing.curves.flatMap(({ start, mid, end }) => [start, mid, end]),
+    ...(geometry.routing.splines ?? []).flatMap((spline) => spline.control_points),
+    ...geometry.routing.vias.map(({ position }) => position),
+  ];
+  if (points.length === 0) return fallback;
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  for (const { x, y } of points) {
+    minX = Math.min(minX, x);
+    maxX = Math.max(maxX, x);
+    minY = Math.min(minY, y);
+    maxY = Math.max(maxY, y);
+  }
+  const width = traceWidthOverride ?? geometry.trace_width_mm;
+  const span = Math.max(maxX - minX, maxY - minY, width * 4, 1);
+  const padding = Math.max(span * 0.05, width * 2, viaPadRadius * 1.5);
+  return { minX: minX - padding, minY: minY - padding, maxX: maxX + padding, maxY: maxY + padding };
+}
 
 interface PreviewEndpoint {
   point: CadPoint;

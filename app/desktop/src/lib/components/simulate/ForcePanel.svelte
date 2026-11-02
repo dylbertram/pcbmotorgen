@@ -19,7 +19,7 @@
     </p>
   </header>
   <div class="min-h-64 rounded border border-slate-700 bg-slate-900/40 p-2">
-    <ForceSweepPlot result={sweep} embedded />
+    <ForceSweepPlot result={sweep} />
   </div>
   <div class="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-slate-400">
     <span>At {config.max_current_a.toFixed(2)} A phase amplitude, {config.commutation === "max_thrust" ? "max-thrust commutation" : "phase A only"}.</span>

@@ -1,22 +1,8 @@
-//! `LinearMotorConfig` construction + validation: `new()` and `validate()`
-//! plus the full field-invariant test suite.
+//! `LinearMotorConfig` field validation for project, simulation and preview use.
 
 use super::{ConfigError, LinearMotorConfig};
 
-// The following methods form the config API. In the binary these are partly
-// exercised via `cargo test` (inline `#[cfg(test)]`) while the shipped runtime
-// path builds the config straight from the IPC DTO's `to_core()`, so keep the
-// API available without dead-code noise in release builds.
-#[allow(dead_code)]
 impl LinearMotorConfig {
-    /// Create a validated config, syncing magnet grade and checking all invariants.
-    #[allow(clippy::wrong_self_convention)]
-    pub fn new(mut self) -> Result<Self, ConfigError> {
-        self.sync_magnet_grade();
-        self.validate()?;
-        Ok(self)
-    }
-
     /// Validate all fields (mirrors Python `_validate_base` + `_validate_linear`).
     pub fn validate(&self) -> Result<(), ConfigError> {
         self.validate_fields(true, true)

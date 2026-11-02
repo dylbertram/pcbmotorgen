@@ -1,54 +1,12 @@
-import { ConfigStore } from "./config.svelte";
-import { SensorStore } from "./sensor.svelte";
-import { MotionStore } from "./motion.svelte";
-import { ProjectStore } from "./project.svelte";
 import type { RecentFilesStore } from "./recentFiles.svelte";
-import type { DocumentKind, WorkspaceLoad, ForceSweepResult, CoilPathDto, HeightStackResultDto, DriveAnalysis } from "../types";
-import { AnalysisWorkspace } from "./analysisWorkspace.svelte";
-import { PreviewCamera } from "../utils/previewGestures.svelte";
-import { CoilPreviewViewState } from "../components/design/coilPreviewViewState.svelte";
+import type { DocumentKind, WorkspaceLoad } from "../types";
+import { DocumentSession } from "./documentSession.svelte";
+import { baseName, parentDirectory } from "../utils/paths";
+import { errorMessage } from "../utils/errorMessage";
 import { fileExists, loadWorkspace, pickProjectOpenPath, pickWorkspaceSavePath, resolveDocumentPath, saveWorkspace } from "../ipc";
 
 export type UnsavedChoice = "save" | "discard" | "cancel";
 export type ResolveUnsaved = (label: string) => Promise<UnsavedChoice>;
-
-let nextDocumentId = 1;
-
-/** Presentation state belongs to an editor view, not the saved file. */
-export class DocumentView {
-  readonly analysis = new AnalysisWorkspace();
-  readonly camera = new PreviewCamera();
-  readonly previewView = new CoilPreviewViewState();
-  runtime: {
-    coils: CoilPathDto | null; sweep: ForceSweepResult | null;
-    height: HeightStackResultDto | null;
-    drive: DriveAnalysis | null;
-  } = { coils: null, sweep: null, height: null, drive: null };
-}
-
-/** One saved model per file; editor groups can share it without copying it. */
-export class DocumentSession extends DocumentView {
-  readonly id = nextDocumentId++;
-  readonly config = new ConfigStore();
-  readonly sensor = new SensorStore();
-  readonly motion = new MotionStore(this.config);
-  readonly projects: ProjectStore;
-  get title(): string { return this.projects.fileName ?? `Untitled ${this.kind} ${this.id}`; }
-
-  constructor(readonly kind: DocumentKind, recents?: RecentFilesStore) {
-    super();
-    this.projects = new ProjectStore(this.config, this.motion, recents, this.sensor, kind);
-  }
-
-  async initialize(): Promise<void> {
-    await Promise.all([this.config.loadRoutingPatterns(), this.config.loadMagnetGrades()]);
-    await this.config.loadRoutingParams(this.config.routing_pattern);
-    this.projects.markClean();
-  }
-}
-
-function message(error: unknown): string { return error instanceof Error ? error.message : String(error); }
-function baseName(path: string): string { return path.split(/[\\/]/).pop() ?? path; }
 
 export class WorkspaceStore {
   documents = $state.raw<DocumentSession[]>([]);
@@ -69,8 +27,7 @@ export class WorkspaceStore {
       if (dir && !dirs.includes(dir)) dirs.push(dir);
     };
     if (this.path) {
-      const idx = Math.max(this.path.lastIndexOf("/"), this.path.lastIndexOf("\\"));
-      if (idx >= 0) add(this.path.slice(0, idx + 1));
+      add(parentDirectory(this.path));
     }
     if (this.active) add(this.active.projects.directory);
     for (const d of this.documents) add(d.projects.directory);
@@ -103,7 +60,7 @@ export class WorkspaceStore {
       this.documents = [...this.documents, document];
       this.activeId = document.id;
       return true;
-    } catch (e) { this.error = message(e); return false; }
+    } catch (e) { this.error = errorMessage(e); return false; }
     finally { this.busy = false; }
   }
 
@@ -185,7 +142,7 @@ export class WorkspaceStore {
     this.busy = true;
     let path: string | null;
     try { path = await pickProjectOpenPath(); }
-    catch (e) { this.error = message(e); return false; }
+    catch (e) { this.error = errorMessage(e); return false; }
     finally { this.busy = false; }
     return path !== null && await this.openPath(path);
   }
@@ -236,7 +193,7 @@ export class WorkspaceStore {
       this.baseline = this.fingerprint;
       await this.recents.record(workspace.path).catch(() => undefined);
       return true;
-    } catch (e) { this.error = `Open failed: ${message(e)}`; return false; }
+    } catch (e) { this.error = `Open failed: ${errorMessage(e)}`; return false; }
     finally { this.busy = false; }
   }
 
@@ -256,7 +213,7 @@ export class WorkspaceStore {
       this.notice = `Saved ${baseName(path)}.`;
       await this.recents.record(path).catch(() => undefined);
       return true;
-    } catch (e) { this.error = `Could not save project: ${message(e)}`; return false; }
+    } catch (e) { this.error = `Could not save project: ${errorMessage(e)}`; return false; }
   }
 
   async save(saveAs = false): Promise<boolean> {

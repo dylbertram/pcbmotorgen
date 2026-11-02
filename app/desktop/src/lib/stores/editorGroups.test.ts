@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { EditorGroups } from "./editorGroups.svelte";
-import { DocumentSession } from "./workspace.svelte";
+import { DocumentSession } from "./documentSession.svelte";
 
 describe("file editor groups", () => {
   it("splits one model into two independent views without duplicating the file", () => {

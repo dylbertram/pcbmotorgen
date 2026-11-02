@@ -102,11 +102,23 @@ mod tests {
         let cfg = default_config();
         assert!((cfg.magnet_array_span_m() - 118e-3).abs() < 1e-12);
         assert!((cfg.travel_m() - 77e-3).abs() < 1e-12);
+        assert_eq!(cfg.active_length_m(), cfg.active_area_length_m);
+        assert_eq!(cfg.pole_pitch_m(), cfg.magnet_pitch_m);
         assert!((cfg.phase_band_pitch_m() - 4e-3).abs() < 1e-12);
         assert_eq!(cfg.rest_offset_m(), 0.0);
         assert!((cfg.magnet_gap_m() - 2e-3).abs() < 1e-12);
         assert!((cfg.min_via_pad_m() - 0.4e-3).abs() < 1e-12);
         assert!((cfg.acceleration_force_n() - 0.03).abs() < 1e-12);
         assert!((cfg.minimum_drive_force_n() - 0.065).abs() < 1e-12);
+    }
+
+    #[test]
+    fn vernier_rest_offset_and_phase_band_pitch_follow_spacing_ratio() {
+        let mut cfg = default_config();
+        cfg.spacing_ratio = 0.8;
+        assert!((cfg.phase_band_pitch_m() - 0.0032).abs() < 1e-12);
+        assert!((cfg.rest_offset_m() - 0.0008).abs() < 1e-12);
+        cfg.spacing_ratio = 1.5;
+        assert_eq!(cfg.rest_offset_m(), 0.0);
     }
 }

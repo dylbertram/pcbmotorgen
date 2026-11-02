@@ -5,9 +5,9 @@ async function holdBackgroundWork(page: Page) {
   await page.addInitScript(() => {
     (window as any).previewWork = { drc: [], envelopes: [], previews: [], holdCounts: [], heldPreviews: [] };
   });
-  await page.route(/\/src\/lib\/ipc\/routing\.ts(?:\?t=\d+)?$/, route => route.fulfill({
+  await page.route(/\/src\/lib\/ipc\/drc\.ts(?:\?t=\d+)?$/, route => route.fulfill({
     contentType: "application/javascript",
-    body: `export * from '/src/lib/ipc/routing.ts?original';
+    body: `export * from '/src/lib/ipc/drc.ts?original';
       export function checkCoilInterference(config) {
         return new Promise((resolve, reject) => window.previewWork.drc.push({config:JSON.parse(JSON.stringify(config)), resolve, reject}));
       }`,

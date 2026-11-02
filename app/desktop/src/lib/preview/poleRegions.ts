@@ -1,4 +1,4 @@
-import type { ViewportBBox } from "../chart";
+import type { ViewportBBox } from "../geometry/viewport";
 import type { PoleRegionDto, RoutingDimensionsDto } from "../types";
 
 /** Pole-region boundaries and phase labels come from the routing sidecar. */
@@ -59,7 +59,7 @@ export function computePoleRegionPhases(zones: readonly PoleRegionZone[]): strin
 
 /** Null or empty selects all phases; the result never aliases the input. */
 export function filterPoleRegionsByPhase(zones: readonly PoleRegionZone[], phase: string | null): PoleRegionZone[] {
-  if (phase == null || phase === "") return zones.length === 0 ? [] : zones.slice();
+  if (phase == null || phase === "") return zones.slice();
   const result: PoleRegionZone[] = [];
   for (const z of zones) if (z.phase === phase) result.push(z);
   return result;

@@ -1,5 +1,6 @@
-import { cancelMovePower, evaluateMovePower } from "../ipc/physics";
+import { cancelMovePower, evaluateMovePower } from "../ipc/movePower";
 import { isTauriAvailable } from "../ipc/core";
+import { errorMessage } from "../utils/errorMessage";
 import type { MovePowerInputs, NativeMoveResult } from "../types/movePower";
 
 /** Canonical input identity ignores object-key order, never geometry or values. */
@@ -81,7 +82,7 @@ export class MovePowerJob {
       if (this.disposed || generation !== this.generation || key !== this.key) return;
       this.result = null;
       this.status = "error";
-      this.error = error instanceof Error ? error.message : String(error);
+      this.error = errorMessage(error);
     } finally {
       if (generation === this.generation) {
         this.running = null;

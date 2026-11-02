@@ -1,43 +1,14 @@
-<!--
-  ═══════════════════════════════════════════════════════════════════════
-  Canvas coil viewer (inline card + lightbox host).
-
-  Layers are drawn OVERLAID at their TRUE coordinates (a top-down view
-  matching the DXF export). Per-layer show/hide toggles let you inspect
-  each copper layer alone.
-
-  This file is the composition root: it owns the geometry derivation, the
-  frame/canvas refs, ResizeObserver sizing and the draw effect for the
-  dual-instance inline/modal draw pattern, and it instantiates the shared
-  helpers both views read:
-    - lib/preview/previewGeometry.ts    — geometry derivation
-    - ./coilPreviewCanvas.ts            — canvas paint routines
-    - lib/utils/previewGestures         — pan/pinch/scroll-zoom state machine
-    - lib/measure/previewMeasure        — two-click measure ruler
-    - ./coilPreviewViewState.svelte.ts  — presentation toggles shared by the
-                                          inline card and the lightbox
-    - ./CoilPreviewLightbox.svelte      — the Bits UI Dialog lightbox (the
-                                          expanded view hosts ALL interactive
-                                          presentation toggles there)
-
-  Interaction: one pointer (mouse / pen / lone touch) drags to pan; a
-  two-finger pinch or a ctrl+wheel trackpad pinch zooms CONTINUOUSLY
-  (clamped 0.5×…10×) with focal-point anchoring. All gesture behavior —
-  touch/pointer ownership, pointer-capture cleanup, pan/pinch/focal math —
-  lives in lib/utils/previewGestures.svelte; this file only binds the
-  gesture handlers and renders the reactive view state.
-  ═══════════════════════════════════════════════════════════════════════
--->
+<!-- Composes the coil workspace and expanded viewer from shared preview tools. -->
 <script lang="ts">
   import { confirm } from "@tauri-apps/plugin-dialog";
   import { untrack } from "svelte";
   import type { Snippet } from "svelte";
   import { isDesignPanel, isLeftPanel, type DesignPanelId, type PreviewPanelId } from "./previewPanels";
-  import type { PreviewCamera } from "../../utils/previewGestures.svelte";
+  import type { PreviewCamera } from "../../preview/previewCamera.svelte";
   import { editableCoilGeometry } from "../../ipc/dxf";
   import type { ConfigStore } from "../../stores/config.svelte";
   import type { MotionStore } from "../../stores/motion.svelte";
-  import type { CadGeometry, CoilPathDto, DriveAnalysis } from "../../types";
+  import type { CadGeometry, CoilPathDto } from "../../types";
   import { CadSimplifyTool } from "../../cad/cadSimplifyTool.svelte";
   import { CoilTerminalTool } from "../../cad/coilTerminalTool.svelte";
   import { withAutomaticCadTerminals } from "../../cad/cadTerminals";
@@ -52,25 +23,20 @@
     computeMoverStripBounds,
     type PreviewConfigLike,
   } from "../../preview/previewGeometry";
-  import { computeBandWidthRows } from "../../preview/bandWidth";
+  import { bandRowInOnePeriod, computeBandWidthRows } from "../../preview/bandWidth";
   import { computeVisibleSegments, computeVisibleArcs } from "../../preview/oneSection";
   import { computePolePitchRuler, firstMagnetCenterX as magnetCenterX } from "../../preview/polePitch";
   import { computePoleRegionZones, computePoleRegionPhases, filterPoleRegionsByPhase, resolvePoleRegionPhaseSelection } from "../../preview/poleRegions";
   import { clientToVirtual, virtualToWorld } from "../../measure/measureRuler";
-  import type { WorldTransform } from "../../chart";
-  import { fitWorldToView, unionBounds } from "../../chart";
-  import { PreviewGestures } from "../../utils/previewGestures.svelte";
+  import { fitWorldToView, unionBounds, type WorldTransform } from "../../geometry/viewport";
+  import { PreviewGestures } from "../../preview/previewGestures.svelte";
   import { PreviewMeasure } from "../../measure/previewMeasure.svelte";
   import CoilPreviewLightbox from "./CoilPreviewLightbox.svelte";
   import CoilPreviewIsoView from "./CoilPreviewIsoView.svelte";
-  import PreviewFrame from "./PreviewFrame.svelte";
-  import {
-    PREVIEW_H,
-    PREVIEW_W,
-    CoilPreviewRenderer,
-    bandRowInOnePeriod,
-  } from "./coilPreviewCanvas";
-  import { CoilPreviewViewState } from "./coilPreviewViewState.svelte";
+  import PreviewFrame from "../preview/PreviewFrame.svelte";
+  import { CoilPreviewRenderer } from "./coilPreviewCanvas";
+  import { PREVIEW_H, PREVIEW_W } from "../../preview/previewStyle";
+  import { CoilPreviewViewState } from "../../preview/coilPreviewViewState.svelte";
   import type { VisualizationInput } from "../../types/simulationVisualization";
   import { previewCopperKeys } from "../../preview/previewCopperKeys";
 
@@ -87,21 +53,12 @@
     designSettings,
     statusContent,
     sidePanel = $bindable<PreviewPanelId | null>(null),
-    drive = null,
-    driveError = null,
-    drivePending = false,
     importedGeometry = null,
     onGeometryChange,
     camera,
     view = new CoilPreviewViewState(),
-  }: { config: ConfigStore; coils: CoilPathDto | null; motion: MotionStore; expanded?: boolean; workspace?: boolean; active?: boolean; focused?: boolean; simulationActive?: boolean; onOpenDriverCalculator?: () => void; designSettings?: Snippet<[DesignPanelId]>; statusContent?: Snippet; sidePanel?: PreviewPanelId | null; drive?: DriveAnalysis | null; driveError?: string | null; drivePending?: boolean; importedGeometry?: CadGeometry | null; onGeometryChange?: (geometry: CadGeometry) => void; camera?: PreviewCamera; view?: CoilPreviewViewState } =
+  }: { config: ConfigStore; coils: CoilPathDto | null; motion: MotionStore; expanded?: boolean; workspace?: boolean; active?: boolean; focused?: boolean; simulationActive?: boolean; onOpenDriverCalculator?: () => void; designSettings?: Snippet<[DesignPanelId]>; statusContent?: Snippet; sidePanel?: PreviewPanelId | null; importedGeometry?: CadGeometry | null; onGeometryChange?: (geometry: CadGeometry) => void; camera?: PreviewCamera; view?: CoilPreviewViewState } =
     $props();
-
-  export function showDesignSettings(section: DesignPanelId = "routing"): void {
-    terminalTool.cancel();
-    view.setTerminalPanelOpen(false);
-    sidePanel = section;
-  }
 
   /** Open the field/loss rail without leaving the current viewer mode. */
   export function showFieldSettings(): void {
@@ -131,10 +88,8 @@
     if (onGeometryChange) simplifyTool.undo();
   }
 
-  // Virtual drawing space. The CSS box keeps the same 760:260 aspect ratio as
-  // the old SVG viewBox; every overlay (legend, disclaimer) is laid out in
-  // these virtual px so it matches the SVG markup exactly. The paint routines
-  // live in ./coilPreviewCanvas.ts, which shares these constants.
+  // Virtual width stays fixed; interactive views adapt height to their frame.
+  // Canvas and SVG overlays use the same virtual coordinates.
   const W = PREVIEW_W;
   let viewportWidth = $state(PREVIEW_W);
   let viewportHeight = $state(PREVIEW_H);
@@ -171,7 +126,7 @@
     if (!workspace) expanded = true;
     terminalTool.begin(coil);
   }
-  // An ends request from elsewhere (the Simulation tab's alert) opens the
+  // An ends request from elsewhere (the simulation dock's alert) opens the
   // expanded viewer with the coil-ends panel ready.
   $effect(() => {
     const request = view.terminalRequest;
@@ -191,10 +146,10 @@
 
   // -------------------------------------------------------------------
   // Zoom bounds + button steps. The actual zoom state, pan, pinch and
-  // scroll-zoom logic live in lib/utils/previewGestures.svelte — this
+  // scroll-zoom logic live in lib/preview/previewGestures.svelte — this
   // component only supplies the geometry transform + constants and forwards
-  // DOM events to the gesture class. `zoom` is CONTINUOUS (0.5…10): the
-  // buttons step through ZOOM_STEPS, while pinches are continuous.
+  // DOM events to the gesture class. Zoom is continuous; buttons step
+  // through ZOOM_STEPS while pinches can exceed the last step.
   const MIN_ZOOM = 0.5;
   const MAX_ZOOM = Infinity;
   const ZOOM_STEPS = [0.5, 1, 1.5, 2, 3, 4, 6, 8, 10] as const;
@@ -203,7 +158,7 @@
   let oneSectionConductorCount = $derived(Math.max(6, 2 * config.phases));
 
   // -------------------------------------------------------------------
-  // Geometry and view calculations come from lib/preview/previewGeometry and lib/chart.
+  // Geometry and view calculations come from previewGeometry and geometry/viewport.
   // `config` (ConfigStore) satisfies PreviewConfigLike structurally (it has
   // magnet_count / magnet_width_mm / magnet_gap_mm plus extras, which is
   // fine for structural typing). Magnet placement also consumes the generated
@@ -215,7 +170,7 @@
   let g = $derived(computePreviewGeometry(coils, config as PreviewConfigLike));
 
   /** World→virtual transform for a zoom level, using the CURRENT geometry
-   *  (backed by lib/chart fitWorldToView; injected into the gesture class).
+   *  (backed by geometry/viewport's fitWorldToView; injected into the gesture class).
    *  `overlayFitBounds` unions the schematic fit box with any
    *  `routing_dimensions` overlay geometry (pole-pitch ruler, band-width
    *  rows, pole regions) so the camera never clips an annotation. */
@@ -538,7 +493,7 @@
   // -------------------------------------------------------------------
   // Interaction — ALL pan/pinch/scroll-zoom logic, touch↔pointer
   // coordination, pointer-capture cleanup and cursor math lives in
-  // lib/utils/previewGestures.svelte. The component merely forwards the
+  // lib/preview/previewGestures.svelte. The component merely forwards the
   // DOM events below and reads the gesture instance's reactive state
   // (gestures.zoom / gestures.panX / gestures.panY / gestures.isPanning).
   // -------------------------------------------------------------------
@@ -601,9 +556,6 @@
       bind:expanded
       height={H}
       {config}
-      {drive}
-      {driveError}
-      {drivePending}
       {motion}
       {view}
       {gestures}

@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { PreviewMeasure } from "../../measure/previewMeasure.svelte";
-  import type { WorldTransform } from "../../chart";
+  import type { WorldTransform } from "../../geometry/viewport";
   import { computeMeasureRuler, type Point2D } from "../../measure/measureRuler";
   import { formatMetresMm } from "../../format";
 

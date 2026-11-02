@@ -1,9 +1,8 @@
 /**
- * Shared mover-position state for the design reflection.
+ * Shared mover-position state for the coil preview.
  *
- * Owned by App.svelte and passed to both the TravelDiagram (position slider /
- * iso view) and the CoilPreview (magnet strip shading), so dragging the
- * position in one place moves the magnet overlay in the other.
+ * Owned by the document session and shared by its preview and motion controls,
+ * so changing position keeps the magnet overlay synchronized.
  *
  * The value is the CENTER of the magnet array in ABSOLUTE TRACK coordinates
  * (the routing/domain frame: the copper active area is
@@ -18,7 +17,7 @@
  * k5r5 + 5c7r). This store does NOT re-derive that
  * math. Until a plausible envelope is installed — and whenever the
  * browser-dev placeholder mock is active — the bounds come from the shared
- * fixed PLACEHOLDER_TRAVEL_ENVELOPE (lib/ipc/mocks.ts) and the
+ * fixed PLACEHOLDER_TRAVEL_ENVELOPE (lib/simulation/travelEnvelopePlaceholder.ts) and the
  * "travel envelope unavailable — backend required" warning is raised via
  * `envelopeWarning`, so placeholder numbers are never mistaken for real
  * physics.
@@ -30,7 +29,7 @@ import type { Finding } from "../constraints/validation";
 import {
   PLACEHOLDER_TRAVEL_ENVELOPE,
   isPlaceholderEnvelope,
-} from "../ipc/mocks";
+} from "../simulation/travelEnvelopePlaceholder";
 
 /** The validation warning raised while only the placeholder envelope is
  *  active. The message text is the kata ab30 contract — keep the wording. */
@@ -67,7 +66,7 @@ export class MotionStore {
 
   /**
    * The envelope currently driving the bounds: the backend value when one is
-   * installed, otherwise the shared fixed placeholder (lib/ipc/mocks.ts;
+   * installed, otherwise the shared fixed placeholder (lib/simulation/travelEnvelopePlaceholder.ts;
    * authority: `equilibrium::travel_envelope_over_slots`). Never re-computed
    * from config — that duplication was removed by kata ab30.
    */
@@ -123,9 +122,6 @@ export class MotionStore {
       ? Math.max(this.moverMinMm, Math.min(this.moverMaxMm, this.positionMm))
       : this.moverMinMm,
   );
-  /** Strip shift from the leftmost limit (mm): 0 at moverMinMm. */
-  offsetFromRestMm = $derived(this.clampedPositionMm - this.moverMinMm);
-
   /**
    * Mover strip extent (mm) in the DOMAIN frame — centred on the current
    * position, so the drawn edges always equal position ± mover_span/2 and

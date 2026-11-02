@@ -22,14 +22,16 @@ import {
   nearestLayer,
   patternLayerRange,
 } from "../constraints/layerConstraints";
-import { mm, listRoutingPatterns, routingPatternParameters, loadInstalledPlugins, fetchMagnetGrades } from "../ipc";
+import { listRoutingPatterns, routingPatternParameters, loadInstalledPlugins, fetchMagnetGrades } from "../ipc";
 import { readPreferences } from "../preferences";
 import { generatorConnection } from "../routing/routingSources";
 import { MAX_PCB_LAYERS } from "../types/simulationLimits";
 import type { RoutedMoveRequest } from "../types/movePower";
-import { magnetMass } from "../carriageMass";
+import { magnetMass } from "../move/carriageMass";
 import { pcbStackupThicknessMm, pcbStackupToSi, type PcbStackupMm } from "../pcb/pcbStackup";
 import { DEFAULT_ROUTING_ORIENTATION, type RoutingOrientation, type RoutingFlip } from "../routing/routingOrientation";
+
+const mmToMetres = (value: number): number => value / 1000;
 
 export class ConfigStore {
   constructor() {
@@ -42,7 +44,7 @@ export class ConfigStore {
   // --- Active area (mm) --------------------------------------------------
   // The travel-axis length of the copper active area is DERIVED from the
   // desired center-to-center travel (set in the overview constraints) plus
-  // the mover's coil span. Only the cross-axis width is a free general
+  // the mover's magnet-array span. Only the cross-axis width is a free general
   // input.
   desired_travel_mm = $state(75);
   active_area_width_mm = $state(20);
@@ -145,7 +147,7 @@ export class ConfigStore {
   drive_frequency_hz = $state(500);
   max_temperature_rise_c = $state(20);
 
-  // --- Driver suitability (Simulation tab) ------------------------------
+  // --- Driver suitability ----------------------------------------------
   /** Driver limits and operating assumptions for `analyze_drive`. Replace
    *  the whole object to edit it, so dependents see one change. */
   drive = $state<DriveSettings>(structuredClone(DEFAULT_DRIVE_SETTINGS));
@@ -380,22 +382,22 @@ export class ConfigStore {
   /** Build the SI LinearMotorConfig for the Tauri backend. */
   toIpc(): LinearMotorConfig {
     return {
-      active_area_length_m: mm(this.active_area_length_mm),
-      board_width_m: mm(this.active_area_width_mm),
-      pcb_thickness_m: mm(this.pcb_thickness_mm),
+      active_area_length_m: mmToMetres(this.active_area_length_mm),
+      board_width_m: mmToMetres(this.active_area_width_mm),
+      pcb_thickness_m: mmToMetres(this.pcb_thickness_mm),
       ...(this.pcb_stackup_mm ? { pcb_stackup: pcbStackupToSi(this.pcb_stackup_mm) } : {}),
       strands_per_phase: this.strands_per_phase,
 
       magnet_count: this.magnet_count,
-      magnet_width_m: mm(this.magnet_width_mm),
-      magnet_cross_width_m: mm(this.magnet_cross_width_mm),
-      magnet_height_m: mm(this.magnet_height_mm),
-      magnet_gap_m: mm(this.magnet_gap_mm),
-      magnet_pitch_m: mm(this.pole_pitch_mm),
+      magnet_width_m: mmToMetres(this.magnet_width_mm),
+      magnet_cross_width_m: mmToMetres(this.magnet_cross_width_mm),
+      magnet_height_m: mmToMetres(this.magnet_height_mm),
+      magnet_gap_m: mmToMetres(this.magnet_gap_mm),
+      magnet_pitch_m: mmToMetres(this.pole_pitch_mm),
 
       magnet_remanence_t: this.magnet_remanence_t,
       magnet_grade: this.magnet_grade,
-      air_gap_m: mm(this.air_gap_mm),
+      air_gap_m: mmToMetres(this.air_gap_mm),
 
       routing_pattern: this.routing_pattern,
       routing_params: this.routing_params,
@@ -407,11 +409,11 @@ export class ConfigStore {
       supply_voltage_v: this.supply_voltage_v,
 
       num_layers: this.num_layers,
-      min_trace_m: mm(this.min_trace_mm),
-      trace_width_m: mm(this.trace_width_mm),
-      min_space_m: mm(this.min_space_mm),
-      min_via_drill_m: mm(this.min_via_drill_mm),
-      min_via_annular_ring_m: mm(this.min_via_annular_ring_mm),
+      min_trace_m: mmToMetres(this.min_trace_mm),
+      trace_width_m: mmToMetres(this.trace_width_mm),
+      min_space_m: mmToMetres(this.min_space_mm),
+      min_via_drill_m: mmToMetres(this.min_via_drill_mm),
+      min_via_annular_ring_m: mmToMetres(this.min_via_annular_ring_mm),
       max_layers: this.max_layers,
       drive_frequency_hz: this.drive_frequency_hz,
       max_temperature_rise_c: this.max_temperature_rise_c,

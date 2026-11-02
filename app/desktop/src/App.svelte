@@ -6,18 +6,22 @@
   import { listen } from "@tauri-apps/api/event";
   import DocumentEditor from "./DocumentEditor.svelte";
   import NewFileDialog from "./lib/components/layout/NewFileDialog.svelte";
-  import ProjectControls from "./lib/components/layout/ProjectControls.svelte";
+  import ProjectLocationDialog from "./lib/components/layout/ProjectLocationDialog.svelte";
   import FileTabs from "./lib/components/layout/FileTabs.svelte";
   import EditorSplit from "./lib/components/layout/EditorSplit.svelte";
-  import { WorkspaceStore, type DocumentSession, type UnsavedChoice } from "./lib/stores/workspace.svelte";
+  import { WorkspaceStore, type UnsavedChoice } from "./lib/stores/workspace.svelte";
+  import type { DocumentSession } from "./lib/stores/documentSession.svelte";
   import { EditorGroups, type EditorSide } from "./lib/stores/editorGroups.svelte";
   import type { ProjectStore } from "./lib/stores/project.svelte";
   import { recentFiles } from "./lib/stores/recentFiles.svelte";
-  import { bindProjectMenuActions, isTauriAvailable, revealInFinder } from "./lib/ipc";
+  import { isTauriAvailable, revealInFinder } from "./lib/ipc";
+  import { bindProjectMenuActions } from "./lib/menu/projectMenu";
   import type { DocumentKind } from "./lib/types";
   import PreferencesDialog from "./lib/components/layout/PreferencesDialog.svelte";
   import { ConfigStore } from "./lib/stores/config.svelte";
   import { bindDriverImports, openDriverCalculator } from "./lib/driver/driverCalculatorWindow";
+  import { baseName } from "./lib/utils/paths";
+  import { errorMessage } from "./lib/utils/errorMessage";
 
   let unsaved = $state<{ label: string; resolve: (choice: UnsavedChoice) => void } | null>(null);
   const workspace = new WorkspaceStore(recentFiles, label => new Promise(resolve => { unsaved = { label, resolve }; }));
@@ -97,7 +101,7 @@
   async function revealTabFile(source: DocumentSession): Promise<void> {
     const path = source.projects.currentPath;
     if (!path || workspace.pending) return;
-    try { await revealInFinder(path); } catch (e) { workspace.error = e instanceof Error ? e.message : String(e); }
+    try { await revealInFinder(path); } catch (e) { workspace.error = errorMessage(e); }
   }
   function action(name: string): void {
     if (workspace.pending) return;
@@ -115,15 +119,15 @@
     try {
       let snapshot = null;
       try { snapshot = await editor?.driverCalculatorSnapshot() ?? null; }
-      catch (e) { workspace.notice = `Calculator opened without motor data: ${e instanceof Error ? e.message : String(e)}`; }
+      catch (e) { workspace.notice = `Calculator opened without motor data: ${errorMessage(e)}`; }
       await openDriverCalculator(snapshot);
     }
-    catch (e) { workspace.error = e instanceof Error ? e.message : String(e); }
+    catch (e) { workspace.error = errorMessage(e); }
     finally { openingCalculator = false; }
   }
   async function approveQuit(): Promise<void> {
     try { if (await workspace.canClose()) await invoke("quit_app"); }
-    catch (e) { workspace.error = e instanceof Error ? e.message : String(e); }
+    catch (e) { workspace.error = errorMessage(e); }
   }
   onMount(() => {
     void recentFiles.load().then(async () => {
@@ -193,11 +197,11 @@
       <h2 class="mt-12 text-sm font-medium text-slate-300">Recent files and projects</h2>
       {#if recentLoading}<p class="mt-3 text-xs text-slate-500">Loading…</p>
       {:else if !recentFiles.paths.length}<p class="mt-3 text-xs text-slate-500">Saved files and projects will appear here.</p>
-      {:else}<ul class="mt-3 divide-y divide-slate-800">{#each recentFiles.paths as path (path)}<li><button type="button" disabled={workspace.pending} onclick={() => void workspace.openPath(path)} class="w-full rounded px-2 py-3 text-left hover:bg-slate-800 focus-visible:outline focus-visible:outline-emerald-400"><span class="block text-sm text-slate-200">{path.split(/[\\/]/).pop()}</span><span class="mt-1 block truncate text-xs text-slate-500">{path}</span></button></li>{/each}</ul>{/if}
+      {:else}<ul class="mt-3 divide-y divide-slate-800">{#each recentFiles.paths as path (path)}<li><button type="button" disabled={workspace.pending} onclick={() => void workspace.openPath(path)} class="w-full rounded px-2 py-3 text-left hover:bg-slate-800 focus-visible:outline focus-visible:outline-emerald-400"><span class="block text-sm text-slate-200">{baseName(path)}</span><span class="mt-1 block truncate text-xs text-slate-500">{path}</span></button></li>{/each}</ul>{/if}
     </section>
   {/if}
   {#if newFileOpen}<NewFileDialog busy={workspace.pending} directories={workspace.directories} {openPaths} onCreate={(kind, source) => void create(kind, source)} onOpenFile={path => void openFromDialog(path)} onClose={() => newFileOpen = false} />{/if}
-  {#if renameTarget}<ProjectControls projects={renameTarget} onClose={() => renameTarget = null} />{/if}
+  {#if renameTarget}<ProjectLocationDialog projects={renameTarget} onClose={() => renameTarget = null} />{/if}
   {#if preferencesConfig}<PreferencesDialog config={preferencesConfig} disabled={workspace.pending} onClose={() => preferencesConfig = null} />{/if}
   <Dialog.Root open={unsaved !== null} onOpenChange={open => { if (!open) decide("cancel"); }}>
     <Dialog.Portal>

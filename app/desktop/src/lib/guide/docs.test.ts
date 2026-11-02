@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { GUIDE_SOURCES, GUIDE_TABS } from "./docs";
+import authoringGuideMd from "../../../../../crates/pcbmotorgen-routing/docs/routing-pattern-authoring.md?raw";
+import apiReferenceMd from "../../../../../crates/pcbmotorgen-routing/docs/API.md?raw";
+import exampleRunnerPy from "../../../../../crates/pcbmotorgen-export/scripts/pattern_runners/example_runner.py?raw";
+import { GUIDE_TABS } from "./docs";
+import { markdownToHtml } from "./markdown";
+
+const GUIDE_SOURCES = { authoringGuideMd, apiReferenceMd, exampleRunnerPy };
 
 /**
  * The guide is bundled verbatim from the routing crate docs at build time.
@@ -15,6 +21,14 @@ describe("bundled guide docs (single source of truth)", () => {
       expect(tab.label.length).toBeGreaterThan(0);
       expect(tab.html).toContain("<h1>");
     }
+  });
+
+  it("renders the bundled source documents in their respective tabs", () => {
+    expect(GUIDE_TABS.find((t) => t.id === "authoring")?.html).toBe(markdownToHtml(authoringGuideMd));
+    expect(GUIDE_TABS.find((t) => t.id === "api")?.html).toBe(markdownToHtml(apiReferenceMd));
+    expect(GUIDE_TABS.find((t) => t.id === "example")?.html).toContain(
+      markdownToHtml(`\`\`\`python\n${exampleRunnerPy.replace(/\s+$/, "")}\n\`\`\``),
+    );
   });
 
   it("authoring guide covers the contract & units (mm, x = travel, y = width)", () => {

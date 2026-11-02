@@ -1,9 +1,9 @@
 <script lang="ts">
-  import CoilPreview3DView from "../../src/lib/components/design/CoilPreview3DView.svelte";
-  import { CoilPreviewViewState } from "../../src/lib/components/design/coilPreviewViewState.svelte";
+  import CoilPreview3DView from "../../src/lib/components/scene/CoilPreview3DView.svelte";
+  import { CoilPreviewViewState } from "../../src/lib/preview/coilPreviewViewState.svelte";
   import type { CadGeometry } from "../../src/lib/types";
   import { SpatialMeasure } from "../../src/lib/measure/spatialMeasure.svelte";
-  import CoilPreviewControls from "../../src/lib/components/design/CoilPreviewControls.svelte";
+  import PreviewZoomControls from "../../src/lib/components/preview/PreviewZoomControls.svelte";
 
   const view = new CoilPreviewViewState();
   view.viewMode = "iso";
@@ -19,7 +19,7 @@
 <div data-testid="physical-copper-detail" style="position:fixed;inset:0;z-index:10000">
   <CoilPreview3DView {geometry} pcbThicknessMm={.3} pcbStackup={{copper_mm:[.035,.07],dielectric_mm:[.195]}} viaSizeMm={{diameter:.4,drill:.2,plating:.025}} {view} {measure}/>
   <div style="position:absolute;right:12px;bottom:8px">
-    <CoilPreviewControls zoomLabel={String(view.spatialZoom)} canZoomIn={false} canZoomOut={false}
+    <PreviewZoomControls zoomLabel={String(view.spatialZoom)} zoomInDisabled={false} zoomOutDisabled={false}
       onZoomIn={()=>view.cameraCommand={id:view.cameraCommand.id+1,zoom:1.25}}
       onZoomOut={()=>view.cameraCommand={id:view.cameraCommand.id+1,zoom:.8}}
       onResetZoom={()=>view.cameraCommand={id:view.cameraCommand.id+1,zoom:1/view.spatialZoom}}

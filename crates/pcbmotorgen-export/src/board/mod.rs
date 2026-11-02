@@ -23,8 +23,6 @@ mod write;
 // Type URLs for board-level queries.
 const GET_BOARD_ENABLED_LAYERS_TYPE_URL: &str =
     "type.googleapis.com/kiapi.board.commands.GetBoardEnabledLayers";
-const BOARD_ENABLED_LAYERS_RESPONSE_TYPE_URL: &str =
-    "type.googleapis.com/kiapi.board.commands.BoardEnabledLayersResponse";
 const GET_NETS_TYPE_URL: &str = "type.googleapis.com/kiapi.board.commands.GetNets";
 const GET_NET_CLASS_FOR_NETS_TYPE_URL: &str =
     "type.googleapis.com/kiapi.board.commands.GetNetClassForNets";
@@ -287,10 +285,6 @@ impl<'a> BoardHandle<'a> {
             .send::<GetBoardOrigin, Vector2>(GET_BOARD_ORIGIN_TYPE_URL, &cmd)
     }
 }
-
-// Keep the response type URL around for documentation/forward-compat.
-#[allow(dead_code)]
-const _RESPONSE_TYPE_URLS: &[&str] = &[BOARD_ENABLED_LAYERS_RESPONSE_TYPE_URL];
 
 // ---------------------------------------------------------------------------
 // Tests (query methods)

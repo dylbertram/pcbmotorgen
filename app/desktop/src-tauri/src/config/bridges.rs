@@ -1,25 +1,10 @@
-//! Bridge methods on [`LinearMotorConfig`](super::LinearMotorConfig): sync
-//! magnet grade, and conversion to the leaf crates (`RoutingContext`,
+//! Bridge methods on [`LinearMotorConfig`](super::LinearMotorConfig): conversion
+//! to the leaf crates (`RoutingContext`,
 //! `DesignRules`, `SimulationInput`, `PhaseCoil`s, routing-pattern id).
 
 use super::LinearMotorConfig;
 
-// The following methods form the config API. In the binary these are partly
-// exercised via `cargo test` (inline `#[cfg(test)]`) while the shipped runtime
-// path builds the config straight from the IPC DTO's `to_core()`, so keep the
-// API available without dead-code noise in release builds.
-#[allow(dead_code)]
 impl LinearMotorConfig {
-    /// Sync `magnet_remanence_t` from `magnet_grade` unless Custom.
-    pub fn sync_magnet_grade(&mut self) {
-        if self.magnet_grade == pcbmotorgen_simulation::magnet_grades::CUSTOM_GRADE {
-            return;
-        }
-        if let Some(br) = pcbmotorgen_simulation::magnet_grades::get_remanence(&self.magnet_grade) {
-            self.magnet_remanence_t = br;
-        }
-    }
-
     /// Build a `RoutingContext` snapshot for the current config.
     ///
     /// The parent config remains SI/metres; the routing crate's public
@@ -125,7 +110,7 @@ impl LinearMotorConfig {
 }
 
 // ---------------------------------------------------------------------------
-// Tests — magnet grade sync
+// Tests — conversion boundaries
 // ---------------------------------------------------------------------------
 
 #[cfg(test)]
@@ -156,36 +141,4 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_sync_magnet_grade_n44() {
-        let mut cfg = LinearMotorConfig {
-            magnet_grade: "N44".into(),
-            magnet_remanence_t: 0.0,
-            ..LinearMotorConfig::default()
-        };
-        cfg.sync_magnet_grade();
-        assert!((cfg.magnet_remanence_t - 1.34).abs() < 1e-6);
-    }
-
-    #[test]
-    fn test_sync_magnet_grade_n44h_suffix() {
-        let mut cfg = LinearMotorConfig {
-            magnet_grade: "N44H".into(),
-            magnet_remanence_t: 0.0,
-            ..LinearMotorConfig::default()
-        };
-        cfg.sync_magnet_grade();
-        assert!((cfg.magnet_remanence_t - 1.34).abs() < 1e-6);
-    }
-
-    #[test]
-    fn test_sync_magnet_grade_custom_unchanged() {
-        let mut cfg = LinearMotorConfig {
-            magnet_grade: "Custom".into(),
-            magnet_remanence_t: 1.50,
-            ..LinearMotorConfig::default()
-        };
-        cfg.sync_magnet_grade();
-        assert!((cfg.magnet_remanence_t - 1.50).abs() < 1e-6);
-    }
 }

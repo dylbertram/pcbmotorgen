@@ -1,21 +1,9 @@
 import { expect, test } from "@playwright/test";
 import { gotoDesignApp, selectDesignPanel } from "./helpers";
+import { installFileActionMenu } from "./project-menu-helpers";
 
 test.beforeEach(async ({ page }) => {
-  // The browser has no native menu. Replace only the menu-event transport,
-  // leaving the real App handlers and export/DRC components under test.
-  await page.route(/\/src\/lib\/ipc\/project\.ts(?:\?t=\d+)?$/, async (route) => {
-    const response = await route.fetch();
-    const body = (await response.text()).replace(
-      "export async function bindProjectMenuActions(handlers) {",
-      `export async function bindProjectMenuActions(handlers) {
-        const handle = event => handlers[event.detail]?.();
-        window.addEventListener('test-file-action', handle);
-        return () => window.removeEventListener('test-file-action', handle);
-      `,
-    );
-    await route.fulfill({ response, body });
-  });
+  await installFileActionMenu(page);
 });
 
 test("Export tab is removed and DRC is available beside Ready", async ({ page }) => {

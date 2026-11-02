@@ -1,17 +1,11 @@
 /**
- * previewMeasure.svelte.ts
- * ============================================================================
- * Two-click measure-ruler tool for canvas previews (extracted from
- * CoilPreview.svelte, mirroring the shared gesture controller
- * pattern: reactive `$state` view fields + arrow-function DOM handlers, so
- * the component only instantiates the class and forwards events).
+ * Two-click ruler state for motor and CAD canvas previews.
  *
- * Tool semantics (unchanged): click 1 sets the start point, click 2 locks
+ * Click 1 sets the start point, click 2 locks
  * the dimension, click 3 clears it. The toolbar's Reset button clears
  * without a click, and toggling the mode off clears too. Taps are
  * distinguished from pan-drags by a movement threshold (MEASURE_TAP_PX), so
- * pan/pinch/zoom keep working while measuring. Lightbox only — the canvas
- * overlay draws only while the lightbox is expanded.
+ * pan/pinch/zoom keep working while measuring.
  *
  * Input routes (mirroring the gesture utility's dual routing):
  *   - PointerEvents: mouse (primary button) and pen. On browsers that also
@@ -22,12 +16,8 @@
  *     a per-identifier map, and a touch only counts as a tap when NO other
  *     finger remains down (so two-finger pinches never place points).
  *
- * The class has NO geometry knowledge: the component injects
- * `screenToWorld(clientX, clientY)` (client px → world metres through
- * measureRuler's clientToVirtual + virtualToWorld under the CURRENT
- * camera), returning null when the measure surface is not mounted. The
- * locked-dimension fit bounds are exposed as a `$derived` for the camera-fit
- * union in the component.
+ * The caller supplies screen-to-world conversion under the current camera;
+ * the locked dimension's bounds can then participate in camera fit.
  */
 
 import { computeMeasureRuler, type Point2D } from "./measureRuler";
@@ -38,8 +28,7 @@ export const MEASURE_TAP_PX = 6;
 export interface PreviewMeasureOptions {
   /**
    * Client-viewport position → world metres under the CURRENT camera.
-   * Returns null when the measure surface (the expanded frame) is not
-   * mounted. Injected by the component so this module knows no geometry.
+   * Returns null when the measure surface is not mounted.
    */
   screenToWorld: (clientX: number, clientY: number) => Point2D | null;
 }
@@ -50,7 +39,7 @@ interface Point {
 }
 
 export class PreviewMeasure {
-  // --- reactive view state (binds straight into the lightbox template) -----
+  // --- reactive view state ---------------------------------------------------
   /** Ruler mode on/off (the Measure toolbar toggle). */
   mode = $state(false);
   /** Click 1: locked start point (world m). */

@@ -24,8 +24,8 @@
 //! | `validate_write_preconditions`| REAL (pure)   | Config-vs-board rule check (no IPC).     |
 //! | `preview_coils`               | REAL (pure)   | Dry-run coil geometry preview (no IPC).  |
 //! | `export_coils_dxf`            | REAL          | Pure DXF R12 ASCII export (`pcbmotorgen-export`). |
-//! | `save_project`                | REAL          | Versioned `.pmproj` artifact, atomic write. |
-//! | `load_project`                | REAL          | Parse + migrate + validate a `.pmproj` artifact. |
+//! | `save_document`               | REAL          | Versioned document artifact, atomic write. |
+//! | `load_project`                | REAL          | Parse + migrate + validate a saved document. |
 //! | `set_recent_files`            | REAL (sync)   | Mirror webview recents into the File menu (kata eap8). |
 //! | `file_exists`                 | REAL (sync)   | Stat check for recents prune-on-access (kata eap8). |
 //! | `list_routing_patterns`       | REAL          | Routing-pattern plugin catalog.          |
@@ -45,23 +45,20 @@
 //!
 //! ## Linear-only constraint
 //!
-//! PRODUCT_GOALS.md §7.A: radial/axial-flux mode is deferred. There is no
-//! `topology` argument on these commands because the frontend sends a single
-//! `LinearMotorConfigIpc` struct. If a radial variant is ever needed it will
-//! be a separate command set returning `"Radial mode not yet implemented."`
+//! Radial/axial-flux simulation is deferred. Move-power requests explicitly
+//! reject non-linear topologies rather than treating them as linear motors.
 //!
 //! ## Module layout
 //!
 //! Handlers are grouped by subject area:
 //! - [`routing_plugins`] — routing-pattern plugin catalog + interference.
-//! - [`physics`] — config derived/validation, force, stackup, power, B-field.
+//! - [`physics`] — force, stackup, drive and native reference calculations.
+//! - [`move_power`] — prescribed-move calculation and cancellation.
+//! - [`dc_jobs`] and [`visualization`] — supervised DC jobs and field sampling.
 //! - [`kicad`] — KiCad IPC bridge (connect, write, diagnostics, preview).
-//! - [`dxf`] — DXF export.
-//! - [`project`] — project save/load (versioned `.pmproj`, kata 0cgm).
-//!
-//! Every public item is re-exported at this level, so `main.rs` can register
-//! handlers as `commands::routing_plugins::list_routing_patterns` or via the
-//! flat `commands::` paths, whichever the caller prefers.
+//! - [`dxf`] — DXF import and export.
+//! - [`project`] and [`workspace`] — document and workspace persistence.
+//! - [`sensor`] — induction-sensor geometry.
 
 pub mod cad_source;
 pub mod dc_jobs;
@@ -81,20 +78,6 @@ mod braid_reference_tests;
 #[cfg(test)]
 mod compact_star_reference_tests;
 
-// Flat re-exports keep `commands::Foo` paths working for any consumer that
-// does not want to name the submodule. `main.rs` currently registers handlers
-// with the explicit submodule paths, so these globs are referenced by the
-// compatibility contract rather than by code in this binary.
-#[allow(unused_imports)]
-pub use dxf::*;
-#[allow(unused_imports)]
-pub use kicad::*;
-#[allow(unused_imports)]
-pub use physics::*;
-#[allow(unused_imports)]
-pub use project::*;
-#[allow(unused_imports)]
-pub use routing_plugins::*;
 #[cfg(test)]
 mod pcb_stackup_tests;
 #[cfg(test)]

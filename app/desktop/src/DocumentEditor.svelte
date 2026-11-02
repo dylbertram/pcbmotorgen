@@ -1,19 +1,18 @@
 <script lang="ts">
   import { placedCopperGeometry } from "./lib/pcb/copperLayerPlacement";
+  import { errorMessage } from "./lib/utils/errorMessage";
   import { onDestroy, untrack } from "svelte";
-  import type { DocumentSession, DocumentView } from "./lib/stores/workspace.svelte";
+  import type { DocumentSession, DocumentView } from "./lib/stores/documentSession.svelte";
   import { BitsConfig } from "bits-ui";
   import {
     evaluateForceSweep,
     generateCoils,
-    generateSensorGeometry,
     fetchTravelEnvelope,
     computeHeightStack,
     analyzeDrive,
     exportSensorDxf,
     exportCadGeometryDxf,
     exportCoilsDxf,
-    debounce,
     isTauriAvailable,
   } from "./lib/ipc";
   import type {
@@ -21,15 +20,16 @@
     CoilPathDto,
     HeightStackResultDto,
     DriveAnalysis,
-    SensorConfig,
     CadGeometry,
     TravelEnvelopeDto,
   } from "./lib/types";
   import type { SimulationAction } from "./lib/menu/simulationMenu";
   import { usesDeltaConnection } from "./lib/driver/driverConnection";
   import { snapshotFromAnalysis, type DriverCalculatorSnapshot } from "./lib/driver/driverCalculator";
-  import { DrcController } from "./lib/stores/drc.svelte";
+  import { DrcController } from "./lib/drc/drcController.svelte";
+  import { SensorGeometryController } from "./lib/sensor/sensorGeometryController";
   import { LatestAsyncTask } from "./lib/utils/latestAsyncTask";
+  import { debounce } from "./lib/utils/debounce";
   import { measureTrace, computePreviewSummary } from "./lib/preview/previewGeometry";
   import PreviewStatus from "./lib/components/design/PreviewStatus.svelte";
   import { cadGeometryToPreview } from "./lib/cad/cadPreview";
@@ -38,18 +38,18 @@
   import { cadMappingProblems } from "./lib/cad/cadMapping";
   import { inferMissingCoilEnds } from "./lib/cad/cadTerminals";
 
-  import DrcStatus from "./lib/components/layout/DrcStatus.svelte";
+  import DrcStatus from "./lib/components/drc/DrcStatus.svelte";
   import StatusIndicator from "./lib/components/layout/StatusIndicator.svelte";
   import StatusBanner from "./lib/components/ui/StatusBanner.svelte";
   import ProjectNotification from "./lib/components/ui/ProjectNotification.svelte";
   import ScrollArea from "./lib/components/ui/ScrollArea.svelte";
   import CoilPreview from "./lib/components/design/CoilPreview.svelte";
   import type { DesignPanelId, PreviewPanelId } from "./lib/components/design/previewPanels";
-  import DesignTab from "./lib/components/layout/DesignTab.svelte";
-  import SimulateTab from "./lib/components/layout/SimulateTab.svelte";
-  import KicadDialog from "./lib/components/layout/KicadDialog.svelte";
-  import CadImportDialog from "./lib/components/layout/CadImportDialog.svelte";
-  import SensorTab from "./lib/components/layout/SensorTab.svelte";
+  import DesignTab from "./lib/components/design/DesignTab.svelte";
+  import SimulateTab from "./lib/components/simulate/SimulateTab.svelte";
+  import KicadDialog from "./lib/components/export/KicadDialog.svelte";
+  import CadImportDialog from "./lib/components/cad/CadImportDialog.svelte";
+  import SensorTab from "./lib/components/sensor/SensorTab.svelte";
   import SensorPreview from "./lib/components/sensor/SensorPreview.svelte";
   import ProjectVersionsDialog from "./lib/components/layout/ProjectVersionsDialog.svelte";
   import PreferencesDialog from "./lib/components/layout/PreferencesDialog.svelte";
@@ -86,13 +86,11 @@
   let coils = $state<CoilPathDto | null>(untrack(() => editorView.runtime.coils));
   let height = $state<HeightStackResultDto | null>(untrack(() => editorView.runtime.height));
   let drive = $state<DriveAnalysis | null>(untrack(() => editorView.runtime.drive));
-  let driveError = $state<string | null>(null);
   let coilPreviewExpanded = $state(false);
   let motorWorkspaceHeight = $state(0);
   let motorStatusHeight = $state(0);
   let previewPanel = $state<PreviewPanelId | null>("routing");
   let coilPreview: CoilPreview | undefined = $state();
-  let drivePending = $state(false);
   let loading = $state(false);
   let error = $state<string | null>(null);
 
@@ -133,7 +131,7 @@
 
   let activeCoils = $derived(projects.cadGeometry ? cadGeometryToPreview(projects.cadGeometry) : coils);
   // The generated braid may cover less than its configured routing domain.
-  let measuredTrace = $derived.by(() => measureTrace(activeCoils, config));
+  let measuredTrace = $derived.by(() => measureTrace(activeCoils));
 
   export function openVersions(creating = false): void {
     showVersions(creating);
@@ -162,7 +160,7 @@
       const path = await saveTextToFile(result.dxf_content, `${designType}-coil.dxf`, ["dxf"]);
       if (path) projects.notice = `Exported DXF to ${path}.`;
     } catch (e) {
-      projects.error = `DXF export failed: ${e instanceof Error ? e.message : String(e)}`;
+      projects.error = `DXF export failed: ${errorMessage(e)}`;
     } finally {
       exportingDxf = false;
     }
@@ -171,7 +169,7 @@
   // -----------------------------------------------------------------------
   // Design preview generation
   // -----------------------------------------------------------------------
-  // Coil geometry is useful outside the Simulation tab, so it has its own
+  // Coil preview geometry has its own
   // request stream. A generation id prevents a slow response for an older
   // config from replacing a newer preview. The preview keeps its last good
   // result while a new request is pending or fails.
@@ -199,51 +197,11 @@
     scheduleTravelEnvelope.request({ generation, ipc });
   }, 0);
 
-  let sensorGeneration = 0;
-  const scheduleSensorGeometry = debounce(
-    (generation: number, request: SensorConfig) => {
-      if (generation !== sensorGeneration) return;
-      void updateSensorGeometry(generation, request);
-    },
-    150,
-  );
-
-  async function updateSensorGeometry(
-    generation: number,
-    request: SensorConfig,
-  ): Promise<void> {
-    sensorStore.loading = true;
-    sensorStore.error = null;
-    try {
-      const result = await generateSensorGeometry(request);
-      if (generation === sensorGeneration) sensorStore.generatedGeometry = result;
-    } catch (e) {
-      if (generation === sensorGeneration) {
-        sensorStore.generatedGeometry = null;
-        sensorStore.error = e instanceof Error ? e.message : String(e);
-      }
-    } finally {
-      if (generation === sensorGeneration) sensorStore.loading = false;
-    }
-  }
+  const sensorGeometry = new SensorGeometryController(sensorStore);
 
   // Keep sensor geometry independent of motor travel and motor routing state.
   $effect(() => {
-    const generation = ++sensorGeneration;
-    if (!active || designType !== "sensor") {
-      scheduleSensorGeometry.cancel();
-      sensorStore.loading = false;
-      return;
-    }
-    if (sensorStore.cadGeometry) {
-      sensorStore.loading = false;
-      sensorStore.error = null;
-      return;
-    }
-    const request = sensorStore.toIpc();
-    sensorStore.loading = true;
-    sensorStore.error = null;
-    scheduleSensorGeometry(generation, request);
+    sensorGeometry.update(active && designType === "sensor");
   });
 
   async function updateCoilPreview(
@@ -255,12 +213,11 @@
       if (generation === previewGeneration) coils = result;
     } catch {
       // Keep the previous preview visible. A transient generation failure
-      // must not make the design reflection depend on simulation state.
+      // must not make the preview depend on simulation state.
     }
   }
 
-  // Generate the Design-tab reflection when geometry or routing inputs change.
-  // This effect intentionally runs regardless of the active workflow tab.
+  // Regenerate the coil preview when geometry or routing inputs change.
   $effect(() => {
     const generation = ++previewGeneration;
     scheduleTravelEnvelope.cancel();
@@ -295,12 +252,9 @@
   });
 
   // -----------------------------------------------------------------------
-  // Simulation-tab scheduling
+  // Simulation scheduling
   // -----------------------------------------------------------------------
-  // Simulation is demand-driven: entering the Simulation tab or changing a
-  // watched input while it is active schedules one run. The generation id
-  // gates both the debounce callback and all result writes, including work
-  // that was already in flight when the user changed tabs.
+  // The generation id rejects results from an earlier input or inactive view.
   let simulationGeneration = 0;
   let autoSimulation = $state(true);
 
@@ -330,19 +284,19 @@
     drive = null;
   }
 
-  /** Opening the coil-ends panel lives in the design reflection preview. */
+  /** Open the coil-ends panel in the preview. */
   function selectCoilEnds(): void {
     const proposal = projects.cadGeometry ? inferMissingCoilEnds(projects.cadGeometry) : null;
     // Review starts from the inferred pairs, so closing the preview without
     // edits keeps those ends. Ambiguous coils still require manual selection.
-    if (proposal && proposal.geometry !== projects.cadGeometry) projects.setCadGeometry(proposal.geometry);
+    if (proposal && proposal.geometry !== projects.cadGeometry) projects.cadGeometry = proposal.geometry;
     editorView.previewView.requestTerminals(proposal?.unresolved[0] ?? proposal?.pending[0]);
   }
 
   function useInferredEnds(): void {
     if (!projects.cadGeometry) return;
     const proposal = inferMissingCoilEnds(projects.cadGeometry);
-    if (!proposal.unresolved.length) projects.setCadGeometry(proposal.geometry);
+    if (!proposal.unresolved.length) projects.cadGeometry = proposal.geometry;
   }
 
   async function runSimulation(generation: number): Promise<void> {
@@ -359,10 +313,9 @@
 
     // Imported copper without confirmed ends has no valid electrical model.
     // Reset rather than present numbers derived from the inferred defaults;
-    // the Simulation tab shows the ends prompt in their place.
+    // the simulation dock shows the ends prompt in their place.
     if (projects.cadGeometry && cadMappingProblems(projects.cadGeometry, config.phases, config.min_trace_mm).length) {
       clearSimulationResults();
-      driveError = null;
       error = null;
       loading = false;
       return;
@@ -394,16 +347,12 @@
           (result): result is PromiseRejectedResult =>
             result.status === "rejected",
         )
-        .map((result) =>
-          result.reason instanceof Error
-            ? result.reason.message
-            : String(result.reason),
-        );
+        .map((result) => errorMessage(result.reason));
       error = reasons.length ? reasons.join("  ·  ") : null;
     } catch (e) {
       if (!isCurrentSimulation(generation)) return;
       clearSimulationResults();
-      error = e instanceof Error ? e.message : String(e);
+      error = errorMessage(e);
     } finally {
       if (isCurrentSimulation(generation)) loading = false;
     }
@@ -493,13 +442,10 @@
   async function runDrive(generation: number): Promise<void> {
     if (!valid) {
       drive = null;
-      drivePending = false;
       return;
     }
     if (projects.cadGeometry && cadMappingProblems(projects.cadGeometry, config.phases, config.min_trace_mm).length) {
       drive = null;
-      driveError = null;
-      drivePending = false;
       return;
     }
     const inputKey = powerInputKey;
@@ -511,13 +457,9 @@
       if (generation !== driveGeneration) return;
       drive = result;
       driveInputKey = inputKey;
-      driveError = null;
-      drivePending = false;
-    } catch (e) {
+    } catch {
       if (generation !== driveGeneration) return;
       drive = null;
-      driveError = e instanceof Error ? e.message : String(e);
-      drivePending = false;
     }
   }
 
@@ -533,12 +475,9 @@
     const generation = ++driveGeneration;
     if (!driveRequested) {
       scheduleDrive.cancel();
-      drivePending = false;
       return;
     }
     drive = null;
-    driveError = null;
-    drivePending = true;
     scheduleDrive(generation);
   });
 
@@ -593,12 +532,11 @@
     disposed = true;
     editorView.runtime = { coils, sweep, height, drive };
     ++previewGeneration;
-    ++sensorGeneration;
     ++simulationGeneration;
     scheduleCoilPreview.cancel();
     scheduleTravelEnvelope.cancel();
     drc.cancel();
-    scheduleSensorGeometry.cancel();
+    sensorGeometry.dispose();
     scheduleSimulation.cancel();
     ++driveGeneration;
     scheduleDrive.cancel();
@@ -607,8 +545,8 @@
 
 {#snippet motorSettings(section: DesignPanelId)}
   <DesignTab {section} {config} {motion} {measuredTrace} routingDimensions={activeCoils?.routing_dimensions ?? null}
-    cadGeometry={projects.cadGeometry} onGeometryChange={(geometry) => projects.setCadGeometry(geometry)}
-    onImportCad={() => (cadImportDialogOpen = true)} onUseGenerated={() => projects.setCadGeometry(null)}
+    cadGeometry={projects.cadGeometry} onGeometryChange={(geometry) => (projects.cadGeometry = geometry)}
+    onImportCad={() => (cadImportDialogOpen = true)} onUseGenerated={() => (projects.cadGeometry = null)}
     backplaneAnalysis={height?.backplane_analysis ?? null} driveBackplane={drive?.backplane ?? null} />
 {/snippet}
 
@@ -694,9 +632,9 @@
                  active={active && !externalDialogOpen} {focused} designSettings={motorSettings}
                  {onOpenDriverCalculator}
                  statusContent={toolbarStatus}
-                bind:sidePanel={previewPanel} bind:expanded={coilPreviewExpanded} {drive} {driveError} {drivePending}
+                bind:sidePanel={previewPanel} bind:expanded={coilPreviewExpanded}
                  camera={editorView.camera} view={editorView.previewView} importedGeometry={projects.cadGeometry}
-                onGeometryChange={(geometry) => projects.setCadGeometry(geometry)} />
+                onGeometryChange={(geometry) => (projects.cadGeometry = geometry)} />
             </div>
                <SimulateTab
                  bind:this={simulationDock}
@@ -710,7 +648,6 @@
                 {config}
                  {active}
                  {sweep}
-                 {drive}
                 {error}
                 cadGeometry={projects.cadGeometry}
                 onSelectEnds={selectCoilEnds}

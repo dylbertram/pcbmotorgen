@@ -1,6 +1,6 @@
 <script lang="ts">
   import { Canvas } from "@threlte/core";
-  import CoilPreviewScene from "../../src/lib/components/design/CoilPreviewScene.svelte";
+  import CoilPreviewScene from "../../src/lib/components/scene/CoilPreviewScene.svelte";
   import { buildCoilScene } from "../../src/lib/visualization/coilScene";
   import { mapCopperLoss } from "../../src/lib/visualization/visualizationGeometry";
   import type { CadGeometry } from "../../src/lib/types";

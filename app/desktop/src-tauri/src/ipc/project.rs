@@ -201,7 +201,7 @@ pub struct ProjectConfigStateIpc {
     pub drive_frequency_hz: f64,
     pub max_temperature_rise_c: f64,
 
-    // --- Driver suitability (Simulation tab) ---
+    // --- Driver suitability ---
     /// Driver IC limits and operating assumptions; absent in older files.
     pub drive: pcbmotorgen_simulation::drive::DriveSettings,
 

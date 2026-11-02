@@ -14,6 +14,7 @@
   import { analyzeDrive } from "../../../ipc/physics";
   import { saveTextToFile } from "../../../files";
   import { formatSi } from "../../../format";
+  import { errorMessage } from "../../../utils/errorMessage";
   import MoveResultDetails from "./MoveResultDetails.svelte";
   import MoveAdvancedSettings from "./MoveAdvancedSettings.svelte";
   import { version } from "../../../../../package.json";
@@ -128,7 +129,7 @@
         // Keep the usable motor and FET-conduction result, but never present
         // it as a complete total.
         request.loss_model = null;
-        fallbackNote = estimateError instanceof Error ? estimateError.message : String(estimateError);
+        fallbackNote = errorMessage(estimateError);
       }
       config.power_move = request;
       savedFingerprint = JSON.stringify(config.power_move);
@@ -140,7 +141,7 @@
       if (generation !== attempt) return;
       await job.run();
     } catch (e) {
-      if (generation === attempt) error = e instanceof Error ? e.message : String(e);
+      if (generation === attempt) error = errorMessage(e);
     } finally {
       if (generation === attempt) {
         preparing = false;
@@ -203,7 +204,7 @@
       const path = await saveTextToFile(content, filename, [extension]);
       if (path) message = `Saved ${path}`;
     } catch (e) {
-      saveFailure = `Could not save: ${e instanceof Error ? e.message : String(e)}`;
+      saveFailure = `Could not save: ${errorMessage(e)}`;
     } finally {
       saving = false;
     }

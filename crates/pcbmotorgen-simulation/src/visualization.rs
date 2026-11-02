@@ -61,7 +61,7 @@ impl VisualizationRequest {
             .iter()
             .try_fold(1usize, |n, &v| n.checked_mul(v));
         if self.counts.iter().any(|&n| !(2..=64).contains(&n))
-            || count.is_none_or(|n| n > SAMPLE_CAP)
+            || count.map_or(true, |n| n > SAMPLE_CAP)
         {
             return Err(format!(
                 "XYZ sampling requires 2..64 points per axis and at most {SAMPLE_CAP} total"

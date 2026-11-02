@@ -6,7 +6,21 @@ import { invoke } from "@tauri-apps/api/core";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import type { CadGeometry, CadImportResult, LinearMotorConfig, DxfExportResult } from "../types";
 import { isTauriAvailable } from "./core";
-import { mockDxfExportResult } from "./mocks";
+
+/** Browser-only DXF skeleton, explicitly marked as having no backend. */
+function mockDxfExportResult(config: LinearMotorConfig): DxfExportResult {
+  const dxf_content = [
+    "0", "SECTION", "2", "HEADER", "9", "$INSUNITS", "70", "4", "0", "ENDSEC",
+    "0", "SECTION", "2", "ENTITIES", "0", "TEXT", "8", "Notes", "10", "0.0",
+    "20", "0.0", "40", "3.0", "1",
+    `(Mock DXF — backend not connected. Config: ${config.routing_pattern}, ${config.num_layers} layers)`,
+    "0", "ENDSEC", "0", "EOF", "",
+  ].join("\n");
+  return {
+    dxf_content,
+    summary: { total_lines: 0, total_arcs: 0, total_circles: 0, layer_count: 1 },
+  };
+}
 
 /**
  * Open the native file picker restricted to generator plugin types. The

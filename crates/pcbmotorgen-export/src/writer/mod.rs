@@ -220,93 +220,17 @@ pub fn sensor_geometry_to_board_items(
 // ---------------------------------------------------------------------------
 
 #[cfg(test)]
+mod test_support;
+
+#[cfg(test)]
 mod tests {
     use super::*;
-    use pcbmotorgen_routing::{
-        generate_coils_from_context, CoilSegment, RoutingContext, SensorConfig,
-    };
+    use pcbmotorgen_routing::{CoilSegment, SensorConfig};
     use prost::Message;
-    use std::collections::HashMap;
 
     use crate::proto::board::types::BoardLayer;
     use crate::Track;
-
-    /// Millimetres (routing crate's native unit).
-    fn mm(v: f64) -> f64 {
-        v
-    }
-
-    /// mil → millimetres (1 mil = 0.0254 mm).
-    fn mils_to_mm(v: f64) -> f64 {
-        v * 0.0254
-    }
-
-    /// `DesignRules` matching the old `braid_test_config` helper.
-    fn braid_rules() -> DesignRules {
-        DesignRules {
-            min_trace_mm: 0.1,
-            trace_width_mm: 0.1,
-            min_space_mm: 0.1,
-            min_via_drill_mm: mm(0.2),
-            min_via_annular_ring_mm: mm(0.1),
-        }
-    }
-
-    /// `DesignRules` matching the old `test_config` helper (48 mm active
-    /// area, 5 mil trace/space, 0.2 mm via drill, 0.1 mm annular ring).
-    fn test_rules() -> DesignRules {
-        DesignRules {
-            min_trace_mm: mils_to_mm(5.0),
-            trace_width_mm: mils_to_mm(5.0),
-            min_space_mm: mils_to_mm(5.0),
-            min_via_drill_mm: mm(0.2),
-            min_via_annular_ring_mm: mm(0.1),
-        }
-    }
-
-    /// Active area used by the braid structural tests (matches the old
-    /// `braid_test_config.active_area_length_mm = 600.0`).
-    const BRAID_ACTIVE_AREA_MM: f64 = 600.0;
-
-    /// Active area used by the hand-built proto tests (matches the old
-    /// `test_config.active_area_length_mm = mm(48.0)`).
-    const TEST_ACTIVE_AREA_MM: f64 = 48.0;
-
-    /// Generate the bundled infinity-braid coil set for a board of
-    /// `num_layers` layers. Mirrors the old `generate_coils_for_board`.
-    fn braid_coils(num_layers: u32) -> Vec<PhaseCoil> {
-        let mut params = HashMap::new();
-        params.insert("num_strands".to_string(), 5.0);
-        params.insert("n_periods".to_string(), 4.0);
-        let ctx = RoutingContext {
-            active_area_length_mm: BRAID_ACTIVE_AREA_MM,
-            board_width_mm: 20.0,
-            num_layers,
-            phases: 3,
-            min_trace_mm: 0.1,
-            trace_width_mm: 0.1,
-            min_space_mm: 0.1,
-            expects_continuous: false,
-            params,
-            ..RoutingContext::default()
-        };
-        generate_coils_from_context(&ctx, "infinity-braid")
-    }
-
-    /// Convenience: braid coil scene → (coils, num_layers, rules, active_area).
-    fn braid_scene(layers: u32) -> (Vec<PhaseCoil>, u32, DesignRules, f64) {
-        (
-            braid_coils(layers),
-            layers,
-            braid_rules(),
-            BRAID_ACTIVE_AREA_MM,
-        )
-    }
-
-    /// Convenience: a 4-layer hand-built coil scene (rules + active area).
-    fn hand_scene() -> (DesignRules, f64) {
-        (test_rules(), TEST_ACTIVE_AREA_MM)
-    }
+    use super::test_support::{braid_coils, braid_scene, hand_scene};
 
     /// Structural assertions for the infinity-braid routing pattern:
     /// non-empty coils, exactly the 3 phase nets (A/B/C), segments on at

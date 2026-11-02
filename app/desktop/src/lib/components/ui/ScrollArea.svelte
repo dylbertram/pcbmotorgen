@@ -22,15 +22,12 @@
     class?: string;
     /** Extra classes for the scrolling viewport. */
     viewportClass?: string;
-    /** Vertical scrollbar thumb color override; default "bg-slate-600". */
-    scrollbarClass?: string;
     children: Snippet;
   }
 
   let {
     class: rootClass = "",
     viewportClass = "",
-    scrollbarClass = "bg-slate-600",
     children,
     ...rest
   }: ScrollAreaProps = $props();
@@ -45,7 +42,7 @@
     orientation="vertical"
     class="h-full flex w-2.5 touch-none select-none flex-col justify-start rounded-md bg-transparent p-0.5 transition-colors data-[state=visible]:bg-slate-800/60"
   >
-    <ScrollArea.Thumb class="relative rounded-full {scrollbarClass}" />
+    <ScrollArea.Thumb class="relative rounded-full bg-slate-600" />
   </ScrollArea.Scrollbar>
   <ScrollArea.Corner />
 </ScrollArea.Root>

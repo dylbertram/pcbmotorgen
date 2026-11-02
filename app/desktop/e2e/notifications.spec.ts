@@ -1,16 +1,9 @@
 import { expect, test, type Page } from "@playwright/test";
 import { gotoDesignApp } from "./helpers";
+import { installFileActionMenu } from "./project-menu-helpers";
 
 test.beforeEach(async ({ page }) => {
-  await page.route(/\/src\/lib\/ipc\/project\.ts(?:\?t=\d+)?$/, route => route.fulfill({
-    contentType: "application/javascript",
-    body: `export * from '/src/lib/ipc/project.ts?original';
-      export async function bindProjectMenuActions(handlers) {
-        const handle = event => handlers[event.detail]?.();
-        window.addEventListener('test-file-action', handle);
-        return () => window.removeEventListener('test-file-action', handle);
-      }`,
-  }));
+  await installFileActionMenu(page);
   await page.route("**/src/lib/files.ts", route => route.fulfill({
     contentType: "application/javascript",
     body: `export async function saveTextToFile() {

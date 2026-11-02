@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { ConfigStore } from "../../stores/config.svelte";
   import type { DriverSpec } from "../../types";
-  import { driverLibrary } from "../../stores/driverLibrary.svelte";
+  import { driverLibrary } from "../../driver/driverLibraryStore.svelte";
   import AddDriverModal from "./AddDriverModal.svelte";
 
   let { config }: { config: ConfigStore } = $props();

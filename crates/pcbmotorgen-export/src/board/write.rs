@@ -31,28 +31,6 @@ fn validate_through_via_spans(coils: &[PhaseCoil], num_layers: u32) -> Result<()
     Ok(())
 }
 
-#[cfg(test)]
-mod via_span_tests {
-    use super::*;
-
-    #[test]
-    fn layer_pair_barrels_are_rejected_instead_of_shorting_a_series_stack() {
-        let mut coil = PhaseCoil {
-            routed_vias: vec![pcbmotorgen_routing::Via {
-                position: pcbmotorgen_routing::Point::new(1.0, 2.0),
-                from_layer: 0, to_layer: 1, net: "A".into(),
-            }],
-            ..Default::default()
-        };
-        assert!(validate_through_via_spans(&[coil.clone()], 2).is_ok());
-        assert!(validate_through_via_spans(&[coil.clone()], 4).is_err());
-        coil.routed_vias[0].to_layer = 3;
-        assert!(validate_through_via_spans(&[coil.clone()], 4).is_ok());
-        coil.routed_vias[0].from_layer = 2;
-        assert!(validate_through_via_spans(&[coil], 4).is_err());
-    }
-}
-
 impl<'a> BoardHandle<'a> {
     /// Write coils to the board atomically.
     ///
@@ -354,5 +332,27 @@ impl<'a> BoardHandle<'a> {
             failures,
             failure_summary,
         })
+    }
+}
+
+#[cfg(test)]
+mod via_span_tests {
+    use super::*;
+
+    #[test]
+    fn layer_pair_barrels_are_rejected_instead_of_shorting_a_series_stack() {
+        let mut coil = PhaseCoil {
+            routed_vias: vec![pcbmotorgen_routing::Via {
+                position: pcbmotorgen_routing::Point::new(1.0, 2.0),
+                from_layer: 0, to_layer: 1, net: "A".into(),
+            }],
+            ..Default::default()
+        };
+        assert!(validate_through_via_spans(&[coil.clone()], 2).is_ok());
+        assert!(validate_through_via_spans(&[coil.clone()], 4).is_err());
+        coil.routed_vias[0].to_layer = 3;
+        assert!(validate_through_via_spans(&[coil.clone()], 4).is_ok());
+        coil.routed_vias[0].from_layer = 2;
+        assert!(validate_through_via_spans(&[coil], 4).is_err());
     }
 }

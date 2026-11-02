@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import type { PhaseBandWidthDto } from "../types";
+import type { CoilSegmentDto, PhaseBandWidthDto } from "../types";
 import { braidLikeFixture } from "../testFixtures/braidLike";
-import { computeBandWidthRows, medianActiveConductorX } from "./bandWidth";
+import { bandRowInOnePeriod, computeBandWidthRows, medianActiveConductorX, type BandWidthRow } from "./bandWidth";
 
 function band(layer: number, net: string, width: number, max: number | null = null, margin: number | null = null): PhaseBandWidthDto {
   return {
@@ -75,5 +75,35 @@ describe("medianActiveConductorX", () => {
   it("returns the median active conductor x, ignoring end-turns", () => {
     const phase = braidLikeFixture().phases.find((p) => p.phase_idx === 1 && p.layer_idx === 0)!;
     expect(medianActiveConductorX(phase)).toBeCloseTo(0.009, 9);
+  });
+});
+
+describe("bandRowInOnePeriod", () => {
+  const row: BandWidthRow = {
+    phaseIdx: 1, layer: 2, phaseName: "B", anchorX: 2, y: 0,
+    bandM: 1, maxM: null, marginM: null, status: "no-limit",
+  };
+  const segments: CoilSegmentDto[] = [
+    { start: [3, 0], end: [1, 0], is_active: true },
+    { start: [-100, 0], end: [100, 0], is_active: false },
+  ];
+
+  it("keeps all rows when one-section mode is off", () => {
+    expect(bandRowInOnePeriod(row, false, new Map())).toBe(true);
+  });
+
+  it("uses inclusive active-segment bounds for the matching phase and layer", () => {
+    const visible = new Map([[1002, segments]]);
+    for (const anchorX of [1, 2, 3]) {
+      expect(bandRowInOnePeriod({ ...row, anchorX }, true, visible)).toBe(true);
+    }
+    expect(bandRowInOnePeriod({ ...row, anchorX: 4 }, true, visible)).toBe(false);
+    expect(bandRowInOnePeriod({ ...row, layer: 1 }, true, visible)).toBe(false);
+  });
+
+  it("rejects missing, empty, or inactive-only segment sets", () => {
+    for (const visible of [new Map(), new Map([[1002, []]]), new Map([[1002, [segments[1]]]])]) {
+      expect(bandRowInOnePeriod(row, true, visible)).toBe(false);
+    }
   });
 });

@@ -1,4 +1,4 @@
-import type { CoilPathDto, PhaseCoilDto, RoutingDimensionsDto } from "../types";
+import type { CoilPathDto, CoilSegmentDto, PhaseCoilDto, RoutingDimensionsDto } from "../types";
 import { isValidMetres } from "./dimensionValues";
 
 const MARGIN_EPS = 1e-12;
@@ -16,6 +16,26 @@ export interface BandWidthRow {
   maxM: number | null;
   marginM: number | null;
   status: BandWidthStatus;
+}
+
+/** Keep rows anchored within the visible active-conductor span in one-section mode. */
+export function bandRowInOnePeriod(
+  row: BandWidthRow,
+  oneSection: boolean,
+  visibleSegments: ReadonlyMap<number, CoilSegmentDto[]>,
+): boolean {
+  if (!oneSection) return true;
+  const segs = visibleSegments.get(row.phaseIdx * 1000 + row.layer);
+  if (!segs || segs.length === 0) return false;
+  let minX = Infinity;
+  let maxX = -Infinity;
+  for (const seg of segs) {
+    if (!seg.is_active) continue;
+    minX = Math.min(minX, seg.start[0], seg.end[0]);
+    maxX = Math.max(maxX, seg.start[0], seg.end[0]);
+  }
+  if (!Number.isFinite(minX)) return false;
+  return row.anchorX >= minX && row.anchorX <= maxX;
 }
 
 function medianValues(values: number[]): number | null {

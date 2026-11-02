@@ -85,8 +85,6 @@ pub struct KiCadClient {
     transport: Box<dyn KicadTransport>,
     client_name: String,
     kicad_token: String,
-    #[allow(dead_code)]
-    timeout_ms: u32,
     connected: bool,
 }
 
@@ -116,19 +114,20 @@ impl KiCadClient {
             transport,
             client_name,
             kicad_token,
-            timeout_ms,
             connected: false,
         }
     }
 
     /// Creates a client with a pre-injected transport (for testing).
     ///
+    /// The supplied transport owns its timeout; the timeout argument is kept
+    /// for API compatibility and does not modify an injected transport.
     /// The client starts in the "connected" state, so [`send`](Self::send) can
     /// be called immediately without calling [`connect`](Self::connect).
     pub fn with_transport(
         transport: Box<dyn KicadTransport>,
         client_name: Option<&str>,
-        timeout_ms: u32,
+        _timeout_ms: u32,
     ) -> Self {
         let client_name = client_name
             .map(String::from)
@@ -140,7 +139,6 @@ impl KiCadClient {
             transport,
             client_name,
             kicad_token,
-            timeout_ms,
             connected: true,
         }
     }

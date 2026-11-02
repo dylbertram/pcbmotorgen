@@ -143,7 +143,7 @@ fn generate_with_report(
     // geometry and the conventional trace-count parameter when present.
     let mut dimensions = if id == "infinity-braid" {
         let trace_count = ctx.param("num_strands", 5.0).round().max(1.0) as u32;
-        let (period_pitch, period_count) = infinity_period(ctx);
+        let (period_pitch, period_count) = inferred_infinity_period(ctx);
         RoutingDimensions::for_infinity(
             &result,
             ctx,
@@ -256,15 +256,17 @@ pub fn register_python_runner(
     Ok(id)
 }
 
-/// Return the exact period metadata used by the bundled infinity braid.
+/// Infer period metadata from the context, independently of generated geometry.
 ///
 /// When a pole pitch is present the braid reserves its uniform phase/strand
-/// interleave step, then uses complete periods that fit in the routable length;
-/// each period is exactly one pole pitch. A runner or legacy probe without
+/// interleave step, then uses complete periods that fit in the routable length.
+/// This inferred count does not account for the braid generator reducing the
+/// count to be coprime with its strand count; it can exceed the actual count.
+/// Each generated period is exactly one pole pitch. A runner or legacy probe without
 /// magnet data uses its explicit fallback period count; its generated repeat
 /// pitch is reported, but it is not presented as magnet-aligned because there
 /// is no pole pitch to compare it with.
-fn infinity_period(ctx: &RoutingContext) -> (Option<f64>, Option<u32>) {
+fn inferred_infinity_period(ctx: &RoutingContext) -> (Option<f64>, Option<u32>) {
     let total = ctx.active_area_length_mm;
     if let Some(pole_pitch) = ctx.magnet_pitch() {
         let phases = ctx.phases.max(1) as f64;

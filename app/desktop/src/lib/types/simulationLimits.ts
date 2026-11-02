@@ -3,4 +3,3 @@
  */
 export const MAX_MAGNET_COUNT = 12;
 export const MAX_PCB_LAYERS = 16;
-export const ABSOLUTE_TEMPERATURE_TARGET_C = 100;

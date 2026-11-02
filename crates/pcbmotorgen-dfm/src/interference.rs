@@ -70,7 +70,7 @@ impl<'a> CopperRun<'a> {
 /// using the supplied DFM rules.
 ///
 /// Checks:
-/// - Same-layer, different-net segment segments closer than
+/// - Same-layer, different-net segments closer than
 ///   `min_trace + min_space` (edge-to-edge clearance).
 /// - Same-layer, different-net IO fanout traces vs segments / other IO traces
 ///   at the same clearance (IO routing is ordinary copper for DRC purposes,
@@ -84,10 +84,12 @@ impl<'a> CopperRun<'a> {
 ///   `pad_radius + trace_width/2 + min_space` to different-net copper, or
 ///   closer than `pad_radius_a + pad_radius_b + min_space` to a different-net
 ///   IO pad sharing a declared layer. The effective pad radius is the half
-///   diagonal of the pad copper (exact for circular pads, conservative for
-///   rectangular ones). Pads without declared layers are skipped.
+///   diagonal of the pad bounding box, conservative for circular and
+///   rectangular pads. Pads without declared layers are skipped.
 ///
-/// Bounded at 200k pair checks to avoid runaway on pathological inputs.
+/// The segment-pair and IO-trace-pair loops each stop evaluating after
+/// 200,001 pairs. Pad and via checks have no corresponding cap. Hitting a
+/// cap does not add a violation indicating that the result is incomplete.
 pub fn check_interference(
     rules: &DesignRules,
     result: &RoutingResult,
@@ -207,7 +209,7 @@ pub fn check_interference(
 
     // Series barrels need all-layer and same-phase no-bypass diagnostics.
     // Ordinary vias retain the existing endpoint-layer checks below.
-    let series_vias = crate::series_vias::indices(result);
+    let series_vias = crate::series_vias::inner_tapped_via_indices(result);
     // --- Via-pad to different-net trace clearance on from/to layers ---
     let via_min_distance = via_pad_radius + trace_width / 2.0 + min_space;
     for (vi, v) in result.vias.iter().enumerate() {
@@ -247,13 +249,12 @@ pub fn check_interference(
 
     // --- IO pad clearance on the layers the pads declare ---
     check_io_pad_clearance(rules, result, &runs_by_layer, &mut violations);
-    violations.extend(crate::series_vias::check(rules, result, &series_vias));
+    violations.extend(crate::series_vias::check_clearance(rules, result, &series_vias));
 
     violations
 }
 
-/// Effective IO pad copper radius [mm]: the half diagonal of the declared pad
-/// copper — exact for circular pads (`x == y`), conservative for rectangles.
+/// Conservative IO pad radius [mm]: half the diagonal of its bounding box.
 fn io_pad_radius_mm(pad: &IoPad) -> f64 {
     ((pad.size.x / 2.0).powi(2) + (pad.size.y / 2.0).powi(2)).sqrt()
 }

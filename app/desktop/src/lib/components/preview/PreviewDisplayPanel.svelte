@@ -1,0 +1,54 @@
+<script lang="ts">
+  /**
+   * Display options inside the Layers drawer: how copper is
+   * drawn (traces or centerlines) and the overlay markers.
+   * The motor viewport keeps the global options in View;
+   * import previews retain them here while the document menu is disabled.
+   */
+  import type { CoilPreviewViewState } from "../../preview/coilPreviewViewState.svelte";
+
+  let { view }: {
+    view: CoilPreviewViewState;
+  } = $props();
+  const displayGroup = $props.id();
+</script>
+
+<div class="display-controls">
+  <fieldset>
+    <legend>Traces</legend>
+    <div class="mode-options">
+      <label><input type="radio" name={displayGroup} value="traces" bind:group={view.traceMode} />Traces</label>
+      <label><input type="radio" name={displayGroup} value="centerlines" bind:group={view.traceMode} />Centerlines</label>
+    </div>
+  </fieldset>
+  <fieldset>
+    <legend>Overlays</legend>
+    <label class="layer-row" class:hidden-row={!view.showTerminals}>
+      <input type="checkbox" bind:checked={view.showTerminals} aria-label="Show terminal arrows" />
+      <span class="swatch" style:background-color="#34d399"></span><span>Coil-end markers</span>
+    </label>
+    <label class="layer-row" class:hidden-row={!view.showVias}>
+      <input type="checkbox" bind:checked={view.showVias} aria-label="Show vias" />
+      <span class="swatch" style:background-color="#fbbf24"></span><span>Vias</span>
+    </label>
+    <label class="layer-row" class:hidden-row={!view.showPcb}>
+      <input type="checkbox" bind:checked={view.showPcb} aria-label="Show PCB body preview" />
+      <span class="swatch" style:background-color="#166534"></span><span>PCB body preview</span>
+    </label>
+  </fieldset>
+</div>
+
+<style>
+  .display-controls { display: grid; gap: 1rem; }
+  fieldset { min-width: 0; }
+  legend { width: 100%; margin-bottom: 0.35rem; font-size: 0.75rem; font-weight: 600; color: rgb(var(--slate-400)); }
+  .layer-row { display: grid; grid-template-columns: 1rem 0.75rem 1fr; align-items: center; gap: 0.6rem; min-height: 2rem; padding: 0.25rem 0.5rem; border-bottom: 1px solid rgb(var(--slate-700)); font-size: 0.75rem; color: rgb(var(--slate-200)); cursor: pointer; }
+  .layer-row:hover { background: rgb(var(--slate-800)); }
+  .hidden-row { color: rgb(var(--slate-500)); }
+  .hidden-row .swatch { opacity: 0.35; }
+  .swatch { width: 0.65rem; height: 0.65rem; border-radius: 2px; }
+  input { accent-color: #34d399; }
+  input:focus-visible { outline: 2px solid #34d399; outline-offset: 3px; }
+  .mode-options { display: flex; gap: 0.75rem; font-size: 0.75rem; color: rgb(var(--slate-200)); }
+  .mode-options label { display: flex; align-items: center; gap: 0.35rem; cursor: pointer; }
+</style>

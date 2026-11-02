@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ConfigStore } from "../stores/config.svelte";
-import { mockDriveAnalysis } from "../ipc/mocks";
+import { mockDriveAnalysis } from "../ipc/driveAnalysisMock";
 import { buildMoveRequest, defaultMoveForm, type MoveDesignDefaults } from "./moveForm";
 import { summariseMove } from "./moveSummary";
 import { moveReportHtml, moveReportMarkdown } from "./moveReport";

@@ -83,6 +83,8 @@ test.describe("touch pinch", () => {
     await page.getByRole("button", { name: "3D fields and heat", exact: true }).click();
     const viewer = page.getByTestId("coil-iso");
     await expect(viewer).toHaveAttribute("data-camera", /position/);
+    await expect(viewer.getByText("3D fields and losses require the desktop's native calculations.", { exact: false })).toBeVisible();
+    await expect(viewer.getByRole("button", { name: "Legends and model limits" })).toBeVisible();
     const rect = await drawingRect(viewer), snapshot = async () => JSON.parse((await viewer.getAttribute("data-camera"))!) as Snapshot;
     // Loading/error legends reflow while the renderer starts. Pick a clear
     // gesture path rather than touching a transient button at a fixed fraction.

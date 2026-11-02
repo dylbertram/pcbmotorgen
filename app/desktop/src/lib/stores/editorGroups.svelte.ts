@@ -1,4 +1,4 @@
-import { DocumentView, type DocumentSession } from "./workspace.svelte";
+import { DocumentView, type DocumentSession } from "./documentSession.svelte";
 
 export type EditorSide = "left" | "right";
 export class EditorGroups {

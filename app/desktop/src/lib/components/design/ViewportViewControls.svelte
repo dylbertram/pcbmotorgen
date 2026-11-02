@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { CoilPreviewViewState } from "./coilPreviewViewState.svelte";
+  import type { CoilPreviewViewState } from "../../preview/coilPreviewViewState.svelte";
   import { applyViewMenuAction, VIEW_MENU_GROUPS } from "../../menu/viewMenu";
   let { view }: { view: CoilPreviewViewState } = $props();
 </script>

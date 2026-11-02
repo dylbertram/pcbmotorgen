@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onDestroy } from "svelte";
-  import type { CoilPreviewViewState } from "./coilPreviewViewState.svelte";
+  import type { CoilPreviewViewState } from "../../preview/coilPreviewViewState.svelte";
   import { applyViewMenuAction, viewMenuItems } from "../../menu/viewMenu";
   import { nativeViewMenu } from "../../menu/viewMenuController";
 

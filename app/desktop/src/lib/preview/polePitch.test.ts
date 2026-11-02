@@ -13,11 +13,11 @@ describe("computePolePitchValue", () => {
   });
   it("prefers pole_pitch_m and labels it Pole pitch", () => {
     expect(computePolePitchValue({ pole_pitch_m: 0.012, period_pitch_m: 0.013 }))
-      .toEqual({ pitchM: 0.012, source: "pole_pitch_m", label: "Pole pitch" });
+      .toEqual({ pitchM: 0.012, label: "Pole pitch" });
   });
   it("falls back to period_pitch_m but clearly labels it Repeat period", () => {
     expect(computePolePitchValue({ pole_pitch_m: null, period_pitch_m: 0.013 }))
-      .toEqual({ pitchM: 0.013, source: "period_pitch_m", label: "Repeat period" });
+      .toEqual({ pitchM: 0.013, label: "Repeat period" });
   });
 });
 
@@ -42,6 +42,10 @@ describe("computePolePitchRuler", () => {
     expect(r!.x2).toBeCloseTo(0.017, 9);
     expect(r!.y).toBeCloseTo(0.1, 9);
     expect(r!.label).toBe("Pole pitch");
-    expect(r!.source).toBe("pole_pitch_m");
+  });
+  it("labels a repeat-period fallback on the ruler", () => {
+    const ruler = computePolePitchRuler({ period_pitch_m: 0.013 }, 0.005, 0.1);
+    expect(ruler?.label).toBe("Repeat period");
+    expect(ruler?.x2).toBeCloseTo(0.018, 9);
   });
 });

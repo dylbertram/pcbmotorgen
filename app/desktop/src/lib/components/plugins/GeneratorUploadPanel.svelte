@@ -6,6 +6,8 @@
     registerRoutingPlugin,
   } from "../../ipc";
   import { attachBackdropScrollGuard, lockPageScroll } from "../../utils/pageScrollLock";
+  import { baseName } from "../../utils/paths";
+  import { errorMessage } from "../../utils/errorMessage";
   import PluginAuthoringGuideModal from "./PluginAuthoringGuideModal.svelte";
 
   let {
@@ -41,7 +43,7 @@
   };
 
   const pathBasename = $derived(
-    path ? path.split(/[\\/]/).pop() || path : "",
+    path ? baseName(path) || path : "",
   );
 
   /**
@@ -71,7 +73,7 @@
       }
     } catch (e) {
       status = "error";
-      message = e instanceof Error ? e.message : String(e);
+      message = errorMessage(e);
     }
   }
 
@@ -109,7 +111,7 @@
       onClose();
     } catch (e) {
       status = "error";
-      message = e instanceof Error ? e.message : String(e);
+      message = errorMessage(e);
     }
   }
 

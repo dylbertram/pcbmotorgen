@@ -1,5 +1,5 @@
 import definitions from "./viewMenu.json";
-import type { CoilPreviewViewState } from "../components/design/coilPreviewViewState.svelte";
+import type { CoilPreviewViewState } from "../preview/coilPreviewViewState.svelte";
 
 type View = Pick<CoilPreviewViewState, "viewMode" | "traceMode" | "showTerminals" | "showVias" | "showPcb" | "showPolePitch" | "showBandWidths" | "showPoleRegions" | "showWaveform" | "oneSection" | "zoomWindow">;
 export interface ViewCapabilities { active: boolean; polePitch: boolean; bandWidths: boolean; poleRegions: boolean }

@@ -1,5 +1,5 @@
 import type { CadGeometry, LinearMotorConfig } from "../types";
-import { coilNames, phaseOf, PHASE_LABELS } from "./cadPhases";
+import { coilNamesWithPaths, phaseOf, PHASE_LABELS } from "./cadPhases";
 import { splinePointAt } from "../geometry/curvePaths";
 import { coilsMissingEnds } from "./cadTerminals";
 
@@ -10,7 +10,7 @@ export function cadMappingProblems(g: CadGeometry, phases: number, minimumWidth:
     problems.push(`Imported trace width must be at least ${minimumWidth} mm.`);
   if (!g.layer_z_mm.length || !g.layer_z_mm.every(Number.isFinite)) problems.push("Set finite copper layer heights.");
   const labels = PHASE_LABELS.slice(0, phases);
-  const coils = coilNames(g);
+  const coils = coilNamesWithPaths(g);
   const missingEnds = new Set(coilsMissingEnds(g));
   if (!coils.length) problems.push("Imported geometry has no copper.");
   for (const coil of coils) {

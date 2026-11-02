@@ -3,7 +3,7 @@ import { fetchTravelEnvelope } from "../ipc";
 import {
   PLACEHOLDER_TRAVEL_ENVELOPE,
   isPlaceholderEnvelope,
-} from "../ipc/mocks";
+} from "./travelEnvelopePlaceholder";
 import { ConfigStore } from "../stores/config.svelte";
 import { MotionStore } from "../stores/motion.svelte";
 
@@ -118,7 +118,7 @@ describe("envelope consumption chain", () => {
     motion.commit(motion.moverMaxMm);
     expect(motion.stripStartMm).toBeCloseTo(72.723, 3);
     expect(motion.stripEndMm).toBeCloseTo(143.223, 3);
-    expect(motion.offsetFromRestMm).toBeCloseTo(71.973, 3);
+    expect(motion.moverMaxMm - motion.moverMinMm).toBeCloseTo(71.973, 3);
 
     // HoldingForceChart domain spans [min, max]; zeros stay on the lattice.
     const domainEnd = Math.max(motion.moverMinMm + 1e-6, motion.moverMaxMm);

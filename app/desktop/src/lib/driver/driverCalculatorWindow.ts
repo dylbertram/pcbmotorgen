@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { isTauriAvailable } from "../ipc/core";
+import { errorMessage } from "../utils/errorMessage";
 import type { DriverCalculatorSnapshot } from "./driverCalculator";
 
 let popup: Window | null = null;
@@ -28,7 +29,7 @@ export async function bindDriverImports(getSnapshot: () => Promise<DriverCalcula
     try {
       const snapshot = await getSnapshot();
       return { snapshot, error: snapshot ? null : "No current motor winding analysis is available. Select a motor or enter winding values manually." };
-    } catch (e) { return { snapshot: null, error: `No current motor winding analysis is available. ${e instanceof Error ? e.message : String(e)}` }; }
+    } catch (e) { return { snapshot: null, error: `No current motor winding analysis is available. ${errorMessage(e)}` }; }
   };
   if (isTauriAvailable()) return listen<string>("driver-calculator:import", async event => { await invoke("provide_driver_calculator_import", { result: { requestId: event.payload, ...await result() } }); });
   const handler = async (event: MessageEvent) => {

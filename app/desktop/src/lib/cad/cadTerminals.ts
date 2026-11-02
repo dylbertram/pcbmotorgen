@@ -149,7 +149,7 @@ export function withAutomaticCadTerminals(geometry: CadGeometry): CadGeometry {
 /**
  * Coils that carry at least two trace endpoints but have no confirmed IN/OUT
  * end selection. The inferred defaults from {@link withAutomaticCadTerminals}
- * are presentation only; the Simulation tab treats imported copper as
+ * are presentation only; simulation treats imported copper as
  * electrically invalid until every such coil has an applied pair.
  */
 export function coilsMissingEnds(geometry: CadGeometry): string[] {

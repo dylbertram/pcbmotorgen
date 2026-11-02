@@ -53,9 +53,14 @@ async function syntheticMove(page: Page) {
   await page.route(/\/src\/lib\/ipc\/physics\.ts(?:\?t=\d+)?$/, route => route.fulfill({
     contentType: "application/javascript",
     body: `export * from '/src/lib/ipc/physics.ts?original';
-      import { mockDriveAnalysis, mockForceSweep } from '/src/lib/ipc/mocks.ts';
+      import { mockDriveAnalysis } from '/src/lib/ipc/driveAnalysisMock.ts';
+      import { mockForceSweep } from '/src/lib/ipc/forceSweepMock.ts';
       export async function evaluateForceSweep(c) { return mockForceSweep(c); }
-      export async function analyzeDrive(c,s,k) { return mockDriveAnalysis(c,s,k); }
+      export async function analyzeDrive(c,s,k) { return mockDriveAnalysis(c,s,k); }`,
+  }));
+  await page.route(/\/src\/lib\/ipc\/movePower\.ts(?:\?t=\d+)?$/, route => route.fulfill({
+    contentType: "application/javascript",
+    body: `import { mockDriveAnalysis } from '/src/lib/ipc/driveAnalysisMock.ts';
       export async function cancelMovePower(id) { window.__cancelledMove = id; return true; }
       export async function evaluateMovePower(id, inputs) {
         if (window.__holdMove) { window.__moveWaiting = true; await new Promise(resolve => window.addEventListener('release-move', resolve, {once:true})); }

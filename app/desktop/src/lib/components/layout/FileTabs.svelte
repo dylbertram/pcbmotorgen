@@ -1,6 +1,6 @@
 <script lang="ts">
   import { ContextMenu } from "bits-ui";
-  import type { DocumentSession } from "../../stores/workspace.svelte";
+  import type { DocumentSession } from "../../stores/documentSession.svelte";
   import type { EditorSide } from "../../stores/editorGroups.svelte";
   let { documents, selected, side, busy, onSelect, onClose, onVersions, onRename, onReveal, onNew, onSplit, onDrag, onDragEnd }: {
     documents: DocumentSession[]; selected: number | null; side: EditorSide; busy: boolean;

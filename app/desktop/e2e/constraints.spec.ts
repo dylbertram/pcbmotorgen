@@ -4,7 +4,7 @@ import {
   numberField,
   activeLengthReadout,
   traceTotalReadout,
-  box,
+  viewportBox,
   eventually,
   gotoDesignApp,
   openCoilPreview,
@@ -153,8 +153,8 @@ test.describe("Design constraints restructure", () => {
     // starting immediately after the title.
     const select = page.locator("#routing-pattern");
     await expect(select).toBeVisible();
-    const h = await box(page, heading);
-    const s = await box(page, select);
+    const h = await viewportBox(heading);
+    const s = await viewportBox(select);
     expect(h).not.toBeNull();
     expect(s).not.toBeNull();
     const hCenter = h!.y + h!.h / 2;

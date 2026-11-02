@@ -1,12 +1,4 @@
-/**
- * KiCad IPC calls (board write via KiCad 10 IPC socket).
- *
- * These are user-facing IPC calls (the "Write to Board" / "Connect to
- * KiCad" buttons). Real Tauri errors MUST propagate to the UI so the
- * "0 of 0 written" bug (and its siblings) can't be silently hidden
- * behind a synthetic zero. The mock fallback is only used when the Tauri
- * runtime itself is absent (`vite dev` without the Tauri shell).
- */
+/** KiCad board operations. Native errors propagate; mocks are browser-only. */
 
 import { invoke } from "@tauri-apps/api/core";
 import { assertCadMapping } from "../cad/cadMapping";
@@ -22,11 +14,10 @@ import type {
 import { isTauriAvailable } from "./core";
 import {
   mockBoardDiagnostics,
-  mockValidatePreconditions,
   mockPreviewCoils,
   mockKicadConnection,
   mockKicadWrite,
-} from "./mocks";
+} from "./kicadMocks";
 
 export async function connectKicad(): Promise<KicadConnection> {
   if (!isTauriAvailable()) return mockKicadConnection();
@@ -42,9 +33,7 @@ export async function connectKicad(): Promise<KicadConnection> {
  * just skips the `Commit` / `create_items` IPC. Use [`previewCoils`]
  * for a no-IPC dry run (useful when KiCad is not open).
  *
- * **No try/catch here.** A real Tauri error (e.g. "no board open",
- * "connection refused") propagates to the caller — that's the fix for
- * the historical "0 of 0 written" bug.
+ * Native errors propagate to the caller instead of producing a mock result.
  */
 export async function writeCoilsToBoard(
   config: LinearMotorConfig,
@@ -60,10 +49,6 @@ export async function writeCoilsToBoard(
   });
 }
 
-// ---------------------------------------------------------------------------
-// Board diagnostics + preconditions + preview — WP-KiCad
-// ---------------------------------------------------------------------------
-
 /**
  * Live snapshot of the open KiCad board (name, layer count, edge-cut
  * bounding box, net classes). Connects to KiCad each call — cache in the
@@ -76,8 +61,8 @@ export async function getBoardDiagnostics(): Promise<BoardDiagnostics> {
 
 /**
  * Compare the user's `config` against the live `diagnostics` and return
- * a list of pre-condition warnings (info / warning / error). Pure on
- * the Rust side — no IPC. Errors propagate.
+ * a list of precondition warnings (info / warning / error). The native
+ * command uses the supplied diagnostics without contacting KiCad again.
  */
 export async function validateWritePreconditions(
   config: LinearMotorConfig,
@@ -85,7 +70,8 @@ export async function validateWritePreconditions(
   cadGeometry: CadGeometry | null = null,
 ): Promise<PreconditionWarning[]> {
   assertCadMapping(cadGeometry, config);
-  if (!isTauriAvailable()) return mockValidatePreconditions(config, diagnostics);
+  // No real board is available to validate in a browser preview.
+  if (!isTauriAvailable()) return [];
   return await invoke<PreconditionWarning[]>("validate_write_preconditions", {
     config,
     diagnostics,
