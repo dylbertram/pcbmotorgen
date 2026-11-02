@@ -1,15 +1,16 @@
 <script lang="ts">
-  import type { ConfigStore } from "../../stores/config.svelte";
-  import type { RoutingDimensionsDto } from "../../types";
+  import type { ConfigStore } from "../../../stores/config.svelte";
+  import type { RoutingDimensionsDto } from "../../../types";
   import {
     phaseBandPitchMm as phaseBandPitchMmFor,
-    restOffsetMm as restOffsetMmFor,
-  } from "../../geometry/phaseBands";
-  import { formatMarginMm, formatMetresMm } from "../../format";
-  import { isValidMetres } from "../../preview/dimensionValues";
-  import HelpTag from "../ui/HelpTag.svelte";
-  import Formula from "../ui/Formula.svelte";
-  import windingBandSvg from "../../assets/winding-band.svg";
+    phaseBandPitchDifferenceMm as phaseBandPitchDifferenceMmFor,
+  } from "../../../geometry/phaseBands";
+  import { formatMetresMm } from "../../../format";
+  import { isPositiveFiniteDimension } from "../../../geometry/dimensionValues";
+  import { bandValueSpan, formatMarginSpanMm, formatSpanMm } from "./constraintSpans";
+  import HelpTag from "../../ui/HelpTag.svelte";
+  import Formula from "../../ui/Formula.svelte";
+  import windingBandSvg from "../../../assets/winding-band.svg";
 
   let {
     config,
@@ -27,12 +28,12 @@
     routingDimensions?: RoutingDimensionsDto | null;
   } = $props();
 
-  // Vernier phase-band pitch / rest-offset formulas live in lib/geometry.
+  // Vernier phase-band dimensions are derived from the configured ratio.
   let phaseBandPitchMm = $derived(
     phaseBandPitchMmFor(config.pole_pitch_mm, config.phases, config.spacing_ratio),
   );
-  let restOffsetMm = $derived(
-    restOffsetMmFor(config.pole_pitch_mm, config.phases, config.spacing_ratio),
+  let pitchDifferenceMm = $derived(
+    phaseBandPitchDifferenceMmFor(config.pole_pitch_mm, config.phases, config.spacing_ratio),
   );
 
   // --- Routing-payload metrics (metres at the IPC boundary) ---------------
@@ -41,7 +42,7 @@
 
   /** Pass-through for finite positive metre quantities; everything else is null. */
   function validMetres(v: number | null | undefined): number | null {
-    return isValidMetres(v) ? v : null;
+    return isPositiveFiniteDimension(v) ? v : null;
   }
 
   let slotCount = $derived(
@@ -52,23 +53,6 @@
   let slotPitchM = $derived(validMetres(routingDimensions?.slot_pitch_m));
   let interleaveStepM = $derived(validMetres(routingDimensions?.interleave_step_m));
 
-  /**
-   * Summarise one metric across all `phase_band_widths` records: a single
-   * value when every band agrees (the common case), otherwise the
-   * `[min, max]` span. Null when no band reports a finite value.
-   */
-  function bandValueSpan(values: (number | null | undefined)[]): [number, number] | null {
-    let min = Infinity;
-    let max = -Infinity;
-    for (const v of values) {
-      if (typeof v !== "number" || !Number.isFinite(v)) continue;
-      min = Math.min(min, v);
-      max = Math.max(max, v);
-    }
-    if (!Number.isFinite(min)) return null;
-    return max - min <= 1e-12 ? [min, min] : [min, max];
-  }
-
   let slotWidthM = $derived(
     bandValueSpan((routingDimensions?.phase_band_widths ?? []).map((b) => b.slot_width_m)),
   );
@@ -78,22 +62,6 @@
   let bandMarginM = $derived(
     bandValueSpan((routingDimensions?.phase_band_widths ?? []).map((b) => b.margin_m)),
   );
-
-  /** Single value → one length; a genuine span → "min – max". */
-  function formatSpanMm(span: [number, number] | null): string {
-    if (!span) return "—";
-    return span[0] === span[1]
-      ? formatMetresMm(span[0])
-      : `${formatMetresMm(span[0])} – ${formatMetresMm(span[1])}`;
-  }
-
-  /** Signed margins keep their sign on both ends of a span. */
-  function formatMarginSpanMm(span: [number, number] | null): string {
-    if (!span) return "—";
-    return span[0] === span[1]
-      ? formatMarginMm(span[0])
-      : `${formatMarginMm(span[0])} – ${formatMarginMm(span[1])}`;
-  }
 
   let slotGroupCaption = $derived(
     routingDimensions === null
@@ -155,7 +123,7 @@
         <dt class="flex items-center text-[10px] text-slate-400">Phase-band pitch<HelpTag label="About phase-band pitch" tip="Band spacing for the Vernier winding. Not the physical slot pitch. Here m is phase count and r is spacing ratio." equation={String.raw`\tau_b = \frac{\tau_p}{m}\,r`} /></dt>
         <dd class="font-mono text-xs text-emerald-300">{phaseBandPitchMm.toFixed(2)} mm</dd>
       </div>
-      <div><dt class="text-[10px] text-slate-400">Rest offset</dt><dd class="font-mono text-xs text-emerald-300">{restOffsetMm.toFixed(2)} mm</dd></div>
+      <div><dt class="flex items-center text-[10px] text-slate-400">Band-pitch difference<HelpTag label="About band-pitch difference" tip="Nominal pitch per phase minus configured band pitch, clamped to zero. This is not an equilibrium rest position." /></dt><dd class="font-mono text-xs text-emerald-300">{pitchDifferenceMm.toFixed(2)} mm</dd></div>
     </dl>
     <div class="mt-3 space-y-3">
     <div>

@@ -55,8 +55,6 @@ export class MotionStore {
 
   constructor(private config: ConfigStore) { }
 
-  moverSpanMm = $derived.by(() => this.config.mover_span_mm);
-
   /**
    * Electrical period P_e (mm): one full 360° cycle = 2 pole pitches.
    * P_e is a user INPUT echoed back by the envelope, so the config remains
@@ -66,9 +64,8 @@ export class MotionStore {
 
   /**
    * The envelope currently driving the bounds: the backend value when one is
-   * installed, otherwise the shared fixed placeholder (lib/simulation/travelEnvelopePlaceholder.ts;
-   * authority: `equilibrium::travel_envelope_over_slots`). Never re-computed
-   * from config — that duplication was removed by kata ab30.
+   * installed, otherwise the shared fixed placeholder. The native command
+   * computes the envelope; the store does not re-derive it from config.
    */
   activeEnvelope = $derived.by(
     () => this.envelope ?? PLACEHOLDER_TRAVEL_ENVELOPE,
@@ -122,14 +119,6 @@ export class MotionStore {
       ? Math.max(this.moverMinMm, Math.min(this.moverMaxMm, this.positionMm))
       : this.moverMinMm,
   );
-  /**
-   * Mover strip extent (mm) in the DOMAIN frame — centred on the current
-   * position, so the drawn edges always equal position ± mover_span/2 and
-   * match every printed number exactly.
-   */
-  stripStartMm = $derived(this.clampedPositionMm - this.moverSpanMm / 2);
-  stripEndMm = $derived(this.clampedPositionMm + this.moverSpanMm / 2);
-
   /** Commit a raw position (slider or number field) into the store. */
   commit(value: number): void {
     if (!Number.isFinite(value)) return;

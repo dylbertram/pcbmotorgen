@@ -1,10 +1,11 @@
 import { describe, it, expect, vi } from "vitest";
-import { SimulationVisualizationController, validateVisualization, type VisualizationView } from "./simulationVisualizationController";
+import { SimulationVisualizationController, type VisualizationView } from "./simulationVisualizationController";
+import { validateVisualization } from "./visualizationValidation";
 import type { VisualizationInput, VisualizationRequest, VisualizationReport } from "../types/simulationVisualization";
 
-export const request = (id = "one"): VisualizationRequest => ({ request_id: id, mover_position_m: 0,
+const request = (id = "one"): VisualizationRequest => ({ request_id: id, mover_position_m: 0,
   bounds_m: [[0, .01], [0, .01], [-.001, .005]], counts: [2, 2, 2], phase_peak_a: 1, fields: true, heat: false });
-export function report(r = request()): VisualizationReport {
+function report(r = request()): VisualizationReport {
   const samples = Array.from({ length: 8 }, (_, i) => ({ position_m: [i % 2 ? .01 : 0, Math.floor(i / 2) % 2 ? .01 : 0, i >= 4 ? .005 : -.001] as [number, number, number],
     b_t: [0, 0, .1] as [number, number, number], magnitude_t: .1 }));
   return { schema: "simulation-visualization-v1", request_id: r.request_id, input_sha256: "a".repeat(64), implementation_sha256: "b".repeat(64), app_version: "test-only", coordinate_convention: "SI routing, PCB topZ=0",

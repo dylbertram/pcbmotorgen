@@ -1,6 +1,6 @@
 import type { RoutingDimensionsDto } from "../types";
 import type { MagnetStrip } from "./previewGeometry";
-import { isValidMetres } from "./dimensionValues";
+import { isPositiveFiniteDimension } from "../geometry/dimensionValues";
 
 /** Centre of the first magnet strip segment (world x, in metres). */
 export function firstMagnetCenterX(magnets: readonly MagnetStrip[]): number | null {
@@ -19,10 +19,10 @@ export interface PolePitchValue {
 export function computePolePitchValue(
   dimensions: Partial<Pick<RoutingDimensionsDto, "pole_pitch_m" | "period_pitch_m">> | null | undefined,
 ): PolePitchValue | null {
-  if (isValidMetres(dimensions?.pole_pitch_m)) {
+  if (isPositiveFiniteDimension(dimensions?.pole_pitch_m)) {
     return { pitchM: dimensions.pole_pitch_m, label: "Pole pitch" };
   }
-  if (isValidMetres(dimensions?.period_pitch_m)) {
+  if (isPositiveFiniteDimension(dimensions?.period_pitch_m)) {
     return { pitchM: dimensions.period_pitch_m, label: "Repeat period" };
   }
   return null;

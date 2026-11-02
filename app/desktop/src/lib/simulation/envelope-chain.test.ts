@@ -6,6 +6,7 @@ import {
 } from "./travelEnvelopePlaceholder";
 import { ConfigStore } from "../stores/config.svelte";
 import { MotionStore } from "../stores/motion.svelte";
+import { stripBoundsDomainMm } from "../geometry/moverBounds";
 
 describe("envelope consumption chain", () => {
   // PLACEHOLDER REFERENCE PINS (kata ab30) — the mock IPC returns the shared
@@ -47,13 +48,13 @@ describe("envelope consumption chain", () => {
     // The fixed legacy placeholder uses pitch-cell limits. Physical bars
     // exclude the extra inter-magnet gap, so it is not a flush envelope.
     motion.commit(motion.moverMinMm);
-    expect(motion.stripStartMm).toBeCloseTo(0.75, 6);
-    expect(motion.stripEndMm).toBeCloseTo(71.25, 6);
+    expect(stripBoundsDomainMm(config, motion).startMm).toBeCloseTo(0.75, 6);
+    expect(stripBoundsDomainMm(config, motion).endMm).toBeCloseTo(71.25, 6);
 
     // Keep the placeholder warning: these limits are not configuration-derived.
     motion.commit(motion.moverMaxMm);
-    expect(motion.stripStartMm).toBeCloseTo(75.75, 6);
-    expect(motion.stripEndMm).toBeCloseTo(146.25, 6);
+    expect(stripBoundsDomainMm(config, motion).startMm).toBeCloseTo(75.75, 6);
+    expect(stripBoundsDomainMm(config, motion).endMm).toBeCloseTo(146.25, 6);
   });
 
   it("rejects implausible envelopes (mm reported as metres) and keeps the flagged placeholder", async () => {
@@ -116,8 +117,8 @@ describe("envelope consumption chain", () => {
     // The refined max is NOT a stable rest (off the φ = 10 mm, P_e = 12 mm
     // lattice) — the mover may hold between rests; endpoints are limits.
     motion.commit(motion.moverMaxMm);
-    expect(motion.stripStartMm).toBeCloseTo(72.723, 3);
-    expect(motion.stripEndMm).toBeCloseTo(143.223, 3);
+    expect(stripBoundsDomainMm(config, motion).startMm).toBeCloseTo(72.723, 3);
+    expect(stripBoundsDomainMm(config, motion).endMm).toBeCloseTo(143.223, 3);
     expect(motion.moverMaxMm - motion.moverMinMm).toBeCloseTo(71.973, 3);
 
     // HoldingForceChart domain spans [min, max]; zeros stay on the lattice.

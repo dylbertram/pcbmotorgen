@@ -2,7 +2,7 @@
   import type { ConfigStore } from "../../../stores/config.svelte";
   import type { DriveSettings } from "../../../types";
   import NumberField from "../../ui/NumberField.svelte";
-  import SettingRow from "../../simulate/SettingRow.svelte";
+  import SettingRow from "../SettingRow.svelte";
   import CarriagePanel from "./CarriagePanel.svelte";
 
   let { config }: { config: ConfigStore } = $props();

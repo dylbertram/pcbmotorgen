@@ -3,7 +3,7 @@
   import { confirm } from "@tauri-apps/plugin-dialog";
   import { untrack } from "svelte";
   import type { Snippet } from "svelte";
-  import { isDesignPanel, isLeftPanel, type DesignPanelId, type PreviewPanelId } from "./previewPanels";
+  import { isDesignPanel, isLeftPanel, type DesignPanelId, type PreviewPanelId } from "../../preview/previewPanels";
   import type { PreviewCamera } from "../../preview/previewCamera.svelte";
   import { editableCoilGeometry } from "../../ipc/dxf";
   import type { ConfigStore } from "../../stores/config.svelte";
@@ -23,6 +23,7 @@
     computeMoverStripBounds,
     type PreviewConfigLike,
   } from "../../preview/previewGeometry";
+  import { stripBoundsDomainMm } from "../../geometry/moverBounds";
   import { bandRowInOnePeriod, computeBandWidthRows } from "../../preview/bandWidth";
   import { computeVisibleSegments, computeVisibleArcs } from "../../preview/oneSection";
   import { computePolePitchRuler, firstMagnetCenterX as magnetCenterX } from "../../preview/polePitch";
@@ -33,7 +34,7 @@
   import { PreviewMeasure } from "../../measure/previewMeasure.svelte";
   import CoilPreviewLightbox from "./CoilPreviewLightbox.svelte";
   import CoilPreviewIsoView from "./CoilPreviewIsoView.svelte";
-  import PreviewFrame from "../preview/PreviewFrame.svelte";
+  import PreviewFrame from "./PreviewFrame.svelte";
   import { CoilPreviewRenderer } from "./coilPreviewCanvas";
   import { PREVIEW_H, PREVIEW_W } from "../../preview/previewStyle";
   import { CoilPreviewViewState } from "../../preview/coilPreviewViewState.svelte";
@@ -217,15 +218,12 @@
 
   let worldTransform = $derived(worldTransformFor(gestures.zoom));
   let magnets = $derived(computeMagnets(config, coils?.routing_dimensions));
-  // The mover position from the shared MotionStore places the whole strip in
-  // ABSOLUTE track coordinates: bar 0's left edge lands exactly at
-  // `motion.stripStartMm` (= position − mover_span/2), matching the design
-  // reflection's iso view and readouts. Polarity order and pitch come from
-  // the pattern-anchored `computeMagnets` layout.
+  // Anchor the strip to the shared bounds used by the iso view and readouts;
+  // polarity order and pitch come from the pattern-anchored magnet layout.
   let visibleMagnets = $derived.by(() => {
     if (magnets.length === 0) return magnets;
     const restStartM = Math.min(...magnets.map((m) => m.x));
-    const targetStartM = motion.stripStartMm / 1000;
+    const targetStartM = stripBoundsDomainMm(config, motion).startMm / 1000;
     return magnets.map((m) => ({ ...m, x: m.x + targetStartM - restStartM }));
   });
   // Camera-fit extreme: the largest leading-edge shift of either travel end
@@ -322,8 +320,7 @@
   let hasPolePitchData = $derived(poleRuler !== null);
   let hasBandWidthData = $derived(bandRows.length > 0);
 
-  // Band rows the renderer paints: phase/layer visibility + the one-section
-  // window filter (pure helper lives in ./coilPreviewCanvas.ts).
+  // Filter band rows by visibility and the one-section window before painting.
   let visibleBandRows = $derived(
     view.showBandWidths
       ? bandRows.filter(
@@ -418,8 +415,7 @@
   });
 
   // -------------------------------------------------------------------
-  // Canvas rendering — the paint routines live in ./coilPreviewCanvas.ts
-  // (`CoilPreviewRenderer`, extracted verbatim from the former `drawInto`).
+  // Canvas rendering — the paint routines live in ./coilPreviewCanvas.ts.
   // This component owns the dual-instance inline/modal draw pattern: the
   // frame/canvas refs, the ResizeObserver sizing above, and the draw effect
   // below, which builds the per-tick `CoilPreviewDrawInput` snapshot and

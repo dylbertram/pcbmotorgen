@@ -73,6 +73,27 @@ describe("cadGeometryToPreview", () => {
     expect(preview.phases[0].via_positions).toEqual([[0.004, 0.002]]);
     expect(preview.phases[1].via_positions).toEqual([[0.004, 0.002]]);
   });
+
+  it("assigns stable sorted net indices across all supported CAD primitives", () => {
+    const geometry: CadGeometry = {
+      layer_z_mm: [0, 1], trace_width_mm: 0.2,
+      routing: {
+        format_version: 2,
+        segments: [{ start: { x: 0, y: 0 }, end: { x: 1, y: 0 }, layer: 0, net: "D", is_active: true }],
+        curves: [{ start: { x: 0, y: 0 }, mid: { x: 1, y: 1 }, end: { x: 2, y: 0 }, layer: 0, net: "C", is_active: true }],
+        splines: [{ degree: 1, knots: [0, 0, 1, 1], control_points: [{ x: 0, y: 0 }, { x: 2, y: 0 }], layer: 0, net: "B", is_active: true }],
+        vias: [{ position: { x: 1, y: 0 }, from_layer: 0, to_layer: 1, net: "A" }],
+      },
+    };
+    const preview = cadGeometryToPreview(geometry);
+    for (const coil of preview.phases) {
+      expect(coil.phase_idx).toBe(["A", "B", "C", "D"].indexOf(coil.phase_name));
+    }
+    expect(new Set(preview.phases.map(coil => coil.phase_name))).toEqual(new Set(["A", "B", "C", "D"]));
+    expect(preview.phases.find(coil => coil.phase_name === "B")?.splines?.[0].control_points[1]).toEqual({ x: 0.002, y: 0 });
+    expect(preview.phases.find(coil => coil.phase_name === "C")?.corner_arcs?.[0].mid).toEqual([0.001, 0.001]);
+    expect(preview.phases.find(coil => coil.phase_name === "A")?.via_positions?.[0]).toEqual([0.001, 0]);
+  });
 });
 
 describe("joinCadPreviewEndpoints", () => {

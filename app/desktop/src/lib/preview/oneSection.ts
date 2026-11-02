@@ -1,10 +1,15 @@
 import type { CoilArcDto, CoilPathDto, CoilSegmentDto, PhaseCoilDto } from "../types";
 
 function selectedActiveConductorIndices(phase: PhaseCoilDto, count: number): Set<number> {
-  const active = phase.segments.filter((segment) => segment.is_active);
   const indices = new Set<number>();
-  for (let i = 0; i < Math.min(count, active.length); i++) {
-    indices.add(phase.segments.indexOf(active[i]));
+  const firstIndex = new Map<CoilSegmentDto, number>();
+  let activeCount = 0;
+  for (let index = 0; index < phase.segments.length && activeCount < count; index++) {
+    const segment = phase.segments[index];
+    if (!segment.is_active) continue;
+    if (!firstIndex.has(segment)) firstIndex.set(segment, index);
+    indices.add(firstIndex.get(segment)!);
+    activeCount++;
   }
   return indices;
 }

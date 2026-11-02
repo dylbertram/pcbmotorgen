@@ -8,8 +8,8 @@
  *   F(x) = −sin(2π(x − φ) / P_e)      (normalized to ±1)
  *
  * Zeros fall EXACTLY on every stable rest position x ≡ φ (mod P_e) and the
- * slope there is negative (restoring), matching the equilibrium envelope that
- * bounds the position slider. Pure functions, shared by the chart and tests.
+ * slope there is negative (restoring). The chart's slider uses travel limits,
+ * which do not necessarily coincide with equilibrium positions.
  */
 
 const TWO_PI = 2 * Math.PI;

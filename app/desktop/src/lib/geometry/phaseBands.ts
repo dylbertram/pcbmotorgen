@@ -7,8 +7,8 @@ export function phaseBandPitchMm(
   return (polePitchMm / phases) * spacingRatio;
 }
 
-/** Rest-position drift per phase band for a reduced vernier ratio. */
-export function restOffsetMm(
+/** Nominal minus configured band pitch, clamped to zero. */
+export function phaseBandPitchDifferenceMm(
   polePitchMm: number,
   phases: number,
   spacingRatio: number,

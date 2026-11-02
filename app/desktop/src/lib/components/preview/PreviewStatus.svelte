@@ -2,7 +2,7 @@
   import type { Snippet } from "svelte";
   import type { ConfigStore } from "../../stores/config.svelte";
   import type { MotionStore } from "../../stores/motion.svelte";
-  import { stripBoundsDomainMm } from "../../preview/previewGeometry";
+  import { stripBoundsDomainMm } from "../../geometry/moverBounds";
 
   let { config, motion, stats, showSummary = true, children }: {
     config: ConfigStore;

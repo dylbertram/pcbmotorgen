@@ -175,7 +175,6 @@ enum Element {
         start: Point,
         end: Point,
         layer: u32,
-        strand: u32,
     },
     Wave {
         kind: WaveKind,
@@ -190,7 +189,6 @@ enum Element {
         end: Point,
         apex_x: f64,
         layer: u32,
-        strand: u32,
     },
 }
 
@@ -198,12 +196,11 @@ fn point(x: f64, y: f64) -> Point {
     Point::new(x, y)
 }
 
-fn connector(start: (f64, f64), end: (f64, f64), layer: u32, strand: u32) -> Element {
+fn connector(start: (f64, f64), end: (f64, f64), layer: u32) -> Element {
     Element::Connector {
         start: point(start.0, start.1),
         end: point(end.0, end.1),
         layer,
-        strand,
     }
 }
 
@@ -218,13 +215,12 @@ fn wave(kind: WaveKind, side: f64, x_start: f64, x_end: f64, layer: u32, strand:
     }
 }
 
-fn bulge(start: (f64, f64), end: (f64, f64), apex_x: f64, layer: u32, strand: u32) -> Element {
+fn bulge(start: (f64, f64), end: (f64, f64), apex_x: f64, layer: u32) -> Element {
     Element::Bulge {
         start: point(start.0, start.1),
         end: point(end.0, end.1),
         apex_x,
         layer,
-        strand,
     }
 }
 
@@ -426,7 +422,7 @@ fn make_sine_elements(c: &SensorConfig) -> Result<Vec<Element>, String> {
 
         if strand == 0 {
             let p = leg_point(c, WaveKind::Sine, 1.0, lead_trim, strand);
-            chain.push(connector((lead_x, lead_y), (p.x, p.y), B_CU, strand));
+            chain.push(connector((lead_x, lead_y), (p.x, p.y), B_CU));
         }
 
         let sigma_forward = if strand == 0 { 1.0 } else { -1.0 };
@@ -453,8 +449,8 @@ fn make_sine_elements(c: &SensorConfig) -> Result<Vec<Element>, String> {
         if strand == 1 {
             let (p, v) = tangent_via(c, WaveKind::Sine, 1.0, begin_swap, strand, -1.0);
             chain.push(wave(WaveKind::Sine, 1.0, begin, begin_swap, F_CU, strand));
-            chain.push(connector((p.x, p.y), (v.x, v.y), F_CU, strand));
-            chain.push(connector((v.x, v.y), (p.x, p.y), B_CU, strand));
+            chain.push(connector((p.x, p.y), (v.x, v.y), F_CU));
+            chain.push(connector((v.x, v.y), (p.x, p.y), B_CU));
             chain.push(wave(
                 WaveKind::Sine,
                 1.0,
@@ -467,8 +463,8 @@ fn make_sine_elements(c: &SensorConfig) -> Result<Vec<Element>, String> {
             chain.push(wave(WaveKind::Sine, 1.0, begin, quarter_via, B_CU, strand));
         }
 
-        chain.push(connector((pfq.x, pfq.y), (vfq.x, vfq.y), B_CU, strand));
-        chain.push(connector((vfq.x, vfq.y), (pfq.x, pfq.y), F_CU, strand));
+        chain.push(connector((pfq.x, pfq.y), (vfq.x, vfq.y), B_CU));
+        chain.push(connector((vfq.x, vfq.y), (pfq.x, pfq.y), F_CU));
         chain.push(wave(
             WaveKind::Sine,
             1.0,
@@ -477,8 +473,8 @@ fn make_sine_elements(c: &SensorConfig) -> Result<Vec<Element>, String> {
             F_CU,
             strand,
         ));
-        chain.push(connector((pfm.x, pfm.y), (vfm.x, vfm.y), F_CU, strand));
-        chain.push(connector((vfm.x, vfm.y), (pfm.x, pfm.y), B_CU, strand));
+        chain.push(connector((pfm.x, pfm.y), (vfm.x, vfm.y), F_CU));
+        chain.push(connector((vfm.x, vfm.y), (pfm.x, pfm.y), B_CU));
 
         if strand == 1 {
             let (p, v) = tangent_via(c, WaveKind::Sine, 1.0, end_swap, strand, -1.0);
@@ -490,8 +486,8 @@ fn make_sine_elements(c: &SensorConfig) -> Result<Vec<Element>, String> {
                 B_CU,
                 strand,
             ));
-            chain.push(connector((p.x, p.y), (v.x, v.y), B_CU, strand));
-            chain.push(connector((v.x, v.y), (p.x, p.y), F_CU, strand));
+            chain.push(connector((p.x, p.y), (v.x, v.y), B_CU));
+            chain.push(connector((v.x, v.y), (p.x, p.y), F_CU));
             chain.push(wave(WaveKind::Sine, 1.0, end_swap, handover, F_CU, strand));
         } else {
             chain.push(wave(
@@ -507,8 +503,8 @@ fn make_sine_elements(c: &SensorConfig) -> Result<Vec<Element>, String> {
         if next == 1 {
             let (p, v) = tangent_via(c, WaveKind::Sine, -1.0, end_swap, next, 1.0);
             chain.push(wave(WaveKind::Sine, -1.0, handover, end_swap, B_CU, next));
-            chain.push(connector((p.x, p.y), (v.x, v.y), B_CU, next));
-            chain.push(connector((v.x, v.y), (p.x, p.y), F_CU, next));
+            chain.push(connector((p.x, p.y), (v.x, v.y), B_CU));
+            chain.push(connector((v.x, v.y), (p.x, p.y), F_CU));
             chain.push(wave(
                 WaveKind::Sine,
                 -1.0,
@@ -528,8 +524,8 @@ fn make_sine_elements(c: &SensorConfig) -> Result<Vec<Element>, String> {
             ));
         }
 
-        chain.push(connector((prm.x, prm.y), (vrm.x, vrm.y), F_CU, next));
-        chain.push(connector((vrm.x, vrm.y), (prm.x, prm.y), B_CU, next));
+        chain.push(connector((prm.x, prm.y), (vrm.x, vrm.y), F_CU));
+        chain.push(connector((vrm.x, vrm.y), (prm.x, prm.y), B_CU));
         chain.push(wave(
             WaveKind::Sine,
             -1.0,
@@ -538,8 +534,8 @@ fn make_sine_elements(c: &SensorConfig) -> Result<Vec<Element>, String> {
             B_CU,
             next,
         ));
-        chain.push(connector((prq.x, prq.y), (vrq.x, vrq.y), B_CU, next));
-        chain.push(connector((vrq.x, vrq.y), (prq.x, prq.y), F_CU, next));
+        chain.push(connector((prq.x, prq.y), (vrq.x, vrq.y), B_CU));
+        chain.push(connector((vrq.x, vrq.y), (prq.x, prq.y), F_CU));
 
         if next == 0 {
             let (p, v) = tangent_via(c, WaveKind::Sine, -1.0, begin_swap, next, -1.0);
@@ -551,8 +547,8 @@ fn make_sine_elements(c: &SensorConfig) -> Result<Vec<Element>, String> {
                 F_CU,
                 next,
             ));
-            chain.push(connector((p.x, p.y), (v.x, v.y), F_CU, next));
-            chain.push(connector((v.x, v.y), (p.x, p.y), B_CU, next));
+            chain.push(connector((p.x, p.y), (v.x, v.y), F_CU));
+            chain.push(connector((v.x, v.y), (p.x, p.y), B_CU));
             chain.push(wave(
                 WaveKind::Sine,
                 -1.0,
@@ -562,8 +558,8 @@ fn make_sine_elements(c: &SensorConfig) -> Result<Vec<Element>, String> {
                 next,
             ));
             let p = leg_point(c, WaveKind::Sine, -1.0, lead_trim, next);
-            chain.push(connector((p.x, p.y), (x0, -lead_y), B_CU, next));
-            chain.push(connector((x0, -lead_y), (lead_x, -lead_y), B_CU, next));
+            chain.push(connector((p.x, p.y), (x0, -lead_y), B_CU));
+            chain.push(connector((x0, -lead_y), (lead_x, -lead_y), B_CU));
         } else {
             chain.push(wave(
                 WaveKind::Sine,
@@ -653,61 +649,34 @@ fn make_cosine_elements(c: &SensorConfig) -> Result<Vec<Element>, String> {
                     (lead_x, c.tx_y_cont()),
                     (via_x, c.tx_y_cont()),
                     B_CU,
-                    strand,
                 ));
-                chain.push(connector(
-                    (via_x, c.tx_y_cont()),
-                    (via_x, lead_y),
-                    F_CU,
-                    strand,
-                ));
-                chain.push(connector((via_x, lead_y), (x_in, lead_y), F_CU, strand));
-                chain.push(connector((x_in, lead_y), (x_in, y_in), F_CU, strand));
+                chain.push(connector((via_x, c.tx_y_cont()), (via_x, lead_y), F_CU));
+                chain.push(connector((via_x, lead_y), (x_in, lead_y), F_CU));
+                chain.push(connector((x_in, lead_y), (x_in, y_in), F_CU));
             } else {
-                chain.push(connector((lead_x, lead_y), (x_in, lead_y), F_CU, strand));
-                chain.push(connector((x_in, lead_y), (x_in, y_in), F_CU, strand));
+                chain.push(connector((lead_x, lead_y), (x_in, lead_y), F_CU));
+                chain.push(connector((x_in, lead_y), (x_in, y_in), F_CU));
             }
         } else {
             let mid_via = (x_in + via_offset, -half_amplitude);
-            chain.push(connector(
-                (x_in, -y_in),
-                (x_in, -half_amplitude),
-                B_CU,
-                strand,
-            ));
-            chain.push(connector((x_in, -half_amplitude), mid_via, B_CU, strand));
-            chain.push(connector(mid_via, (x_in, -half_amplitude), F_CU, strand));
-            chain.push(connector(
-                (x_in, -half_amplitude),
-                (x_in, y_in),
-                F_CU,
-                strand,
-            ));
+            chain.push(connector((x_in, -y_in), (x_in, -half_amplitude), B_CU));
+            chain.push(connector((x_in, -half_amplitude), mid_via, B_CU));
+            chain.push(connector(mid_via, (x_in, -half_amplitude), F_CU));
+            chain.push(connector((x_in, -half_amplitude), (x_in, y_in), F_CU));
         }
 
         let bulge_layer = if strand % 2 == 0 { F_CU } else { B_CU };
-        let mut handover = vec![connector(
-            (x_out, y_out),
-            (x_out, half_amplitude),
-            F_CU,
-            strand,
-        )];
+        let mut handover = vec![connector((x_out, y_out), (x_out, half_amplitude), F_CU)];
         if bulge_layer != F_CU {
             let via_top = (x_out - via_offset, half_amplitude);
-            handover.push(connector((x_out, half_amplitude), via_top, F_CU, strand));
-            handover.push(connector(
-                via_top,
-                (x_out, half_amplitude),
-                bulge_layer,
-                strand,
-            ));
+            handover.push(connector((x_out, half_amplitude), via_top, F_CU));
+            handover.push(connector(via_top, (x_out, half_amplitude), bulge_layer));
         }
         handover.push(bulge(
             (x_out, half_amplitude),
             (x_out_next, -half_amplitude),
             apex_x,
             bulge_layer,
-            strand,
         ));
         if bulge_layer != B_CU {
             let via_bottom = (x_out_next - via_offset, -half_amplitude);
@@ -715,20 +684,13 @@ fn make_cosine_elements(c: &SensorConfig) -> Result<Vec<Element>, String> {
                 (x_out_next, -half_amplitude),
                 via_bottom,
                 bulge_layer,
-                strand,
             ));
-            handover.push(connector(
-                via_bottom,
-                (x_out_next, -half_amplitude),
-                B_CU,
-                strand,
-            ));
+            handover.push(connector(via_bottom, (x_out_next, -half_amplitude), B_CU));
         }
         handover.push(connector(
             (x_out_next, -half_amplitude),
             (x_out_next, -y_out_next),
             B_CU,
-            next,
         ));
 
         chain.push(wave(
@@ -739,8 +701,8 @@ fn make_cosine_elements(c: &SensorConfig) -> Result<Vec<Element>, String> {
             F_CU,
             strand,
         ));
-        chain.push(connector((pfh.x, pfh.y), (vfh.x, vfh.y), F_CU, strand));
-        chain.push(connector((vfh.x, vfh.y), (pfh.x, pfh.y), B_CU, strand));
+        chain.push(connector((pfh.x, pfh.y), (vfh.x, vfh.y), F_CU));
+        chain.push(connector((vfh.x, vfh.y), (pfh.x, pfh.y), B_CU));
         chain.push(wave(
             WaveKind::Cosine,
             1.0,
@@ -749,8 +711,8 @@ fn make_cosine_elements(c: &SensorConfig) -> Result<Vec<Element>, String> {
             B_CU,
             strand,
         ));
-        chain.push(connector((pf.x, pf.y), (vf.x, vf.y), B_CU, strand));
-        chain.push(connector((vf.x, vf.y), (pf.x, pf.y), F_CU, strand));
+        chain.push(connector((pf.x, pf.y), (vf.x, vf.y), B_CU));
+        chain.push(connector((vf.x, vf.y), (pf.x, pf.y), F_CU));
         chain.push(wave(WaveKind::Cosine, 1.0, end_swap, x_out, F_CU, strand));
         chain.extend(handover);
 
@@ -762,8 +724,8 @@ fn make_cosine_elements(c: &SensorConfig) -> Result<Vec<Element>, String> {
             B_CU,
             next,
         ));
-        chain.push(connector((pr.x, pr.y), (vr.x, vr.y), B_CU, next));
-        chain.push(connector((vr.x, vr.y), (pr.x, pr.y), F_CU, next));
+        chain.push(connector((pr.x, pr.y), (vr.x, vr.y), B_CU));
+        chain.push(connector((vr.x, vr.y), (pr.x, pr.y), F_CU));
         chain.push(wave(
             WaveKind::Cosine,
             -1.0,
@@ -772,8 +734,8 @@ fn make_cosine_elements(c: &SensorConfig) -> Result<Vec<Element>, String> {
             F_CU,
             next,
         ));
-        chain.push(connector((prh.x, prh.y), (vrh.x, vrh.y), F_CU, next));
-        chain.push(connector((vrh.x, vrh.y), (prh.x, prh.y), B_CU, next));
+        chain.push(connector((prh.x, prh.y), (vrh.x, vrh.y), F_CU));
+        chain.push(connector((vrh.x, vrh.y), (prh.x, prh.y), B_CU));
         chain.push(wave(
             WaveKind::Cosine,
             -1.0,
@@ -785,25 +747,16 @@ fn make_cosine_elements(c: &SensorConfig) -> Result<Vec<Element>, String> {
     }
 
     let y_start = wave_y(c, WaveKind::Cosine, 1.0, x0, 0);
-    chain.push(connector((x0, -y_start), (x0, -lead_y), B_CU, 0));
+    chain.push(connector((x0, -y_start), (x0, -lead_y), B_CU));
     Ok(chain)
 }
 
-fn element_endpoints(c: &SensorConfig, element: Element) -> (Point, Point, u32, u32) {
+fn element_endpoints(c: &SensorConfig, element: Element) -> (Point, Point, u32) {
     match element {
-        Element::Connector {
-            start,
-            end,
-            layer,
-            strand,
-        }
+        Element::Connector { start, end, layer }
         | Element::Bulge {
-            start,
-            end,
-            layer,
-            strand,
-            ..
-        } => (start, end, layer, strand),
+            start, end, layer, ..
+        } => (start, end, layer),
         Element::Wave {
             kind,
             side,
@@ -815,7 +768,6 @@ fn element_endpoints(c: &SensorConfig, element: Element) -> (Point, Point, u32, 
             leg_point(c, kind, side, x_start, strand),
             leg_point(c, kind, side, x_end, strand),
             layer,
-            strand,
         ),
     }
 }
@@ -987,26 +939,17 @@ fn emit_chain(
     c: &SensorConfig,
     elements: &[Element],
     net: &str,
-    is_active: bool,
-) -> Result<
-    (
-        Vec<RouteSegment>,
-        Vec<RouteCurve>,
-        Vec<RouteSpline>,
-        Vec<Via>,
-    ),
-    String,
-> {
+) -> Result<SensorNetGeometry, String> {
     let mut segments = Vec::new();
     let mut curves = Vec::new();
     let mut splines = Vec::new();
     let mut vias = Vec::new();
     let mut seen_vias = Vec::new();
-    let mut previous: Option<(Point, u32, u32)> = None;
+    let mut previous: Option<(Point, u32)> = None;
 
     for (index, element) in elements.iter().copied().enumerate() {
-        let (mut start, end, layer, strand) = element_endpoints(c, element);
-        if let Some((previous_end, previous_layer, _previous_strand)) = previous {
+        let (mut start, end, layer) = element_endpoints(c, element);
+        if let Some((previous_end, previous_layer)) = previous {
             if !same_point(start, previous_end) {
                 return Err(format!(
                     "{net} chain is discontinuous before element {index}: ({:.9}, {:.9}) != ({:.9}, {:.9})",
@@ -1035,7 +978,7 @@ fn emit_chain(
                 end,
                 layer,
                 net: net.to_string(),
-                is_active,
+                is_active: true,
             }),
             Element::Wave {
                 kind,
@@ -1055,7 +998,7 @@ fn emit_chain(
                         weights: vec![],
                         layer,
                         net: net.to_string(),
-                        is_active,
+                        is_active: true,
                     });
                 }
             }
@@ -1067,13 +1010,22 @@ fn emit_chain(
                     end,
                     layer,
                     net: net.to_string(),
-                    is_active,
+                    is_active: true,
                 });
             }
         }
-        previous = Some((end, layer, strand));
+        previous = Some((end, layer));
     }
-    Ok((segments, curves, splines, vias))
+    Ok(SensorNetGeometry {
+        name: net.to_string(),
+        segments,
+        curves,
+        splines,
+        vias,
+        trace_width_mm: c.trace_width_mm,
+        via_size_mm: c.via_size_mm,
+        arc_step_mm: c.arc_step_mm,
+    })
 }
 
 fn generate_tx(c: &SensorConfig) -> (Vec<RouteSegment>, Vec<Via>, Vec<(String, Point)>) {
@@ -1147,30 +1099,7 @@ pub fn generate_sensor(c: &SensorConfig) -> Result<SensorGeometry, String> {
     validate(c)?;
     let cosine = make_cosine_elements(c)?;
     let sine = make_sine_elements(c)?;
-    let (cl1_segments, cl1_curves, cl1_splines, cl1_vias) = emit_chain(c, &cosine, "CL1", true)?;
-    let (cl2_segments, cl2_curves, cl2_splines, cl2_vias) = emit_chain(c, &sine, "CL2", true)?;
-    let mut nets = vec![
-        SensorNetGeometry {
-            name: "CL1".into(),
-            segments: cl1_segments,
-            curves: cl1_curves,
-            splines: cl1_splines,
-            vias: cl1_vias,
-            trace_width_mm: c.trace_width_mm,
-            via_size_mm: c.via_size_mm,
-            arc_step_mm: c.arc_step_mm,
-        },
-        SensorNetGeometry {
-            name: "CL2".into(),
-            segments: cl2_segments,
-            curves: cl2_curves,
-            splines: cl2_splines,
-            vias: cl2_vias,
-            trace_width_mm: c.trace_width_mm,
-            via_size_mm: c.via_size_mm,
-            arc_step_mm: c.arc_step_mm,
-        },
-    ];
+    let mut nets = vec![emit_chain(c, &cosine, "CL1")?, emit_chain(c, &sine, "CL2")?];
     let mut terminal_markers = Vec::new();
     if c.tx_enabled {
         let (segments, vias, terminals) = generate_tx(c);
@@ -1357,7 +1286,8 @@ mod tests {
 
     #[test]
     fn default_geometry_keeps_waves_and_bends_as_curves() {
-        let geometry = generate_sensor(&SensorConfig::default()).unwrap();
+        let config = SensorConfig::default();
+        let geometry = generate_sensor(&config).unwrap();
         assert_eq!(
             geometry
                 .nets
@@ -1376,6 +1306,25 @@ mod tests {
         assert_eq!(geometry.nets[2].segments.len(), 23);
         assert_eq!(geometry.nets[2].vias.len(), 3);
         assert_eq!(geometry.terminal_markers.len(), 2);
+        for net in &geometry.nets[..2] {
+            assert_eq!(net.trace_width_mm, config.trace_width_mm);
+            assert_eq!(net.via_size_mm, config.via_size_mm);
+            assert_eq!(net.arc_step_mm, config.arc_step_mm);
+            assert!(net
+                .segments
+                .iter()
+                .all(|part| part.is_active && part.net == net.name));
+            assert!(net
+                .curves
+                .iter()
+                .all(|part| part.is_active && part.net == net.name));
+            assert!(net
+                .splines
+                .iter()
+                .all(|part| part.is_active && part.net == net.name));
+            assert!(net.vias.iter().all(|part| part.net == net.name));
+        }
+        assert!(geometry.nets[2].segments.iter().all(|part| !part.is_active));
     }
 
     #[test]

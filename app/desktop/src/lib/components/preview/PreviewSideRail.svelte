@@ -4,7 +4,7 @@
   import { onDestroy } from "svelte";
   import { Layers, X, Plug, CircuitBoard, Route, Magnet, Gauge, Waves } from "@lucide/svelte";
   import type { Snippet } from "svelte";
-  import { DESIGN_PANELS, isDesignPanel, isLeftPanel, type DesignPanelId, type PreviewPanelId } from "../design/previewPanels";
+  import { DESIGN_PANELS, isDesignPanel, isLeftPanel, type DesignPanelId, type PreviewPanelId } from "../../preview/previewPanels";
   import CoilTerminalPanel from "../winding/CoilTerminalPanel.svelte";
   import type { CoilTerminalTool } from "../../cad/coilTerminalTool.svelte";
   import PreviewVisibilityPanel from "./PreviewVisibilityPanel.svelte";

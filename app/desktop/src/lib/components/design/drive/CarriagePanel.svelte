@@ -2,7 +2,7 @@
   import type { ConfigStore } from "../../../stores/config.svelte";
   import { MAGNET_MASS_REFERENCES } from "../../../move/carriageMass";
   import NumberField from "../../ui/NumberField.svelte";
-  import SettingRow from "../../simulate/SettingRow.svelte";
+  import SettingRow from "../SettingRow.svelte";
 
   let { config }: { config: ConfigStore } = $props();
   const field = "w-24 shrink-0 px-2 py-1 text-xs font-mono text-emerald-200";

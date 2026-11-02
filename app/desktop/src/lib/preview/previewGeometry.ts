@@ -129,24 +129,6 @@ export function measureTrace(coils: CoilPathDto | null): TraceMeasure | null {
   };
 }
 
-/**
- * Mover-strip bounds in the DOMAIN (routing) frame — THE single anchor
- * shared by the canvas overlay, the iso view, the coil preview and the
- * position readouts. The strip is centred on the MotionStore's clamped
- * position (absolute track coordinates), so drawn edges always equal
- * position ± mover_span/2 and every printed number agrees with every pixel.
- */
-export function stripBoundsDomainMm(
-  config: PreviewConfigLike & { mover_span_mm: number },
-  motion: { clampedPositionMm: number },
-): { startMm: number; endMm: number } {
-  const half = config.mover_span_mm / 2;
-  return {
-    startMm: motion.clampedPositionMm - half,
-    endMm: motion.clampedPositionMm + half,
-  };
-}
-
 /** Full geometry derivation for the preview camera + drawing. */
 export function computePreviewGeometry(
   coils: CoilPathDto | null,

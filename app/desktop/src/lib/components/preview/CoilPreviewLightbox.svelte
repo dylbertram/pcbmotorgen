@@ -15,26 +15,26 @@
   import { Dialog, DropdownMenu } from "bits-ui";
   import { onDestroy, untrack } from "svelte";
   import type { Snippet } from "svelte";
-  import { isDesignPanel, isLeftPanel, type DesignPanelId, type PreviewPanelId } from "./previewPanels";
+  import { isDesignPanel, isLeftPanel, type DesignPanelId, type PreviewPanelId } from "../../preview/previewPanels";
   import type { CadGeometry } from "../../types";
   import type { WorldTransform } from "../../geometry/viewport";
   import type { CoilTerminalTool } from "../../cad/coilTerminalTool.svelte";
   import CoilTerminalOverlay from "../winding/CoilTerminalOverlay.svelte";
-  import PreviewLayerSlider from "../preview/PreviewLayerSlider.svelte";
+  import PreviewLayerSlider from "./PreviewLayerSlider.svelte";
   import type { PreviewGestures } from "../../preview/previewGestures.svelte";
   import type { PreviewMeasure } from "../../measure/previewMeasure.svelte";
   import {
     attachBackdropScrollGuard,
     lockPageScroll,
   } from "../../utils/pageScrollLock";
-  import PreviewZoomControls from "../preview/PreviewZoomControls.svelte";
+  import PreviewZoomControls from "./PreviewZoomControls.svelte";
   import ViewportViewControls from "./ViewportViewControls.svelte";
   import NativeViewMenuBridge from "./NativeViewMenuBridge.svelte";
   import GeometryEditingToolbar from "../cad/GeometryEditingToolbar.svelte";
   import GeometryEditingOverlay from "../cad/GeometryEditingOverlay.svelte";
-  import PreviewFrame from "../preview/PreviewFrame.svelte";
+  import PreviewFrame from "./PreviewFrame.svelte";
   import PreviewMeasureOverlay from "../measure/PreviewMeasureOverlay.svelte";
-  import PreviewSideRail from "../preview/PreviewSideRail.svelte";
+  import PreviewSideRail from "./PreviewSideRail.svelte";
   import CoilPreviewIsoView from "./CoilPreviewIsoView.svelte";
   import MoverPositionControls from "./MoverPositionControls.svelte";
   import { PREVIEW_H, PREVIEW_W } from "../../preview/previewStyle";
@@ -44,7 +44,7 @@
   import PreviewStatus from "./PreviewStatus.svelte";
   import type { VisualizationInput } from "../../types/simulationVisualization";
   import { SpatialMeasure } from "../../measure/spatialMeasure.svelte";
-  import ZoomWindowOverlay from "../preview/ZoomWindowOverlay.svelte";
+  import ZoomWindowOverlay from "./ZoomWindowOverlay.svelte";
 
   let {
     expanded = $bindable(false),
