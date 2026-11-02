@@ -11,7 +11,7 @@ pub struct Definition {
     pub action: Option<String>,
 }
 pub fn groups() -> Vec<Vec<Definition>> {
-    serde_json::from_str(include_str!("../../src/lib/viewMenu.json")).expect("bundled View menu schema")
+    serde_json::from_str(include_str!("../../src/lib/menu/viewMenu.json")).expect("bundled View menu schema")
 }
 #[derive(Clone, Default, serde::Deserialize)]
 pub struct ViewMenuState { pub owner: Option<String>, pub items: Vec<ItemState> }

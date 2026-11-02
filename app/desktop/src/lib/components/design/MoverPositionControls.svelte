@@ -21,7 +21,7 @@
    */
   import type { ConfigStore } from "../../stores/config.svelte";
   import type { MotionStore } from "../../stores/motion.svelte";
-  import { stripBoundsDomainMm } from "../../previewGeometry";
+  import { stripBoundsDomainMm } from "../../preview/previewGeometry";
   import NumberField from "../ui/NumberField.svelte";
   import Slider from "../ui/Slider.svelte";
   import HelpTag from "../ui/HelpTag.svelte";

@@ -28,7 +28,7 @@ for (const layers of [2, 4, 6, 8]) {
       await expect(viewer).toHaveAttribute("data-vias", /[1-9]/);
       const viaCount=(await viewer.getAttribute("data-vias"))!;
       const spanPadCount = await page.evaluate(async ({ coils, layers }) => {
-        const { generatedTerminalGeometry } = await import(/* @vite-ignore */ "/src/lib/generatedTerminalGeometry.ts");
+        const { generatedTerminalGeometry } = await import(/* @vite-ignore */ "/src/lib/routing/generatedTerminalGeometry.ts");
         const geometry = generatedTerminalGeometry(JSON.parse(coils), layers, 1.6, .2, 2);
         return geometry.routing.vias.reduce((sum, via) => sum + Math.abs(via.to_layer - via.from_layer) + 1, 0);
       }, { coils, layers });
@@ -48,7 +48,7 @@ for (const layers of [2, 4, 6, 8]) {
       if (layers > 2) {
         // Through-vias still cross an inner layer when both outer layers are hidden.
         const expectedVias = await page.evaluate(async ({ coils, layers }) => {
-          const { generatedTerminalGeometry } = await import(/* @vite-ignore */ "/src/lib/generatedTerminalGeometry.ts");
+          const { generatedTerminalGeometry } = await import(/* @vite-ignore */ "/src/lib/routing/generatedTerminalGeometry.ts");
           const geometry = generatedTerminalGeometry(JSON.parse(coils), layers, 1.6, .2, 2);
           return geometry.routing.vias.filter(via => Math.min(via.from_layer, via.to_layer) <= 1 && Math.max(via.from_layer, via.to_layer) >= 1).length;
         }, { coils, layers });

@@ -57,8 +57,8 @@ pub fn get_grade(grade: &str) -> Option<MagnetGrade> {
 fn extract_base_grade(grade: &str) -> Option<String> {
     let g = grade.trim();
     let lower = g.to_ascii_lowercase();
-    if lower.starts_with('n') {
-        let digits: String = lower[1..]
+    if let Some(suffix) = lower.strip_prefix('n') {
+        let digits: String = suffix
             .chars()
             .take_while(|c| c.is_ascii_digit())
             .collect();

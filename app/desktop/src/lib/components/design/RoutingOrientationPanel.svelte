@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { ConfigStore } from "../../stores/config.svelte";
   import type { CadGeometry } from "../../types";
-  import { DEFAULT_ROUTING_ORIENTATION, flipCadGeometry, type RoutingFlip } from "../../routingOrientation";
+  import { DEFAULT_ROUTING_ORIENTATION, flipCadGeometry, type RoutingFlip } from "../../routing/routingOrientation";
 
   let { config, geometry = null, onGeometryChange }: {
     config: ConfigStore;

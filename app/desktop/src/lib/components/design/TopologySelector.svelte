@@ -1,11 +1,11 @@
 <script lang="ts">
   import type { ConfigStore } from "../../stores/config.svelte";
   import { Select } from "bits-ui";
-  import { formatLayerRange } from "../../layerConstraints";
+  import { formatLayerRange } from "../../constraints/layerConstraints";
   import Separator from "../ui/Separator.svelte";
   import RoutingParamsPanel from "./RoutingParamsPanel.svelte";
   import GeneratorUploadPanel from "../plugins/GeneratorUploadPanel.svelte";
-  import { routingSources } from "../../routingSources";
+  import { routingSources } from "../../routing/routingSources";
 
   let { config, cadGeometryActive = false, cadSourceFileName, onImportCad, onUseGenerated }: {
     config: ConfigStore;

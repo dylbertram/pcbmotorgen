@@ -16,7 +16,7 @@
     InterferenceViolation,
     CadGeometry,
   } from "../../types";
-  import { cadMappingProblems } from "../../cadMapping";
+  import { cadMappingProblems } from "../../cad/cadMapping";
   import KicadConnectionCard from "./KicadConnectionCard.svelte";
   import KicadPreflightCard from "./KicadPreflightCard.svelte";
   import KicadWriteControls from "./KicadWriteControls.svelte";

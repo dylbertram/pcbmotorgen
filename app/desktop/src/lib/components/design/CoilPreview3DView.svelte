@@ -1,24 +1,24 @@
 <script lang="ts">
   import { Canvas } from "@threlte/core";
   import type { CadGeometry } from "../../types";
-  import { buildCoilScene, connectedViaPads, isViaVisible } from "../../coilScene";
+  import { buildCoilScene, connectedViaPads, isViaVisible } from "../../visualization/coilScene";
   import type { CoilPreviewViewState } from "./coilPreviewViewState.svelte";
   import CoilPreviewScene from "./CoilPreviewScene.svelte";
   import { untrack, onDestroy } from "svelte";
   import type { VisualizationInput, VisualizationMode, VisualizationRequest } from "../../types/simulationVisualization";
-  import { SimulationVisualizationController, type VisualizationView } from "../../simulationVisualizationController";
+  import { SimulationVisualizationController, type VisualizationView } from "../../simulation/simulationVisualizationController";
   import { sampleSimulationVisualization } from "../../ipc/simulationVisualization";
-  import { FIELD_PALETTE, HEAT_PALETTE, mapCopperLoss } from "../../visualizationGeometry";
-  import type { FieldStyle } from "../../simulationFieldGeometry";
+  import { FIELD_PALETTE, HEAT_PALETTE, mapCopperLoss } from "../../visualization/visualizationGeometry";
+  import type { FieldStyle } from "../../visualization/simulationFieldGeometry";
   import type { DcWindingFieldResult } from "../../types/dcCoupling";
   import QualifiedCoilFieldControls from "./QualifiedCoilFieldControls.svelte";
-  import { combineVisualizationFields } from "../../combineVisualizationFields";
-  import { placedCopperGeometry } from "../../copperLayerPlacement";
-  import { pcbBody } from "../../pcbBody";
-  import type { SpatialMeasure } from "../../spatialMeasure.svelte";
+  import { combineVisualizationFields } from "../../visualization/combineVisualizationFields";
+  import { placedCopperGeometry } from "../../pcb/copperLayerPlacement";
+  import { computePcbBody } from "../../pcb/pcbBody";
+  import type { SpatialMeasure } from "../../measure/spatialMeasure.svelte";
   import ZoomWindowOverlay from "./ZoomWindowOverlay.svelte";
-  import type { PcbStackupMm } from "../../pcbStackup";
-  import type { TopCameraTransform } from "../../fitCoilCamera";
+  import type { PcbStackupMm } from "../../pcb/pcbStackup";
+  import type { TopCameraTransform } from "../../visualization/fitCoilCamera";
   import ViewportAxes from "./ViewportAxes.svelte";
   import type { Snippet } from "svelte";
 
@@ -46,7 +46,7 @@
   });
   const geometry = $derived(placement.geometry);
   let scene = $derived(buildCoilScene(geometry, { ...copperThicknessMm, layers: pcbStackup?.copper_mm }));
-  const board = $derived(geometry && scene ? pcbBody(geometry, scene, pcbThicknessMm, pcbStackup ? 0 : undefined) : null);
+  const board = $derived(geometry && scene ? computePcbBody(geometry, scene, pcbThicknessMm, pcbStackup ? 0 : undefined) : null);
   $effect(() => { void geometry; untrack(() => measure?.clear()); });
   let paths = $derived(scene?.paths.filter(p => view.isLayerVisible(p.layer) && isVisible(p.net, p.layer) && (!visibleCopperKeys || visibleCopperKeys.has(p.key))) ?? []);
   let vias = $derived(view.showVias ? scene?.vias.filter(v =>

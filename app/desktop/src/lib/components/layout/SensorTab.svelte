@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { SensorStore } from "../../stores/sensor.svelte";
-  import SensorParamField from "../design/SensorParamField.svelte";
+  import SensorParamField from "../sensor/SensorParamField.svelte";
 
   let { store }: { store: SensorStore } = $props();
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { extractBaseGrade, getRemanence, GRADE_NAMES, MAGNET_GRADES } from "./magnets";
+import { extractBaseGrade, getRemanence, MAGNET_GRADES } from "./magnets";
 
 describe("extractBaseGrade", () => {
   it("strips thermal suffixes from the base grade", () => {
@@ -25,7 +25,7 @@ describe("getRemanence", () => {
 
 describe("MAGNET_GRADES catalog", () => {
   it("has the six standard grades with sane Br bounds", () => {
-    expect(GRADE_NAMES).toEqual(["N35", "N38", "N42", "N44", "N48", "N52"]);
+    expect(Object.keys(MAGNET_GRADES)).toEqual(["N35", "N38", "N42", "N44", "N48", "N52"]);
     for (const g of Object.values(MAGNET_GRADES)) {
       expect(g.br_min_t).toBeLessThanOrEqual(g.br_typ_t);
       expect(g.br_typ_t).toBeLessThanOrEqual(g.br_max_t);

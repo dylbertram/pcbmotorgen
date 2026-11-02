@@ -4,8 +4,8 @@
 
 import type { BackplaneStack } from "./backplane";
 import type { CommutationMode } from "./enums";
-import type { PcbStackupSi } from "../pcbStackup";
-import type { RoutingOrientation } from "../routingOrientation";
+import type { PcbStackupSi } from "../pcb/pcbStackup";
+import type { RoutingOrientation } from "../routing/routingOrientation";
 
 /** The full design configuration sent to the Tauri backend on every call. */
 export interface LinearMotorConfig {

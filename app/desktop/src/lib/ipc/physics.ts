@@ -8,14 +8,13 @@
  */
 
 import { invoke } from "@tauri-apps/api/core";
-import { assertCadMapping } from "../cadMapping";
-import { driverConnectionError, usesDeltaConnection } from "../driverConnection";
+import { assertCadMapping } from "../cad/cadMapping";
+import { driverConnectionError, usesDeltaConnection } from "../driver/driverConnection";
 import type {
   LinearMotorConfig,
   CoilPathDto,
   ForceSweepResult,
   HeightStackResultDto,
-  FrictionBudgetDto,
   TravelEnvelopeDto,
   MagnetGrade,
   DriveSettings,
@@ -24,15 +23,13 @@ import type {
 } from "../types";
 import type { HousingMotionAnalysis } from "../types/drive";
 import { isTauriAvailable } from "./core";
-import { orientCoilPreview } from "../routingOrientation";
+import { orientCoilPreview } from "../routing/routingOrientation";
 import type { PeriodicStaticReference } from "../types/periodicReference";
-import type { DcWindingGeometry } from "../types/dcCoupling";
 import type { MovePowerInputs, NativeMoveResult } from "../types/movePower";
 import {
   mockCoils,
   mockForceSweep,
   mockHeightStack,
-  mockFriction,
   mockTravelEnvelope,
   mockMagnetGrades,
   mockDriveAnalysis,
@@ -106,13 +103,6 @@ export async function periodicBackplaneReference(
   return await invoke<PeriodicStaticReference>("periodic_backplane_reference", { config });
 }
 
-export async function computeFriction(
-  config: LinearMotorConfig,
-): Promise<FrictionBudgetDto> {
-  if (!isTauriAvailable()) return mockFriction(config);
-  return await invoke<FrictionBudgetDto>("compute_friction", { config });
-}
-
 /**
  * Driver suitability from the routed copper (analyze_drive). `kf` is the
  * force sweep's mean thrust per ampere; null skips the speed/thrust checks.
@@ -134,19 +124,6 @@ export async function analyzeDrive(
     thrustConstantNPerA: kf,
     cadGeometry,
   });
-}
-
-/** Actual winding geometry only, with no browser physics substitute. */
-export async function prepareDcWindingGeometry(
-  config: LinearMotorConfig,
-  driveSettings: DriveSettings,
-  cadGeometry: CadGeometry | null = null,
-): Promise<DcWindingGeometry> {
-  assertCadMapping(cadGeometry, config);
-  if (!isTauriAvailable()) {
-    throw new Error("Finite DC geometry preparation requires the desktop app. Browser previews do not substitute winding geometry or forces.");
-  }
-  return await invoke<DcWindingGeometry>("prepare_dc_winding_geometry", { config, driveSettings, cadGeometry });
 }
 
 /** Independent PM/housing capability. Never fabricates a browser substitute. */

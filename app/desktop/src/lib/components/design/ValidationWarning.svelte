@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { ConfigStore } from "../../stores/config.svelte";
-  import { validateDesign, hasErrors as hasFindingsErrors } from "../../validation";
+  import { validateDesign, hasErrors as hasFindingsErrors } from "../../constraints/validation";
 
   let { config }: { config: ConfigStore } = $props();
 

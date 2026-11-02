@@ -4,21 +4,21 @@
   import { untrack, tick } from "svelte";
   import { Box3, Vector3, MOUSE, TOUCH, type Group, type OrthographicCamera } from "three";
   import type { OrbitControls as OrbitController } from "three/examples/jsm/controls/OrbitControls.js";
-  import { fitCoilCamera, fitCoilWindow, coilWindowFocus, stopCoilCameraMotion, alignTopCamera, type TopCameraTransform } from "../../fitCoilCamera";
-  import type { CoilScene, CopperPath } from "../../coilScene";
+  import { fitCoilCamera, fitCoilWindow, coilWindowFocus, stopCoilCameraMotion, alignTopCamera, type TopCameraTransform } from "../../visualization/fitCoilCamera";
+  import type { CoilScene, CopperPath } from "../../visualization/coilScene";
   import { PHASE_COLORS } from "./coilPreviewCanvas";
-  import CoilCopperBatch from "./CoilCopperBatch.svelte";
-  import SimulationFieldGlyphs from "./SimulationFieldGlyphs.svelte";
-  import SimulationMagnets from "./SimulationMagnets.svelte";
+  import CoilCopperBatch from "../scene/CoilCopperBatch.svelte";
+  import SimulationFieldGlyphs from "../scene/SimulationFieldGlyphs.svelte";
+  import SimulationMagnets from "../scene/SimulationMagnets.svelte";
   import type { FieldPreview } from "../../types/simulationVisualization";
-  import { HEAT_PALETTE, heatColor } from "../../visualizationGeometry";
-  import type { FieldStyle } from "../../simulationFieldGeometry";
-  import type { pcbBody } from "../../pcbBody";
-  import SpatialMeasureScene from "./SpatialMeasureScene.svelte";
-  import type { SpatialMeasure } from "../../spatialMeasure.svelte";
-  import ViaPadsBatch from "./ViaPadsBatch.svelte";
-  import CoilTerminalMarkers from "./CoilTerminalMarkers.svelte";
-  import type { CopperPad } from "../../viaCopperMesh";
+  import { HEAT_PALETTE, heatColor } from "../../visualization/visualizationGeometry";
+  import type { FieldStyle } from "../../visualization/simulationFieldGeometry";
+  import type { computePcbBody } from "../../pcb/pcbBody";
+  import SpatialMeasureScene from "../scene/SpatialMeasureScene.svelte";
+  import type { SpatialMeasure } from "../../measure/spatialMeasure.svelte";
+  import ViaPadsBatch from "../scene/ViaPadsBatch.svelte";
+  import CoilTerminalMarkers from "../scene/CoilTerminalMarkers.svelte";
+  import type { CopperPad } from "../../visualization/viaCopperMesh";
 
   let { scene, paths, vias, pads = [], viaSize = {diameter:.04,drill:.02}, terminals, traceMode, reset, fit = 0, command, windowCommand = {id:0,a:[0,0],b:[1,1]}, onCamera, viewMode = "iso", topCamera = null, board = null, showPcb = false, measure = null, field = null, heat = null, opacity = .8, fieldStyle = "lines-slice", sliceFraction = .5, sectionView = false, magnets = [] }: {
     scene: CoilScene;
@@ -35,7 +35,7 @@
     onCamera?: (snapshot: { position: number[]; target: number[]; up: number[]; zoom: number; fitZoom: number }) => void;
     viewMode?: "top" | "front" | "left" | "iso";
     topCamera?: TopCameraTransform | null;
-    board?: ReturnType<typeof pcbBody> | null;
+    board?: ReturnType<typeof computePcbBody> | null;
     showPcb?: boolean;
     measure?: SpatialMeasure | null;
     field?: FieldPreview | null;

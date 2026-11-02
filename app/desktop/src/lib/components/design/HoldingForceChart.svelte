@@ -20,7 +20,7 @@
     restPositions,
     phaseStroke,
     phaseFill,
-  } from "../../holdingForce";
+  } from "./holdingForce";
 
   let { config, motion, flush = false }: { config: ConfigStore; motion: MotionStore; flush?: boolean } = $props();
 

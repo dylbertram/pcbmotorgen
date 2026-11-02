@@ -1,9 +1,6 @@
 /**
- * coilPreviewCanvas.ts
- * ============================================================================
- * Canvas paint routines for the coil preview (extracted from
- * CoilPreview.svelte, which now only builds the per-tick `CoilPreviewDrawInput`
- * snapshot and owns the frame/canvas refs + ResizeObserver sizing).
+ * Canvas paint routines for the coil preview. CoilPreview owns the canvas
+ * and frame sizing and supplies a per-draw CoilPreviewDrawInput snapshot.
  *
  * Everything drawn in one tick lives in `CoilPreviewRenderer.draw`:
  *   - the dark PCB panel + active-copper band,
@@ -21,30 +18,23 @@
  *  2. virtual 760×260 csspx under `setTransform(k, …)` for the legend and
  *     disclaimer overlays that must not move with the world.
  *
- * Introspection counters. These are NOT Svelte `$state`: draw() runs inside
- * an `$effect` in the component, and writing reactive state from an effect
- * reschedules the effect (Svelte retries the flush ~1000×), i.e. a full
- * repaint storm on load. Plain locals + imperative `canvas.dataset` writes
- * give e2e/debug hooks with zero reactivity feedback. `#revision` is a single
- * shared counter across the inline and modal canvases (one renderer instance
- * per CoilPreview); `drawnSegments`/`drawnVias` are per-draw locals written to
- * whatever canvas was passed in.
+ * Draw counters are plain locals written to canvas.dataset: reactive state
+ * would reschedule the effect that draws the canvas. The revision is shared
+ * between inline and modal canvases; segment and via counts are per draw.
  */
 
 import type { CoilArcDto, CoilPathDto, CoilSegmentDto } from "../../types";
 import {
-  computeMeasureRuler,
-  formatMarginMm,
-  formatMetresMm,
-  type BandWidthRow,
   type MagnetStrip,
-  type PolePitchRuler,
-  type PoleRegionZone,
-  type Point2D,
   type PreviewGeometry,
-} from "../../previewGeometry";
+} from "../../preview/previewGeometry";
+import type { BandWidthRow } from "../../preview/bandWidth";
+import type { PolePitchRuler } from "../../preview/polePitch";
+import { formatMarginMm, formatMetresMm } from "../../format";
+import type { PoleRegionZone } from "../../preview/poleRegions";
+import { computeMeasureRuler, type Point2D } from "../../measure/measureRuler";
 import type { WorldTransform } from "../../chart";
-import { arcSvgPath, splineSvgPath } from "../../curvePaths";
+import { arcSvgPath, splineSvgPath } from "../../geometry/curvePaths";
 
 /**
  * World geometry reaches the canvas in micrometres, not metres. WebKit (the

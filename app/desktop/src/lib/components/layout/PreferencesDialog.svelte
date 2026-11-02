@@ -4,7 +4,7 @@
   import type { ConfigStore } from "../../stores/config.svelte";
   import { DEFAULT_RULES, RULE_FIELDS, readPreferences, writePreferences, validRules, type Appearance, type DrcRules } from "../../preferences";
   import { attachBackdropScrollGuard, lockPageScroll } from "../../utils/pageScrollLock";
-  import { importKicadDrc } from "../../kicadDrc";
+  import { importKicadDrc } from "../../drc/kicadDrc";
   import { drcRulesets } from "../../stores/drcRulesets.svelte";
   import DriverLibrarySection from "./DriverLibrarySection.svelte";
   import CoilPatternLibrarySection from "./CoilPatternLibrarySection.svelte";

@@ -8,7 +8,7 @@
  */
 
 import { invoke } from "@tauri-apps/api/core";
-import { assertCadMapping } from "../cadMapping";
+import { assertCadMapping } from "../cad/cadMapping";
 import type {
   CadGeometry,
   LinearMotorConfig,

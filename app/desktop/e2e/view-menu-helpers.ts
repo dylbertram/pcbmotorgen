@@ -1,5 +1,5 @@
 import { expect, type Page } from "@playwright/test";
-import type { ViewMenuState } from "../src/lib/viewMenu";
+import type { ViewMenuState } from "../src/lib/menu/viewMenu";
 
 /** Exercise the real menu controller at its native IPC boundary in Chromium. */
 export async function installViewMenu(page: Page): Promise<void> {

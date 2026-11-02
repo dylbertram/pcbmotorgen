@@ -33,7 +33,7 @@ describe("paddedRange", () => {
 
   it("falls back to a tiny pad for flat data", () => {
     const [min, max] = paddedRange([5, 5]);
-    expect(max - min).toBeCloseTo(0.002);
+    expect(max - min).toBeCloseTo(0.002, 9);
   });
 });
 

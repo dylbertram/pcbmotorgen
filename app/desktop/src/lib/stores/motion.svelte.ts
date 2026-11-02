@@ -26,7 +26,7 @@
 
 import type { ConfigStore } from "./config.svelte";
 import type { TravelEnvelopeDto } from "../types";
-import type { Finding } from "../validation";
+import type { Finding } from "../constraints/validation";
 import {
   PLACEHOLDER_TRAVEL_ENVELOPE,
   isPlaceholderEnvelope,

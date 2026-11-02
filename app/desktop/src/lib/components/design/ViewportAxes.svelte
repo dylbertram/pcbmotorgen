@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { viewportAxes, type AxisCamera, type AxisView } from "../../viewportAxes";
+  import { viewportAxes, type AxisCamera, type AxisView } from "../../visualization/viewportAxes";
   let { view, camera = null }: { view: AxisView; camera?: AxisCamera | null } = $props();
   const axes = $derived(viewportAxes(view, camera));
 </script>

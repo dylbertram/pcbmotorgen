@@ -23,8 +23,6 @@ export const MAGNET_GRADES: Record<string, MagnetGrade> = {
   N52: { name: "N52", br_min_t: 1.43, br_typ_t: 1.45, br_max_t: 1.48, max_temp_c: { Std: 80 } },
 };
 
-export const GRADE_NAMES = Object.keys(MAGNET_GRADES);
-
 /** Extract base grade (e.g. "N44H" → "N44"). */
 export function extractBaseGrade(grade: string): string {
   const m = grade.trim().match(/^([Nn]\d+)/);

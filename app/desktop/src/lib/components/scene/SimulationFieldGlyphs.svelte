@@ -1,0 +1,25 @@
+<script lang="ts">
+  import { T, useThrelte } from "@threlte/core";
+  import { DoubleSide } from "three";
+  import type { CoilScene } from "../../visualization/coilScene";
+  import type { FieldPreview } from "../../types/simulationVisualization";
+  import { fieldGlyphGeometry } from "../../visualization/visualizationGeometry";
+  import { fieldLineGeometry, fieldSliceGeometry, type FieldStyle } from "../../visualization/simulationFieldGeometry";
+
+  let { field, scene, opacity, style, sliceFraction }: { field: FieldPreview; scene: CoilScene; opacity: number; style: FieldStyle; sliceFraction: number } = $props();
+  const { invalidate } = useThrelte();
+  const geometry = $derived(style === "slice" ? null : style === "arrows" ? fieldGlyphGeometry(field, scene) : fieldLineGeometry(field, scene, sliceFraction, style === "lines-3d" ? "3d" : "slice"));
+  const slice = $derived(style === "slice" || style === "lines-slice" ? fieldSliceGeometry(field, scene, sliceFraction) : null);
+  $effect(() => { const current = geometry, currentSlice = slice; invalidate(); return () => { current?.dispose(); currentSlice?.dispose(); }; });
+</script>
+
+{#if slice}
+<T.Mesh geometry={slice} renderOrder={-1}>
+  <T.MeshBasicMaterial vertexColors transparent opacity={opacity * .6} side={DoubleSide} depthWrite={false} />
+</T.Mesh>
+{/if}
+{#if geometry}
+<T.LineSegments {geometry}>
+  <T.LineBasicMaterial vertexColors transparent {opacity} depthWrite={false} />
+</T.LineSegments>
+{/if}

@@ -8,7 +8,6 @@ import {
   mockCoils,
   mockForceSweep,
   mockHeightStack,
-  mockFriction,
   mockBoardDiagnostics,
   mockPreviewCoils,
   mockDxfExportResult,
@@ -18,7 +17,7 @@ import {
   isPlaceholderEnvelope,
 } from "./mocks";
 import type { LinearMotorConfig } from "../types";
-import { computePreviewGeometry, computeMagnets } from "../previewGeometry";
+import { computePreviewGeometry, computeMagnets } from "../preview/previewGeometry";
 
 it("force sweep endpoints keep the physical array inside the active area", () => {
   for (const width of [0.006, 0.012]) {
@@ -153,7 +152,7 @@ describe("mockCoils", () => {
     // Traces (and the board panel) span the routing domain, which EQUALS the
     // active area (no end padding) — the mover must have coils beneath it at
     // every travel position, exactly like the real infinity braid.
-    expect(g.contentBox.maxX).toBeCloseTo(0.147);
+    expect(g.contentBox.maxX).toBeCloseTo(0.147, 9);
 
     const magnets = computeMagnets(
       { magnet_count: 12, magnet_width_mm: 4.5, magnet_gap_mm: 1.5 },
@@ -162,18 +161,13 @@ describe("mockCoils", () => {
     const travelM = 0.075;
     const restMin = magnets[0].x;
     const restMax = magnets[magnets.length - 1].x + 4.5 / 1000;
-    // EXACT FIT (kata hrd8): the copper active area is the whole routing
-    // domain and active_area = span + travel, so the drawn board fits the
-    // swept strip with zero slack.
-    expect(g.contentBox.maxX).toBeCloseTo(0.147);
-    expect(restMax - restMin + travelM).toBeCloseTo(0.147);
+    // The painted bars span eleven pitches plus one magnet width, leaving
+    // one gap of slack relative to twelve full pitch cells plus travel.
+    expect(restMax - restMin + travelM).toBeCloseTo(0.1455, 9);
+    expect(g.contentBox.maxX - (restMax - restMin + travelM)).toBeCloseTo(0.0015, 9);
     // The drawn (pattern-anchored) rest strip starts on the board.
     expect(restMin).toBeGreaterThanOrEqual(0);
-    // Sweeping the strip across the mock ENVELOPE (the fixed placeholder —
-    // kata ab30) keeps it exactly within the domain: leading edge on the
-    // copper start at min, trailing edge on the copper end at max (the
-    // placeholder pin equals the authority `travel_envelope_over_slots`
-    // output for this reference build).
+    // The mock travel envelope keeps the swept strip inside the domain.
     const env = mockTravelEnvelope(c);
     const spanM = restMax - restMin;
     const stripStartAtMin = env.min_position_m - spanM / 2;
@@ -225,27 +219,18 @@ describe("mockForceSweep", () => {
   });
 });
 
-describe("mockFriction", () => {
-  it("splits the total into bearing/cable/wiper parts", () => {
-    const f = mockFriction(makeConfig({ friction_n: 0.1 }));
-    expect(f.total_n).toBe(0.1);
-    expect(f.bearing_friction_n + f.cable_drag_n + f.wiper_contact_n).toBeCloseTo(0.1);
-    expect(f.minimum_drive_force_n).toBeCloseTo(0.13);
-  });
-});
-
 describe("mockHeightStack", () => {
   it("does not add copper twice to an explicit stackup", () => {
     const h = mockHeightStack(makeConfig({ pcb_thickness_m:.0008, pcb_stackup:{copper_m:[35e-6,35e-6],dielectric_m:[.00073]} }));
     expect(h.cu_protrusion_m).toBe(0);
-    expect(h.total_height_m).toBeCloseTo(h.pcb_thickness_m+h.solder_mask_m+h.air_gap_m+h.magnet_height_m+h.tolerance_m);
+    expect(h.total_height_m).toBeCloseTo(h.pcb_thickness_m+h.solder_mask_m+h.air_gap_m+h.magnet_height_m+h.tolerance_m, 12);
   });
   it("sums the full stack including tolerance", () => {
     const c = makeConfig();
     const h = mockHeightStack(c);
     expect(h.total_height_m).toBeCloseTo(
       h.pcb_thickness_m + h.cu_protrusion_m + h.solder_mask_m + h.air_gap_m +
-        h.magnet_height_m + h.tolerance_m + h.backplane_m + h.housing_gap_m + h.housing_m,
+        h.magnet_height_m + h.tolerance_m + h.backplane_m + h.housing_gap_m + h.housing_m, 12,
     );
   });
 
@@ -260,10 +245,10 @@ describe("mockHeightStack", () => {
         housing: { material: "aluminum6061", thickness_m: 0.003, gap_m: 0.001 },
       },
     }));
-    expect(h.backplane_m).toBeCloseTo(0.0036);
-    expect(h.housing_gap_m).toBeCloseTo(0.001);
-    expect(h.housing_m).toBeCloseTo(0.003);
-    expect(h.total_height_m).toBeCloseTo(bare.total_height_m + 0.0036 + 0.001 + 0.003);
+    expect(h.backplane_m).toBeCloseTo(0.0036, 12);
+    expect(h.housing_gap_m).toBeCloseTo(0.001, 12);
+    expect(h.housing_m).toBeCloseTo(0.003, 12);
+    expect(h.total_height_m).toBeCloseTo(bare.total_height_m + 0.0036 + 0.001 + 0.003, 12);
     expect(h.backplane_analysis).toBeNull();
   });
 

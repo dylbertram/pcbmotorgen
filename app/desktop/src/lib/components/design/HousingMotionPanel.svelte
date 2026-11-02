@@ -3,7 +3,7 @@
   import type { HousingMotionAnalysis } from "../../types/drive";
   import type { CadGeometry } from "../../types";
   import NumberField from "../ui/NumberField.svelte";
-  import { validateBackplaneInput } from "../../validation";
+  import { validateBackplaneInput } from "../../constraints/validation";
   import { analyzeHousingMotion } from "../../ipc";
 
   let { config, cadGeometry = null }: { config: ConfigStore; cadGeometry?: CadGeometry | null } = $props();

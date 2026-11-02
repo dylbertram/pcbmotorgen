@@ -1,5 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
-import { gotoDesignApp } from "./helpers";
+import { gotoDesignApp, selectDesignPanel, selectRoutingConnection } from "./helpers";
 
 // UI transport fixtures only. Numerical verification uses the Rust model and
 // independent diffusion FEM, not these deliberately distinct display values.
@@ -40,9 +40,10 @@ async function motionBridge(page: Page) {
   }));
 }
 
-async function openHousing(page: Page) {
+async function openHousing(page: Page, connection?: "star" | "delta") {
   await gotoDesignApp(page);
-  await page.getByRole("button", { name: "Stackup", exact: true }).click();
+  if (connection) await selectRoutingConnection(page, connection);
+  await selectDesignPanel(page, "Stackup");
   await page.getByRole("button", { name: "Add backplane", exact: true }).click();
   await page.getByRole("checkbox", { name: "Housing below the backplane", exact: true }).check();
 }
@@ -123,7 +124,7 @@ test("a coreless housing can be analyzed without adding a magnetic shielding lay
 });
 
 test("housing motion does not require a compatible electrical driver or star winding", async ({ page }) => {
-  await motionBridge(page); await openHousing(page);
+  await motionBridge(page); await openHousing(page, "delta");
   const panel = page.getByRole("region", { name: "Experimental housing motion", exact: true });
   await panel.getByRole("checkbox").check(); await expect(panel.locator("dl")).toHaveCount(1);
   await expect.poll(() => page.evaluate(() => (window as any).__housingRequests.at(-1).config.routing_params.connection)).toBe(1);
@@ -140,7 +141,7 @@ test("browser previews do not fabricate housing physics when the desktop backend
 
 test("the current routing selector offers sixteen copper layers but nothing above the program cap", async ({ page }) => {
   await gotoDesignApp(page);
-  await page.getByRole("button", { name: "Routing", exact: true }).click();
+  await selectDesignPanel(page, "Routing");
   const layers = page.getByLabel("Copper layer count", { exact: true });
   await layers.click();
   await expect(page.getByRole("option", { name: "16", exact: true })).toBeVisible();

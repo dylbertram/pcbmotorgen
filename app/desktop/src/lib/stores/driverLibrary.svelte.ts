@@ -4,10 +4,10 @@
  * The Simulation tab's driver selector/Add flow and the Settings editor both
  * read and write this one instance, so an edit in either place shows up in the
  * other without a reload. Validation and persistence stay in
- * `lib/driverLibrary.ts` (pure functions, unit-tested); this store only holds
+ * `lib/driver/driverLibrary.ts` (pure functions, unit-tested); this store only holds
  * the in-memory list and reports whether a write reached browser storage.
  */
-import { driverValidationError, readDrivers, saveDrivers } from "../driverLibrary";
+import { driverValidationError, readDrivers, saveDrivers } from "../driver/driverLibrary";
 import type { DriverSpec } from "../types/drive";
 
 export class DriverLibrary {

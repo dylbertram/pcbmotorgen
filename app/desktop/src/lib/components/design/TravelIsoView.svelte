@@ -1,13 +1,13 @@
 <script lang="ts">
   import type { ConfigStore } from "../../stores/config.svelte";
-  import type { TraceMeasure } from "../../previewGeometry";
+  import type { TraceMeasure } from "../../preview/previewGeometry";
   import {
     ISO_Z_EXAG,
     isoBoxPath,
     isoVisibleFaces,
     isoCenter as computeIsoCenter,
     isoProject,
-  } from "../../geometry";
+  } from "../../geometry/isometric";
 
   let {
     config,

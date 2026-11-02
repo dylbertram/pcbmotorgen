@@ -1,7 +1,7 @@
 <script lang="ts">
   import { Dialog } from "bits-ui";
   import type { DriverSpec } from "../../types";
-  import { driverValidationError } from "../../driverLibrary";
+  import { driverValidationError } from "../../driver/driverLibrary";
 
   let { existingNames, onAdd, onClose, zIndex = 50 }: {
     existingNames: string[];

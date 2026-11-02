@@ -30,9 +30,8 @@ fn default_trace_width_m() -> f64 {
 
 /// Linear PCB coreless motor configuration — IPC / frontend contract.
 ///
-/// Mirrors `app/src/lib/types.ts` `LinearMotorConfig` **exactly** (field names,
-/// order, units). All lengths in metres, electrical in SI. Per PRODUCT_GOALS.md
-/// §3: `active_area_length_m` is the primary INPUT; `travel` is DERIVED.
+/// Corresponds to `app/desktop/src/lib/types/config.ts` `LinearMotorConfig`.
+/// Wire lengths are in metres and electrical quantities use SI units.
 ///
 /// Magnet axis convention (matches the frontend store):
 /// - `magnet_width_m`       — along the travel (x) axis.
@@ -119,13 +118,12 @@ pub struct LinearMotorConfigIpc {
 impl LinearMotorConfigIpc {
     /// Convert to the core SI representation.
     ///
-    /// Maps the IPC superset onto the core's compact fields:
+    /// Maps the IPC fields onto the core representation:
     /// - `magnet_dims_m = [magnet_width, magnet_cross_width, magnet_height]`
     /// - `magnet_pitch_m` passed through (core stores pitch, not gap).
-    /// - UI-only fields (`num_layers`, `commutation`, `n_positions`,
-    ///   `meshing`, `magnet_gap_m`, `magnet_cross_width_m`) are NOT carried
-    ///   into the core config — they are consumed directly by the stub
-    ///   handlers until Phases C/D/E port the full calculators.
+    /// - Fields used by individual handlers but not by the core config,
+    ///   such as `commutation`, `n_positions` and `meshing`, remain on the
+    ///   IPC value.
     pub fn to_core(&self) -> CoreConfig {
         CoreConfig {
             magnet_dims_m: [
@@ -141,7 +139,6 @@ impl LinearMotorConfigIpc {
             board_width_m: self.board_width_m,
             pcb_thickness_m: self.pcb_thickness_m,
             pcb_stackup: self.pcb_stackup.clone(),
-            // Round 9: multi-strand pass-through to the core.
             strands_per_phase: self.strands_per_phase,
             air_gap_m: self.air_gap_m,
             routing_pattern: self.routing_pattern.clone(),

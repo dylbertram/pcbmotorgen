@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 import { gotoDesignApp, openCoilPreview } from "./helpers";
 import { readFileSync } from "node:fs";
 import { installViewMenu, nativeViewAction as nativeAction, viewMenuSnapshot as snapshot, viewMenuChecked as checked } from "./view-menu-helpers";
-const groups = JSON.parse(readFileSync(new URL("../src/lib/viewMenu.json", import.meta.url), "utf8")) as { id: string; label: string }[][];
+const groups = JSON.parse(readFileSync(new URL("../src/lib/menu/viewMenu.json", import.meta.url), "utf8")) as { id: string; label: string }[][];
 
 // Exercise the real state/ownership bridge at its native IPC boundary.
 test.beforeEach(async ({ page }) => { await installViewMenu(page); });

@@ -17,7 +17,7 @@
   import type { DocumentKind } from "./lib/types";
   import PreferencesDialog from "./lib/components/layout/PreferencesDialog.svelte";
   import { ConfigStore } from "./lib/stores/config.svelte";
-  import { bindDriverImports, openDriverCalculator } from "./lib/driverCalculatorWindow";
+  import { bindDriverImports, openDriverCalculator } from "./lib/driver/driverCalculatorWindow";
 
   let unsaved = $state<{ label: string; resolve: (choice: UnsavedChoice) => void } | null>(null);
   const workspace = new WorkspaceStore(recentFiles, label => new Promise(resolve => { unsaved = { label, resolve }; }));

@@ -17,7 +17,7 @@ import type { SensorConfig } from "./sensor";
 import type { DriveSettings } from "./drive";
 import type { BackplaneStack } from "./backplane";
 import type { RoutedMoveRequest } from "./movePower";
-import type { PcbStackupMm } from "../pcbStackup";
+import type { PcbStackupMm } from "../pcb/pcbStackup";
 
 export type DocumentKind = "motor" | "sensor";
 
@@ -55,7 +55,7 @@ export interface ProjectConfigState {
   // --- Coil / routing (generation settings) ---
   routing_pattern: string;
   routing_params: Record<string, number>;
-  routing_orientation?: import("../routingOrientation").RoutingOrientation;
+  routing_orientation?: import("../routing/routingOrientation").RoutingOrientation;
   phases: number;
   num_layers: number;
 

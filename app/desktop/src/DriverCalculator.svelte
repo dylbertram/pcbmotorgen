@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import { calculateDriver, emptyDriverInput, type DriverCalculatorInput, type DriverCalculatorSnapshot } from "./lib/driverCalculator";
-  import { calculatorSeed, listenDriverImport, requestDriverImport } from "./lib/driverCalculatorWindow";
+  import { calculateDriver, emptyDriverInput, type DriverCalculatorInput, type DriverCalculatorSnapshot } from "./lib/driver/driverCalculator";
+  import { calculatorSeed, listenDriverImport, requestDriverImport } from "./lib/driver/driverCalculatorWindow";
   import DriverSelector from "./lib/components/simulate/DriverSelector.svelte";
   import { ConfigStore } from "./lib/stores/config.svelte";
   const config = new ConfigStore();

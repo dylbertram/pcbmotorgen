@@ -2,9 +2,9 @@
   import { PHASE_COLORS } from "./coilPreviewCanvas";
   import type { CoilPreviewViewState } from "./coilPreviewViewState.svelte";
   import type { CadGeometry } from "../../types";
-  import type { CadSelectionTool } from "../../utils/cadSelectionTool.svelte";
-  import SelectionAssignmentMenu from "./SelectionAssignmentMenu.svelte";
-  import { selectableTraces } from "../../cadSelection";
+  import type { CadSelectionTool } from "../../cad/cadSelectionTool.svelte";
+  import SelectionAssignmentMenu from "../cad/SelectionAssignmentMenu.svelte";
+  import { selectableTraces } from "../../cad/cadSelection";
 
   let { name, colorIdx, label, visibilityLabel, visible, onToggle, layers, view,
     geometry, selection, disabled = false }: {

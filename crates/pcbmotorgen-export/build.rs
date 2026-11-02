@@ -39,7 +39,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // so relative imports like `import "common/types/base_types.proto"` resolve.
     // protox bundles the well-known protos, so `google/protobuf/any.proto` and
     // `google/protobuf/field_mask.proto` resolve automatically.
-    let file_descriptor_set = protox::compile(&proto_files_str, &[proto_root.clone()])?;
+    let file_descriptor_set = protox::compile(&proto_files_str, std::slice::from_ref(&proto_root))?;
 
     let mut config = prost_build::Config::new();
     config.compile_fds(file_descriptor_set)?;
