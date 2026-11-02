@@ -1,11 +1,9 @@
 <script lang="ts">
-  import type { ConfigStore } from "../../stores/config.svelte";
-  import { validateDesign, hasErrors as hasFindingsErrors } from "../../constraints/validation";
+  import type { ConfigStore } from "../../../stores/config.svelte";
+  import { validateDesign, hasErrors as hasFindingsErrors } from "../../../constraints/validation";
 
   let { config }: { config: ConfigStore } = $props();
 
-  // Rule engine lives in lib/validation so it is unit-testable; this panel
-  // is a pure consumer keeping the same rendered behaviour.
   let findings = $derived(validateDesign(config));
   let hasErrors = $derived(hasFindingsErrors(findings));
 </script>

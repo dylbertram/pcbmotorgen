@@ -14,7 +14,7 @@ test("design settings stay in the drawer and keep winding details on demand", as
   const details = constraints.locator("details");
   await expect(details).not.toHaveAttribute("open", "");
   await details.locator("summary").click();
-  await expect(details.getByText("Rest offset", { exact: true })).toBeVisible();
+  await expect(details.getByText("Band-pitch difference", { exact: true })).toBeVisible();
   await details.locator("summary").click();
   await page.screenshot({ path: testInfo.outputPath("design-dark.png"), fullPage: true });
   await page.emulateMedia({ colorScheme: "light" });

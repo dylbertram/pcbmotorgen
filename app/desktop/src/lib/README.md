@@ -17,7 +17,7 @@ Feature modules live next to their unit tests:
 - `components/`: Svelte UI grouped by feature, including the import dialog and
   editing controls in `cad/`, sensor controls in `sensor/`, export panels in
   `export/`, design controls grouped under `design/` and the simulation dock in `simulate/`,
-  3D scene and viewer in `scene/`, frame, side rail, layer and zoom controls in `preview/`, measurement controls in `measure/`,
+  3D scene and viewer in `scene/`, coil workspace and its canvas, side rail, view-menu, status, motion, force chart, layer and zoom controls in `preview/`, measurement controls in `measure/`,
   generator management in `plugins/`, PCB guides in `pcb/`, and design-rule status in `drc/`;
   component-specific helpers live alongside their consumers and `ui/`
   contains shared controls.

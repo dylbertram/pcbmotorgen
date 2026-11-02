@@ -58,19 +58,6 @@ export function layerOptions(
 }
 
 /**
- * Epsilon-tolerant "is a whole multiple of" check, mirroring the routing
- * crate's 1e-9 discipline so the UI and the backend agree. Degenerate inputs
- * (non-finite value, non-positive/NaN multiple) pass — the backend owns the
- * real rejection.
- */
-export function isMultipleOf(value: number, multipleOf: number): boolean {
-  if (!Number.isFinite(value)) return true;
-  if (!Number.isFinite(multipleOf) || multipleOf <= 0) return true;
-  const scaled = value / multipleOf;
-  return Math.abs(Math.round(scaled) - scaled) * multipleOf <= 1e-9;
-}
-
-/**
  * Nearest option to `n` (ties pick the smaller option). Empty options list
  * returns `n` unchanged — the caller decides what an empty option set means.
  */

@@ -3,7 +3,7 @@
   import type { HousingMotionAnalysis } from "../../../types/drive";
   import type { CadGeometry } from "../../../types";
   import NumberField from "../../ui/NumberField.svelte";
-  import { validateBackplaneInput } from "../../../constraints/validation";
+  import { validateBackplaneInput } from "../../../constraints/backplaneValidation";
   import { analyzeHousingMotion } from "../../../ipc";
   import { errorMessage } from "../../../utils/errorMessage";
 

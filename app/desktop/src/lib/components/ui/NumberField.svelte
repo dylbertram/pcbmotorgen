@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { isMultipleOf } from "../../constraints/layerConstraints";
+  import { validateNumberDraft } from "./numberFieldValidation";
 
   /**
    * A numeric text field that keeps the last committed value in the parent
@@ -20,7 +20,6 @@
     multipleOf?: number;
     id?: string;
     ariaLabel?: string;
-    describedBy?: string;
     disabled?: boolean;
     class?: string;
     onCommit: (value: number) => void;
@@ -37,7 +36,6 @@
     multipleOf,
     id,
     ariaLabel,
-    describedBy,
     disabled = false,
     class: inputClass = "",
     onCommit,
@@ -54,39 +52,11 @@
     return Number.isFinite(valueToFormat) ? String(valueToFormat) : "";
   }
 
-  function validate(raw: string): { value: number | null; error: string | null } {
-    if (raw.trim() === "") {
-      return { value: null, error: "Enter a number." };
-    }
-
-    const parsed = Number(raw);
-    if (!Number.isFinite(parsed)) {
-      return { value: null, error: "Enter a finite number." };
-    }
-    if (integer && !Number.isInteger(parsed)) {
-      return { value: null, error: "Value must be a whole number." };
-    }
-    if (min !== undefined && Number.isFinite(min) && parsed < min) {
-      return { value: null, error: `Value must be at least ${min}.` };
-    }
-    if (max !== undefined && Number.isFinite(max) && parsed > max) {
-      return { value: null, error: `Value must be at most ${max}.` };
-    }
-    if (multipleOf !== undefined && !isMultipleOf(parsed, multipleOf)) {
-      return {
-        value: null,
-        error: `Value must be a multiple of ${multipleOf}.`,
-      };
-    }
-
-    return { value: parsed, error: null };
-  }
-
   function handleInput(event: Event): void {
     const raw = (event.currentTarget as HTMLInputElement).value;
     draftOverride = raw;
 
-    const result = validate(raw);
+    const result = validateNumberDraft(raw, { integer, min, max, multipleOf });
     error = result.error;
     if (result.value === null) return;
 
@@ -100,10 +70,6 @@
     draftOverride = null;
     error = null;
   }
-
-  let describedByValue = $derived(
-    error ? errorId : describedBy,
-  );
 
   let inputClasses = $derived(
     [
@@ -129,7 +95,7 @@
     step={step}
     aria-label={ariaLabel}
     aria-invalid={error !== null}
-    aria-describedby={describedByValue}
+    aria-describedby={error ? errorId : undefined}
     disabled={disabled}
     class={inputClasses}
     oninput={handleInput}

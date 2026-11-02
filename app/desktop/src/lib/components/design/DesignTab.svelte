@@ -5,19 +5,13 @@
   import MagnetsPanel from "./magnets/MagnetsPanel.svelte";
   import DrivePanel from "./drive/DrivePanel.svelte";
   import type { MotionStore } from "../../stores/motion.svelte";
-  import { stripBoundsDomainMm, type TraceMeasure } from "../../preview/previewGeometry";
-  import TravelIsoView from "./TravelIsoView.svelte";
-  import ConstraintReadouts from "./ConstraintReadouts.svelte";
+  import type { TraceMeasure } from "../../preview/previewGeometry";
+  import DesignConstraints from "./routing/DesignConstraints.svelte";
   import RoutingSourcePanel from "./routing/RoutingSourcePanel.svelte";
   import TracesBoardPanel from "./routing/TracesBoardPanel.svelte";
   import RoutingOrientationPanel from "./routing/RoutingOrientationPanel.svelte";
-  import ValidationWarning from "./ValidationWarning.svelte";
-  import NumberField from "../ui/NumberField.svelte";
-  import HelpTag from "../ui/HelpTag.svelte";
-  import Formula from "../ui/Formula.svelte";
   import ScrollArea from "../ui/ScrollArea.svelte";
-  import electricalPitchSvg from "../../assets/electrical-pitch.svg";
-  import type { DesignPanelId } from "./previewPanels";
+  import type { DesignPanelId } from "../../preview/previewPanels";
 
   let {
     config,
@@ -44,7 +38,6 @@
     driveBackplane?: DriveBackplane | null;
     section?: DesignPanelId;
   } = $props();
-  const stripBounds = $derived(stripBoundsDomainMm(config, motion));
 </script>
 
 <ScrollArea
@@ -54,89 +47,6 @@
   aria-label={`${section} settings`}
 >
   <div class="design-settings space-y-3">
-    <!-- Travel inputs, live assembly geometry and derived sizing readouts. -->
-    {#snippet constraints()}
-    <section
-      id="design-constraints-heading"
-      aria-label="Design constraints"
-    >
-      <div class="grid gap-x-3 gap-y-2.5">
-        <label
-          class="min-w-0"
-        >
-          <span class="flex items-center justify-between gap-2">
-            <span class="min-w-0 truncate text-xs text-slate-300"
-              >Travel (mm)<HelpTag
-                label="About desired travel"
-                tip="Center-to-center travel. The copper must cover the mover span plus this distance."
-                equation={String.raw`L_{\mathrm{active}} = L_{\mathrm{mover}} + d`}
-              /></span
-            >
-            <NumberField
-              id="desired-travel"
-              value={config.desired_travel_mm}
-              min={0.1}
-              max={400}
-              step={0.5}
-              ariaLabel="Desired travel (center-to-center)"
-              class="w-24 shrink-0 px-2 py-1 text-xs font-mono text-emerald-200"
-              onCommit={(value) => (config.desired_travel_mm = value)}
-            />
-          </span>
-        </label>
-
-        <label class="min-w-0">
-          <span class="flex items-center justify-between gap-2">
-            <span class="min-w-0 truncate text-xs text-slate-300">Active area width (mm)</span>
-            <NumberField
-              id="active-area-width"
-              value={config.active_area_width_mm}
-              min={1}
-              max={80}
-              step={0.1}
-              ariaLabel="Active area width (mm)"
-              class="w-24 shrink-0 px-2 py-1 text-xs font-mono text-emerald-200"
-              onCommit={(value) => (config.active_area_width_mm = value)}
-            />
-          </span>
-        </label>
-
-        <label class="min-w-0">
-          <span class="flex items-center justify-between gap-2">
-            <span class="min-w-0 truncate text-xs text-slate-300"
-              >Electrical pitch <Formula tex="P_e" /> (mm)<HelpTag
-                label="About electrical pitch"
-                image={electricalPitchSvg}
-                imageAlt="One electrical cycle spans a north and south pole."
-                tip="A cycle spans two poles. Oversized magnets cause a design error. Generated copper follows pitch; imported copper does not."
-                equation={String.raw`\tau_p = \frac{P_e}{2}`}
-              /></span
-            >
-            <NumberField
-              id="electrical-pitch"
-              value={config.electrical_pitch_mm}
-              min={0.1}
-              max={40}
-              step={0.1}
-              ariaLabel="Electrical pitch P_e (mm)"
-              class="w-24 shrink-0 px-2 py-1 text-xs font-mono text-emerald-200"
-              onCommit={(value) => {
-                config.electrical_pitch_mm = value;
-              }}
-            />
-          </span>
-        </label>
-
-      </div>
-      <div class="mt-2">
-        <div class="w-full">
-          <TravelIsoView {config} {measuredTrace} stripStartMm={stripBounds.startMm} stripEndMm={stripBounds.endMm} />
-        </div>
-      </div>
-      <ConstraintReadouts {config} measuredTraceLengthMm={measuredTrace?.traceLengthMm ?? null} {routingDimensions} />
-    </section>
-    <ValidationWarning {config} />
-    {/snippet}
     {#if section === "stackup"}
 
     <BackplanePanel {config} {backplaneAnalysis} {driveBackplane} {cadGeometry} />
@@ -152,7 +62,7 @@
       <div class="space-y-3">
         <RoutingSourcePanel {config} cadGeometryActive={cadGeometry !== null} cadSourceFileName={cadGeometry?.source_file_name} {onImportCad} {onUseGenerated} />
         <RoutingOrientationPanel {config} geometry={cadGeometry} {onGeometryChange} />
-        {@render constraints()}
+        <DesignConstraints {config} {motion} {measuredTrace} {routingDimensions} />
         {#if cadGeometry}
           <div
             class="rounded-md border border-sky-500/30 bg-sky-500/5 px-3 py-3"

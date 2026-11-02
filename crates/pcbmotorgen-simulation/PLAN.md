@@ -37,6 +37,6 @@ Improvements the user has requested but deferred to a future round.
 
 | #   | Wish                           | Effort | Notes                                                                                                                                                                                                                                        |
 | --- | ------------------------------ | ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| W1  | FOC error-injection test hooks | Medium | Add a `foc_variant: FocVariant` field / `phase_offset_override` to `ForceEvaluator` so the 3-point guard can be unit-tested against a 90° sin error and a wrong per-coil offset. Currently `#[ignore]`d in `src/magnetic/force_eval/mod.rs`. |
+| W1  | FOC error-injection test hooks | Medium | Add a `foc_variant: FocVariant` field / `phase_offset_override` to `ForceEvaluator` so the 3-point guard can be unit-tested against a 90° sin error and a wrong per-coil offset. These fault-rejection cases are not currently covered; see `src/magnetic/force_eval/mod.rs`. |
 
 ---

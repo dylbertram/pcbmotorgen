@@ -9,7 +9,7 @@ describe("routing source connection metadata", () => {
     store.magnet_width_mm = 5;
     store.electrical_pitch_mm = 9;
     expect(store.electrical_pitch_mm).toBe(9);
-    expect(store.max_magnet_width_mm).toBe(4.5);
+    expect(store.pole_pitch_mm).toBe(4.5);
     expect(store.magnet_width_mm).toBe(5);
     expect(store.toIpc().magnet_pitch_m).toBe(0.0045);
     expect(validateDesign(store).find(f => f.id === "magnet-fill")?.message).toContain("too big");

@@ -1,5 +1,5 @@
 import type { CoilPathDto, CoilSegmentDto, PhaseCoilDto, RoutingDimensionsDto } from "../types";
-import { isValidMetres } from "./dimensionValues";
+import { isPositiveFiniteDimension } from "../geometry/dimensionValues";
 
 const MARGIN_EPS = 1e-12;
 
@@ -76,7 +76,7 @@ export function computeBandWidthRows(
 
   const rows: BandWidthRow[] = [];
   for (const band of dimensions.phase_band_widths) {
-    if (!isValidMetres(band.band_width_m)) continue;
+    if (!isPositiveFiniteDimension(band.band_width_m)) continue;
     const phase = byKey.get(`${band.layer}|${band.net}`);
     if (!phase) continue;
     const anchorX = medianActiveConductorX(phase);

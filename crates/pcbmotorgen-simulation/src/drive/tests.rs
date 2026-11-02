@@ -396,8 +396,7 @@ fn seg(x0: f64, y0: f64, x1: f64, y1: f64, layer: u32, net: &str) -> RouteSegmen
 /// 100 mm back on layer 1.
 fn two_strand_fixture() -> RoutingResult {
     let mut r = RoutingResult::default();
-    for (k, y) in [(0, 0.0), (1, 5.0)] {
-        let _ = k;
+    for y in [0.0, 5.0] {
         r.segments.push(seg(0.0, y, 100.0, y, 0, "A"));
         r.segments.push(seg(100.0, y, 0.0, y + 1.0, 1, "A"));
         r.vias.push(Via { position: Point::new(100.0, y), from_layer: 0, to_layer: 1, net: "A".into() });

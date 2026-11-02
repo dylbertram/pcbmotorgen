@@ -1,7 +1,7 @@
 import { mount, unmount } from "svelte";
 import NativeVisualizationScene from "./NativeVisualizationScene.svelte";
 import { generatedTerminalGeometry } from "../../src/lib/routing/generatedTerminalGeometry";
-import { validateVisualization } from "../../src/lib/simulation/simulationVisualizationController";
+import { validateVisualization } from "../../src/lib/simulation/visualizationValidation";
 
 export function renderFrozenNativeReport(value: any) {
   validateVisualization(value.report, value.request);

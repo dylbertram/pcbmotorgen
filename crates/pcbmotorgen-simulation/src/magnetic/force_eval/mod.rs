@@ -897,6 +897,9 @@ mod tests {
         let result = ev.evaluate(&cfg, &coils).expect("default braid must simulate");
         assert_eq!(result.n_positions(), 50);
         assert!(result.force_x_n.iter().all(|force| force.is_finite()));
+        assert_eq!(result.per_phase_force_x.len() % result.n_phases, 0);
+        assert!(!result.per_phase_force_x.is_empty());
+        assert!(result.per_phase_force_x.iter().all(|force| force.is_finite()));
     }
 
     /// End-to-end robustness: the 4:5 Vernier config (spacing_ratio=0.8, 3
@@ -1075,29 +1078,6 @@ mod tests {
             "phase_shift must be 0 or π after 3-point guard, got {}",
             ev.phase_shift
         );
-    }
-
-    /// If the FOC guard accepts the generated braid, the resulting per-phase
-    /// sweep must be nonempty, finite and divisible by phase count. Rejection
-    /// is allowed; this does not assert phase-A alignment.
-    #[test]
-    fn accepted_braid_sweep_has_finite_per_phase_values() {
-        let cfg = SimulationInput::default();
-        let coils = generate_coils(&cfg);
-        let mut ev = ForceEvaluator::new(50, 20, CommutationMode::MaxThrust, 0.0);
-        // The classic "Phase A is at its maximum at p=0" alignment held for the
-        // removed single-layer serpentine, whose conductors sat directly under
-        // the magnet peaks. The infinity-braid is a staggered two-layer weave,
-        // so that alignment is not guaranteed. Assert robustness instead: when
-        // the FOC guard passes, the per-phase sweep is finite and shaped
-        // correctly; when it rejects, that is the guard's job (no panic).
-        if let Ok(result) = ev.evaluate(&cfg, &coils) {
-            assert_eq!(result.per_phase_force_x.len() % result.n_phases, 0);
-            assert!(!result.per_phase_force_x.is_empty());
-            for f in &result.per_phase_force_x {
-                assert!(f.is_finite(), "per-phase force not finite: {f}");
-            }
-        }
     }
 
     /// Sample position pairs one period apart without panicking. Accepted

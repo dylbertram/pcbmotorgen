@@ -207,7 +207,7 @@ if (process.env.PCB_MOTOR_NATIVE_PAIRED_PM_REPORT && process.env.PCB_MOTOR_NATIV
     const winding = JSON.parse(readFileSync(process.env.PCB_MOTOR_NATIVE_WINDING_FIELD_REPORT!, "utf8"));
     await gotoDesignApp(page);
     const checked = await page.evaluate(async ({ pm, winding }) => {
-      const { validateVisualization } = await import(/* @vite-ignore */ "/src/lib/simulation/simulationVisualizationController.ts");
+      const { validateVisualization } = await import(/* @vite-ignore */ "/src/lib/simulation/visualizationValidation.ts");
       const { combineVisualizationFields } = await import(/* @vite-ignore */ "/src/lib/visualization/combineVisualizationFields.ts");
       validateVisualization(pm.report, pm.request);
       const sum = combineVisualizationFields(winding.field, pm.report.field);
@@ -307,7 +307,7 @@ if (process.env.PCB_MOTOR_NATIVE_VISUALIZATION_REPORT) {
     const checked = await page.evaluate(async value => {
       const { generatedTerminalGeometry } = await import(/* @vite-ignore */ "/src/lib/routing/generatedTerminalGeometry.ts");
       const { mapCopperLoss } = await import(/* @vite-ignore */ "/src/lib/visualization/visualizationGeometry.ts");
-      const { validateVisualization } = await import(/* @vite-ignore */ "/src/lib/simulation/simulationVisualizationController.ts");
+      const { validateVisualization } = await import(/* @vite-ignore */ "/src/lib/simulation/visualizationValidation.ts");
       const { buildCoilScene } = await import(/* @vite-ignore */ "/src/lib/visualization/coilScene.ts");
       const { fieldLineGeometry, fieldSliceGeometry } = await import(/* @vite-ignore */ "/src/lib/visualization/simulationFieldGeometry.ts");
       validateVisualization(value.report, value.request);

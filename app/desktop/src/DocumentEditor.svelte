@@ -31,7 +31,7 @@
   import { LatestAsyncTask } from "./lib/utils/latestAsyncTask";
   import { debounce } from "./lib/utils/debounce";
   import { measureTrace, computePreviewSummary } from "./lib/preview/previewGeometry";
-  import PreviewStatus from "./lib/components/design/PreviewStatus.svelte";
+  import PreviewStatus from "./lib/components/preview/PreviewStatus.svelte";
   import { cadGeometryToPreview } from "./lib/cad/cadPreview";
   import { saveTextToFile } from "./lib/files";
   import { geometryKey } from "./lib/cad/cadPhases";
@@ -43,8 +43,8 @@
   import StatusBanner from "./lib/components/ui/StatusBanner.svelte";
   import ProjectNotification from "./lib/components/ui/ProjectNotification.svelte";
   import ScrollArea from "./lib/components/ui/ScrollArea.svelte";
-  import CoilPreview from "./lib/components/design/CoilPreview.svelte";
-  import type { DesignPanelId, PreviewPanelId } from "./lib/components/design/previewPanels";
+  import CoilPreview from "./lib/components/preview/CoilPreview.svelte";
+  import type { DesignPanelId, PreviewPanelId } from "./lib/preview/previewPanels";
   import DesignTab from "./lib/components/design/DesignTab.svelte";
   import SimulateTab from "./lib/components/simulate/SimulateTab.svelte";
   import KicadDialog from "./lib/components/export/KicadDialog.svelte";

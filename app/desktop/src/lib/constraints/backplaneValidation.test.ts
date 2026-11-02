@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { validateBackplaneInput } from "./validation";
+import { validateBackplaneInput } from "./backplaneValidation";
 import type { BackplaneStack } from "../types/backplane";
 
 describe("coreless backplane restored-input validation", () => {

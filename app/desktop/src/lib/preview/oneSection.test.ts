@@ -29,6 +29,21 @@ describe("computeVisibleSegments", () => {
   it("returns empty map with no coils", () => {
     expect(computeVisibleSegments(null, false, 6).size).toBe(0);
   });
+
+  it("keeps the first index for repeated references, as the original selection did", () => {
+    const coils = braidLikeFixture();
+    const phase = coils.phases[0];
+    phase.segments[2] = phase.segments[0];
+    expect(computeVisibleSegments(coils, true, 2).get(coilKey(phase))).toEqual([phase.segments[0]]);
+  });
+
+  it("keeps existing handling of fractional and non-finite counts", () => {
+    const coils = braidLikeFixture();
+    const phase = coils.phases[0];
+    expect(computeVisibleSegments(coils, true, 1.5).get(coilKey(phase))).toEqual(phase.segments.slice(0, 3));
+    expect(computeVisibleSegments(coils, true, Number.NaN).get(coilKey(phase))).toEqual([]);
+    expect(computeVisibleSegments(coils, true, Infinity).get(coilKey(phase))).toEqual(phase.segments);
+  });
 });
 
 describe("computeVisibleArcs", () => {

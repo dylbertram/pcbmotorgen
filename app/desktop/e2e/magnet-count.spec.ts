@@ -79,6 +79,10 @@ test("an over-limit magnet draft is rejected rather than clamping saved geometry
   await count.fill("5"); await count.press("Tab");
   await count.fill("13");
   await expect(count).toHaveAttribute("aria-invalid", "true");
-  await expect(page.getByRole("alert").filter({ hasText: "Value must be at most 12" })).toBeVisible();
+  await expect(count).toHaveAttribute("aria-describedby", "magnet-count-error");
+  const error = page.getByRole("alert").filter({ hasText: "Value must be at most 12" });
+  await expect(error).toBeVisible();
+  await expect(error).toHaveId("magnet-count-error");
   await count.press("Tab"); await expect(count).toHaveValue("5");
+  await expect(count).not.toHaveAttribute("aria-describedby");
 });

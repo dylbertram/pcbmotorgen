@@ -9,7 +9,7 @@ import type {
 import { sampleSpline, splinePointAt } from "../geometry/curvePaths";
 import type { ViewportBBox } from "../geometry/viewport";
 
-const M = 1e-3;
+const MM_TO_M = 1e-3;
 
 /** Bounds of CAD preview points in millimetres, including trace and via padding. */
 export function cadImportPreviewBounds(
@@ -246,7 +246,6 @@ export function cadGeometryToPreview(geometry: CadGeometry): CoilPathDto {
     const key = `${layer}\u0000${net}`;
     let coil = grouped.get(key);
     if (!coil) {
-      if (!netOrder.has(net)) netOrder.set(net, netOrder.size);
       coil = {
         phase_idx: netOrder.get(net)!, layer_idx: layer, phase_name: net,
         pattern_id: "imported-cad", segments: [], corner_arcs: [], via_positions: [], routed_vias: [],
@@ -259,20 +258,20 @@ export function cadGeometryToPreview(geometry: CadGeometry): CoilPathDto {
     return coil;
   };
   const bounds = new Map<string, [number, number, number, number]>();
-  const addBounds = (coil: PhaseCoilDto, pts: Array<[number, number]>) => {
+  const addBounds = (coil: PhaseCoilDto, pointsMm: Array<[number, number]>) => {
     const key = `${coil.layer_idx}\u0000${coil.phase_name}`;
-    const b = bounds.get(key) ?? [Infinity, Infinity, -Infinity, -Infinity];
-    for (const [x, y] of pts) {
-      b[0] = Math.min(b[0], x * M); b[1] = Math.min(b[1], y * M);
-      b[2] = Math.max(b[2], x * M); b[3] = Math.max(b[3], y * M);
+    const box = bounds.get(key) ?? [Infinity, Infinity, -Infinity, -Infinity];
+    for (const [x, y] of pointsMm) {
+      box[0] = Math.min(box[0], x * MM_TO_M); box[1] = Math.min(box[1], y * MM_TO_M);
+      box[2] = Math.max(box[2], x * MM_TO_M); box[3] = Math.max(box[3], y * MM_TO_M);
     }
-    bounds.set(key, b);
+    bounds.set(key, box);
   };
 
   for (const segment of geometry.routing.segments) {
     const coil = getGroup(segment.layer, segment.net);
-    const start: [number, number] = [segment.start.x * M, segment.start.y * M];
-    const end: [number, number] = [segment.end.x * M, segment.end.y * M];
+    const start: [number, number] = [segment.start.x * MM_TO_M, segment.start.y * MM_TO_M];
+    const end: [number, number] = [segment.end.x * MM_TO_M, segment.end.y * MM_TO_M];
     const length = Math.hypot(end[0] - start[0], end[1] - start[1]);
     coil.segments.push({ start, end, is_active: segment.is_active });
     coil.total_length_m += length;
@@ -282,28 +281,28 @@ export function cadGeometryToPreview(geometry: CadGeometry): CoilPathDto {
   }
   for (const curve of geometry.routing.curves) {
     const coil = getGroup(curve.layer, curve.net);
-    const start: [number, number] = [curve.start.x * M, curve.start.y * M];
-    const mid: [number, number] = [curve.mid.x * M, curve.mid.y * M];
-    const end: [number, number] = [curve.end.x * M, curve.end.y * M];
+    const start: [number, number] = [curve.start.x * MM_TO_M, curve.start.y * MM_TO_M];
+    const mid: [number, number] = [curve.mid.x * MM_TO_M, curve.mid.y * MM_TO_M];
+    const end: [number, number] = [curve.end.x * MM_TO_M, curve.end.y * MM_TO_M];
     coil.corner_arcs!.push({ start, mid, end, is_active: curve.is_active });
     addBounds(coil, [[curve.start.x, curve.start.y], [curve.mid.x, curve.mid.y], [curve.end.x, curve.end.y]]);
   }
   for (const spline of geometry.routing.splines ?? []) {
     const coil = getGroup(spline.layer, spline.net);
-    (coil.splines ??= []).push({ ...spline, control_points: spline.control_points.map((p) => ({ x: p.x * M, y: p.y * M })) });
+    (coil.splines ??= []).push({ ...spline, control_points: spline.control_points.map((p) => ({ x: p.x * MM_TO_M, y: p.y * MM_TO_M })) });
     addBounds(coil, spline.control_points.map((p) => [p.x, p.y]));
     const points = sampleSpline(spline);
-    const length = points.slice(1).reduce((sum, p, i) => sum + Math.hypot(p.x - points[i].x, p.y - points[i].y) * M, 0);
+    const length = points.slice(1).reduce((sum, p, i) => sum + Math.hypot(p.x - points[i].x, p.y - points[i].y) * MM_TO_M, 0);
     coil.total_length_m += length;
     if (spline.is_active) coil.active_length_m += length;
     else coil.end_turn_length_m += length;
   }
   for (const via of geometry.routing.vias) {
     getGroup(via.from_layer, via.net).routed_vias!.push({
-      position: [via.position.x * M, via.position.y * M], from_layer: via.from_layer, to_layer: via.to_layer,
+      position: [via.position.x * MM_TO_M, via.position.y * MM_TO_M], from_layer: via.from_layer, to_layer: via.to_layer,
     });
-    getGroup(via.from_layer, via.net).via_positions!.push([via.position.x * M, via.position.y * M]);
-    getGroup(via.to_layer, via.net).via_positions!.push([via.position.x * M, via.position.y * M]);
+    getGroup(via.from_layer, via.net).via_positions!.push([via.position.x * MM_TO_M, via.position.y * MM_TO_M]);
+    getGroup(via.to_layer, via.net).via_positions!.push([via.position.x * MM_TO_M, via.position.y * MM_TO_M]);
   }
   const phases = [...grouped.values()];
   for (const coil of phases) {
@@ -319,9 +318,9 @@ export function cadGeometryToPreview(geometry: CadGeometry): CoilPathDto {
     coil.terminal_end = last?.end ?? (splineEnd ? [splineEnd.x, splineEnd.y] : [b[2], b[3]]);
     const terminals = geometry.coil_terminals && Object.hasOwn(geometry.coil_terminals, coil.phase_name) ? geometry.coil_terminals[coil.phase_name] : undefined;
     if (terminals) {
-      coil.terminal_start = [terminals.input.position.x * M, terminals.input.position.y * M];
-      coil.terminal_end = [terminals.output.position.x * M, terminals.output.position.y * M];
+      coil.terminal_start = [terminals.input.position.x * MM_TO_M, terminals.input.position.y * MM_TO_M];
+      coil.terminal_end = [terminals.output.position.x * MM_TO_M, terminals.output.position.y * MM_TO_M];
     }
   }
-  return { phases, layer_count: Math.max(geometry.layer_z_mm.length, 1), trace_width_m: geometry.trace_width_mm * M };
+  return { phases, layer_count: Math.max(geometry.layer_z_mm.length, 1), trace_width_m: geometry.trace_width_mm * MM_TO_M };
 }

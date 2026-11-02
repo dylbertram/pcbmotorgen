@@ -8,7 +8,6 @@ function validConfig(overrides: Partial<DesignConfigInput> = {}): DesignConfigIn
     mover_span_mm: 72,
     magnet_count: 12,
     magnet_width_mm: 4.5,
-    magnet_gap_mm: 1.5,
     electrical_pitch_mm: 12.0,
     min_space_mm: 0.127,
     magnet_cross_width_mm: 10,

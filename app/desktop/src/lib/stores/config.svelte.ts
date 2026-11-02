@@ -164,15 +164,6 @@ export class ConfigStore {
   // ---------------------------------------------------------------------
 
   pole_pitch_mm = $derived(this.electrical_pitch_mm / 2);
-  /** Upper limit on the magnet X length: a fully-filled pole pitch
-   *  (k_fill = 1.0) leaves no inter-pole gap. */
-  max_magnet_width_mm = $derived(Math.max(0, this.pole_pitch_mm));
-  /** Magnet pole fill factor, now DERIVED from the width input:
-   *  k_fill = W_m / τ_p. Kept exported under its historical name because
-   *  validation.ts and MagnetsPanel.svelte consume it. */
-  magnet_fill_k = $derived(
-    this.pole_pitch_mm > 0 ? this.magnet_width_mm / this.pole_pitch_mm : 0,
-  );
   /** Inter-pole gap is automatic: W_gap = τ_p − W_m (zero at k_fill = 1.0). */
   magnet_gap_mm = $derived(
     Math.max(0, this.pole_pitch_mm - this.magnet_width_mm),
@@ -192,12 +183,6 @@ export class ConfigStore {
   /** Vernier slot-pitch ratio. No longer user-adjustable in the UI — pinned
    *  to the standard 1:1 and passed to the backend untouched. */
   spacing_ratio = $derived(1.0);
-
-  /** True when the active area is too short to cover the mover magnet-array
-   *  span. */
-  is_active_area_invalid = $derived(
-    this.active_area_length_mm <= this.mover_span_mm,
-  );
 
   // --- Pattern-constrained layer selection (mirrored IPC metadata) --------
   // The routing crate declares a supported layer range per pattern
@@ -323,13 +308,12 @@ export class ConfigStore {
 
   /**
    * Load the declared user-editable parameter definitions for a routing
-   * pattern and reseed `routing_params` so every declared parameter has a
-   * value in the UI.
+   * pattern and seed missing `routing_params`, except termination parameters
+   * whose absence has a generator-defined meaning.
    *
    * For each declared `def` we only write a value when the user hasn't
-   * already set one for *this* pattern (tracked by key). This keeps the
-   * user's tweaks across pattern switches while still showing a sensible
-   * default for newly-exposed parameters.
+   * already set one with the same key. This preserves existing values while
+   * showing defaults for newly-exposed parameters.
    */
   async loadRoutingParams(patternId: string): Promise<void> {
     // The pattern changed: re-constrain the layer count against the new
@@ -340,7 +324,7 @@ export class ConfigStore {
       if (this.routing_pattern !== patternId) return;
       this.routing_param_defs = defs;
     } catch {
-      // backend unavailable or errored — leave current defs in place
+      // Backend unavailable or errored; clear the parameter definitions.
       this.routing_param_defs = [];
       return;
     }
