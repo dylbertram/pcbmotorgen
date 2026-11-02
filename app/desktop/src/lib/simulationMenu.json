@@ -1,5 +1,5 @@
 [
-  { "id": "driver", "label": "Driver check" },
+  { "id": "driver", "label": "Driver calculator…" },
   { "id": "run", "label": "Run simulations" },
   { "id": "move", "label": "Move & power" },
   { "id": "force", "label": "Force" },

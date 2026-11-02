@@ -75,7 +75,7 @@ test("driver inductance help explains the circuit without crowding the panel", a
   const modal = coilWorkspace(page);
   await modal.getByRole("button", { name: "Driver settings", exact: true }).click();
   const panel = page.getByRole("dialog", { name: "Preview driver settings", exact: true });
-  await expect(panel.getByRole("region", { name: "Preview driver simulation results" })).toContainText("Current ripple");
+  await expect(panel.getByRole("button", { name: "Open driver calculator", exact: true })).toBeVisible();
   await panel.getByRole("button", { name: "About series inductance" }).focus();
   const tooltip = page.getByRole("tooltip");
   await expect(tooltip.locator("math")).toHaveCount(1);

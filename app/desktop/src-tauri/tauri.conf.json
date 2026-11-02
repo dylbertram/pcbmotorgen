@@ -16,6 +16,7 @@
         "width": 1280,
         "height": 800,
         "resizable": true,
+        "dragDropEnabled": false,
         "fullscreen": false,
         "titleBarStyle": "Overlay",
         "hiddenTitle": true,

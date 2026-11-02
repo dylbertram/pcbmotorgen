@@ -107,7 +107,7 @@ test("an undeclared generator's winding parameter moves to coil ends", async ({ 
   await expect(page.getByLabel("Generator winding connection")).toHaveCount(0);
 });
 
-test("uploaded winding warnings lead to the editable connection in Coil ends", async ({ page }) => {
+test("opening the calculator leaves an uploaded winding's connection editable in Coil ends", async ({ page }) => {
   await useNativeBraid(page);
   await gotoDesignApp(page);
   await page.getByRole("button", { name: "Set coil terminals", exact: true }).click();
@@ -117,8 +117,9 @@ test("uploaded winding warnings lead to the editable connection in Coil ends", a
   await panel.getByRole("combobox", { name: "Winding connection", exact: true }).selectOption("delta");
   await panel.getByRole("button", { name: "Close terminals panel", exact: true }).click();
   const dock = page.getByRole("region", { name: "Simulation results", exact: true });
-  await openDriverChecks(page);
-  await page.getByTestId("driver-check-document").getByRole("button", { name: "Change winding connection", exact: true }).click();
+  const calculator = await openDriverChecks(page);
+  await calculator.close();
+  await page.getByRole("button", { name: "Set coil terminals", exact: true }).click();
   await expect(panel).toBeVisible();
   await expect(panel.getByRole("combobox", { name: "Winding connection", exact: true })).toHaveValue("delta");
   await expect(page.getByRole("dialog", { name: "Routing", exact: true })).toHaveCount(0);

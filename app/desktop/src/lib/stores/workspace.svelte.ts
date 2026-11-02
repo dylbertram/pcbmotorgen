@@ -14,15 +14,9 @@ export type ResolveUnsaved = (label: string) => Promise<UnsavedChoice>;
 
 let nextDocumentId = 1;
 
-/** One complete working session per file. No editable state is shared by tabs. */
-export class DocumentSession {
+/** Presentation state belongs to an editor view, not the saved file. */
+export class DocumentView {
   readonly analysis = new AnalysisWorkspace();
-  readonly id = nextDocumentId++;
-  readonly config = new ConfigStore();
-  readonly sensor = new SensorStore();
-  readonly motion = new MotionStore(this.config);
-  readonly projects: ProjectStore;
-  get title(): string { return this.projects.fileName ?? `Untitled ${this.kind} ${this.id}`; }
   readonly camera = new PreviewCamera();
   readonly previewView = new CoilPreviewViewState();
   runtime: {
@@ -30,8 +24,19 @@ export class DocumentSession {
     height: HeightStackResultDto | null;
     drive: DriveAnalysis | null;
   } = { coils: null, sweep: null, height: null, drive: null };
+}
+
+/** One saved model per file; editor groups can share it without copying it. */
+export class DocumentSession extends DocumentView {
+  readonly id = nextDocumentId++;
+  readonly config = new ConfigStore();
+  readonly sensor = new SensorStore();
+  readonly motion = new MotionStore(this.config);
+  readonly projects: ProjectStore;
+  get title(): string { return this.projects.fileName ?? `Untitled ${this.kind} ${this.id}`; }
 
   constructor(readonly kind: DocumentKind, recents?: RecentFilesStore) {
+    super();
     this.projects = new ProjectStore(this.config, this.motion, recents, this.sensor, kind);
   }
 

@@ -12,7 +12,7 @@
   import FieldsPanel from "../simulate/FieldsPanel.svelte";
   import DcCouplingPanel from "../simulate/DcCouplingPanel.svelte";
 
-  let { config, active, open, availableHeight, sweep, drive,
+  let { config, active, open, availableHeight, sweep,
     error, cadGeometry = null,
     onSelectEnds, onUseInferredEnds, powerInput, autoSimulation = $bindable(true), loading = false, onRun, canRun = true,
     onOpenFieldSettings, onOpenDriverCheck, designName = "Untitled design", selected = $bindable("move") }: {
@@ -168,7 +168,7 @@
     </Tabs.Content>
     <Tabs.Content value="force" data-dock-panel="force" class="min-h-0 flex-1 overflow-auto p-3">
       {@render warnings()}
-      <ForcePanel {config} {sweep} {drive} {onOpenDriverCheck} />
+      <ForcePanel {config} {sweep} {onOpenDriverCheck} />
     </Tabs.Content>
     <Tabs.Content value="fields" data-dock-panel="fields" class="min-h-0 flex-1 overflow-auto p-3">
       {@render warnings()}

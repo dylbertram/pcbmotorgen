@@ -2,7 +2,7 @@
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
   "description": "Default capability set",
-  "windows": ["main"],
+  "windows": ["main", "driver-calculator"],
   "permissions": [
     "core:default",
     "core:window:allow-start-dragging",

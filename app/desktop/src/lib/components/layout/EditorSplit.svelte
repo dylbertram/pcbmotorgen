@@ -1,8 +1,8 @@
 <script lang="ts">
   import type { Snippet } from "svelte";
-  import type { AnalysisWorkspace } from "../../stores/analysisWorkspace.svelte";
+  import type { EditorGroups } from "../../stores/editorGroups.svelte";
 
-  let { state, left, right }: { state: AnalysisWorkspace; left: Snippet; right: Snippet } = $props();
+  let { state, left, right }: { state: EditorGroups; left: Snippet; right: Snippet } = $props();
   let frame: HTMLDivElement;
   let pointer: number | null = null;
 
@@ -18,26 +18,26 @@
     if (node.hasPointerCapture(event.pointerId)) node.releasePointerCapture(event.pointerId);
   }
   function keyResize(event: KeyboardEvent): void {
-    const next = { ArrowLeft: state.leftPercent - 3, ArrowRight: state.leftPercent + 3, Home: 30, End: 75 }[event.key];
+    const next = { ArrowLeft: state.leftPercent - 3, ArrowRight: state.leftPercent + 3, Home: 25, End: 75 }[event.key];
     if (next === undefined) return;
     event.preventDefault();
     state.resize(next);
   }
 </script>
 
-<div bind:this={frame} class="editor-split min-h-0 min-w-0 flex-1" class:split={state.driverCheckOpen}
+<div bind:this={frame} class="editor-split min-h-0 min-w-0 flex-1" class:split={state.splitOpen}
   style:--split-left={`${state.leftPercent}fr`} style:--split-right={`${100 - state.leftPercent}fr`}>
-  <div class="flex min-h-0 min-w-0 flex-col" onpointerdowncapture={() => { state.focusedGroup = "design"; }} onfocusincapture={() => { state.focusedGroup = "design"; }}>
+  <div class="flex min-h-0 min-w-0 flex-col">
     {@render left()}
   </div>
-  {#if state.driverCheckOpen}
+  {#if state.splitOpen}
     <!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions -->
     <div role="separator" aria-label="Resize editor groups" aria-orientation="vertical" tabindex="0"
-      aria-valuemin="30" aria-valuemax="75" aria-valuenow={Math.round(state.leftPercent)}
+      aria-valuemin="25" aria-valuemax="75" aria-valuenow={Math.round(state.leftPercent)}
       class="splitter bg-slate-700 hover:bg-emerald-500 focus-visible:bg-emerald-500 focus-visible:outline-none"
       onpointerdown={(event) => { if (event.button !== 0) return; pointer = event.pointerId; event.currentTarget.setPointerCapture(pointer); event.preventDefault(); }}
       onpointermove={resize} onpointerup={release} onpointercancel={release} onlostpointercapture={() => { pointer = null; }} onkeydown={keyResize} ondblclick={() => state.resize(50)}></div>
-    <div class="flex min-h-0 min-w-0 flex-col" onpointerdowncapture={() => { state.focusedGroup = "driver"; }} onfocusincapture={() => { state.focusedGroup = "driver"; }}>
+    <div class="flex min-h-0 min-w-0 flex-col">
       {@render right()}
     </div>
   {/if}

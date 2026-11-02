@@ -68,8 +68,10 @@ test("driver library edits persist and feed the Simulation selector", async ({ p
   await selectDesignPanel(page, "Routing");
   await coilWorkspace(page).getByRole("button", { name: "Driver settings", exact: true }).click();
   await page.getByRole("combobox", { name: "Driver to evaluate" }).selectOption("Settings driver v2");
-  await openDriverChecks(page);
-  await expect(page.locator('section[aria-labelledby="driver-suitability-heading"]')).toContainText("Settings driver v2");
+  const calculator = await openDriverChecks(page);
+  await calculator.getByRole("combobox", { name: "Driver to evaluate", exact: true }).selectOption("Settings driver v2");
+  await expect(calculator.getByRole("combobox", { name: "Driver to evaluate", exact: true })).toHaveValue("Settings driver v2");
+  await calculator.close();
 });
 
 test("bundled drivers live in the library, are deletable, and leave the selectors", async ({ page }) => {

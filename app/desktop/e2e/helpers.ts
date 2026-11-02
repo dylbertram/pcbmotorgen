@@ -96,12 +96,15 @@ export async function openSimulationView(page: Page, view: "Move & power" | "For
   await expect(dock.getByRole("tabpanel", { name: view, exact: true })).toBeVisible();
 }
 
-/** The driver check opens as a source-linked document in the right group. */
-export async function openDriverChecks(page: Page): Promise<void> {
+/** The calculator is independent and has its own browser window. */
+export async function openDriverChecks(page: Page): Promise<Page> {
   const dock = simulationDock(page);
   await openSimulationView(page, "Force");
-  await dock.getByRole("button", { name: "Open driver check", exact: true }).click();
-  await expect(page.getByTestId("driver-check-document")).toBeVisible();
+  const popup = page.waitForEvent("popup");
+  await dock.getByRole("button", { name: "Open driver calculator", exact: true }).click();
+  const calculator = await popup;
+  await expect(calculator.getByRole("heading", { name: "Driver calculator", exact: true })).toBeVisible();
+  return calculator;
 }
 
 /** NumberField wrapper by aria-label. */

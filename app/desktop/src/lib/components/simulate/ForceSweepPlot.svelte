@@ -46,7 +46,7 @@
   });
 </script>
 
-<div class="thrust-panel {embedded ? 'embedded flex h-full min-h-0 flex-col' : 'rounded-lg bg-slate-800/40 border border-slate-700 p-4'}">
+<div class="thrust-panel {embedded ? 'embedded' : 'rounded-lg bg-slate-800/40 border border-slate-700 p-4'}">
   <div class="mb-2 flex shrink-0 flex-wrap items-center justify-between gap-2">
     <h3 class="text-sm font-semibold text-slate-200">Thrust vs. position</h3>
     {#if result}
@@ -116,11 +116,11 @@
 <style>
   .thrust-panel { container-type: inline-size; }
   .thrust-layout { display: grid; min-height: 0; gap: 1rem; }
-  .embedded .thrust-layout { flex: 1; grid-template-rows: minmax(160px, 1fr) auto; }
+  .embedded .plot-slot { height: 208px; }
   .plot-slot { min-width: 0; min-height: 0; }
   .thrust-metrics { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.75rem 1rem; align-content: start; }
   @container (min-width: 680px) {
-    .embedded .thrust-layout { grid-template-columns: minmax(0, 1fr) 12rem; grid-template-rows: minmax(0, 1fr); }
+    .embedded .thrust-layout { grid-template-columns: minmax(0, 1fr) 12rem; }
     .embedded .thrust-metrics { grid-template-columns: minmax(0, 1fr); border-left: 1px solid rgb(var(--slate-700)); padding-left: 1rem; }
   }
 </style>

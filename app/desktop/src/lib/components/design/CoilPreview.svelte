@@ -90,8 +90,10 @@
     expanded = $bindable(false),
     workspace = false,
     active = true,
+    focused = true,
     simulationActive = false,
     onRequestSimulation,
+    onOpenDriverCalculator,
     designSettings,
     statusContent,
     sidePanel = $bindable<PreviewPanelId | null>(null),
@@ -102,7 +104,7 @@
     onGeometryChange,
     camera,
     view = new CoilPreviewViewState(),
-  }: { config: ConfigStore; coils: CoilPathDto | null; motion: MotionStore; expanded?: boolean; workspace?: boolean; active?: boolean; simulationActive?: boolean; onRequestSimulation?: () => void; designSettings?: Snippet<[DesignPanelId]>; statusContent?: Snippet; sidePanel?: PreviewPanelId | null; drive?: DriveAnalysis | null; driveError?: string | null; drivePending?: boolean; importedGeometry?: CadGeometry | null; onGeometryChange?: (geometry: CadGeometry) => void; camera?: PreviewCamera; view?: CoilPreviewViewState } =
+  }: { config: ConfigStore; coils: CoilPathDto | null; motion: MotionStore; expanded?: boolean; workspace?: boolean; active?: boolean; focused?: boolean; simulationActive?: boolean; onRequestSimulation?: () => void; onOpenDriverCalculator?: () => void; designSettings?: Snippet<[DesignPanelId]>; statusContent?: Snippet; sidePanel?: PreviewPanelId | null; drive?: DriveAnalysis | null; driveError?: string | null; drivePending?: boolean; importedGeometry?: CadGeometry | null; onGeometryChange?: (geometry: CadGeometry) => void; camera?: PreviewCamera; view?: CoilPreviewViewState } =
     $props();
 
   export function showDesignSettings(section: DesignPanelId = "routing"): void {
@@ -604,6 +606,8 @@
       {onRequestSimulation}
        {designSettings}
        {statusContent}
+       {onOpenDriverCalculator}
+       {focused}
       bind:sidePanel
       bind:expanded
       height={H}

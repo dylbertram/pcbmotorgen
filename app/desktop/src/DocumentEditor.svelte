@@ -1,7 +1,7 @@
 <script lang="ts">
   import { placedCopperGeometry } from "./lib/copperLayerPlacement";
-  import { onDestroy, tick, untrack } from "svelte";
-  import type { DocumentSession } from "./lib/stores/workspace.svelte";
+  import { onDestroy, untrack } from "svelte";
+  import type { DocumentSession, DocumentView } from "./lib/stores/workspace.svelte";
   import { BitsConfig } from "bits-ui";
   import {
     evaluateForceSweep,
@@ -26,9 +26,8 @@
     TravelEnvelopeDto,
   } from "./lib/types";
   import type { SimulationAction } from "./lib/simulationMenu";
-  import EditorSplit from "./lib/components/layout/EditorSplit.svelte";
-  import DriverSuitability from "./lib/components/simulate/DriverSuitability.svelte";
   import { usesDeltaConnection } from "./lib/driverConnection";
+  import { snapshotFromAnalysis, type DriverCalculatorSnapshot } from "./lib/driverCalculator";
   import { DrcController } from "./lib/stores/drc.svelte";
   import { LatestAsyncTask } from "./lib/utils/latestAsyncTask";
   import { measureTrace, computePreviewSummary } from "./lib/previewGeometry";
@@ -55,12 +54,15 @@
   import ProjectVersionsDialog from "./lib/components/layout/ProjectVersionsDialog.svelte";
   import PreferencesDialog from "./lib/components/layout/PreferencesDialog.svelte";
 
-  let { session, active }: { session: DocumentSession; active: boolean } = $props();
+  let { session, view = session, active, focused = true, onOpenDriverCalculator }: {
+    session: DocumentSession; view?: DocumentView; active: boolean; focused?: boolean; onOpenDriverCalculator?: () => void;
+  } = $props();
   // A keyed editor owns one session for its lifetime. Switching tabs never
   // swaps stores under mounted controls or in-flight requests.
   const { config, sensor: sensorStore, motion, projects, kind: designType } = untrack(() => session);
 
-  const analysisWorkspace = untrack(() => session.analysis);
+  const editorView = untrack(() => view);
+  const analysisWorkspace = editorView.analysis;
   let simulationDock = $state<SimulateTab | undefined>();
   let cadImportDialogOpen = $state(false);
   let kicadDialogOpen = $state(false);
@@ -80,8 +82,8 @@
 
 
   // Async result state.
-  let sweep = $state<ForceSweepResult | null>(untrack(() => session.runtime.sweep));
-  let coils = $state<CoilPathDto | null>(untrack(() => session.runtime.coils));
+  let sweep = $state<ForceSweepResult | null>(untrack(() => editorView.runtime.sweep));
+  let coils = $state<CoilPathDto | null>(untrack(() => editorView.runtime.coils));
   /**
    * Geometry MEASURED from the returned coil payload (trace X extent +
    * canvas-consistent magnet-strip rest bounds). The routing braid floors
@@ -89,8 +91,8 @@
    * the configured routing domain — every preview and readout consumes THIS,
    * never the configured numbers. Null until the first payload arrives.
    */
-  let height = $state<HeightStackResultDto | null>(untrack(() => session.runtime.height));
-  let drive = $state<DriveAnalysis | null>(untrack(() => session.runtime.drive));
+  let height = $state<HeightStackResultDto | null>(untrack(() => editorView.runtime.height));
+  let drive = $state<DriveAnalysis | null>(untrack(() => editorView.runtime.drive));
   let driveError = $state<string | null>(null);
   let coilPreviewExpanded = $state(false);
   let motorWorkspaceHeight = $state(0);
@@ -110,24 +112,25 @@
   let powerInputKey = $derived(JSON.stringify([config.toIpc(), config.drive, geometryKey(projects.cadGeometry)]));
   let powerSweep = $derived(sweepInputKey === forceInputKey ? sweep : null);
   let powerDrive = $derived(driveInputKey === powerInputKey ? drive : null);
-  const windingNeedsConfiguration = $derived(projects.cadGeometry ? projects.cadGeometry.terminal_connection === "delta"
-    : config.generatorConnection === "delta" || (!config.generatorEndType && usesDeltaConnection(config.toIpc())));
-
-  $effect(() => {
-    if (!analysisWorkspace.driverCheckOpen || !active) return;
-    void tick().then(() => {
-      if (analysisWorkspace.driverCheckOpen && active) document.getElementById(`driver-document-${session.id}`)?.focus();
-    });
-  });
-
-  function configureWinding(): void {
-    if (projects.cadGeometry || !config.generatorEndType) session.previewView.requestTerminals();
-    else coilPreview?.showDesignSettings("routing");
+  let disposed = false;
+  export async function driverCalculatorSnapshot(): Promise<DriverCalculatorSnapshot | null> {
+    if (designType !== "motor") return null;
+    if (!valid || (projects.cadGeometry && cadMappingProblems(projects.cadGeometry, config.phases, config.min_trace_mm).length)) throw new Error("Resolve the active motor's winding and geometry errors before importing.");
+    const key = powerInputKey;
+    const settings = structuredClone($state.snapshot(config.drive));
+    const ipc = structuredClone($state.snapshot(config.toIpc()));
+    const currentSweep = powerSweep;
+    const kf = currentSweep && currentSweep.current_a > 0 ? Math.abs(currentSweep.mean_thrust_n) / currentSweep.current_a : null;
+    const result = powerDrive ?? await analyzeDrive(ipc, settings, kf, structuredClone($state.snapshot(projects.cadGeometry)));
+    if (disposed || key !== powerInputKey) throw new Error("The motor changed during import. Import again to use its current inputs.");
+    const delta = projects.cadGeometry ? projects.cadGeometry.terminal_connection === "delta"
+      : config.generatorConnection === "delta" || (!config.generatorEndType && usesDeltaConnection(config.toIpc()));
+    return snapshotFromAnalysis(session.title, result, settings, 2 * ipc.magnet_pitch_m, delta, isTauriAvailable());
   }
 
   export function handleSimulationAction(command: SimulationAction): void {
     if (!active || projects.busy || designType !== "motor") return;
-    if (command === "driver") analysisWorkspace.openDriverCheck();
+    if (command === "driver") onOpenDriverCalculator?.();
     else if (command === "run") runSimulationManually();
     else simulationDock?.selectView(command);
   }
@@ -348,7 +351,7 @@
     // Review starts from the inferred pairs, so closing the preview without
     // edits keeps those ends. Ambiguous coils still require manual selection.
     if (proposal && proposal.geometry !== projects.cadGeometry) projects.setCadGeometry(proposal.geometry);
-    session.previewView.requestTerminals(proposal?.unresolved[0] ?? proposal?.pending[0]);
+    editorView.previewView.requestTerminals(proposal?.unresolved[0] ?? proposal?.pending[0]);
   }
 
   function useInferredEnds(): void {
@@ -602,7 +605,8 @@
   });
 
   onDestroy(() => {
-    session.runtime = { coils, sweep, height, drive };
+    disposed = true;
+    editorView.runtime = { coils, sweep, height, drive };
     ++previewGeneration;
     ++sensorGeneration;
     ++simulationGeneration;
@@ -693,23 +697,22 @@
           aria-label="Coil preview panel"
         >
           <ScrollArea class="h-full min-h-0" viewportClass="p-4 lg:pr-2">
-              <SensorPreview store={sensorStore} camera={session.camera} previewView={session.previewView} />
+               <SensorPreview store={sensorStore} camera={editorView.camera} previewView={editorView.previewView} />
           </ScrollArea>
         </aside>{/if}
 
         <div class="min-w-0 min-h-0 h-full" bind:clientHeight={motorWorkspaceHeight}>
           {#if designType === "motor"}
            <div class="flex h-full min-h-0 flex-col">
-           <EditorSplit state={analysisWorkspace}>
-             {#snippet left()}
              <div class="min-h-0 flex-1">
                <CoilPreview bind:this={coilPreview} workspace {config} coils={activeCoils} {motion}
                  simulationActive={active}
                  onRequestSimulation={() => simulationDock?.selectView("fields")}
-                 active={active && !externalDialogOpen} designSettings={motorSettings}
+                 active={active && !externalDialogOpen} {focused} designSettings={motorSettings}
+                 {onOpenDriverCalculator}
                  statusContent={toolbarStatus}
                 bind:sidePanel={previewPanel} bind:expanded={coilPreviewExpanded} {drive} {driveError} {drivePending}
-                camera={session.camera} view={session.previewView} importedGeometry={projects.cadGeometry}
+                 camera={editorView.camera} view={editorView.previewView} importedGeometry={projects.cadGeometry}
                 onGeometryChange={(geometry) => projects.setCadGeometry(geometry)} />
             </div>
                <SimulateTab
@@ -720,7 +723,7 @@
                 powerInput={{ config: config.toIpc(), driveSettings: config.drive, desiredTravelMm: config.desired_travel_mm, topology: config.topology, cadGeometry: projects.cadGeometry, sweep: powerSweep, drive: powerDrive, native: isTauriAvailable() }}
                  open={true}
                 availableHeight={Math.max(0, motorWorkspaceHeight - motorStatusHeight)}
-                 onOpenDriverCheck={() => analysisWorkspace.openDriverCheck()}
+                 onOpenDriverCheck={onOpenDriverCalculator}
                 {config}
                  {active}
                  {sweep}
@@ -735,16 +738,6 @@
               <div class="shrink-0" bind:clientHeight={motorStatusHeight}>
                 <PreviewStatus {config} {motion} stats={computePreviewSummary(activeCoils)} />
                </div>
-             {/snippet}
-             {#snippet right()}
-               <div id={`driver-document-${session.id}`} data-testid="driver-check-document" role="tabpanel" aria-labelledby={`driver-tab-${session.id}`} tabindex="0"
-                 class="min-h-0 flex-1 overflow-auto overscroll-contain p-4 focus-visible:outline focus-visible:outline-emerald-400"
-                 aria-label="Driver check document">
-                 <p class="mb-4 border-b border-slate-700 pb-3 text-xs text-slate-400">Driver check for <span class="text-slate-200">{session.title}</span>. Live results from this design's routed copper, not a separate saved file.</p>
-                 <DriverSuitability analysis={powerDrive} error={driveError} embedded onConfigureWinding={windingNeedsConfiguration ? configureWinding : undefined} />
-               </div>
-             {/snippet}
-           </EditorSplit>
            </div>
            {:else}
              <div class="h-full">

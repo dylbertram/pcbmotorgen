@@ -1,146 +1,162 @@
 import { expect, test, type Page } from "@playwright/test";
-import { gotoDesignApp, openDriverChecks, selectDesignPanel, simulationDock } from "./helpers";
+import { gotoDesignApp, selectDesignPanel, simulationDock } from "./helpers";
 
-async function nativeMenu(page: Page) {
-  // This transport tests the real App -> DocumentEditor command route. Native
-  // item IDs/labels and event validation have separate Rust/TS coverage.
+async function splitRight(page: Page) {
+  const tab = page.getByRole("navigation", { name: "Open files", exact: true }).getByRole("tab").first();
+  await tab.click({ button: "right" });
+  await page.getByRole("menuitem", { name: "Split right", exact: true }).click();
+  await expect(page.getByRole("region", { name: "Right editor group", exact: true })).toBeVisible();
+}
+async function newMotor(page: Page) {
+  await page.getByRole("navigation", { name: "Open files", exact: true }).getByRole("button", { name: "New coil file", exact: true }).click();
+  await page.getByRole("dialog", { name: "New coil file", exact: true }).getByRole("button", { name: /^Motor coil/ }).click();
+}
+
+async function installMenuTransport(page: Page): Promise<void> {
   await page.route(/\/src\/lib\/ipc\/project\.ts(?:\?t=\d+)?$/, route => route.fulfill({
     contentType: "application/javascript",
     body: `export * from '/src/lib/ipc/project.ts?original';
       export async function bindProjectMenuActions(handlers) {
-        const simulate = e => handlers.simulate?.(e.detail);
-        window.addEventListener('test-simulate', simulate);
-        const close = () => handlers.closeFile?.();
-        window.addEventListener('test-close-file', close);
-        return () => { window.removeEventListener('test-simulate', simulate); window.removeEventListener('test-close-file', close); };
+        const listener = event => { if (event.detail === 'close') handlers.closeFile?.(); else handlers.simulate?.(event.detail); };
+        window.addEventListener('test-menu', listener); return () => window.removeEventListener('test-menu', listener);
       }`,
   }));
 }
-
 test("unified workspace, min/max links and consistently underlined Advanced", async ({ page }) => {
   await gotoDesignApp(page);
   const dock = simulationDock(page);
   await expect(page.getByRole("tab", { name: /^(Design|Simulate)$/i })).toHaveCount(0);
-  await expect(dock).toBeVisible();
   await expect(dock.getByRole("tab")).toHaveText(["Move & power", "Force", "Fields", "Advanced"]);
   const toolbar = page.getByRole("toolbar", { name: "Coil preview tools", exact: true });
   await expect(toolbar.getByRole("button", { name: /^Design rule check:/ })).toBeVisible();
-  await expect(toolbar.getByText("ready", { exact: true })).toBeVisible();
   const move = page.getByRole("region", { name: "Move and power", exact: true });
-  await expect(move.getByRole("button", { name: "Full travel", exact: true })).toHaveCount(0);
   const from = move.getByRole("spinbutton", { name: "Move start in millimetres", exact: true });
   const to = move.getByRole("spinbutton", { name: "Move end in millimetres", exact: true });
   const max = await to.inputValue();
-  await from.fill("10");
-  await to.fill("20");
+  await from.fill("10"); await to.fill("20");
   await move.getByRole("button", { name: "Set move start to minimum", exact: true }).click();
-  await expect(from).toHaveValue("0");
-  await expect(to).toHaveValue("20");
+  await expect(from).toHaveValue("0"); await expect(to).toHaveValue("20");
   await move.getByRole("button", { name: "Set move end to maximum", exact: true }).click();
   await expect(to).toHaveValue(max);
-  await expect(move.locator("header")).toContainText("mass and friction");
-  await expect(move.locator("p").filter({ hasText: /^Choose Calculate/ })).toHaveCount(0);
   for (const name of ["Move & power", "Force", "Fields", "Advanced"]) {
-    const tab = dock.getByRole("tab", { name, exact: true });
-    await tab.click();
+    const tab = dock.getByRole("tab", { name, exact: true }); await tab.click();
     await expect(tab).toHaveAttribute("aria-selected", "true");
-    const underline = await tab.evaluate(el => getComputedStyle(el, "::after").backgroundColor);
-    expect(underline).not.toBe("rgba(0, 0, 0, 0)");
+    expect(await tab.evaluate(el => getComputedStyle(el, "::after").backgroundColor)).not.toBe("rgba(0, 0, 0, 0)");
   }
-  await expect(dock.getByRole("button", { name: /Back to/ })).toHaveCount(0);
 });
 
-test("driver check is a resizable closable split document, not nested Force content", async ({ page }, info) => {
+test("Split right creates a second view of the same file, with aligned tabs and resizable groups", async ({ page }, info) => {
   await gotoDesignApp(page);
-  const workspace = page.getByRole("region", { name: "Coil design workspace", exact: true });
-  const canvas = workspace.getByTestId("coil-annotations");
-  await canvas.evaluate(el => el.setAttribute("data-instance", "retained"));
-  await openDriverChecks(page);
-  const driver = page.getByTestId("driver-check-document");
-  const dock = simulationDock(page);
-  await expect(dock.getByText("Friction budget", { exact: true })).toHaveCount(0);
-  await expect(dock.getByText("Stack height", { exact: true })).toHaveCount(0);
-  await expect(dock.getByText("Net of friction:", { exact: true })).toHaveCount(0);
-  await expect(dock.getByRole("region", { name: "Force", exact: true }).locator("details")).toHaveCount(0);
-  await expect(driver.getByRole("region", { name: "Routed copper measurements", exact: true })).toBeVisible();
-  await expect(driver.getByRole("columnheader", { name: "Strands", exact: true })).toHaveCount(0);
-  await expect(canvas).toHaveAttribute("data-instance", "retained");
-  const left = (await workspace.boundingBox())!, right = (await driver.boundingBox())!;
-  expect(right.x).toBeGreaterThanOrEqual(left.x + left.width);
-  expect(Math.abs(right.y - left.y)).toBeLessThanOrEqual(1);
-  const analysisHeader = page.getByRole("navigation", { name: "Analysis editor group", exact: true });
-  expect((await analysisHeader.boundingBox())!.x).toBe(right.x);
+  await splitRight(page);
+  const left = page.getByRole("region", { name: "Left editor group", exact: true });
+  const right = page.getByRole("region", { name: "Right editor group", exact: true });
+  await expect(left.getByRole("navigation").getByRole("tab")).toHaveText(await right.getByRole("navigation").getByRole("tab").innerText());
+  const leftBox = (await left.boundingBox())!, rightBox = (await right.boundingBox())!;
+  expect(rightBox.x).toBeGreaterThan(leftBox.x + leftBox.width);
+  expect(rightBox.y).toBe(leftBox.y);
   const handle = page.getByRole("separator", { name: "Resize editor groups", exact: true });
-  const width = left.width;
   await handle.press("ArrowLeft");
-  await expect.poll(async () => (await workspace.boundingBox())!.width).toBeLessThan(width);
+  await expect.poll(async () => (await left.boundingBox())!.width).toBeLessThan(leftBox.width);
   const grip = (await handle.boundingBox())!;
-  await page.mouse.move(grip.x + grip.width / 2, grip.y + grip.height / 2);
-  await page.mouse.down();
-  await page.mouse.move(grip.x + grip.width / 2 - 40, grip.y + grip.height / 2, { steps: 5 });
-  await page.mouse.up();
-  await expect.poll(async () => (await workspace.boundingBox())!.width).toBeLessThan(width - 40);
-  expect((await analysisHeader.boundingBox())!.x).toBe((await driver.boundingBox())!.x);
-  await page.screenshot({ path: info.outputPath("split-driver-check.png") });
-  await page.getByRole("button", { name: "Close driver check", exact: true }).click();
-  await expect(driver).toHaveCount(0);
-  await expect(canvas).toHaveAttribute("data-instance", "retained");
-  expect((await workspace.boundingBox())!.width).toBeGreaterThan(width);
-  await expect(dock).toBeVisible();
-  await openDriverChecks(page);
-  await expect(page.getByRole("tab", { name: /^Driver check/ })).toHaveCount(1);
-  await openDriverChecks(page);
-  await expect(page.getByRole("tab", { name: /^Driver check/ })).toHaveCount(1);
+  await page.mouse.move(grip.x + 2, grip.y + grip.height / 2); await page.mouse.down();
+  await page.mouse.move(grip.x - 40, grip.y + grip.height / 2, { steps: 5 }); await page.mouse.up();
+  await expect.poll(async () => (await left.boundingBox())!.width).toBeLessThan(leftBox.width - 40);
+  await page.screenshot({ path: info.outputPath("file-editor-split.png") });
+  await right.getByRole("button", { name: /^Close Untitled motor/ }).click();
+  await expect(right).toHaveCount(0);
+  await expect(page.getByRole("dialog", { name: "Save changes?", exact: true })).toHaveCount(0);
+  await expect(left.getByRole("navigation").getByRole("tab")).toHaveCount(1);
 });
 
-test("source edits invalidate the linked driver result and reopening keeps its source", async ({ page }) => {
+test("dragging file tabs previews the destination, moves in both directions and cancels cleanly", async ({ page }, info) => {
+  await gotoDesignApp(page); await newMotor(page);
+  const left = page.getByRole("region", { name: "Left editor group", exact: true });
+  const source = left.getByRole("navigation").getByRole("tab").last();
+  const name = await source.innerText();
+  const dataTransfer = await page.evaluateHandle(() => new DataTransfer());
+  await source.dispatchEvent("dragstart", { dataTransfer });
+  const bounds = (await left.boundingBox())!;
+  await left.dispatchEvent("dragover", { dataTransfer, clientX: bounds.x + bounds.width * .8 });
+  const preview = page.getByTestId("editor-drop-preview");
+  await expect(preview).toBeVisible();
+  expect((await preview.boundingBox())!.x).toBeGreaterThan(bounds.x + bounds.width * .4);
+  expect(await preview.evaluate(el => getComputedStyle(el).backgroundColor)).not.toBe("rgba(0, 0, 0, 0)");
+  await page.screenshot({ path: info.outputPath("tab-drop-preview.png") });
+  await source.dispatchEvent("dragend");
+  await expect(preview).toHaveCount(0);
+  await expect(page.getByRole("region", { name: "Right editor group", exact: true })).toHaveCount(0);
+  await source.dispatchEvent("dragstart", { dataTransfer });
+  await left.dispatchEvent("dragover", { dataTransfer, clientX: bounds.width * .8 });
+  await left.dispatchEvent("drop", { dataTransfer });
+  const right = page.getByRole("region", { name: "Right editor group", exact: true });
+  await expect(right.getByRole("navigation").getByRole("tab")).toHaveText(name);
+  await expect(left.getByRole("navigation").getByRole("tab")).toHaveCount(1);
+  await right.getByRole("navigation").getByRole("tab").dragTo(left.getByRole("navigation"));
+  await expect(right).toHaveCount(0);
+  await expect(left.getByRole("navigation").getByRole("tab")).toHaveCount(2);
+});
+
+test("split views share source edits but keep their simulation selection independent", async ({ page }) => {
+  await gotoDesignApp(page); await splitRight(page);
+  const left = page.getByRole("region", { name: "Left editor group", exact: true });
+  const right = page.getByRole("region", { name: "Right editor group", exact: true });
+  await left.getByRole("tab", { name: "Force", exact: true }).click();
+  await expect(right.getByRole("tab", { name: "Move & power", exact: true })).toHaveAttribute("aria-selected", "true");
+  await left.getByRole("button", { name: "Magnets", exact: true }).click();
+  const count = left.getByRole("spinbutton", { name: "Magnet count", exact: true });
+  await count.fill("8"); await count.press("Enter");
+  await right.getByRole("button", { name: "Magnets", exact: true }).click();
+  await expect(right.getByRole("spinbutton", { name: "Magnet count", exact: true })).toHaveValue("8");
+  await expect(left.getByRole("tab", { name: "Force", exact: true })).toHaveAttribute("aria-selected", "true");
+});
+
+test("driver calculator opens in a separate window and imports only on request", async ({ page }) => {
   await gotoDesignApp(page);
-  await openDriverChecks(page);
-  const driver = page.getByTestId("driver-check-document");
-  await expect(driver).toContainText("5.0 V");
+  await page.getByRole("tab", { name: "Force", exact: true }).click();
+  await expect(page.getByLabel("Simulation run controls")).toContainText("Results for the active geometry");
+  const popupPromise = page.waitForEvent("popup");
+  await page.getByRole("button", { name: "Open driver calculator", exact: true }).click();
+  const tool = await popupPromise;
+  await expect(tool.getByRole("heading", { name: "Driver calculator", exact: true })).toBeVisible();
+  const bus = tool.getByRole("spinbutton", { name: "Bus voltage (V)", exact: true });
+  await expect(bus).toHaveValue("5");
+  await bus.fill("24");
   await selectDesignPanel(page, "Drive & force targets");
-  const voltage = page.getByRole("spinbutton", { name: "Bus voltage (V)", exact: true });
-  await voltage.fill("12");
-  await voltage.press("Enter");
-  await expect(driver).toContainText("12.0 V");
-  await expect(driver).not.toContainText("5.0 V bus");
+  const sourceBus = page.getByRole("spinbutton", { name: "Bus voltage (V)", exact: true });
+  await expect(sourceBus).toHaveValue("5");
+  await sourceBus.fill("12"); await sourceBus.press("Enter");
+  await expect(page.getByLabel("Simulation run controls")).toContainText("Results for the active geometry");
+  await expect(bus).toHaveValue("24");
+  await tool.getByRole("button", { name: "Import active motor", exact: true }).click();
+  await expect(bus).toHaveValue("12");
+  await expect(page.getByTestId("driver-check-document")).toHaveCount(0);
+  await expect(page.getByRole("separator", { name: "Resize editor groups", exact: true })).toHaveCount(0);
+  await tool.close();
+  await expect(sourceBus).toHaveValue("12");
 });
 
-test("native Simulate commands select views and open the same driver document", async ({ page }) => {
-  await nativeMenu(page);
-  await gotoDesignApp(page);
-  for (const [id, label] of [["force", "Force"], ["fields", "Fields"], ["advanced", "Advanced"], ["move", "Move & power"]]) {
-    await page.evaluate(id => window.dispatchEvent(new CustomEvent("test-simulate", { detail: id })), id);
-    await expect(simulationDock(page).getByRole("tab", { name: label, exact: true })).toHaveAttribute("aria-selected", "true");
-  }
-  await page.evaluate(() => window.dispatchEvent(new CustomEvent("test-simulate", { detail: "driver" })));
-  await expect(page.getByTestId("driver-check-document")).toBeVisible();
-  await page.evaluate(() => window.dispatchEvent(new CustomEvent("test-close-file")));
-  await expect(page.getByTestId("driver-check-document")).toHaveCount(0);
-  await expect(page.getByRole("navigation", { name: "Open files" }).getByRole("tab")).toHaveCount(1);
+test("native menu commands target the focused editor and close only that view", async ({ page }) => {
+  await installMenuTransport(page);
+  await gotoDesignApp(page); await splitRight(page);
+  const right = page.getByRole("region", { name: "Right editor group", exact: true });
+  const left = page.getByRole("region", { name: "Left editor group", exact: true });
+  await right.getByRole("navigation").getByRole("tab").click();
+  await page.evaluate(() => window.dispatchEvent(new CustomEvent("test-menu", { detail: "force" })));
+  await expect(right.getByRole("tab", { name: "Force", exact: true })).toHaveAttribute("aria-selected", "true");
+  await expect(left.getByRole("tab", { name: "Move & power", exact: true })).toHaveAttribute("aria-selected", "true");
+  await page.evaluate(() => window.dispatchEvent(new CustomEvent("test-menu", { detail: "close" })));
+  await expect(right).toHaveCount(0);
+  await expect(left.getByRole("navigation").getByRole("tab")).toHaveCount(1);
+  await expect(page.getByRole("dialog", { name: "Save changes?", exact: true })).toHaveCount(0);
 });
 
-test("each source retains its own analysis group and simulation view", async ({ page }) => {
-  await gotoDesignApp(page);
-  await openDriverChecks(page);
-  const handle = page.getByRole("separator", { name: "Resize editor groups", exact: true });
-  await handle.press("ArrowLeft");
-  const percent = await handle.getAttribute("aria-valuenow");
-  const files = page.getByRole("navigation", { name: "Open files", exact: true });
-  const first = files.getByRole("tab").first();
-  const firstName = (await first.innerText()).replace(/^M\s*/, "").replace(/●/g, "").trim();
-  await page.getByRole("button", { name: "New coil file", exact: true }).click();
-  await page.getByRole("dialog", { name: "New coil file", exact: true }).getByRole("button", { name: /^Motor coil/ }).click();
-  await expect(page.getByTestId("driver-check-document")).toHaveCount(0);
-  await expect(simulationDock(page).getByRole("tab", { name: "Move & power", exact: true })).toHaveAttribute("aria-selected", "true");
-  await openDriverChecks(page);
-  const secondName = (await files.getByRole("tab").nth(1).innerText()).replace(/^M\s*/, "").replace(/●/g, "").trim();
-  await expect(page.getByTestId("driver-check-document")).toContainText(secondName);
-  await page.getByRole("button", { name: "Close driver check", exact: true }).click();
-  await first.click();
-  await expect(page.getByTestId("driver-check-document")).toContainText(firstName);
-  await expect(handle).toHaveAttribute("aria-valuenow", percent!);
-  await expect(simulationDock(page).getByRole("tab", { name: "Force", exact: true })).toHaveAttribute("aria-selected", "true");
-  await files.getByRole("tab").nth(1).click();
-  await expect(page.getByTestId("driver-check-document")).toHaveCount(0);
+test("the native calculator command can open a blank tool without a source file", async ({ page }) => {
+  await installMenuTransport(page);
+  await page.goto("/");
+  const popup = page.waitForEvent("popup");
+  await page.evaluate(() => window.dispatchEvent(new CustomEvent("test-menu", { detail: "driver" })));
+  const calculator = await popup;
+  await expect(calculator.getByRole("heading", { name: "Driver calculator", exact: true })).toBeVisible();
+  await expect(calculator.getByRole("spinbutton", { name: "Hot phase resistance (Ω)", exact: true })).toHaveValue("");
+  await calculator.close();
 });

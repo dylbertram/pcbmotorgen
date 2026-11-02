@@ -144,7 +144,7 @@ test("edits survive panel and result view changes", async ({ page }) => {
   await expect(page.getByRole("button", { name: "Routing source", exact: true })).toHaveText("Infinity Braid - Star (Wye)");
   await page.getByRole("button", { name: "Driver settings", exact: true }).click();
   await expect(page.getByRole("dialog", { name: "Routing", exact: true })).toHaveCount(0);
-  await expect(page.getByRole("region", { name: "Preview driver simulation results" })).toContainText("Current ripple");
+  await expect(page.getByRole("button", { name: "Open driver calculator", exact: true }).first()).toBeVisible();
   await left.getByRole("button", { name: "Routing", exact: true }).click();
   await expect(travel).toHaveValue("100");
   await page.getByRole("tab", { name: "Force", exact: true }).click();

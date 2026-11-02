@@ -125,7 +125,7 @@ test("menu follows the active file and ignores stale events and modal actions", 
   await expect.poll(async () => (await snapshot(page)).owner).not.toBe(owner);
   await nativeAction(page, "view:3d", owner);
   await expect(page.getByRole("button", { name: "Top-down", exact: true })).toHaveAttribute("aria-pressed", "true");
-  await page.locator("#file-tab-1").click();
+  await page.getByRole("navigation", { name: "Open files", exact: true }).getByRole("tab").first().click();
   await expect.poll(() => checked(page, "view:vias")).toBe(false);
   await page.getByRole("button", { name: "New coil file", exact: true }).first().click();
   await page.getByRole("dialog", { name: "New coil file", exact: true }).getByRole("button", { name: /^Sensor coil/ }).click();
