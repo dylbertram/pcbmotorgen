@@ -2,7 +2,7 @@ import { BufferGeometry, ExtrudeGeometry, Path, Shape, Vector2, type Vector3 } f
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 import type { Ring } from "polygon-clipping";
 
-export const VIA_RADIAL_SEGMENTS = 48;
+const VIA_RADIAL_SEGMENTS = 48;
 export interface CopperPad {
   point: Vector3;
   thickness: number;

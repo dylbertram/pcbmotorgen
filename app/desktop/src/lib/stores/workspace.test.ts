@@ -192,6 +192,23 @@ describe("workspace documents", () => {
     expect(workspace.path).toBeNull();
   });
 
+  it("rejects overlapping New Project requests while confirmation is pending", async () => {
+    const { workspace, choose } = makeWorkspace();
+    await workspace.create("motor");
+    const document = workspace.active!;
+    document.config.magnet_count = 8;
+    let confirm!: (choice: "discard") => void;
+    choose.mockReturnValueOnce(new Promise(resolve => { confirm = resolve; }));
+    const pending = workspace.newProject();
+    expect(workspace.busy).toBe(true);
+    expect(await workspace.newProject()).toBe(false);
+    expect(workspace.active).toBe(document);
+    confirm("discard");
+    expect(await pending).toBe(true);
+    expect(workspace.documents).toEqual([]);
+    expect(workspace.busy).toBe(false);
+  });
+
   it("edits made during a close-save keep the document open and dirty", async () => {
     const { workspace, choose } = makeWorkspace();
     await workspace.openPath("/motor.pmmotor");

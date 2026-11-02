@@ -180,7 +180,7 @@ export interface DriveAnalysis {
 
 /**
  * Driver presets. Typical datasheet values: check them against the revision
- * you design with. Additional parts can be added from the Simulation tab.
+ * you design with. Additional parts can be added from Driver settings.
  */
 export const DRIVER_PRESETS: DriverSpec[] = [
   {

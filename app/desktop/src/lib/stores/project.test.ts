@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ConfigStore } from "./config.svelte";
 import { MotionStore } from "./motion.svelte";
 import { ProjectStore } from "./project.svelte";
-import { SensorStore } from "./sensor.svelte";
+import { SensorStore } from "../sensor/sensor.svelte";
 import { RecentFilesStore } from "./recentFiles.svelte";
 import type { ProjectState } from "../types";
 import type { CadGeometry } from "../types";
@@ -324,6 +324,13 @@ describe("ProjectStore snapshot mapping", () => {
     b.config.setRoutingParam("zzz", 2);
     b.config.setRoutingParam("aaa", 1);
     expect(a.projects.snapshotJson).toBe(b.projects.snapshotJson);
+    const params = a.projects.snapshotIpc().config.routing_params;
+    expect(params.aaa).toBe(1);
+    expect(params.zzz).toBe(2);
+    expect(Object.keys(params).indexOf("aaa")).toBeLessThan(Object.keys(params).indexOf("zzz"));
+    a.projects.markClean();
+    a.config.routing_params = Object.fromEntries(Object.entries(a.config.routing_params).reverse());
+    expect(a.projects.isDirty).toBe(false);
   });
 });
 
@@ -362,7 +369,7 @@ describe("ProjectStore dirty tracking", () => {
       trace_width_mm: 0.2,
       source_file_name: "motor-coils.dxf",
     };
-    projects.setCadGeometry(geometry);
+    projects.cadGeometry = geometry;
     expect(projects.isDirty).toBe(true);
     const target = makeStores().projects;
     target.applyToState(projects.snapshotIpc());
@@ -380,7 +387,7 @@ describe("ProjectStore dirty tracking", () => {
   });
 });
 
-describe("ProjectStore openPath (kata eap8)", () => {
+describe("ProjectStore loadFromPath", () => {
   beforeEach(() => {
     vi.mocked(loadProject).mockReset();
   });
@@ -405,9 +412,9 @@ describe("ProjectStore openPath (kata eap8)", () => {
     };
     vi.mocked(loadProject).mockResolvedValue(result);
 
-    projects.markClean(); // clean: no discard-confirm path
+    projects.markClean();
     projects.notice = "Previous notification";
-    const ok = await projects.openPath("/home/user/motor-1.pmproj");
+    const ok = await projects.loadFromPath("/home/user/motor-1.pmproj");
     expect(ok).toBe(true);
     expect(loadProject).toHaveBeenCalledWith("/home/user/motor-1.pmproj", null);
     expect(projects.currentPath).toBe("/home/user/motor-1.pmproj");
@@ -432,7 +439,7 @@ describe("ProjectStore openPath (kata eap8)", () => {
       versions: [],
       validation: { errors: [], warnings: ["Check the imported geometry"] },
     });
-    expect(await projects.openPath("/warned.pmproj")).toBe(true);
+    expect(await projects.loadFromPath("/warned.pmproj")).toBe(true);
     expect(projects.notice).toBeNull();
     expect(projects.loadIssues?.warnings).toEqual(["Check the imported geometry"]);
   });
@@ -448,7 +455,7 @@ describe("ProjectStore openPath (kata eap8)", () => {
     config.desired_travel_mm = 60;
     motion.positionMm = 42.5;
     projects.markClean();
-    const ok = await projects.openPath("/nope.pmproj");
+    const ok = await projects.loadFromPath("/nope.pmproj");
     expect(ok).toBe(false);
     expect(projects.currentPath).toBeNull();
     expect(projects.error).toBe(
@@ -464,11 +471,7 @@ describe("ProjectStore openPath (kata eap8)", () => {
   });
 });
 
-describe("ProjectStore newProject", () => {
-  beforeEach(() => {
-    vi.mocked(confirmDiscardChanges).mockReset();
-  });
-
+describe("ProjectStore routing defaults", () => {
   it("starts new motor designs in star without changing saved connection choices", () => {
     const { config, projects } = makeStores();
     expect(config.routing_params.connection).toBe(2);
@@ -481,57 +484,6 @@ describe("ProjectStore newProject", () => {
     }
   });
 
-  it("resets motor, sensor, mover, file path, CAD, and messages", async () => {
-    const { config, motion, sensor, projects } = makeStores();
-    const defaults = projects.snapshotIpc();
-    editDesign(config, motion);
-    sensor.set("lambda_mm", 240);
-    projects.currentPath = "/saved.pmproj";
-    projects.cadGeometry = { trace_width_mm: 0.2 } as CadGeometry;
-    projects.error = "Previous failure";
-    projects.markClean();
-
-    expect(await projects.newProject()).toBe(true);
-    expect(projects.snapshotIpc().config.desired_travel_mm).toBe(defaults.config.desired_travel_mm);
-    expect(projects.snapshotIpc().sensor_config).toEqual(defaults.sensor_config);
-    expect(motion.positionMm).toBe(defaults.mover_position_mm);
-    expect(projects.currentPath).toBeNull();
-    expect(projects.cadGeometry).toBeNull();
-    expect(projects.error).toBeNull();
-    expect(projects.isDirty).toBe(false);
-    config.desired_travel_mm += 1;
-    expect(projects.isDirty).toBe(true);
-  });
-
-  it("keeps the entire working state when discard is cancelled", async () => {
-    const { config, projects } = makeStores();
-    projects.currentPath = "/saved.pmproj";
-    projects.markClean();
-    config.desired_travel_mm = 42;
-    const before = projects.snapshotJson;
-    vi.mocked(confirmDiscardChanges).mockResolvedValue(false);
-
-    expect(await projects.newProject()).toBe(false);
-    expect(confirmDiscardChanges).toHaveBeenCalledOnce();
-    expect(projects.snapshotJson).toBe(before);
-    expect(projects.currentPath).toBe("/saved.pmproj");
-    expect(projects.busy).toBe(false);
-  });
-
-  it("requires confirmation for unsaved changes and ignores overlapping New", async () => {
-    const { config, projects } = makeStores();
-    projects.markClean();
-    config.desired_travel_mm = 42;
-    let confirm!: (value: boolean) => void;
-    vi.mocked(confirmDiscardChanges).mockReturnValue(new Promise((resolve) => { confirm = resolve; }));
-    const pending = projects.newProject();
-    expect(projects.busy).toBe(true);
-    expect(await projects.newProject()).toBe(false);
-    confirm(true);
-    expect(await pending).toBe(true);
-    expect(projects.isDirty).toBe(false);
-    expect(projects.busy).toBe(false);
-  });
 });
 
 describe("ProjectStore versions", () => {

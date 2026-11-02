@@ -13,7 +13,6 @@
  */
 
 import { invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
 import {
   confirm,
   open as openDialog,
@@ -27,7 +26,6 @@ import type {
   WorkspaceLoad,
 } from "../types";
 import { isTauriAvailable } from "./core";
-import { isSimulationAction, type SimulationAction } from "../menu/simulationMenu";
 
 const PROJECT_FILE_FILTERS = [
   { name: "pcbmotorgen files", extensions: ["pmproj", "pmmotor", "pmsensor"] },
@@ -199,71 +197,4 @@ export async function setRecentFiles(paths: string[]): Promise<void> {
 export async function fileExists(path: string): Promise<boolean> {
   if (!isTauriAvailable()) return true;
   return await invoke<boolean>("file_exists", { path });
-}
-
-/**
- * Wire the native File menu to the project flows. The Rust menu bar owns
- * the items and accelerators (`src-tauri/src/menu.rs`) and forwards each
- * click as a Tauri event whose name equals the item id. Handlers run the
- * same `ProjectStore` flows the former header buttons used; the store's
- * `busy` guard serializes overlapping events. Resolves with an unbind
- * function (no-op outside the Tauri shell — plain browser dev has no
- * native menu).
- */
-export async function bindProjectMenuActions(handlers: {
-  simulate?: (action: SimulationAction) => void;
-  newFile?: () => void;
-  newProject?: () => void;
-  saveWorkspace?: () => void;
-  saveWorkspaceAs?: () => void;
-  saveAll?: () => void;
-  closeFile?: () => void;
-  exportDxf?: () => void;
-  sendKicad?: () => void;
-  open: () => void;
-  save: () => void;
-  saveAs: () => void;
-  saveNewVersion?: () => void;
-  settings?: () => void;
-  /** The native File > Import CAD menu item was clicked. */
-  importCad?: () => void;
-  /**
-   * An "Open Recent" entry was clicked (kata eap8). The payload is the
-   * absolute path exactly as it was displayed in the submenu.
-   */
-  openRecent?: (path: string) => void;
-  /** The "Clear Recent Files" entry was clicked (kata eap8). */
-  clearRecent?: () => void;
-}): Promise<() => void> {
-  if (!isTauriAvailable()) {
-    return () => {};
-  }
-  const unlisteners = await Promise.all([
-    listen<unknown>("menu:simulate", (event) => { if (isSimulationAction(event.payload)) handlers.simulate?.(event.payload); }),
-    listen("menu:new-file", () => handlers.newFile?.()),
-    listen("menu:new-project", () => handlers.newProject?.()),
-    listen("menu:save-workspace", () => handlers.saveWorkspace?.()),
-    listen("menu:save-workspace-as", () => handlers.saveWorkspaceAs?.()),
-    listen("menu:save-all", () => handlers.saveAll?.()),
-    listen("menu:close-file", () => handlers.closeFile?.()),
-    listen("menu:export-dxf", () => handlers.exportDxf?.()),
-    listen("menu:send-kicad", () => handlers.sendKicad?.()),
-    listen("menu:open-project", handlers.open),
-    listen("menu:save-project", handlers.save),
-    listen("menu:save-project-as", handlers.saveAs),
-    listen("menu:save-project-new-version", () => handlers.saveNewVersion?.()),
-    listen("menu:settings", () => handlers.settings?.()),
-    listen("menu:import-cad", () => handlers.importCad?.()),
-    // Open Recent (kata eap8): Rust resolves the entry id to the path that
-    // was displayed and forwards it as the event payload. Registered even
-    // when the handlers are absent — the recents wiring is optional and
-    // the menu emits these events only when its items are clicked.
-    listen<string>("menu:open-project-recent", (event) =>
-      handlers.openRecent?.(event.payload),
-    ),
-    listen("menu:clear-recent-files", () => handlers.clearRecent?.()),
-  ]);
-  return () => {
-    for (const unlisten of unlisteners) unlisten();
-  };
 }

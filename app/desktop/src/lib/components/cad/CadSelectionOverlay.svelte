@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { CadGeometry, CadPoint } from "../../types";
-  import type { WorldTransform } from "../../chart";
+  import type { WorldTransform } from "../../geometry/viewport";
   import type { CadSelectionTool } from "../../cad/cadSelectionTool.svelte";
   import { selectableTraces } from "../../cad/cadSelection";
   import SelectionAssignmentMenu from "./SelectionAssignmentMenu.svelte";

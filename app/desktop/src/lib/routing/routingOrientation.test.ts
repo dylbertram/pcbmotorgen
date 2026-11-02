@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { DEFAULT_ROUTING_ORIENTATION, flipCadGeometry, orientCoilPreview } from "./routingOrientation";
 import { ConfigStore } from "../stores/config.svelte";
 import type { CadGeometry } from "../types";
-import { mockCoils } from "../ipc/mocks";
+import { mockCoils } from "../ipc/coilPreviewMock";
 
 const fixture = (): CadGeometry => ({
   trace_width_mm: .2, layer_z_mm: [0, -.2, -.7, -.8], source_file_name: "reference.dxf", coil_phases: { winding: "A" },

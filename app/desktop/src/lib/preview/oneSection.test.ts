@@ -22,6 +22,7 @@ describe("computeVisibleSegments", () => {
       expect(actives.length).toBeLessThanOrEqual(2);
       expect(actives.length).toBeGreaterThan(0);
       expect(segs.some((s) => !s.is_active)).toBe(true);
+      expect(segs).toEqual(ph.segments.slice(0, 3));
     }
   });
 

@@ -1,16 +1,10 @@
 import { expect, test, type Page } from "@playwright/test";
 import { gotoDesignApp, openDriverChecks, selectDesignPanel, coilWorkspace } from "./helpers";
 import { fileURLToPath } from "node:url";
+import { installFileActionMenu } from "./project-menu-helpers";
 
 test.beforeEach(async ({ page }) => {
-  await page.route(/\/src\/lib\/ipc\/project\.ts(?:\?t=\d+)?$/, async route => {
-    const response = await route.fetch();
-    const body = (await response.text()).replace("export async function bindProjectMenuActions(handlers) {", `export async function bindProjectMenuActions(handlers) {
-      const handle = event => handlers[event.detail]?.();
-      window.addEventListener('test-file-action', handle);
-      return () => window.removeEventListener('test-file-action', handle);`);
-    await route.fulfill({ response, body });
-  });
+  await installFileActionMenu(page);
 });
 
 async function action(page: Page, name: string) {
@@ -23,9 +17,10 @@ async function settings(page: Page) {
   return dialog;
 }
 
-test("driver library edits persist and feed the Simulation selector", async ({ page }) => {
+test("driver library edits persist and feed the driver selectors", async ({ page }) => {
   await gotoDesignApp(page);
   let dialog = await settings(page);
+  await expect(dialog.getByText("Saved drivers are shared with Driver settings and the driver calculator.")).toBeVisible();
 
   await dialog.getByRole("button", { name: "Add driver…", exact: true }).click();
   const modal = page.getByRole("dialog", { name: "Add driver", exact: true });
@@ -63,7 +58,7 @@ test("driver library edits persist and feed the Simulation selector", async ({ p
   dialog = await settings(page);
   await expect(dialog.getByText("Settings driver v2", { exact: true })).toBeVisible();
 
-  // The Simulation tab selects from the same library.
+  // Driver settings and the calculator select from the same library.
   await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
   await selectDesignPanel(page, "Routing");
   await coilWorkspace(page).getByRole("button", { name: "Driver settings", exact: true }).click();
@@ -86,7 +81,7 @@ test("bundled drivers live in the library, are deletable, and leave the selector
   await library.getByRole("button", { name: "Remove DRV8313", exact: true }).click();
   await expect(library.getByText("DRV8313", { exact: true })).toHaveCount(0);
 
-  // The Simulation tab reads the same library, so the removed driver is gone.
+  // Driver settings reads the same library, so the removed driver is gone.
   await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
   await coilWorkspace(page).getByRole("button", { name: "Driver settings", exact: true }).click();
   const selector = page.getByRole("combobox", { name: "Driver to evaluate" });
@@ -105,6 +100,7 @@ test("coil pattern library lists bundled generators and the installed set", asyn
   await gotoDesignApp(page);
   const dialog = await settings(page);
   const library = dialog.locator("fieldset", { hasText: "Coil pattern library" });
+  await expect(library).toContainText("Routing › Routing source");
   await expect(library).toContainText("Infinity Braid");
   await expect(library).toContainText("Built-in");
   await expect(library).toContainText("No user-installed generators.");

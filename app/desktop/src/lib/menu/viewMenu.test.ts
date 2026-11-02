@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { CoilPreviewViewState } from "../components/design/coilPreviewViewState.svelte";
+import { CoilPreviewViewState } from "../preview/coilPreviewViewState.svelte";
 import { applyViewMenuAction, VIEW_MENU_GROUPS, viewMenuItems, type ViewMenuAction, type ViewMenuState } from "./viewMenu";
 import { ViewMenuController } from "./viewMenuController";
 

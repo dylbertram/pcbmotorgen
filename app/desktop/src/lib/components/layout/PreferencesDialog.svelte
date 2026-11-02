@@ -4,10 +4,11 @@
   import type { ConfigStore } from "../../stores/config.svelte";
   import { DEFAULT_RULES, RULE_FIELDS, readPreferences, writePreferences, validRules, type Appearance, type DrcRules } from "../../preferences";
   import { attachBackdropScrollGuard, lockPageScroll } from "../../utils/pageScrollLock";
+  import { errorMessage } from "../../utils/errorMessage";
   import { importKicadDrc } from "../../drc/kicadDrc";
-  import { drcRulesets } from "../../stores/drcRulesets.svelte";
-  import DriverLibrarySection from "./DriverLibrarySection.svelte";
-  import CoilPatternLibrarySection from "./CoilPatternLibrarySection.svelte";
+  import { drcRulesets } from "../../drc/drcRulesetsStore.svelte";
+  import DriverLibrarySection from "../simulate/DriverLibrarySection.svelte";
+  import CoilPatternLibrarySection from "../plugins/CoilPatternLibrarySection.svelte";
 
   let { config, disabled = false, onClose }: { config: ConfigStore; disabled?: boolean; onClose: () => void } = $props();
   let open = $state(true);
@@ -54,7 +55,7 @@
       importName = file.name;
       importWarnings = imported.warnings;
     } catch (reason) {
-      error = `Could not import rules. ${reason instanceof Error ? reason.message : String(reason)}`;
+      error = `Could not import rules. ${errorMessage(reason)}`;
     } finally {
       importing = false;
       input.value = "";
@@ -98,7 +99,7 @@
       Object.assign(config, rules);
       onClose();
     } catch (reason) {
-      error = `Could not save settings. ${reason instanceof Error ? reason.message : String(reason)}`;
+      error = `Could not save settings. ${errorMessage(reason)}`;
     }
   }
 </script>

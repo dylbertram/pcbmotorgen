@@ -17,6 +17,7 @@
     CadGeometry,
   } from "../../types";
   import { cadMappingProblems } from "../../cad/cadMapping";
+  import { errorMessage } from "../../utils/errorMessage";
   import KicadConnectionCard from "./KicadConnectionCard.svelte";
   import KicadPreflightCard from "./KicadPreflightCard.svelte";
   import KicadWriteControls from "./KicadWriteControls.svelte";
@@ -126,7 +127,7 @@
       }
     } catch (e) {
       connection = null;
-      error = e instanceof Error ? e.message : String(e);
+      error = errorMessage(e);
     } finally {
       connecting = false;
     }
@@ -139,7 +140,7 @@
       diagnostics = await getBoardDiagnostics();
     } catch (e) {
       diagnostics = null;
-      error = e instanceof Error ? e.message : String(e);
+      error = errorMessage(e);
     } finally {
       refreshingDiag = false;
     }
@@ -162,7 +163,7 @@
         : `${n} finding(s) (${errs} blocking)`;
       showToast(`Validation complete: ${tail}`);
     } catch (e) {
-      error = e instanceof Error ? e.message : String(e);
+      error = errorMessage(e);
     } finally {
       validating = false;
     }
@@ -180,7 +181,7 @@
           `${previewResult.total_vias} via(s).`,
       );
     } catch (e) {
-      error = e instanceof Error ? e.message : String(e);
+      error = errorMessage(e);
     } finally {
       previewing = false;
     }
@@ -237,7 +238,7 @@
       // Real Tauri error — surface to the UI. This is the fix for the
       // "0 of 0" bug: a backend failure no longer gets hidden behind a
       // synthetic zero-result.
-      error = e instanceof Error ? e.message : String(e);
+      error = errorMessage(e);
     } finally {
       writing = false;
     }

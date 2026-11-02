@@ -1,4 +1,4 @@
-//! Integration tests for the Phase 7 KiCad writer module.
+//! Integration tests for the KiCad writer module.
 //!
 //! These tests exercise the pure `coils_to_board_items` function (no socket
 //! needed) and the `Commit` handle using `MockTransport`.
@@ -26,39 +26,29 @@ use pcbmotorgen_export::proto::common::types::{
 // Helpers
 // ---------------------------------------------------------------------------
 
-/// Millimetres (routing crate's native unit).
-fn mm(v: f64) -> f64 {
-    v
-}
-
 /// mil → millimetres (1 mil = 0.0254 mm).
 fn mils_to_mm(v: f64) -> f64 {
     v * 0.0254
 }
 
-/// `DesignRules` matching the old `braid_config` / `test_config` helpers:
-/// 5 mil trace/space, 0.2 mm via drill, 0.1 mm annular ring.
+/// Five-mil trace and spacing with 0.2 mm drills and 0.1 mm annular rings.
 fn braid_rules() -> DesignRules {
     DesignRules {
         min_trace_mm: mils_to_mm(5.0),
         trace_width_mm: mils_to_mm(5.0),
         min_space_mm: mils_to_mm(5.0),
-        min_via_drill_mm: mm(0.2),
-        min_via_annular_ring_mm: mm(0.1),
+        min_via_drill_mm: 0.2,
+        min_via_annular_ring_mm: 0.1,
     }
 }
 
-/// Active area used by the infinity-braid tests (matches the old
-/// `braid_config.active_area_length_m = 0.6`).
+/// Active area used by the infinity-braid tests.
 const BRAID_ACTIVE_AREA_MM: f64 = 600.0;
 
-/// Active area used by the hand-built proto tests (matches the old
-/// `test_config.active_area_length_m = mm(48.0)`).
+/// Active area used by the hand-built proto tests.
 const TEST_ACTIVE_AREA_MM: f64 = 48.0;
 
-/// Generate the bundled infinity-braid coil set for a board of `num_layers`
-/// layers. Mirrors the old `generate_coils_for_board`. The braid requires
-/// two or four layers (returns an empty set for unsupported stack counts).
+/// Generate the bundled infinity-braid coil set for a board of `num_layers` layers.
 fn braid_coils(num_layers: u32) -> Vec<PhaseCoil> {
     let mut params = HashMap::new();
     params.insert("num_strands".to_string(), 5.0);
@@ -217,7 +207,7 @@ fn test_track_coordinates_are_in_nanometres() {
 fn test_track_width_matches_config() {
     let coils = braid_coils(2);
     let items = braid_items(&coils, 2);
-    let expected = (braid_rules().min_trace_mm * 1e6).round() as i64;
+    let expected = (braid_rules().trace_width_mm * 1e6).round() as i64;
     let track: Track = Track::decode(items[0].value.as_slice()).expect("decode Track");
     assert_eq!(track.width.unwrap().value_nm, expected);
 }
@@ -866,11 +856,11 @@ use pcbmotorgen_export::io_elements_to_board_items;
 
 fn io_rules() -> DesignRules {
     DesignRules {
-        min_trace_mm: mm(0.1),
-        trace_width_mm: mm(0.1),
-        min_space_mm: mm(0.1),
-        min_via_drill_mm: mm(0.2),
-        min_via_annular_ring_mm: mm(0.1),
+        min_trace_mm: 0.1,
+        trace_width_mm: 0.1,
+        min_space_mm: 0.1,
+        min_via_drill_mm: 0.2,
+        min_via_annular_ring_mm: 0.1,
     }
 }
 
@@ -889,7 +879,7 @@ fn io_result() -> RoutingResult {
             IoPad {
                 position: Point::new(0.0, 18.0),
                 size: PadSize { x: 0.4, y: 0.4 },
-                drill_mm: Some(mm(0.2)),
+                drill_mm: Some(0.2),
                 layers: vec![],
                 kind: IoPadKind::Tht,
                 net: "B".into(),

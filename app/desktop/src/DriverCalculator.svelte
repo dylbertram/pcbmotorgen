@@ -4,6 +4,7 @@
   import { calculatorSeed, listenDriverImport, requestDriverImport } from "./lib/driver/driverCalculatorWindow";
   import DriverSelector from "./lib/components/simulate/DriverSelector.svelte";
   import { ConfigStore } from "./lib/stores/config.svelte";
+  import { errorMessage } from "./lib/utils/errorMessage";
   const config = new ConfigStore();
   let input = $state<DriverCalculatorInput>(emptyDriverInput());
   let source = $state<DriverCalculatorSnapshot | null>(null);
@@ -43,7 +44,7 @@
     clearTimeout(timeout);
     timeout = setTimeout(() => { activeRequest = null; importing = false; error = "The motor window did not respond. Existing calculator inputs are unchanged."; }, 8000);
     try { await requestDriverImport(requestId); }
-    catch (e) { if (activeRequest !== requestId) return; activeRequest = null; clearTimeout(timeout); importing = false; error = e instanceof Error ? e.message : String(e); }
+    catch (e) { if (activeRequest !== requestId) return; activeRequest = null; clearTimeout(timeout); importing = false; error = errorMessage(e); }
   }
   onMount(() => {
     document.title = "Driver calculator";

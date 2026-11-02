@@ -1,4 +1,4 @@
-import type { ViewportBBox, WorldTransform } from "../chart";
+import type { ViewportBBox, WorldTransform } from "../geometry/viewport";
 
 /** A point in virtual pixels or world metres, depending on the caller. */
 export interface Point2D { x: number; y: number }

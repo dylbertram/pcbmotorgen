@@ -1,21 +1,19 @@
 /**
- * Open Recent state (kata eap8) — the most-recent-first list of opened
- * `.pmproj` files backing the native File > Open Recent submenu.
+ * Open Recent state: most-recent-first workspace and document paths backing
+ * the native File > Open Recent submenu.
  *
  * Ownership & flow: the webview owns the list and its persistence; the
  * native menu is a mirror. Mutations (open, clear, prune) persist to
  * localStorage and are pushed to the menu via the `set_recent_files`
  * command; menu clicks flow back as `menu:*` events (see
- * `bindProjectMenuActions`) into `ProjectStore.openPath`.
+ * `bindProjectMenuActions`) into `WorkspaceStore.openPath`.
  *
  * Persistence choice: localStorage — synchronous lazy load (no async
  * dependency before the first menu sync), no extra capability/permission
  * changes, trivial to unit-test, and it persists across restarts of the
  * packaged WKWebView-based app.
  *
- * Pruning: missing files are dropped on ACCESS (first menu sync after
- * load, and immediately before re-opening an entry) — never as a
- * background startup scan of the filesystem.
+ * The first load prunes missing files before the initial menu sync.
  *
  * Port contract: `RecentFilesPort` implementations must not reject — they
  * degrade gracefully (keep the entry / skip the best-effort menu refresh)
@@ -48,7 +46,7 @@ export class RecentFilesStore {
 
   constructor(private port: RecentFilesPort) {}
 
-  /** Lazily load the persisted list once; the first load is an access, so it prunes dead entries before syncing the menu. */
+  /** Load once, pruning missing entries before syncing the menu. */
   async load(): Promise<void> {
     await this.ensureLoaded();
   }
@@ -75,29 +73,6 @@ export class RecentFilesStore {
     await this.ensureLoaded();
     this.paths = [];
     await this.sync();
-  }
-
-  /**
-   * Prune every entry whose file no longer exists on disk and return the
-   * pruned paths. Called on access (first menu build) — deliberately NOT
-   * wired to app startup beyond that.
-   */
-  async pruneMissing(): Promise<string[]> {
-    await this.ensureLoaded();
-    const missing = await this.pruneNow();
-    return missing;
-  }
-
-  /**
-   * Pre-open hook for a recents entry: drop it if its file vanished, then
-   * the caller proceeds anyway — `ProjectStore.openPath` surfaces the
-   * existing backend "Open failed — could not open …: file not found" UX.
-   */
-  async dropMissing(path: string): Promise<void> {
-    await this.ensureLoaded();
-    if (this.paths.includes(path) && !(await this.port.exists(path))) {
-      await this.remove(path);
-    }
   }
 
   /** Single-load guard; concurrent callers share the same promise. */

@@ -6,21 +6,25 @@ import { readFileSync } from "node:fs";
 async function nativeFixture(page: Page) {
   await page.evaluate(async () => {
     const w = window as any;
-    const mocks = await import(/* @vite-ignore */ "/src/lib/ipc/mocks.ts");
+    const { mockCoils } = await import(/* @vite-ignore */ "/src/lib/ipc/coilPreviewMock.ts");
+    const { mockDriveAnalysis } = await import(/* @vite-ignore */ "/src/lib/ipc/driveAnalysisMock.ts");
+    const { mockForceSweep } = await import(/* @vite-ignore */ "/src/lib/ipc/forceSweepMock.ts");
+    const { mockHeightStack } = await import(/* @vite-ignore */ "/src/lib/ipc/heightStackMock.ts");
+    const { PLACEHOLDER_TRAVEL_ENVELOPE } = await import(/* @vite-ignore */ "/src/lib/simulation/travelEnvelopePlaceholder.ts");
     const { generatedTerminalGeometry } = await import(/* @vite-ignore */ "/src/lib/routing/generatedTerminalGeometry.ts");
     w.vizCalls = []; w.vizMode = "ready"; w.simulationCalls = [];
     w.__TAURI_INTERNALS__ = { invoke: async (command: string, args: any) => {
       if (command === "set_view_menu_state") return;
-      if (command === "generate_coils") return mocks.mockCoils(args.config);
+      if (command === "generate_coils") return mockCoils(args.config);
       if (command === "evaluate_force_sweep") {
         w.simulationCalls.push(args);
-        const result = mocks.mockForceSweep(args.config);
+        const result = mockForceSweep(args.config);
         if (w.delaySweep) return new Promise(resolve => { w.resolveSweep = () => resolve(result); });
         return result;
       }
-      if (command === "compute_height_stack") return mocks.mockHeightStack(args.config);
-      if (command === "travel_envelope") return mocks.mockTravelEnvelope(args.config);
-      if (command === "analyze_drive") return mocks.mockDriveAnalysis(args.config, args.drive, null);
+      if (command === "compute_height_stack") return mockHeightStack(args.config);
+      if (command === "travel_envelope") return PLACEHOLDER_TRAVEL_ENVELOPE;
+      if (command === "analyze_drive") return mockDriveAnalysis(args.config, args.drive, null);
       if (command === "dc_coupling_capability") return { available: false, reason: "No qualified coil source in this UI fixture." };
       if (command !== "sample_simulation_visualization") throw new Error(`UI fixture has no${command}`);
       w.vizCalls.push(args); const r = args.request, config = args.config;
@@ -30,7 +34,7 @@ async function nativeFixture(page: Page) {
         const b = [.03 * Math.sin(x), .02 * (y - 2), .08 + .03 * Math.cos(x)];
         samples.push({ position_m: p, b_t: b, magnitude_t: Math.hypot(...b) });
       }
-      const geometry = args.cadGeometry ?? generatedTerminalGeometry(mocks.mockCoils(config), config.num_layers, config.pcb_thickness_m * 1000, config.trace_width_m * 1000);
+      const geometry = args.cadGeometry ?? generatedTerminalGeometry(mockCoils(config), config.num_layers, config.pcb_thickness_m * 1000, config.trace_width_m * 1000);
       const edges = geometry.routing.segments.map((s: any, i: number) => {
         const loss = .001 * r.phase_peak_a ** 2 * (1 + i % 5);
         return { net: geometry.coil_phases?.[s.net] ?? s.net, kind: "trace", layers: [s.layer, s.layer],

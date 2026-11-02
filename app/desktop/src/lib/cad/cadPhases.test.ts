@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { CadGeometry } from "../types";
-import { coilNames, phaseOf, withCoilPhase, geometryKey } from "./cadPhases";
+import { coilNamesWithPaths, phaseOf, withCoilPhase, geometryKey } from "./cadPhases";
+import { cadCoilNames } from "./cadPreview";
 
 const seg = (net: string) => ({ start: { x: 0, y: 0 }, end: { x: 1, y: 0 }, layer: 0, net, is_active: true });
 const geometry: CadGeometry = {
@@ -11,10 +12,19 @@ const geometry: CadGeometry = {
 
 describe("cadPhases", () => {
   it("maps phase-named coils implicitly and reports the rest", () => {
-    expect(coilNames(geometry)).toEqual(["A", "inner", "outer"]);
+    expect(coilNamesWithPaths(geometry)).toEqual(["A", "inner", "outer"]);
     expect(phaseOf(geometry, "A")).toBe("A");
     expect(phaseOf(geometry, "inner")).toBeNull();
     expect(phaseOf(geometry, "outer")).toBeNull();
+  });
+
+  it("excludes via-only nets from phase mapping while retaining them in the preview list", () => {
+    const viaOnly: CadGeometry = {
+      ...geometry,
+      routing: { ...geometry.routing, vias: [{ position: { x: 0, y: 0 }, from_layer: 0, to_layer: 1, net: "via-only" }] },
+    };
+    expect(coilNamesWithPaths(viaOnly)).toEqual(["A", "inner", "outer"]);
+    expect(cadCoilNames(viaOnly)).toEqual(["A", "inner", "outer", "via-only"]);
   });
 
   it("assigns and clears explicit phases without mutating", () => {

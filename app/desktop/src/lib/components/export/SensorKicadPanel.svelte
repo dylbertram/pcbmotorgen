@@ -1,7 +1,8 @@
 <script lang="ts">
   import { connectKicad, writeSensorToBoard } from "../../ipc";
-  import type { SensorStore } from "../../stores/sensor.svelte";
+  import type { SensorStore } from "../../sensor/sensor.svelte";
   import type { KicadConnection, KicadWriteResult } from "../../types";
+  import { errorMessage } from "../../utils/errorMessage";
 
   let { sensor }: { sensor: SensorStore } = $props();
   let connection = $state<KicadConnection | null>(null);
@@ -16,7 +17,7 @@
     try {
       connection = await connectKicad();
       if (!connection.connected) error = "Open a board in KiCad and enable its IPC API, then connect again.";
-    } catch (e) { error = e instanceof Error ? e.message : String(e); }
+    } catch (e) { error = errorMessage(e); }
     finally { busy = false; }
   }
 
@@ -27,7 +28,7 @@
     try {
       result = await writeSensorToBoard(sensor.toIpc(), dryRun);
       if (result.items_attempted === 0) error = "The sensor generated no items. Check the sensor settings before writing.";
-    } catch (e) { error = e instanceof Error ? e.message : String(e); }
+    } catch (e) { error = errorMessage(e); }
     finally { busy = false; }
   }
 </script>

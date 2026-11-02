@@ -1,10 +1,10 @@
 /**
- * Physics IPC calls with deterministic mock fallback.
+ * Physics IPC calls for previews and simulation analysis.
  *
- * The UI schedules coil generation independently for the design reflection
- * and gates Simulation-tab calculations on the active tab. Errors propagate
- * so controllers clear old results. Some legacy previews have a browser-only
+ * The UI schedules coil generation separately from simulation. Errors
+ * propagate so controllers clear old results. Some legacy previews have a browser-only
  * mock; housing motion and the periodic reference never fabricate one.
+ * Native-only move-power commands live in `movePower.ts`.
  */
 
 import { invoke } from "@tauri-apps/api/core";
@@ -25,15 +25,12 @@ import type { HousingMotionAnalysis } from "../types/drive";
 import { isTauriAvailable } from "./core";
 import { orientCoilPreview } from "../routing/routingOrientation";
 import type { PeriodicStaticReference } from "../types/periodicReference";
-import type { MovePowerInputs, NativeMoveResult } from "../types/movePower";
-import {
-  mockCoils,
-  mockForceSweep,
-  mockHeightStack,
-  mockTravelEnvelope,
-  mockMagnetGrades,
-  mockDriveAnalysis,
-} from "./mocks";
+import { PLACEHOLDER_TRAVEL_ENVELOPE } from "../simulation/travelEnvelopePlaceholder";
+import { mockHeightStack } from "./heightStackMock";
+import { mockForceSweep } from "./forceSweepMock";
+import { mockDriveAnalysis } from "./driveAnalysisMock";
+import { mockCoils } from "./coilPreviewMock";
+import { MAGNET_GRADES } from "../types/magnets";
 
 /**
  * Fetch the magnet-grade reference table (NdFeB) from the backend. The Rust
@@ -41,7 +38,7 @@ import {
  * truth; the static TS table is only the offline/mock fallback.
  */
 export async function fetchMagnetGrades(): Promise<MagnetGrade[]> {
-  if (!isTauriAvailable()) return mockMagnetGrades();
+  if (!isTauriAvailable()) return Object.values(MAGNET_GRADES).map((grade) => ({ ...grade }));
   return await invoke<MagnetGrade[]>("get_magnet_grades");
 }
 
@@ -52,24 +49,11 @@ export async function generateCoils(
   return await invoke<CoilPathDto>("generate_coils", { config });
 }
 
-/** No browser mock: engineering move traces require the actual native model. */
-export async function evaluateMovePower(requestId: string, inputs: MovePowerInputs): Promise<NativeMoveResult> {
-  if (!isTauriAvailable()) throw new Error("Move power requires the desktop app; browser previews do not produce engineering traces.");
-  if (inputs.topology !== "linear") throw new Error("Move power supports one linear track, not rotary motion.");
-  assertCadMapping(inputs.cad_geometry, inputs.config);
-  return await invoke<NativeMoveResult>("evaluate_move_power", { requestId, inputs });
-}
-
-export async function cancelMovePower(requestId: string): Promise<boolean> {
-  if (!isTauriAvailable()) return false;
-  return await invoke<boolean>("cancel_move_power", { requestId });
-}
-
 /** Travel limits of the mover array centre (see TravelEnvelopeDto). */
 export async function fetchTravelEnvelope(
   config: LinearMotorConfig,
 ): Promise<TravelEnvelopeDto> {
-  if (!isTauriAvailable()) return mockTravelEnvelope(config);
+  if (!isTauriAvailable()) return PLACEHOLDER_TRAVEL_ENVELOPE;
   return await invoke<TravelEnvelopeDto>("travel_envelope", { config });
 }
 

@@ -1,5 +1,5 @@
 //! Imported CAD geometry as the copper source for KiCad export, DRC, and the
-//! Simulation tab. Every consumer goes through [`CadBoard`] so they all see
+//! simulation. Every consumer goes through [`CadBoard`] so they all see
 //! the same phase-mapped routing.
 
 use crate::config::LinearMotorConfig;

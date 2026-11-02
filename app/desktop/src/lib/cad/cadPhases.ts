@@ -8,8 +8,8 @@ import type { CadGeometry } from "../types";
 
 export const PHASE_LABELS = ["A", "B", "C", "D", "E", "F"];
 
-/** Every coil/net carrying copper, sorted. */
-export function coilNames(geometry: CadGeometry): string[] {
+/** Coils with routed segments, arcs or splines; via-only nets are excluded. */
+export function coilNamesWithPaths(geometry: CadGeometry): string[] {
   const names = new Set<string>();
   for (const s of geometry.routing.segments) names.add(s.net);
   for (const c of geometry.routing.curves) names.add(c.net);

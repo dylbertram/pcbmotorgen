@@ -25,27 +25,23 @@ export function holdingForceAt(
 }
 
 /**
- * Sample the profile across [minX, maxX] at `n` points (inclusive).
+ * Sample positions across [minX, maxX] at `n` points (inclusive).
  * Guards degenerate ranges so the chart always gets finite data.
  */
-export function sampleHoldingForce(
+export function samplePositions(
   minX: number,
   maxX: number,
-  restPhaseMm: number,
-  periodMm: number,
   n = 200,
-): { xs: number[]; ys: number[] } {
+): number[] {
   const count = Math.max(2, Math.floor(n));
   const lo = Number.isFinite(minX) ? minX : 0;
   const hi = Number.isFinite(maxX) && maxX > lo ? maxX : lo + 1;
   const xs: number[] = [];
-  const ys: number[] = [];
   for (let i = 0; i < count; i++) {
     const x = lo + ((hi - lo) * i) / (count - 1);
     xs.push(x);
-    ys.push(holdingForceAt(x, restPhaseMm, periodMm));
   }
-  return { xs, ys };
+  return xs;
 }
 
 /**

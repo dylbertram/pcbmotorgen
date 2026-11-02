@@ -3,9 +3,8 @@
 //!
 //! Rust owns the menu bar. Each project item's id equals the Tauri event
 //! name it is forwarded as (see `on_menu_event` in `main.rs`), where
-//! `bindProjectMenuActions` (`src/lib/ipc/project.ts`) dispatches into the
-//! `ProjectStore` flows — dialogs, busy-guard, and dirty tracking stay in
-//! the existing frontend store.
+//! `bindProjectMenuActions` (`src/lib/ipc/project.ts`) forwards them to
+//! frontend handlers for workspace and document actions.
 //!
 //! The Open Recent list is webview-owned (frontend recents store,
 //! kata eap8); Rust only mirrors it. The frontend pushes the list through

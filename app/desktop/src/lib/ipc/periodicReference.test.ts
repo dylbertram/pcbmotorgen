@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { DriveSettings, LinearMotorConfig } from "../types";
+import type { LinearMotorConfig } from "../types";
 
 const { invoke, available } = vi.hoisted(() => ({ invoke: vi.fn(), available: vi.fn() }));
 vi.mock("@tauri-apps/api/core", () => ({ invoke }));
 vi.mock("./core", () => ({ isTauriAvailable: available }));
-import { analyzeDrive, evaluateForceSweep, periodicBackplaneReference } from "./physics";
+import { periodicBackplaneReference } from "./physics";
 
 describe("periodic backplane reference", () => {
   beforeEach(() => vi.clearAllMocks());
@@ -29,14 +29,4 @@ describe("periodic backplane reference", () => {
     await expect(periodicBackplaneReference({} as LinearMotorConfig)).rejects.toThrow("refinement gate failed");
   });
 
-  it("does not replace force or driver placement errors with mock results", async () => {
-    available.mockReturnValue(true);
-    const message = "Copper layer is below the first magnetic/conducting stack surface";
-    invoke.mockRejectedValue(new Error(message));
-    const config = { routing_pattern: "test", routing_params: {} } as unknown as LinearMotorConfig;
-    const drive = { driver: {} } as DriveSettings;
-    await expect(evaluateForceSweep(config, null, drive)).rejects.toThrow(message);
-    await expect(analyzeDrive(config, drive, null, null)).rejects.toThrow(message);
-    expect(invoke.mock.calls.map(([command]) => command)).toEqual(["evaluate_force_sweep", "analyze_drive"]);
-  });
 });

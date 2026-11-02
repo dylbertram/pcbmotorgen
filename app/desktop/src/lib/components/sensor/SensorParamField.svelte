@@ -9,7 +9,6 @@
     max,
     step,
     integer = false,
-    disabled = false,
     onCommit,
   }: {
     label: string;
@@ -19,7 +18,6 @@
     max?: number;
     step?: number;
     integer?: boolean;
-    disabled?: boolean;
     onCommit: (value: number) => void;
   } = $props();
 </script>
@@ -33,7 +31,6 @@
     {max}
     {step}
     {integer}
-    {disabled}
     ariaLabel={label}
     class="w-full min-w-0 px-2 py-1.5 text-xs font-mono text-emerald-200"
     {onCommit}

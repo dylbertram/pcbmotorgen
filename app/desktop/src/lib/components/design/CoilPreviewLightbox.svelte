@@ -17,35 +17,34 @@
   import type { Snippet } from "svelte";
   import { isDesignPanel, isLeftPanel, type DesignPanelId, type PreviewPanelId } from "./previewPanels";
   import type { CadGeometry } from "../../types";
-  import type { WorldTransform } from "../../chart";
+  import type { WorldTransform } from "../../geometry/viewport";
   import type { CoilTerminalTool } from "../../cad/coilTerminalTool.svelte";
   import CoilTerminalOverlay from "../winding/CoilTerminalOverlay.svelte";
-  import PreviewLayerSlider from "./PreviewLayerSlider.svelte";
-  import type { PreviewGestures } from "../../utils/previewGestures.svelte";
+  import PreviewLayerSlider from "../preview/PreviewLayerSlider.svelte";
+  import type { PreviewGestures } from "../../preview/previewGestures.svelte";
   import type { PreviewMeasure } from "../../measure/previewMeasure.svelte";
   import {
     attachBackdropScrollGuard,
     lockPageScroll,
   } from "../../utils/pageScrollLock";
-  import CoilPreviewControls from "./CoilPreviewControls.svelte";
+  import PreviewZoomControls from "../preview/PreviewZoomControls.svelte";
   import ViewportViewControls from "./ViewportViewControls.svelte";
   import NativeViewMenuBridge from "./NativeViewMenuBridge.svelte";
   import GeometryEditingToolbar from "../cad/GeometryEditingToolbar.svelte";
   import GeometryEditingOverlay from "../cad/GeometryEditingOverlay.svelte";
-  import PreviewFrame from "./PreviewFrame.svelte";
+  import PreviewFrame from "../preview/PreviewFrame.svelte";
   import PreviewMeasureOverlay from "../measure/PreviewMeasureOverlay.svelte";
-  import PreviewSideRail from "./PreviewSideRail.svelte";
+  import PreviewSideRail from "../preview/PreviewSideRail.svelte";
   import CoilPreviewIsoView from "./CoilPreviewIsoView.svelte";
   import MoverPositionControls from "./MoverPositionControls.svelte";
-  import { PREVIEW_H, PREVIEW_W } from "./coilPreviewCanvas";
-  import type { CoilPreviewViewState } from "./coilPreviewViewState.svelte";
+  import { PREVIEW_H, PREVIEW_W } from "../../preview/previewStyle";
+  import type { CoilPreviewViewState } from "../../preview/coilPreviewViewState.svelte";
   import { CadSelectionTool } from "../../cad/cadSelectionTool.svelte";
   import HoldingForceChart from "./HoldingForceChart.svelte";
   import PreviewStatus from "./PreviewStatus.svelte";
-  import type { DriveAnalysis } from "../../types";
   import type { VisualizationInput } from "../../types/simulationVisualization";
   import { SpatialMeasure } from "../../measure/spatialMeasure.svelte";
-  import ZoomWindowOverlay from "./ZoomWindowOverlay.svelte";
+  import ZoomWindowOverlay from "../preview/ZoomWindowOverlay.svelte";
 
   let {
     expanded = $bindable(false),
@@ -59,9 +58,6 @@
     sidePanel = $bindable<PreviewPanelId | null>(null),
     height = PREVIEW_H,
     config,
-    drive = null,
-    driveError = null,
-    drivePending = false,
     motion,
     view,
     gestures,
@@ -101,9 +97,6 @@
     sidePanel?: PreviewPanelId | null;
     height?: number;
     config: ConfigStore;
-    drive?: DriveAnalysis | null;
-    driveError?: string | null;
-    drivePending?: boolean;
     motion: MotionStore;
     view: CoilPreviewViewState;
     gestures: PreviewGestures;
@@ -304,7 +297,7 @@
             {statusContent}
             {selection} {measure} {terminalTool} {onSimplify} {onUndoSimplify} {simplifyNotice} borderless
             spatialMeasure={view.viewMode !== "top" ? measure3d : null}
-            zoomWindow={view.zoomWindow} onToggleZoomWindow={toggleZoomWindow} showZoomWindowControl={false}
+            zoomWindow={view.zoomWindow} onToggleZoomWindow={toggleZoomWindow}
             disabled={!active}
             onActivateSelection={activateSelection} onPrepareGeometry={onStartSegmentEditing} />
         </div>
@@ -319,7 +312,7 @@
 
         {#if designSettings}
           <div class="absolute bottom-0 left-0 z-20 w-11" style:top={`${toolbarHeight}px`}>
-            <PreviewSideRail designOnly {designSettings} {onOpenDriverCalculator} bind:open={sidePanel} active={active && focused} {view} {config} {drive} {driveError} {drivePending}
+            <PreviewSideRail designOnly {designSettings} {onOpenDriverCalculator} bind:open={sidePanel} active={active && focused} {view} {config}
               {terminalTool} {onStartTerminals} generated={!importedGeometry} terminalsDisabled={!onGeometryChange}
               geometry={terminalGeometry ?? importedGeometry} selection={importedGeometry ? selection : undefined}
               showMotorControls={true} layers={[]} label="Design settings" dismissOnOutsideClick={false} />
@@ -329,7 +322,7 @@
         <!-- Right rail: hangs from the bottom of the top toolbar down to the
               status bar, so the Layers panel pulls out under it. -->
         <div class="absolute bottom-0 right-0 z-20 w-11" style:top={`${toolbarHeight}px`}>
-              <PreviewSideRail viewControlsInMenu drawingOnly={!!designSettings} {fieldSettings} {onOpenDriverCalculator} onOpenFields={openFields} generated={!importedGeometry} {config} {drive} {driveError} {drivePending} {view} bind:open={sidePanel} active={active && focused} layers={importedGeometry ? importedGeometry.layer_z_mm.map((_, idx) => ({ idx })) : uniqueLayers} phases={importedGeometry ? [] : uniquePhases}
+              <PreviewSideRail viewControlsInMenu drawingOnly={!!designSettings} {fieldSettings} {onOpenDriverCalculator} onOpenFields={openFields} generated={!importedGeometry} {config} {view} bind:open={sidePanel} active={active && focused} layers={importedGeometry ? importedGeometry.layer_z_mm.map((_, idx) => ({ idx })) : uniqueLayers} phases={importedGeometry ? [] : uniquePhases}
              {terminalTool} {onStartTerminals} terminalsDisabled={!onGeometryChange}
            geometry={terminalGeometry ?? importedGeometry} selection={importedGeometry ? selection : undefined} assignmentDisabled={view.viewMode !== "top" || !importedGeometry || !onGeometryChange || measure.mode || !!terminalTool?.active || view.oneSection}
           coils={importedGeometry ? uniquePhases.map((phase) => ({ name: phase.name, colorIdx: phase.colorIdx })) : []}
@@ -342,10 +335,10 @@
              right as the position box has at the bottom. -->
          <div class="viewport-view-dock absolute bottom-3 z-40 flex max-w-[calc(100%-7rem)] flex-col items-end gap-2" bind:clientHeight={viewDockHeight} style:right={`calc(${dockWidth}px + 3.5rem)`}>
           <div class="viewport-zoom {sidePanel ? 'max-sm:hidden' : ''}" style:--panel-offset={`${dockWidth}px`}>
-          <CoilPreviewControls
+          <PreviewZoomControls
             zoomLabel={view.viewMode === "top" ? gestures.zoomLabel : String(Math.round(view.spatialZoom * 1000) / 1000)}
-            canZoomIn={view.viewMode === "top" && gestures.canZoomIn}
-            canZoomOut={view.viewMode === "top" && gestures.canZoomOut}
+            zoomInDisabled={view.viewMode === "top" && gestures.zoomInDisabled}
+            zoomOutDisabled={view.viewMode === "top" && gestures.zoomOutDisabled}
             onZoomIn={() => view.viewMode === "top" ? gestures.zoomIn() : zoomCamera(1.25)}
             onZoomOut={() => view.viewMode === "top" ? gestures.zoomOut() : zoomCamera(.8)}
             onResetZoom={() => view.viewMode === "top" ? gestures.zoomReset() : zoomCamera(1 / view.spatialZoom)}
@@ -356,17 +349,15 @@
           </div>
          </div>
 
-        <!-- Mover position: same controls as the Design reflection on the
-             shared MotionStore, so the slider lives next to the strip it
-             moves inside the lightbox. The phase-waveform popover is anchored
-             directly above this box at the same width, so it cannot be moved. -->
+        <!-- Position controls share the MotionStore with the inline preview.
+             The phase-waveform popover is anchored above this box. -->
         <div bind:clientHeight={view.positionBarHeight} class="position-bar absolute bottom-16 lg:bottom-3 z-20 flex w-[min(420px,calc(100%-4rem))] flex-col gap-2 {sidePanel && !terminalPanelOpen ? 'max-lg:hidden' : ''}" class:terminal-position-bar={terminalPanelOpen} style:left={`${leftDockWidth + 8}px`} style:max-width={`calc(100% - ${leftDockWidth + dockWidth + 60}px)`}>
           {#if view.positionBarMode === "position" && !embedded && view.showWaveform}
             <div role="dialog" aria-label="Phase waveform" class="relative">
               <button type="button" aria-label="Close phase waveform"
                 class="absolute right-1 top-1 z-10 rounded p-1 text-slate-400 hover:bg-slate-800 hover:text-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
                 onclick={() => { view.showWaveform = false; }}><X size={16} aria-hidden="true" /></button>
-              <HoldingForceChart {config} {motion} flush />
+              <HoldingForceChart {config} {motion} />
             </div>
           {/if}
           <div class="rounded-md border border-slate-700 bg-slate-900/95 p-3">
@@ -378,7 +369,7 @@
           {#if view.positionBarMode === "layers"}
               <PreviewLayerSlider {view} layers={importedGeometry ? importedGeometry.layer_z_mm.map((_, idx) => ({ idx })) : uniqueLayers} onSelect={(layer) => { if (layer !== null && terminalTool?.active) terminalTool.chooseLayer(layer); view.phaseVisibility = []; }} />
           {:else}
-            <MoverPositionControls {config} {motion} showWaveform={false} compact />
+            <MoverPositionControls {motion} />
           {/if}
           </div>
         </div>

@@ -7,7 +7,7 @@ import { describe, expect, it } from "vitest";
 import {
   holdingForceAt,
   holdingForceAtPhase,
-  sampleHoldingForce,
+  samplePositions,
   restPositions,
   phaseStroke,
 } from "./holdingForce";
@@ -43,24 +43,21 @@ describe("holdingForceAt", () => {
   });
 });
 
-describe("sampleHoldingForce", () => {
+describe("samplePositions", () => {
   it("samples n inclusive points across the range", () => {
-    const { xs, ys } = sampleHoldingForce(10, 22, 10, 12, 5);
+    const xs = samplePositions(10, 22, 5);
     expect(xs).toHaveLength(5);
     expect(xs[0]).toBeCloseTo(10, 12);
     expect(xs[4]).toBeCloseTo(22, 12);
-    // Both endpoints are rest positions → zero force.
-    expect(ys[0]).toBeCloseTo(0, 12);
-    expect(ys[4]).toBeCloseTo(0, 12);
   });
 
   it("guards degenerate ranges", () => {
-    const { xs } = sampleHoldingForce(Number.NaN, 20, 0, 12, 4);
+    const xs = samplePositions(Number.NaN, 20, 4);
     expect(xs[0]).toBe(0);
     // A collapsed range is widened to a 1 mm span so the chart still draws.
-    const single = sampleHoldingForce(5, 5, 0, 12, 4);
-    expect(single.xs[0]).toBe(5);
-    expect(single.xs[single.xs.length - 1]).toBe(6);
+    const single = samplePositions(5, 5, 4);
+    expect(single[0]).toBe(5);
+    expect(single[single.length - 1]).toBe(6);
   });
 });
 

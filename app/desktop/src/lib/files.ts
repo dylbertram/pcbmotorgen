@@ -1,10 +1,3 @@
-/**
- * Native file-system helpers for export features.
- *
- * Currently one primitive: "save string content via native dialog".
- * Every export target shares this save flow.
- */
-
 import { save } from "@tauri-apps/plugin-dialog";
 import { writeTextFile } from "@tauri-apps/plugin-fs";
 
@@ -25,7 +18,6 @@ export async function saveTextToFile(
     defaultPath: fileName,
     filters: [{ name: `${extensions.join("/").toUpperCase()} files`, extensions }],
   });
-  // User cancelled the dialog.
   if (filePath === null) return null;
   await writeTextFile(filePath, content);
   return filePath;

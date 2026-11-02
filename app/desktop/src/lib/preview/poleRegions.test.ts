@@ -103,6 +103,8 @@ describe("filterPoleRegionsByPhase", () => {
   it("returns a fresh copy (never mutates the source)", () => {
     const all = filterPoleRegionsByPhase(zones, "");
     expect(all).not.toBe(zones);
+    const empty: typeof zones = [];
+    expect(filterPoleRegionsByPhase(empty, "")).not.toBe(empty);
   });
 });
 

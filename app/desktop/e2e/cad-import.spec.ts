@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { gotoDesignApp, openCoilPreview, coilWorkspace, selectDesignPanel } from "./helpers";
 import { installViewMenu, setViewMenuChecked } from "./view-menu-helpers";
+import { installFileActionMenu } from "./project-menu-helpers";
 
 async function revisitWorkspace(page: Page) {
   await page.getByRole("button", { name: "Collapse simulation panel", exact: true }).click();
@@ -17,12 +18,7 @@ test.beforeEach(async ({ page }) => {
     const body = (await response.text()).replace(/async function confirm\(message2, options\) \{[\s\S]*?\n\}/, "async function confirm() { return window.__cadConfirmResult ?? false; }");
     await route.fulfill({ response, body });
   });
-  await page.route(/\/src\/lib\/ipc\/project\.ts(?:\?t=\d+)?$/, async route => {
-    const response = await route.fetch();
-    const body = (await response.text()).replace("export async function bindProjectMenuActions(handlers) {", `export async function bindProjectMenuActions(handlers) {
-      window.addEventListener('test-file-action', event => handlers[event.detail]?.());`);
-    await route.fulfill({ response, body });
-  });
+  await installFileActionMenu(page);
   await page.route(/\/src\/lib\/ipc\/dxf\.ts(?:\?t=\d+)?$/, async route => {
     const response = await route.fetch();
     let body = await response.text();
@@ -49,6 +45,22 @@ test.beforeEach(async ({ page }) => {
     body = body.replace(/export async function editableCoilGeometry\([\s\S]*?\n\}/, "export async function editableCoilGeometry() { return (await importCadDxf('', 1, .05, .4, 2, 1.6)).geometry; }");
     await route.fulfill({ response, body });
   });
+});
+
+test("sensor CAD import keeps source assignments without motor phase controls", async ({ page }) => {
+  await gotoDesignApp(page);
+  await page.getByRole("button", { name: "New coil file", exact: true }).click();
+  await page.getByRole("dialog", { name: "New coil file", exact: true }).getByRole("button", { name: /^Sensor coil/ }).click();
+  await page.evaluate(() => window.dispatchEvent(new CustomEvent("test-file-action", { detail: "importCad" })));
+  const dialog = page.getByRole("dialog", { name: "Import CAD", exact: true });
+  await expect(dialog.getByLabel("Coil type")).toHaveValue("sensor");
+  await dialog.getByRole("button", { name: "Choose DXF…" }).click();
+  await expect(dialog.getByRole("region", { name: "Source layer coil assignments" })).toBeVisible();
+  await expect(dialog.getByRole("region", { name: "Motor phase assignments" })).toHaveCount(0);
+  await dialog.getByLabel("Coil for source layer L0_B").fill("");
+  await expect(dialog.getByText("Enter a coil name for every source layer assignment.")).toBeVisible();
+  await dialog.getByLabel("Coil for source layer L0_B").fill("B");
+  await expect(dialog.getByText("Enter a coil name for every source layer assignment.")).toHaveCount(0);
 });
 
 async function openTerminalTool(page: Page, { layered = false } = {}) {
@@ -95,8 +107,10 @@ test("inferred ends require one acceptance and never substitute generated copper
     await route.fulfill({ response, body });
   });
   const dialog = await openImport(page);
-  // Ignore runs of the generated design before import; the pending imported
-  // geometry must block every subsequent sweep until its ends are accepted.
+  // Let the initial debounced generated-design sweep start before clearing it;
+  // imported geometry must block every subsequent sweep until acceptance.
+  await expect.poll(() => page.evaluate(() => (window as any).__mappingSweepCalls?.length ?? 0)).toBeGreaterThan(0);
+  expect(await page.evaluate(() => (window as any).__mappingSweepCalls.every((g: unknown) => g === null))).toBe(true);
   await page.evaluate(() => { (window as any).__mappingSweepCalls = []; });
   await dialog.getByRole("button", { name: "Open with this geometry" }).click();
   const notice = page.getByRole("status", { name: "Inferred coil ends" });
@@ -609,6 +623,7 @@ test("CAD Layers combines reciprocal phase-layer sorting with display options wi
       const matrix = (path as SVGGraphicsElement).getScreenCTM()!;
       return Number(getComputedStyle(path).strokeWidth.replace("px", "")) * Math.abs(matrix.a);
     })).toBeCloseTo(1, 2);
+    await expect(vias).toHaveCount(2);
     await panel.getByRole("checkbox", { name: "Show vias", exact: true }).uncheck();
     await expect(vias).toHaveCount(0);
     await page.screenshot({ path: testInfo.outputPath(`cad-layers-${viewport.width}.png`) });
@@ -633,6 +648,7 @@ test("CAD Layers combines reciprocal phase-layer sorting with display options wi
     await panel.getByRole("checkbox", { name: "Coil B", exact: true }).check();
     await panel.getByRole("radio", { name: "Traces", exact: true }).check();
     await panel.getByRole("checkbox", { name: "Show vias", exact: true }).check();
+    await expect(vias).toHaveCount(2);
     await panel.getByRole("button", { name: "Close layers panel" }).click();
     await expect(panel).toBeHidden();
     // An outside click, a repeat trigger click, and the Close button all dismiss.
@@ -682,6 +698,11 @@ test("source-layer assignments preserve coil visibility and import simplificatio
   await panel.getByRole("checkbox", { name: "Coil B", exact: true }).uncheck();
   await expect(preview.locator("path")).toHaveCount(2);
   await panel.getByRole("checkbox", { name: "Coil B", exact: true }).check();
+  await expect(preview.locator("circle")).toHaveCount(2);
+  await panel.getByRole("checkbox", { name: "Coil A", exact: true }).uncheck();
+  await expect(preview.locator("circle")).toHaveCount(0);
+  await panel.getByRole("checkbox", { name: "Coil A", exact: true }).check();
+  await expect(preview.locator("circle")).toHaveCount(2);
   await panel.getByRole("button", { name: "Close layers panel" }).click();
   await dialog.getByRole("checkbox", { name: "Simplify collinear lines on import" }).check();
   await expect(summary).toContainText("2 lines");

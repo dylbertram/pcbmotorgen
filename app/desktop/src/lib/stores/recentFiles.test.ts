@@ -42,11 +42,6 @@ function makePort(options: FakePortOptions = {}): RecentFilesPort & {
   };
 }
 
-/** Drain the background record queue after a microtask-flushing wait. */
-async function flush(): Promise<void> {
-  for (let i = 0; i < 5; i++) await Promise.resolve();
-}
-
 describe("RecentFilesStore — load", () => {
   it("no persisted list: syncs the disabled menu without rewriting storage", async () => {
     const port = makePort();
@@ -88,16 +83,14 @@ describe("RecentFilesStore — load", () => {
 
   it("prunes persisted entries whose file vanished on the first access", async () => {
     const port = makePort({
-      stored: ["/live.pmproj", "/deleted.pmproj"],
+      stored: ["/new.pmproj", "/deleted.pmproj", "/old.pmproj"],
       exists: (p) => p !== "/deleted.pmproj",
     });
     const store = new RecentFilesStore(port);
     await store.load();
-    expect(store.paths).toEqual(["/live.pmproj"]);
-    // Prune result is persisted + mirrored in the same access.
-    await flush();
-    expect(store.paths).toEqual(["/live.pmproj"]);
-    expect(port.syncCalls).toEqual([["/live.pmproj"]]);
+    expect(store.paths).toEqual(["/new.pmproj", "/old.pmproj"]);
+    expect(port.persistCalls).toEqual([["/new.pmproj", "/old.pmproj"]]);
+    expect(port.syncCalls).toEqual([["/new.pmproj", "/old.pmproj"]]);
   });
 
   it("disables the menu if every persisted project has vanished", async () => {
@@ -169,52 +162,7 @@ describe("RecentFilesStore — record", () => {
   });
 });
 
-describe("RecentFilesStore — prune/remove/clear", () => {
-  it("pruneMissing removes only dead entries and keeps recency order", async () => {
-    const port = makePort({
-      stored: [],
-    });
-    const store = new RecentFilesStore(port);
-    await store.record("/gone.pmproj");
-    await store.record("/live.pmproj");
-    // Flip the disk verdict on "/gone.pmproj" after recording.
-    port.exists = async (p) => p !== "/gone.pmproj";
-
-    const missing = await store.pruneMissing();
-    expect(missing).toEqual(["/gone.pmproj"]);
-    expect(store.paths).toEqual(["/live.pmproj"]);
-  });
-
-  it("pruneMissing persists + syncs only when something changed", async () => {
-    const port = makePort();
-    const store = new RecentFilesStore(port);
-    await store.record("/live.pmproj");
-    const syncsAfterRecord = port.syncCalls.length;
-
-    const missing = await store.pruneMissing();
-    expect(missing).toEqual([]);
-    expect(port.syncCalls).toHaveLength(syncsAfterRecord);
-  });
-
-  it("dropMissing drops the entry at open time when the file vanished", async () => {
-    const port = makePort({ exists: () => false });
-    const store = new RecentFilesStore(port);
-    await store.record("/vanished.pmproj");
-    await store.record("/kept.pmproj");
-
-    await store.dropMissing("/vanished.pmproj");
-    expect(store.paths).toEqual(["/kept.pmproj"]);
-  });
-
-  it("dropMissing keeps the entry when the file still exists", async () => {
-    const port = makePort({ exists: () => true });
-    const store = new RecentFilesStore(port);
-    await store.record("/kept.pmproj");
-
-    await store.dropMissing("/kept.pmproj");
-    expect(store.paths).toEqual(["/kept.pmproj"]);
-  });
-
+describe("RecentFilesStore — remove/clear", () => {
   it("remove() ignores unknown paths", async () => {
     const port = makePort();
     const store = new RecentFilesStore(port);

@@ -44,8 +44,11 @@ test.beforeEach(async ({ page }) => {
         return { project: clone(version.project), versions: archive.versions.map(({project,...info}) => info), active_version_id: version.id, format_version: 1, source_format_version: 1, validation: { errors: [], warnings: [] } };
       }
       export async function saveWorkspace(path, files, activeFile) { disk[path] = { path, files: [...files], active_file: activeFile }; }
-      export async function loadWorkspace(path) { if (!disk[path]) throw Error('File not found'); return clone(disk[path]); }
-      export async function bindProjectMenuActions(handlers) {
+      export async function loadWorkspace(path) { if (!disk[path]) throw Error('File not found'); return clone(disk[path]); }`,
+  }));
+  await page.route(/\/src\/lib\/menu\/projectMenu\.ts(?:\?t=\d+)?$/, route => route.fulfill({
+    contentType: "application/javascript",
+    body: `export async function bindProjectMenuActions(handlers) {
         window.__fileAction = (name) => handlers[name]?.();
         return () => {};
       }`,

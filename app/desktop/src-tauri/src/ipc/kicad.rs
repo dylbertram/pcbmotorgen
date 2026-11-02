@@ -11,18 +11,15 @@ use super::enums::PreconditionLevelIpc;
 
 /// Snapshot of the open KiCad board — IPC wire format.
 ///
-/// Mirrors `pcbmotorgen_export::BoardDiagnostics` exactly. `board_*_mm`
-/// are populated from the board's edge cuts when the IPC supports that query
-/// (currently 0.0 — TODO: real query). `available_net_classes` is empty for
-/// the same reason. `board_name` and `copper_layer_count` are always
-/// populated by `get_board_diagnostics`.
+/// Mirrors `pcbmotorgen_export::BoardDiagnostics`. Board bounds and effective
+/// net classes are queried from the open board; individual fields fall back
+/// to zero or empty values when their backing query fails.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub struct BoardDiagnosticsIpc {
     pub board_name: String,
     pub copper_layer_count: u32,
-    /// Bounding box of the board edge cuts, in mm. Defaults to 0.0 when
-    /// the KiCad 10 IPC does not yet expose the edge-cut query (TODO).
+    /// Bounding box of the board edge cuts, in mm; zero when unavailable.
     pub board_x_min_mm: f64,
     pub board_x_max_mm: f64,
     pub board_y_min_mm: f64,

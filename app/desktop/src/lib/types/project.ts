@@ -91,7 +91,7 @@ export interface ProjectConfigState {
   drive_frequency_hz: number;
   max_temperature_rise_c: number;
 
-  // --- Driver suitability (Simulation tab) ---
+  // --- Driver suitability ---
   /** Missing in files saved before the driver check existed. */
   drive?: DriveSettings;
   /** Absent in legacy files. No operating requirements are inferred on load. */

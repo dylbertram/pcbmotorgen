@@ -15,8 +15,8 @@
  *  1. world metres (y-up) under `scale(s, -s)` for the schematic itself;
  *     screen-constant strokes are `screenPx / s` wide so they don't
  *     fatten when zoomed (the canvas equivalent of non-scaling-stroke).
- *  2. virtual 760×260 csspx under `setTransform(k, …)` for the legend and
- *     disclaimer overlays that must not move with the world.
+ *  2. virtual CSS pixels with a fixed width and frame-dependent height under
+ *     `setTransform(k, …)` for overlays that must not move with the world.
  *
  * Draw counters are plain locals written to canvas.dataset: reactive state
  * would reschedule the effect that draws the canvas. The revision is shared
@@ -33,59 +33,10 @@ import type { PolePitchRuler } from "../../preview/polePitch";
 import { formatMarginMm, formatMetresMm } from "../../format";
 import type { PoleRegionZone } from "../../preview/poleRegions";
 import { computeMeasureRuler, type Point2D } from "../../measure/measureRuler";
-import type { WorldTransform } from "../../chart";
+import type { WorldTransform } from "../../geometry/viewport";
 import { arcSvgPath, splineSvgPath } from "../../geometry/curvePaths";
-
-/**
- * World geometry reaches the canvas in micrometres, not metres. WebKit (the
- * desktop app's engine) mis-rasterises paths whose user-space coordinates are
- * ~1e-3 under a ~1e5 scale: short traces vanish and long ones shift. Scaling
- * the coordinates up and the transform down by the same factor draws the
- * same picture with well-conditioned numbers.
- */
-const WORLD_UNITS = 1e6;
-
-/** Canvas facade for world-metre drawing: scales coordinates and lengths. */
-class WorldPen {
-  constructor(private readonly ctx: CanvasRenderingContext2D) {}
-  set strokeStyle(v: string) { this.ctx.strokeStyle = v; }
-  set fillStyle(v: string) { this.ctx.fillStyle = v; }
-  set globalAlpha(v: number) { this.ctx.globalAlpha = v; }
-  set lineCap(v: CanvasLineCap) { this.ctx.lineCap = v; }
-  set lineJoin(v: CanvasLineJoin) { this.ctx.lineJoin = v; }
-  set lineWidth(v: number) { this.ctx.lineWidth = v * WORLD_UNITS; }
-  setLineDash(d: number[]) { this.ctx.setLineDash(d.map((v) => v * WORLD_UNITS)); }
-  beginPath() { this.ctx.beginPath(); }
-  moveTo(x: number, y: number) { this.ctx.moveTo(x * WORLD_UNITS, y * WORLD_UNITS); }
-  lineTo(x: number, y: number) { this.ctx.lineTo(x * WORLD_UNITS, y * WORLD_UNITS); }
-  arc(x: number, y: number, r: number, a0: number, a1: number) {
-    this.ctx.arc(x * WORLD_UNITS, y * WORLD_UNITS, r * WORLD_UNITS, a0, a1);
-  }
-  rect(x: number, y: number, w: number, h: number) {
-    this.ctx.rect(x * WORLD_UNITS, y * WORLD_UNITS, w * WORLD_UNITS, h * WORLD_UNITS);
-  }
-  roundRect(x: number, y: number, w: number, h: number, r: number) {
-    this.ctx.roundRect(x * WORLD_UNITS, y * WORLD_UNITS, w * WORLD_UNITS, h * WORLD_UNITS, r * WORLD_UNITS);
-  }
-  fillRect(x: number, y: number, w: number, h: number) {
-    this.ctx.fillRect(x * WORLD_UNITS, y * WORLD_UNITS, w * WORLD_UNITS, h * WORLD_UNITS);
-  }
-  strokeRect(x: number, y: number, w: number, h: number) {
-    this.ctx.strokeRect(x * WORLD_UNITS, y * WORLD_UNITS, w * WORLD_UNITS, h * WORLD_UNITS);
-  }
-  fill() { this.ctx.fill(); }
-  stroke(path?: Path2D) { if (path) this.ctx.stroke(path); else this.ctx.stroke(); }
-  /** A world point in canvas units, for building Path2D strings. */
-  point(p: { x: number; y: number }) { return { x: p.x * WORLD_UNITS, y: p.y * WORLD_UNITS }; }
-}
-
-/** Virtual drawing-space width (the canvas maps to 760 virtual px). */
-export const PREVIEW_W = 760;
-/** Virtual drawing-space height (the canvas maps to 260 virtual px). */
-export const PREVIEW_H = 260;
-
-/** Trace colours, one per phase (cycled by `phase_idx`). */
-export const PHASE_COLORS = ["#10b981", "#3b82f6", "#f59e0b", "#ec4899", "#8b5cf6"];
+import { PHASE_COLORS, PREVIEW_W } from "../../preview/previewStyle";
+import { WorldPen, WORLD_UNITS } from "./worldCanvasPen";
 
 // Pole-region zone fills. Alternating red/blue by `pole_index` parity,
 // translucent so the winding traces stay readable above them.
@@ -137,29 +88,6 @@ export interface CoilPreviewDrawInput {
   poleRegions: readonly PoleRegionZone[];
   /** Measure-ruler state, or null when the lightbox is closed/mode off. */
   measure: CoilPreviewMeasureOverlay | null;
-}
-
-/**
- * One-section filter for band rows: show only rows anchored inside the
- * currently kept (first-N-active) conductor x-window for their phase.
- */
-export function bandRowInOnePeriod(
-  row: BandWidthRow,
-  oneSection: boolean,
-  visibleSegments: ReadonlyMap<number, CoilSegmentDto[]>,
-): boolean {
-  if (!oneSection) return true;
-  const segs = visibleSegments.get(row.phaseIdx * 1000 + row.layer);
-  if (!segs || segs.length === 0) return false;
-  let minX = Infinity;
-  let maxX = -Infinity;
-  for (const seg of segs) {
-    if (!seg.is_active) continue;
-    minX = Math.min(minX, seg.start[0], seg.end[0]);
-    maxX = Math.max(maxX, seg.start[0], seg.end[0]);
-  }
-  if (!Number.isFinite(minX)) return false;
-  return row.anchorX >= minX && row.anchorX <= maxX;
 }
 
 /**
@@ -417,9 +345,7 @@ export class CoilPreviewRenderer {
       }
     }
 
-    // Magnet array overlay along the top edge of the fitted region. The bars
-    // track the shared mover position (shifted by `motion.offsetFromRestMm`),
-    // so the strip slides over the fixed stator zones as the slider moves.
+    // The supplied magnet positions track the mover over the fixed stator.
     for (const mag of input.visibleMagnets) {
       w.globalAlpha = 0.7;
       w.fillStyle = mag.pole > 0 ? "#f97316" : "#3b82f6";

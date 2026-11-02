@@ -1,6 +1,6 @@
 import { Box3, OrthographicCamera, Plane, Raycaster, Vector2, Vector3, type Object3D } from "three";
 import type { CoilScene } from "./coilScene";
-import type { WorldTransform } from "../chart";
+import type { WorldTransform } from "../geometry/viewport";
 import type { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 
 export interface TopCameraTransform { transform: WorldTransform; panX: number; panY: number; width: number; height: number }

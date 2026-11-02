@@ -8,14 +8,11 @@
  */
 
 import { invoke } from "@tauri-apps/api/core";
-import { assertCadMapping } from "../cad/cadMapping";
 import type {
-  CadGeometry,
   LinearMotorConfig,
   RoutingPatternInfo,
   RoutingParamDef,
   InstalledPlugin,
-  InterferenceViolation,
 } from "../types";
 import { isTauriAvailable } from "./core";
 
@@ -141,21 +138,4 @@ export async function removeRoutingPlugin(id: string): Promise<void> {
     throw new Error("Tauri backend unavailable");
   }
   await invoke("remove_routing_plugin", { id });
-}
-
-/**
- * Run the core's DRC interference checks (clearance + via-pad) on the
- * coils the current pattern produces, using the configured trace / via
- * sizes. Returns the violations (empty = clear).
- */
-export async function checkCoilInterference(
-  config: LinearMotorConfig,
-  cadGeometry: CadGeometry | null = null,
-): Promise<InterferenceViolation[]> {
-  assertCadMapping(cadGeometry, config);
-  if (!isTauriAvailable()) return [];
-  return await invoke<InterferenceViolation[]>("check_coil_interference", {
-    config,
-    cadGeometry,
-  });
 }

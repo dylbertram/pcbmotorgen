@@ -71,7 +71,7 @@ pub fn make_source_assembly(magnets: Vec<CuboidMagnet>) -> SourceAssembly {
 /// point is processed on a separate rayon task.
 #[inline]
 pub fn compute_b_batch_parallel(
-    source: &(impl Source<f64> + Sync),
+    source: &impl Source<f64>,
     points: &[Point3<f64>],
 ) -> Vec<Vector3<f64>> {
     points.par_iter().map(|p| source.compute_B(*p)).collect()

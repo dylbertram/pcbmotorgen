@@ -183,10 +183,8 @@ pub struct CoilPathIpc {
 // Geometry conversions (core PhaseCoil → IPC)
 // ===========================================================================
 
-#[allow(dead_code)]
 impl CoilSegmentIpc {
-    /// Convert a core `CoilSegment` (array coords) to the IPC form.
-    /// Both already use `[f64; 2]` — this is a 1:1 passthrough.
+    /// Convert routing coordinates in millimetres to IPC coordinates in metres.
     pub fn from_core(s: &CoreCoilSegment) -> Self {
         Self {
             start: [s.start.0 * MM_TO_M, s.start.1 * MM_TO_M],
@@ -196,9 +194,8 @@ impl CoilSegmentIpc {
     }
 }
 
-#[allow(dead_code)]
 impl CoilArcIpc {
-    /// Convert a core `CoilArc` (tuple coords) to the IPC form.
+    /// Convert routing coordinates in millimetres to IPC coordinates in metres.
     pub fn from_core(a: &pcbmotorgen_routing::CoilArc) -> Self {
         Self {
             start: [a.start.0 * MM_TO_M, a.start.1 * MM_TO_M],
@@ -209,7 +206,6 @@ impl CoilArcIpc {
     }
 }
 
-#[allow(dead_code)]
 impl PhaseCoilIpc {
     /// Convert a core `PhaseCoil` to the IPC wire format.
     pub fn from_core(coil: &CorePhaseCoil) -> Self {
@@ -264,7 +260,6 @@ impl PhaseCoilIpc {
     }
 }
 
-#[allow(dead_code)]
 impl CoilPathIpc {
     /// Build the IPC coil path and include the dimensions produced by the
     /// routing report.

@@ -13,9 +13,9 @@ async function newMotor(page: Page) {
 }
 
 async function installMenuTransport(page: Page): Promise<void> {
-  await page.route(/\/src\/lib\/ipc\/project\.ts(?:\?t=\d+)?$/, route => route.fulfill({
+  await page.route(/\/src\/lib\/menu\/projectMenu\.ts(?:\?t=\d+)?$/, route => route.fulfill({
     contentType: "application/javascript",
-    body: `export * from '/src/lib/ipc/project.ts?original';
+    body: `export * from '/src/lib/menu/projectMenu.ts?original';
       export async function bindProjectMenuActions(handlers) {
         const listener = event => { if (event.detail === 'close') handlers.closeFile?.(); else handlers.simulate?.(event.detail); };
         window.addEventListener('test-menu', listener); return () => window.removeEventListener('test-menu', listener);
@@ -148,6 +148,38 @@ test("native menu commands target the focused editor and close only that view", 
   await expect(right).toHaveCount(0);
   await expect(left.getByRole("navigation").getByRole("tab")).toHaveCount(1);
   await expect(page.getByRole("dialog", { name: "Save changes?", exact: true })).toHaveCount(0);
+});
+
+test("simulation menu actions select current views, run, and open the calculator", async ({ page }) => {
+  await installMenuTransport(page);
+  await page.route(/\/src\/lib\/ipc\/physics\.ts(?:\?t=\d+)?$/, route => route.fulfill({
+    contentType: "application/javascript",
+    body: `import * as original from '/src/lib/ipc/physics.ts?original';
+      export * from '/src/lib/ipc/physics.ts?original';
+      export async function evaluateForceSweep(...args) {
+        window.__menuSweepCalls = (window.__menuSweepCalls || 0) + 1;
+        return original.evaluateForceSweep(...args);
+      }`,
+  }));
+  await gotoDesignApp(page);
+  const dock = simulationDock(page);
+  for (const [action, label] of [["advanced", "Advanced"], ["force", "Force"], ["move", "Move & power"]] as const) {
+    await page.evaluate(value => window.dispatchEvent(new CustomEvent("test-menu", { detail: value })), action);
+    await expect(dock.getByRole("tab", { name: label, exact: true })).toHaveAttribute("aria-selected", "true");
+  }
+
+  await page.evaluate(() => window.dispatchEvent(new CustomEvent("test-menu", { detail: "force" })));
+  await dock.getByLabel("Auto-run on edits").uncheck();
+  await expect(dock.getByRole("button", { name: "Run simulations", exact: true })).toBeEnabled();
+  const before = await page.evaluate(() => (window as any).__menuSweepCalls || 0);
+  await page.evaluate(() => window.dispatchEvent(new CustomEvent("test-menu", { detail: "run" })));
+  await expect.poll(() => page.evaluate(() => (window as any).__menuSweepCalls || 0)).toBeGreaterThan(before);
+
+  const popupPromise = page.waitForEvent("popup");
+  await page.evaluate(() => window.dispatchEvent(new CustomEvent("test-menu", { detail: "driver" })));
+  const calculator = await popupPromise;
+  await expect(calculator.getByRole("heading", { name: "Driver calculator", exact: true })).toBeVisible();
+  await calculator.close();
 });
 
 test("the native calculator command can open a blank tool without a source file", async ({ page }) => {

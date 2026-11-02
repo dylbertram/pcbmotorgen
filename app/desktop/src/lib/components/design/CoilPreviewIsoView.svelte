@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { CadGeometry } from "../../types";
-  import type { CoilPreviewViewState } from "./coilPreviewViewState.svelte";
+  import type { CoilPreviewViewState } from "../../preview/coilPreviewViewState.svelte";
   import type { VisualizationInput } from "../../types/simulationVisualization";
   import type { SpatialMeasure } from "../../measure/spatialMeasure.svelte";
   import type { PcbStackupMm } from "../../pcb/pcbStackup";
@@ -26,7 +26,7 @@
   } = $props();
 
   // Load the shared renderer separately from the document-management bundle.
-  const viewer = import("./CoilPreview3DView.svelte").catch(error => {
+  const viewer = import("../scene/CoilPreview3DView.svelte").catch(error => {
     onRenderStatus?.(false);
     throw error;
   });

@@ -277,9 +277,8 @@ pub async fn write_sensor_to_board(
 /// Get the current board's diagnostics (layer count, edge cuts, net classes).
 ///
 /// Connects to KiCad, queries the open PCB, and returns a `BoardDiagnosticsIpc`
-/// snapshot. The edge-cut bounding box and net-class list are not yet
-/// queryable via the KiCad 10 IPC, so they default to `0.0` / empty — a
-/// `// TODO` in the core marks the spot for the real query.
+/// snapshot. Bounds and effective net classes are queried from the board;
+/// individual fields fall back to zero or empty values when unavailable.
 #[tauri::command]
 pub async fn get_board_diagnostics() -> Result<BoardDiagnosticsIpc, String> {
     tauri::async_runtime::spawn_blocking(move || {

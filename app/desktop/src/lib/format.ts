@@ -2,29 +2,6 @@
  * Presentation formatting helpers shared by panels.
  */
 
-/** Severity level of a write pre-condition warning. */
-export type WarningLevel = "info" | "warning" | "error";
-
-/**
- * Tailwind border/bg/text triple for a pre-condition severity level.
- * Kept as a function (not a lookup) so callers can use it in {#each}.
- */
-export function warningClasses(level: WarningLevel): string {
-  switch (level) {
-    case "error":
-      return "border-rose-500/60 bg-rose-500/10 text-rose-200";
-    case "warning":
-      return "border-amber-500/60 bg-amber-500/10 text-amber-200";
-    case "info":
-      return "border-sky-500/40 bg-sky-500/10 text-sky-200";
-  }
-}
-
-/** Uppercase severity label for badges ("ERROR", "WARNING", "INFO"). */
-export function warningLabel(level: WarningLevel): string {
-  return level.toUpperCase();
-}
-
 /** Format a metre length as a compact mm string, e.g. "12 mm" / "1.78 mm". */
 export function formatMetresMm(v: number): string {
   if (!Number.isFinite(v)) return "—";

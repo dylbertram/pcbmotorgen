@@ -17,15 +17,10 @@
     step?: number; // default 1
     /** Controlled value; two-way bindable (e.g. `bind:value={getter, setter}`). */
     value?: number;
-    disabled?: boolean;
     /** Accessible name for the slider thumb (role="slider"). */
     ariaLabel: string;
-    /** Root classes appended after the base root classes. */
-    class?: string;
     /** Fires for every value the primitive writes (drag/keyboard). */
     onValueChange?: (value: number) => void;
-    /** Fires when a value interaction ends (commit). */
-    onValueCommit?: (value: number) => void;
   }
 
   let {
@@ -33,11 +28,8 @@
     max = 100,
     step = 1,
     value = $bindable(),
-    disabled = false,
     ariaLabel,
-    class: rootClass = "",
     onValueChange,
-    onValueCommit,
   }: SliderProps = $props();
 </script>
 
@@ -47,10 +39,8 @@
   {max}
   {step}
   bind:value
-  {disabled}
   {onValueChange}
-  {onValueCommit}
-  class="relative flex w-full touch-none select-none items-center {rootClass}"
+  class="relative flex w-full touch-none select-none items-center"
 >
   <!-- bits-ui 2.x exposes no Track part; the Range positions itself inside
        this plain relative span (shadcn-svelte pattern). -->

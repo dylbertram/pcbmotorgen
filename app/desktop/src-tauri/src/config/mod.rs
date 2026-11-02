@@ -17,11 +17,11 @@
 //!
 //! The `LinearMotorConfig` API is split across sibling submodules, all of
 //! which `impl` the struct defined here:
-//! - [`validation`] — `new()` / `validate()` (field-invariant checks).
-//! - [`derived`] — derived geometry methods + `summary()`.
+//! - [`validation`] — field-invariant checks.
+//! - [`derived`] — application-facing derived geometry methods.
 //! - [`bridges`] — conversions to the leaf crates (`routing_context`,
 //!   `design_rules`, `to_simulation`, `generate_coils_for_board`,
-//!   `routing_pattern_id`, `sync_magnet_grade`).
+//!   `routing_pattern_id`).
 
 use serde::{Deserialize, Serialize};
 

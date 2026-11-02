@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { warningClasses, warningLabel } from "../../format";
+  import { warningClasses, warningLabel } from "./preflightWarning";
   import type { PreconditionWarning, CoilPreview } from "../../types";
 
   let {

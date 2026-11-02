@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { calculateDriver, emptyDriverInput, snapshotFromAnalysis } from "./driverCalculator";
 import { DEFAULT_DRIVE_SETTINGS } from "../types/drive";
-import { mockDriveAnalysis } from "../ipc/mocks";
+import { mockDriveAnalysis } from "../ipc/driveAnalysisMock";
 import { ConfigStore } from "../stores/config.svelte";
 
 describe("independent driver calculator", () => {

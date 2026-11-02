@@ -11,12 +11,12 @@
 
   const commutationLabel = (mode: CommutationMode): string => COMMUTATION_LABELS[mode];
 
-  let { result, embedded = false }: { result: ForceSweepResult | null; embedded?: boolean } = $props();
+  let { result }: { result: ForceSweepResult | null } = $props();
 
   let chartWidth = $state(760);
   let chartHeight = $state(240);
-  const W = $derived(embedded ? Math.max(320, chartWidth) : 760);
-  const H = $derived(embedded ? Math.max(160, chartHeight) : 240);
+  const W = $derived(Math.max(320, chartWidth));
+  const H = $derived(Math.max(160, chartHeight));
   const PAD_L = 50;
   const PAD_R = 20;
   const PAD_T = 16;
@@ -35,18 +35,16 @@
     const sx = createLinearScale(minX, maxX, PAD_L, W - PAD_L - PAD_R);
     const sy = createLinearScale(minY, maxY, H - PAD_B, -(H - PAD_T - PAD_B));
     const linePts = polyline(sx, sy, xs, ys);
-    // mean line (single straight segment — not an `sx/sy` polyline)
     const meanY = result.mean_thrust_n;
-    const meanLine = `${sx(minX).toFixed(1)},${sy(meanY).toFixed(1)} ${sx(maxX).toFixed(1)},${sy(meanY).toFixed(1)}`;
     // y-axis ticks (5)
     const yTicks = ticks(minY, maxY, 5, sy).map((t) => ({ v: t.v, y: t.pos }));
     // x-axis ticks (5)
     const xTicks = ticks(minX, maxX, 5, sx).map((t) => ({ v: t.v, x: t.pos }));
-    return { xs, ys, sx, sy, linePts, meanLine, yTicks, xTicks, minY, maxY, minX, maxX, meanY };
+    return { sx, sy, linePts, yTicks, xTicks, minX, maxX, meanY };
   });
 </script>
 
-<div class="thrust-panel {embedded ? 'embedded' : 'rounded-lg bg-slate-800/40 border border-slate-700 p-4'}">
+<div class="thrust-panel embedded">
   <div class="mb-2 flex shrink-0 flex-wrap items-center justify-between gap-2">
     <h3 class="text-sm font-semibold text-slate-200">Thrust vs. position</h3>
     {#if result}
@@ -58,7 +56,7 @@
 
   <div class="thrust-layout">
   <div class="plot-slot" bind:clientWidth={chartWidth} bind:clientHeight={chartHeight}>
-  <svg viewBox="0 0 {W} {H}" preserveAspectRatio="xMinYMin meet" class={embedded ? "block h-full min-h-0 w-full" : "block h-auto w-full"} role="img" aria-label="Thrust sweep plot">
+  <svg viewBox="0 0 {W} {H}" preserveAspectRatio="xMinYMin meet" class="block h-full min-h-0 w-full" role="img" aria-label="Thrust sweep plot">
     {#if plot}
       <!-- grid -->
       {#each plot.yTicks as t (t.v)}

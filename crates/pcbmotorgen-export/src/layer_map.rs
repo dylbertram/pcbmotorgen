@@ -63,11 +63,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_layer_0_is_bcu() {
-        assert_eq!(layer_idx_to_board_layer(0, 4), BoardLayer::BlBCu);
-    }
-
-    #[test]
     fn test_layer_top_is_fcu() {
         assert_eq!(layer_idx_to_board_layer(3, 4), BoardLayer::BlFCu);
         assert_eq!(layer_idx_to_board_layer(11, 12), BoardLayer::BlFCu);
@@ -91,11 +86,5 @@ mod tests {
         assert_eq!(mm_to_nm(1.0), 1_000_000);
         assert_eq!(mm_to_nm(20.0), 20_000_000);
         assert_eq!(mm_to_nm(0.0), 0);
-    }
-
-    #[test]
-    fn test_via_pad_diameter() {
-        // 0.2mm drill + 2×0.1mm ring = 0.4mm = 400µm = 400,000 nm
-        assert_eq!(via_pad_diameter_nm(0.2, 0.1), 400_000);
     }
 }

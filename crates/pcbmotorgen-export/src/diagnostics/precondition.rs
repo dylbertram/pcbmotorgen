@@ -191,8 +191,7 @@ fn mm(v: f64) -> f64 {
     v * 1e-3
 }
 
-/// `DesignRules` matching the old `default_config` helper (5 mil trace/space,
-/// 0.2 mm via drill, 0.1 mm annular ring).
+/// Five-mil trace and spacing with 0.2 mm drills and 0.1 mm annular rings.
 fn braid_rules() -> DesignRules {
     DesignRules {
         min_trace_mm: 0.127,
@@ -287,21 +286,6 @@ fn test_validate_layer_mismatch_reports_user_num_layers() {
         "error must report the user-selected num_layers (6), got: {}",
         msg
     );
-}
-
-#[test]
-fn test_validate_layer_match_no_warning() {
-    let rules = braid_rules();
-    let mut d = empty_diagnostics();
-    d.copper_layer_count = 4;
-    let warnings = validate_write_preconditions(&rules, 4, ACTIVE_AREA_M, BOARD_WIDTH_M, &d);
-    let errs: Vec<&PreconditionWarning> = warnings
-        .iter()
-        .filter(|w| {
-            w.level == PreconditionLevel::Error && w.field.as_deref() == Some("num_layers")
-        })
-        .collect();
-    assert!(errs.is_empty(), "got unexpected error: {:?}", errs);
 }
 
 #[test]

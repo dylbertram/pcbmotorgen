@@ -1,26 +1,5 @@
-/**
- * docs.ts — build-time bundling of the routing-plugin authoring guide
- * (kata bprp).
- * ============================================================================
- *
- * SINGLE SOURCE OF TRUTH: every byte of guide content below is imported
- * VERBATIM from the routing/export crates at build time via Vite `?raw`
- * imports. Nothing here forks, paraphrases, or duplicates contract content —
- * when the crate docs change, the in-app guide changes with them on the
- * next build.
- *
- * BUILD-TIME MISSING-DOC GUARANTEE: Vite raw imports are resolved by the
- * bundler; if any imported doc file is missing (renamed, moved, deleted),
- * `vite build` and `vite dev` FAIL with an unresolved-import error before
- * any bundle exists. There is no runtime fallback and none is wanted — a
- * guide silently missing its contract sections would be worse than a
- * failed build.
- *
- * Dev-server note: these files live outside `app/desktop` (the Vite root),
- * so `vite.config.ts` extends `server.fs.allow` to the repo root — the
- * modules are then served as `/@fs/...` raw imports in `vite dev` (the
- * Playwright webServer). `vite build` is unaffected (rollup resolves
- * relative imports regardless of fs.allow).
+/** Bundle the routing guide and its reference runner directly from the crates.
+ * Missing raw imports fail the build; vite.config.ts allows them in dev mode.
  */
 
 import authoringGuideMd from "../../../../../crates/pcbmotorgen-routing/docs/routing-pattern-authoring.md?raw";
@@ -64,38 +43,24 @@ function workedExampleHtml(): string {
   return markdownToHtml(md);
 }
 
-function buildTabs(): GuideTab[] {
-  return [
-    {
-      id: "authoring",
-      label: "Authoring guide",
-      title: "Routing-Pattern Plugin Authoring Guide",
-      html: markdownToHtml(authoringGuideMd),
-    },
-    {
-      id: "api",
-      label: "API reference",
-      title: "pcbmotorgen-routing API",
-      html: markdownToHtml(apiReferenceMd),
-    },
-    {
-      id: "example",
-      label: "Worked example",
-      title: "Worked example — reference Python runner",
-      html: workedExampleHtml(),
-    },
-  ];
-}
-
 /** The bundled guide tabs, rendered once at module load. */
-export const GUIDE_TABS: GuideTab[] = buildTabs();
-
-/**
- * The verbatim source documents (raw markdown / python), exposed for tests
- * and debugging — the UI renders only `GUIDE_TABS`.
- */
-export const GUIDE_SOURCES = {
-  authoringGuideMd,
-  apiReferenceMd,
-  exampleRunnerPy,
-} as const;
+export const GUIDE_TABS: GuideTab[] = [
+  {
+    id: "authoring",
+    label: "Authoring guide",
+    title: "Routing-Pattern Plugin Authoring Guide",
+    html: markdownToHtml(authoringGuideMd),
+  },
+  {
+    id: "api",
+    label: "API reference",
+    title: "pcbmotorgen-routing API",
+    html: markdownToHtml(apiReferenceMd),
+  },
+  {
+    id: "example",
+    label: "Worked example",
+    title: "Worked example — reference Python runner",
+    html: workedExampleHtml(),
+  },
+];

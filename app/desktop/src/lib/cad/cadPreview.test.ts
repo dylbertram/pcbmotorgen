@@ -1,9 +1,35 @@
 import { describe, expect, it } from "vitest";
 import {
   cadGeometryToPreview,
+  cadImportPreviewBounds,
   joinCadPreviewEndpoints,
 } from "./cadPreview";
 import type { CadGeometry } from "../types";
+
+describe("cadImportPreviewBounds", () => {
+  const geometry: CadGeometry = {
+    layer_z_mm: [0], trace_width_mm: 0.2,
+    routing: {
+      format_version: 2,
+      segments: [{ start: { x: -10, y: 0 }, end: { x: 0, y: 0 }, layer: 0, net: "A", is_active: true }],
+      curves: [{ start: { x: 0, y: 0 }, mid: { x: 10, y: 0 }, end: { x: 1, y: 0 }, layer: 0, net: "A", is_active: true }],
+      splines: [{ degree: 1, knots: [0, 0, 1, 1], control_points: [{ x: 0, y: -20 }, { x: 0, y: 0 }], layer: 0, net: "A", is_active: true }],
+      vias: [{ position: { x: 0, y: 20 }, from_layer: 0, to_layer: 1, net: "A" }],
+    },
+  };
+
+  it("returns default bounds for missing or empty geometry", () => {
+    const fallback = { minX: 0, minY: 0, maxX: 1, maxY: 1 };
+    expect(cadImportPreviewBounds(null, null, 0)).toEqual(fallback);
+    expect(cadImportPreviewBounds({ ...geometry, routing: { format_version: 2, segments: [], curves: [], vias: [] } }, null, 0)).toEqual(fallback);
+  });
+
+  it("includes segments, curves, spline controls and vias with size-dependent padding", () => {
+    expect(cadImportPreviewBounds(geometry, null, 0.5)).toEqual({ minX: -12, minY: -22, maxX: 12, maxY: 22 });
+    expect(cadImportPreviewBounds(geometry, 3, 0.5)).toEqual({ minX: -16, minY: -26, maxX: 16, maxY: 26 });
+    expect(cadImportPreviewBounds(geometry, null, 5)).toEqual({ minX: -17.5, minY: -27.5, maxX: 17.5, maxY: 27.5 });
+  });
+});
 
 describe("cadGeometryToPreview", () => {
   it("keeps coils distinct even when their centerlines occupy the same copper plane", () => {

@@ -6,7 +6,7 @@ use std::collections::BTreeSet;
 use pcbmotorgen_routing::{Point, RoutingResult, Via};
 use crate::{DesignRules, InterferenceViolation};
 
-pub(crate) fn indices(r: &RoutingResult) -> Vec<usize> {
+pub(crate) fn inner_tapped_via_indices(r: &RoutingResult) -> Vec<usize> {
     r.vias.iter().enumerate().filter_map(|(i, v)| inner_pair(r, v).map(|_| i)).collect()
 }
 
@@ -22,7 +22,7 @@ fn inner_pair(r: &RoutingResult, v: &Via) -> Option<(u32, u32)> {
     (b == a + 1).then_some((a, b))
 }
 
-pub(crate) fn check(rules: &DesignRules, r: &RoutingResult, series: &[usize]) -> Vec<InterferenceViolation> {
+pub(crate) fn check_clearance(rules: &DesignRules, r: &RoutingResult, series: &[usize]) -> Vec<InterferenceViolation> {
     let mut warnings = Vec::new();
     let pad = rules.via_pad_diameter_mm();
     for &i in series {
@@ -37,7 +37,7 @@ pub(crate) fn check(rules: &DesignRules, r: &RoutingResult, series: &[usize]) ->
                 && (start.distance_to(via.position) < 1e-6 || end.distance_to(via.position) < 1e-6) {
                 continue; // Intended electrical contact, not a bypass warning.
             }
-            let gap = distance(via.position, start, end) - pad / 2.0 - rules.trace_width_mm / 2.0;
+            let gap = point_to_segment_distance(via.position, start, end) - pad / 2.0 - rules.trace_width_mm / 2.0;
             if gap + 1e-9 < rules.min_space_mm {
                 warnings.push(InterferenceViolation {
                     layer, net_a: via.net.clone(), net_b: net.clone(), kind: "series_via_clearance", gap_mm: gap,
@@ -62,7 +62,7 @@ pub(crate) fn check(rules: &DesignRules, r: &RoutingResult, series: &[usize]) ->
     warnings
 }
 
-fn distance(p: Point, a: Point, b: Point) -> f64 {
+fn point_to_segment_distance(p: Point, a: Point, b: Point) -> f64 {
     let (dx, dy) = (b.x - a.x, b.y - a.y);
     let length_squared = dx * dx + dy * dy;
     if length_squared == 0.0 { return p.distance_to(a); }
@@ -89,7 +89,7 @@ mod tests {
         };
         let before = r.clone();
         let rules = DesignRules { trace_width_mm: 0.2, min_via_drill_mm: 0.3, ..Default::default() };
-        let warnings = check(&rules, &r, &indices(&r));
+        let warnings = check_clearance(&rules, &r, &inner_tapped_via_indices(&r));
         assert_eq!(warnings.len(), 3);
         assert!(warnings.iter().any(|w| w.net_b == "A" && w.layer == 3 && (w.gap_mm + 0.05).abs() < 1e-9));
         assert!(warnings.iter().any(|w| w.net_b == "B" && w.layer == 1 && (w.gap_mm - 0.1).abs() < 1e-9));
@@ -97,7 +97,7 @@ mod tests {
         assert_eq!(r, before, "DFM must not mutate the drawn geometry");
         let mut bypass = r.clone();
         bypass.segments.push(trace(0, "A", via, Point::new(2.0, 1.0)));
-        let warnings = check(&rules, &bypass, &indices(&bypass));
+        let warnings = check_clearance(&rules, &bypass, &inner_tapped_via_indices(&bypass));
         assert!(warnings.iter().any(|w| w.kind == "series_via_clearance" && w.layer == 0
             && w.net_a == "A" && w.net_b == "A" && (w.gap_mm + 0.35).abs() < 1e-9),
             "an unintended outer-layer endpoint must not stop series classification and hide a bypass");

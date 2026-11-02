@@ -1,7 +1,7 @@
 <script lang="ts">
-  import CoilPreview3DView from "../../src/lib/components/design/CoilPreview3DView.svelte";
+  import CoilPreview3DView from "../../src/lib/components/scene/CoilPreview3DView.svelte";
   import ViewportViewControls from "../../src/lib/components/design/ViewportViewControls.svelte";
-  import { CoilPreviewViewState } from "../../src/lib/components/design/coilPreviewViewState.svelte";
+  import { CoilPreviewViewState } from "../../src/lib/preview/coilPreviewViewState.svelte";
   import type { CadGeometry } from "../../src/lib/types";
 
   const view = new CoilPreviewViewState();

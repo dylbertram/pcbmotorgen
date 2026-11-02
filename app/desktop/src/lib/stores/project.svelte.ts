@@ -1,14 +1,10 @@
 /**
- * Per-coil persistence controller. WorkspaceStore creates one instance per
- * document and owns file tabs, workspace replacement and workspace manifests.
+ * Per-coil persistence controller. Each document session owns one instance;
+ * WorkspaceStore manages tabs, workspace replacement and manifests.
  *
- * Architecture boundary: this class contains NO persistence logic. It
- * (a) gathers the user-facing store fields into the `ProjectState` DTO
- * (the same data-mapping job `ConfigStore.toIpc()` does for physics) and
- * (b) applies a loaded DTO back onto the stores. Serialization, artifact
- * versioning/migration, file I/O, and load validation all happen in Rust
- * behind the `save_document` / `load_project` commands (see
- * `src-tauri/src/ipc/project.rs`).
+ * This class maps user-facing state to and from `ProjectState`, tracks dirty
+ * state, and coordinates save/load operations. Serialization, migration,
+ * file I/O and load validation happen in Rust behind the native commands.
  *
  * Dirty-state tracking compares a canonical JSON snapshot of the persisted
  * fields against the baseline captured at the last successful save/load —
@@ -24,11 +20,9 @@ import type {
   DocumentKind,
 } from "../types";
 import { DEFAULT_DRIVE_SETTINGS, DEFAULT_SENSOR_CONFIG } from "../types";
-import { readPreferences } from "../preferences";
 import {
   confirmDiscardChanges,
   loadProject,
-  pickProjectOpenPath,
   pickProjectSavePath,
   saveProject,
   relocateProject,
@@ -38,22 +32,12 @@ import {
 import type { ConfigStore } from "./config.svelte";
 import type { MotionStore } from "./motion.svelte";
 import type { RecentFilesStore } from "./recentFiles.svelte";
-import type { SensorStore } from "./sensor.svelte";
-
-/** Normalise any thrown value into a display string. */
-function errorMessage(e: unknown): string {
-  return e instanceof Error ? e.message : String(e);
-}
-
-/** File name portion of a path (handles both separators). */
-function baseName(path: string): string {
-  const idx = Math.max(path.lastIndexOf("/"), path.lastIndexOf("\\"));
-  return idx === -1 ? path : path.slice(idx + 1);
-}
+import type { SensorStore } from "../sensor/sensor.svelte";
+import { baseName, parentDirectory } from "../utils/paths";
+import { errorMessage } from "../utils/errorMessage";
 
 export class ProjectStore {
   checkSavePath?: (path: string) => void | Promise<void>;
-  private readonly initialState: ProjectState;
   /** Absolute path of the motor or sensor file backing this document. */
   currentPath = $state<string | null>(null);
   /** True while a save/open round-trip is in flight. */
@@ -87,7 +71,6 @@ export class ProjectStore {
     private sensor?: SensorStore,
     readonly kind: DocumentKind = "motor",
   ) {
-    this.initialState = JSON.parse(JSON.stringify(this.snapshotIpc()));
   }
 
   // --- Derived state -----------------------------------------------------
@@ -122,17 +105,15 @@ export class ProjectStore {
 
   directory = $derived.by(() => {
     if (!this.currentPath) return null;
-    const index = Math.max(this.currentPath.lastIndexOf("/"), this.currentPath.lastIndexOf("\\"));
-    return index < 0 ? null : this.currentPath.slice(0, index + 1);
+    return parentDirectory(this.currentPath);
   });
 
-  // --- DTO mapping (interface only — no persistence logic) ---------------
+  // --- DTO mapping -------------------------------------------------------
 
   /** Gather the persisted working state into the IPC DTO. */
   snapshotIpc(): ProjectState {
     const params = Object.entries(this.config.routing_params)
-      .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
-      .map(([key, value]) => ({ key, value }));
+      .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
 
     return {
       config: {
@@ -149,7 +130,7 @@ export class ProjectStore {
         air_gap_mm: this.config.air_gap_mm,
         electrical_pitch_mm: this.config.electrical_pitch_mm,
         routing_pattern: this.config.routing_pattern,
-        routing_params: Object.fromEntries(params.map((p) => [p.key, p.value])),
+        routing_params: Object.fromEntries(params),
         routing_orientation: { ...this.config.routing_orientation },
         phases: this.config.phases,
         num_layers: this.config.num_layers,
@@ -250,10 +231,6 @@ export class ProjectStore {
     if (this.sensor) this.sensor.cadGeometry = state.sensor_cad_geometry ?? null;
   }
 
-  setCadGeometry(geometry: CadGeometry | null): void {
-    this.cadGeometry = geometry;
-  }
-
   /** Re-baseline the dirty tracker at the current state. */
   markClean(): void {
     this.savedSnapshot = this.snapshotJson;
@@ -296,30 +273,6 @@ export class ProjectStore {
       return true;
     } catch (e) {
       this.error = `Could not change project name or location: ${errorMessage(e)}`;
-      return false;
-    } finally {
-      this.busy = false;
-    }
-  }
-
-  /** Start an untitled design without replacing unsaved work silently. */
-  async newProject(): Promise<boolean> {
-    if (this.busy) return false;
-    this.busy = true;
-    try {
-      if (this.isDirty && !(await confirmDiscardChanges())) return false;
-      this.applyToState(this.initialState);
-      Object.assign(this.config, readPreferences().rules);
-      await this.config.loadRoutingParams(this.config.routing_pattern);
-      this.config.constrainLayersToPattern();
-      this.currentPath = null;
-      this.versions = [];
-      this.activeVersionId = null;
-      this.clearMessages();
-      this.markClean();
-      return true;
-    } catch (e) {
-      this.error = `New project failed: ${errorMessage(e)}`;
       return false;
     } finally {
       this.busy = false;
@@ -428,57 +381,9 @@ export class ProjectStore {
   }
 
   /**
-   * Open a `.pmproj` artifact chosen via the native dialog and restore the
-   * full working state. Asks before discarding unsaved changes. On any
-   * backend rejection the in-progress state is left untouched (restore
-   * happens only after the command returns successfully). Resolves `true`
-   * on success.
-   */
-  async open(): Promise<boolean> {
-    if (this.busy) return false;
-    if (this.isDirty) {
-      const discard = await confirmDiscardChanges();
-      if (!discard) {
-        this.notice = "Open cancelled — unsaved changes kept.";
-        return false;
-      }
-    }
-
-    let path: string | null;
-    try {
-      path = await pickProjectOpenPath();
-    } catch (e) {
-      this.error = errorMessage(e);
-      return false;
-    }
-    if (path === null) return false;
-
-    return await this.loadFromPath(path);
-  }
-
-  /**
-   * Open a specific `.pmproj` path through the same flow as File > Open —
-   * the dispatch target of the native Open Recent menu entries (kata eap8).
-   * Identical guards to `open()` (busy serialization + unsaved-changes
-   * confirm); a vanished file is rejected by the backend and surfaces the
-   * same "Open failed — could not open …" error UX.
-   */
-  async openPath(path: string): Promise<boolean> {
-    if (this.busy) return false;
-    if (this.isDirty) {
-      const discard = await confirmDiscardChanges();
-      if (!discard) {
-        this.notice = "Open cancelled — unsaved changes kept.";
-        return false;
-      }
-    }
-    return await this.loadFromPath(path);
-  }
-
-  /**
-   * The shared load half of `open` / `openPath`: busy-guarded backend load,
-   * state restore, and (on success) the recents record (kata eap8).
-   * Recents failures are swallowed — they only degrade the menu.
+   * Load a document, restore its state, and record it in recents on success.
+   * The workspace owns open/unsaved-change coordination. Recents failures
+   * are best-effort and do not invalidate a successful load.
    */
   async loadFromPath(path: string, versionId: number | null = null): Promise<boolean> {
     this.busy = true;

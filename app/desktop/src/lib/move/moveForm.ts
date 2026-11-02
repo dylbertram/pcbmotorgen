@@ -31,7 +31,7 @@ export interface MoveDesignDefaults {
   massSource: "magnets" | "assembly";
 }
 
-export const DESIGN_MASS_INCLUDES = {
+const DESIGN_MASS_INCLUDES = {
   magnets: "Magnet-only estimate; excludes carrier, bushings, enclosure, knob and other moving parts",
   assembly: "Full moving assembly estimate including magnets, carrier, bushings, moving enclosure, knob and attached load",
 } as const;

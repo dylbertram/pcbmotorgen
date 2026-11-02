@@ -3,6 +3,7 @@ import { DEFAULT_RULES, PREFERENCES_KEY, applyAppearance, initializeAppearance, 
 import { ConfigStore } from "./stores/config.svelte";
 import { ProjectStore } from "./stores/project.svelte";
 import { MotionStore } from "./stores/motion.svelte";
+import { DocumentSession } from "./stores/documentSession.svelte";
 
 describe("preferences", () => {
   let values: Map<string, string>;
@@ -65,10 +66,10 @@ describe("preferences", () => {
     writePreferences({ appearance: "auto", rules: { ...DEFAULT_RULES, min_space_mm: 0.3 } });
     projects.applyToState(saved);
     expect(config.min_space_mm).toBe(0.127);
-    projects.markClean();
-    expect(await projects.newProject()).toBe(true);
-    expect(config.min_space_mm).toBe(0.3);
-    expect(projects.isDirty).toBe(false);
+    const document = new DocumentSession("motor");
+    await document.initialize();
+    expect(document.config.min_space_mm).toBe(0.3);
+    expect(document.projects.isDirty).toBe(false);
   });
 
   it("does not apply appearance if storage fails", () => {
