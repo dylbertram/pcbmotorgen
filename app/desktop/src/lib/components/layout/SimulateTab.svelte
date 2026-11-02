@@ -2,21 +2,21 @@
   import { Tabs } from "bits-ui";
   import type { PowerRequirementsInput } from "../../powerRequirements";
   import { tick } from "svelte";
-  import { ChevronDown, ChevronUp, FlaskConical } from "@lucide/svelte";
+  import { ChevronDown, ChevronUp } from "@lucide/svelte";
   import type { ConfigStore } from "../../stores/config.svelte";
-  import type { ForceSweepResult, FrictionBudgetDto, HeightStackResultDto, DriveAnalysis, CadGeometry } from "../../types";
+  import type { ForceSweepResult, DriveAnalysis, CadGeometry } from "../../types";
   import { cadMappingProblems } from "../../cadMapping";
   import { inferMissingCoilEnds } from "../../cadTerminals";
-  import { usesDeltaConnection } from "../../driverConnection";
   import MovePowerPanel from "../simulate/MovePowerPanel.svelte";
   import ForcePanel from "../simulate/ForcePanel.svelte";
   import FieldsPanel from "../simulate/FieldsPanel.svelte";
   import DcCouplingPanel from "../simulate/DcCouplingPanel.svelte";
 
-  let { config, active, open, availableHeight, sweep, friction, height, drive,
-    driveError = null, error, cadGeometry = null, onConfigureWinding,
+  let { config, active, open, availableHeight, sweep, drive,
+    error, cadGeometry = null,
     onSelectEnds, onUseInferredEnds, powerInput, autoSimulation = $bindable(true), loading = false, onRun, canRun = true,
-    onOpenFieldSettings, designName = "Untitled design" }: {
+    onOpenFieldSettings, onOpenDriverCheck, designName = "Untitled design", selected = $bindable("move") }: {
+    selected?: "move" | "force" | "fields" | "advanced";
     autoSimulation?: boolean;
     loading?: boolean;
     onRun?: () => void;
@@ -26,13 +26,10 @@
     open: boolean;
     availableHeight: number;
     sweep: ForceSweepResult | null;
-    friction: FrictionBudgetDto | null;
-    height: HeightStackResultDto | null;
     drive: DriveAnalysis | null;
-    driveError?: string | null;
     error: string | null;
     cadGeometry?: CadGeometry | null;
-    onConfigureWinding?: () => void;
+    onOpenDriverCheck?: () => void;
     onSelectEnds?: () => void;
     onUseInferredEnds?: () => void;
     powerInput: PowerRequirementsInput;
@@ -44,8 +41,8 @@
     { id: "move", label: "Move & power" },
     { id: "force", label: "Force" },
     { id: "fields", label: "Fields" },
+    { id: "advanced", label: "Advanced" },
   ];
-  let selected = $state("move");
   let requestedHeight = $state(320);
   let collapsed = $state(false);
   const minHeight = $derived(Math.min(160, Math.max(80, availableHeight * 0.4)));
@@ -126,9 +123,8 @@
     event.preventDefault();
     resize(values[event.key]);
   }
-  const advanced = $derived(selected === "advanced");
-  function openAdvanced(): void {
-    selected = "advanced";
+  export function selectView(value: "move" | "force" | "fields" | "advanced"): void {
+    selected = value;
     collapsed = false;
   }
 </script>
@@ -146,16 +142,13 @@
     <span aria-hidden="true" class="h-0.5 w-10 rounded-full bg-slate-600"></span>
   </div>
   {/if}
-  <Tabs.Root value={collapsed ? "" : selected} onValueChange={(value) => { if (value) { selected = value; collapsed = false; } }} class="flex min-h-0 flex-1 flex-col">
+  <Tabs.Root value={collapsed ? "" : selected} onValueChange={(value) => { if (value === "move" || value === "force" || value === "fields" || value === "advanced") { selected = value; collapsed = false; } }} class="flex min-h-0 flex-1 flex-col">
     <div class="flex shrink-0 items-stretch border-slate-700 {collapsed ? 'h-9' : 'h-11 border-b'}">
       <Tabs.List aria-label="Simulation views" class="flex min-w-0 flex-1 items-stretch overflow-x-auto px-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {#each results as result (result.id)}
-          <Tabs.Trigger value={result.id} onclick={() => { selected = result.id; collapsed = false; }} class="relative flex h-full shrink-0 items-center justify-center whitespace-nowrap px-3 text-xs text-slate-400 after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 after:bg-transparent hover:text-slate-100 data-[state=active]:text-emerald-300 data-[state=active]:after:bg-emerald-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400"><span class="block leading-none">{result.label}</span></Tabs.Trigger>
+          <Tabs.Trigger value={result.id} onclick={() => { collapsed = false; }} class="relative flex h-full shrink-0 items-center justify-center whitespace-nowrap px-3 text-xs text-slate-400 after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 after:bg-transparent hover:text-slate-100 data-[state=active]:text-emerald-300 data-[state=active]:after:bg-emerald-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400"><span class="block leading-none">{result.label}</span></Tabs.Trigger>
         {/each}
       </Tabs.List>
-      <button type="button" onclick={openAdvanced} aria-pressed={advanced}
-        class="flex shrink-0 items-center gap-1 self-center rounded px-2 py-1 text-xs text-slate-500 hover:text-slate-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400"
-        title="Restricted material-coupled DC analysis"><FlaskConical size={12} aria-hidden="true" />Advanced</button>
       <button type="button" aria-label={collapsed ? "Expand simulation panel" : "Collapse simulation panel"} aria-expanded={!collapsed} aria-controls={`${dockId}-content`} onclick={() => (collapsed = !collapsed)} class="flex w-11 shrink-0 items-center justify-center self-stretch text-slate-400 hover:bg-slate-800 hover:text-slate-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400">
         {#if collapsed}<ChevronUp size={16} aria-hidden="true" />{:else}<ChevronDown size={16} aria-hidden="true" />{/if}
       </button>
@@ -166,7 +159,7 @@
         <button type="button" onclick={onRun} disabled={!active || !canRun || loading || !onRun}
           class="rounded border border-emerald-600 px-3 py-1.5 text-emerald-200 hover:bg-emerald-950 disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400">{loading ? "Running simulations…" : "Run simulations"}</button>
         <label class="flex items-center gap-2"><input type="checkbox" bind:checked={autoSimulation} class="accent-emerald-400" /> Auto-run on edits</label>
-        <p role="status">{!canRun ? "Resolve the design and coil-end warnings to run." : loading ? "Calculating the active geometry." : sweep ? "Results for the active geometry." : "Run to calculate thrust over travel, friction and stack height."}</p>
+        <p role="status">{!canRun ? "Resolve the design and coil-end warnings to run." : loading ? "Calculating the active geometry." : sweep ? "Results for the active geometry." : "Run to calculate thrust over travel."}</p>
       </div>
     {/if}
     <Tabs.Content value="move" data-dock-panel="move" class="min-h-0 flex-1 overflow-auto p-3">
@@ -175,7 +168,7 @@
     </Tabs.Content>
     <Tabs.Content value="force" data-dock-panel="force" class="min-h-0 flex-1 overflow-auto p-3">
       {@render warnings()}
-      <ForcePanel {config} {sweep} {friction} {height} {drive} {driveError} onConfigureWinding={(cadGeometry ? cadGeometry.terminal_connection === "delta" : config.generatorConnection === "delta" || (!config.generatorEndType && usesDeltaConnection(config.toIpc()))) ? onConfigureWinding : undefined} />
+      <ForcePanel {config} {sweep} {drive} {onOpenDriverCheck} />
     </Tabs.Content>
     <Tabs.Content value="fields" data-dock-panel="fields" class="min-h-0 flex-1 overflow-auto p-3">
       {@render warnings()}
@@ -187,7 +180,6 @@
           <h2 class="text-sm font-semibold text-slate-100">Advanced analysis</h2>
           <p class="text-xs text-slate-400">Material-coupled DC force at one fixed magnet position. Separate scope and admission from the move estimate.</p>
         </div>
-        <button type="button" onclick={() => { selected = "move"; }} class="rounded border border-slate-600 px-2.5 py-1 text-xs text-slate-200 hover:bg-slate-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400">Back to move and power</button>
       </div>
       <DcCouplingPanel {config} {cadGeometry} active={active && open && !collapsed && selected === "advanced"} />
     </Tabs.Content>

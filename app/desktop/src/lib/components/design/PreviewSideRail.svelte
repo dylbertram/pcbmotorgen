@@ -186,7 +186,7 @@
 
   {#if !drawingOnly}
   {#if open === "terminals" && geometry && terminalTool && onStartTerminals}
-    <div role="dialog" aria-label="Coil terminals" aria-modal="false" class={`${panelClass} ${showMotorControls ? 'max-lg:bottom-44' : ''}`} transition:fly={{ x: designOnly ? -16 : 16, duration: 140 }}>
+    <div role="dialog" aria-label="Coil terminals" aria-modal="false" class={`${panelClass} ${showMotorControls ? 'max-lg:bottom-[min(11rem,35%)]' : ''}`} transition:fly={{ x: designOnly ? -16 : 16, duration: 140 }}>
       <header class="flex shrink-0 items-center justify-between border-b border-slate-700 px-3 py-2">
         <h3 class="text-sm font-semibold">Coil ends</h3>
         <button type="button" aria-label="Close terminals panel" onclick={close} class="rounded p-1 text-slate-400 hover:bg-slate-800"><X size={16} aria-hidden="true" /></button>

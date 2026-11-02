@@ -5,7 +5,7 @@ for (const simulate of [false, true]) for (const mobile of [false, true]) {
   test(`position and layers work in every viewport ${simulate ? "simulate" : "design"} ${mobile ? "mobile" : "desktop"}`, async ({ page }, info) => {
     if (mobile) await page.setViewportSize({ width: 390, height: 844 });
     await gotoDesignApp(page);
-    if (simulate) await page.getByRole("tab", { name: /^Simulate/i }).click();
+    if (!simulate) await page.getByRole("button", { name: "Collapse simulation panel", exact: true }).click();
     await openCoilPreview(page);
     const workspace = page.getByRole("region", { name: "Coil design workspace", exact: true });
     const modes = workspace.getByRole("group", { name: "Position bar mode", exact: true });

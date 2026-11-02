@@ -1,8 +1,16 @@
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect, type Locator, type Page } from "@playwright/test";
 import { gotoDesignApp, openCoilPreview } from "./helpers";
 import { installViewMenu } from "./view-menu-helpers";
 
 const views = [["Top-down", "top"], ["Front", "front"], ["Left", "left"], ["3D fields and heat", "iso"]];
+async function expectCameraUnchanged(viewer: Locator, camera: string): Promise<void> {
+  const before = JSON.parse(camera);
+  const after = JSON.parse((await viewer.getAttribute("data-camera"))!);
+  // OrbitControls may renormalize by a few floating-point ULPs while idle.
+  for (const key of ["position", "target", "up"]) after[key].forEach((v: number, i: number) => expect(v).toBeCloseTo(before[key][i], 9));
+  expect(after.zoom).toBeCloseTo(before.zoom, 9);
+  expect(after.fitZoom).toBeCloseTo(before.fitZoom, 9);
+}
 async function selectWindow(page: Page, label: string, id: string) {
   await page.getByRole("button", { name: label, exact: true }).click();
   const viewer = page.getByTestId(`coil-${id}`);
@@ -27,7 +35,7 @@ test("dragging fits on release without moving the camera during selection in eve
     await expect(picker).toContainText("Release to zoom");
     expect(Number(await picker.locator("svg rect").getAttribute("width"))).toBeCloseTo(30, 3);
     expect(Number(await picker.locator("svg rect").getAttribute("height"))).toBeCloseTo(25, 3);
-    await expect(viewer).toHaveAttribute("data-camera", camera);
+    await expectCameraUnchanged(viewer, camera);
     if (id === "iso") await page.screenshot({ path: info.outputPath("drag-window-before-release.png") });
     await page.mouse.up();
     await expect(picker).toHaveCount(0);
@@ -49,7 +57,7 @@ test("tiny drags and Escape during a held drag never fit or navigate", async ({ 
     const x = rect.x + rect.width * .4, y = rect.y + rect.height * .4;
     await page.mouse.move(x, y); await page.mouse.down();
     await page.mouse.move(x + 2, y + 2); await page.mouse.up();
-    await expect(picker).toBeVisible(); await expect(viewer).toHaveAttribute("data-camera", camera);
+    await expect(picker).toBeVisible(); await expectCameraUnchanged(viewer, camera);
     await page.keyboard.press("Escape"); await expect(picker).toHaveCount(0);
     await page.getByRole("button", { name: "Zoom window", exact: true }).click();
     await page.mouse.move(x, y); await page.mouse.down();
@@ -57,7 +65,7 @@ test("tiny drags and Escape during a held drag never fit or navigate", async ({ 
     await page.keyboard.press("Escape");
     await expect(picker).toHaveCount(0);
     await page.mouse.up(); await page.mouse.move(x, y);
-    await expect(viewer).toHaveAttribute("data-camera", camera);
+    await expectCameraUnchanged(viewer, camera);
   }
 });
 
@@ -67,7 +75,7 @@ test("captured drag can finish beyond the viewport edge", async ({ page }) => {
   await page.mouse.move(rect.x + rect.width * .35, rect.y + rect.height * .3); await page.mouse.down();
   await page.mouse.move(rect.x + rect.width + 20, rect.y + rect.height + 12, { steps: 10 });
   await expect(picker).toContainText("Release to zoom");
-  await expect(viewer).toHaveAttribute("data-camera", camera);
+  await expectCameraUnchanged(viewer, camera);
   await page.mouse.up(); await expect(picker).toHaveCount(0);
   await expect.poll(async () => JSON.parse((await viewer.getAttribute("data-camera"))!).zoom).toBeGreaterThan(JSON.parse(camera).zoom);
 });
@@ -79,16 +87,16 @@ test.describe("touch selection", () => {
     const touch = await page.context().newCDPSession(page);
     for (const [label, id] of [views[0], views[3]]) {
       const { viewer, camera, picker, rect } = await selectWindow(page, label, id);
-      const a = { x: rect.x + rect.width * .35, y: rect.y + rect.height * .35 }, b = { x: rect.x + rect.width * .65, y: rect.y + rect.height * .65 };
+      const a = { x: rect.x + rect.width * .35, y: rect.y + rect.height * .2 }, b = { x: rect.x + rect.width * .65, y: rect.y + rect.height * .3 };
       await touch.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [a] });
       await touch.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: [b] });
       await expect(picker).toContainText("Release to zoom");
       await touch.send("Input.dispatchTouchEvent", { type: "touchCancel", touchPoints: [] });
       await expect(picker).toContainText("Drag a window or click two corners");
-      await expect(viewer).toHaveAttribute("data-camera", camera);
+      await expectCameraUnchanged(viewer, camera);
       await touch.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [a] });
       await touch.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: [b] });
-      await expect(viewer).toHaveAttribute("data-camera", camera);
+      await expectCameraUnchanged(viewer, camera);
       await touch.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
       await expect(picker).toHaveCount(0);
       await expect.poll(async () => JSON.parse((await viewer.getAttribute("data-camera"))!).zoom).toBeGreaterThan(JSON.parse(camera).zoom);

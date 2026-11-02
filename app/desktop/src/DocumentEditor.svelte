@@ -1,14 +1,13 @@
 <script lang="ts">
   import { placedCopperGeometry } from "./lib/copperLayerPlacement";
-  import { onDestroy, untrack } from "svelte";
+  import { onDestroy, tick, untrack } from "svelte";
   import type { DocumentSession } from "./lib/stores/workspace.svelte";
-  import { BitsConfig, Tabs } from "bits-ui";
+  import { BitsConfig } from "bits-ui";
   import {
     evaluateForceSweep,
     generateCoils,
     generateSensorGeometry,
     fetchTravelEnvelope,
-    computeFriction,
     computeHeightStack,
     analyzeDrive,
     exportSensorDxf,
@@ -20,14 +19,16 @@
   import type {
     ForceSweepResult,
     CoilPathDto,
-    FrictionBudgetDto,
     HeightStackResultDto,
     DriveAnalysis,
     SensorConfig,
     CadGeometry,
     TravelEnvelopeDto,
   } from "./lib/types";
-  import { TABS, type TabId } from "./lib/ui";
+  import type { SimulationAction } from "./lib/simulationMenu";
+  import EditorSplit from "./lib/components/layout/EditorSplit.svelte";
+  import DriverSuitability from "./lib/components/simulate/DriverSuitability.svelte";
+  import { usesDeltaConnection } from "./lib/driverConnection";
   import { DrcController } from "./lib/stores/drc.svelte";
   import { LatestAsyncTask } from "./lib/utils/latestAsyncTask";
   import { measureTrace, computePreviewSummary } from "./lib/previewGeometry";
@@ -38,7 +39,6 @@
   import { cadMappingProblems } from "./lib/cadMapping";
   import { inferMissingCoilEnds } from "./lib/cadTerminals";
 
-  import TabNav from "./lib/components/layout/TabNav.svelte";
   import DrcStatus from "./lib/components/layout/DrcStatus.svelte";
   import StatusIndicator from "./lib/components/layout/StatusIndicator.svelte";
   import StatusBanner from "./lib/components/ui/StatusBanner.svelte";
@@ -60,9 +60,8 @@
   // swaps stores under mounted controls or in-flight requests.
   const { config, sensor: sensorStore, motion, projects, kind: designType } = untrack(() => session);
 
-  // Session-only navigation state; none of these values enter IPC.
-  let activeTab = $state<TabId>(untrack(() => session.runtime.activeTab));
-  let workflowTabs = $derived(TABS.filter((tab) => designType === "motor" || tab.id !== "simulate"));
+  const analysisWorkspace = untrack(() => session.analysis);
+  let simulationDock = $state<SimulateTab | undefined>();
   let cadImportDialogOpen = $state(false);
   let kicadDialogOpen = $state(false);
   let exportingDxf = $state(false);
@@ -90,7 +89,6 @@
    * the configured routing domain — every preview and readout consumes THIS,
    * never the configured numbers. Null until the first payload arrives.
    */
-  let friction = $state<FrictionBudgetDto | null>(untrack(() => session.runtime.friction));
   let height = $state<HeightStackResultDto | null>(untrack(() => session.runtime.height));
   let drive = $state<DriveAnalysis | null>(untrack(() => session.runtime.drive));
   let driveError = $state<string | null>(null);
@@ -112,6 +110,27 @@
   let powerInputKey = $derived(JSON.stringify([config.toIpc(), config.drive, geometryKey(projects.cadGeometry)]));
   let powerSweep = $derived(sweepInputKey === forceInputKey ? sweep : null);
   let powerDrive = $derived(driveInputKey === powerInputKey ? drive : null);
+  const windingNeedsConfiguration = $derived(projects.cadGeometry ? projects.cadGeometry.terminal_connection === "delta"
+    : config.generatorConnection === "delta" || (!config.generatorEndType && usesDeltaConnection(config.toIpc())));
+
+  $effect(() => {
+    if (!analysisWorkspace.driverCheckOpen || !active) return;
+    void tick().then(() => {
+      if (analysisWorkspace.driverCheckOpen && active) document.getElementById(`driver-document-${session.id}`)?.focus();
+    });
+  });
+
+  function configureWinding(): void {
+    if (projects.cadGeometry || !config.generatorEndType) session.previewView.requestTerminals();
+    else coilPreview?.showDesignSettings("routing");
+  }
+
+  export function handleSimulationAction(command: SimulationAction): void {
+    if (!active || projects.busy || designType !== "motor") return;
+    if (command === "driver") analysisWorkspace.openDriverCheck();
+    else if (command === "run") runSimulationManually();
+    else simulationDock?.selectView(command);
+  }
 
   // Whether the current config produces a valid travel range.
   let valid = $derived(config.travel_mm > 0);
@@ -298,7 +317,7 @@
   let autoSimulation = $state(true);
 
   function runSimulationManually(): void {
-    if (loading || !active || activeTab !== "simulate") return;
+    if (loading || !active || designType !== "motor") return;
     scheduleSimulation.cancel();
     clearSimulationResults();
     void runSimulation(++simulationGeneration);
@@ -314,12 +333,11 @@
   }, 150);
 
   function isCurrentSimulation(generation: number): boolean {
-    return active && activeTab === "simulate" && generation === simulationGeneration;
+    return active && designType === "motor" && generation === simulationGeneration;
   }
 
   function clearSimulationResults(): void {
     sweep = null;
-    friction = null;
     height = null;
     drive = null;
   }
@@ -371,18 +389,16 @@
     try {
       const results = await Promise.allSettled([
         evaluateForceSweep(ipc, simulationCad(), $state.snapshot(config.drive)),
-        computeFriction(ipc),
         computeHeightStack(ipc),
       ]);
 
       if (!isCurrentSimulation(generation)) return;
 
-      const [s, f, h] = results;
+      const [s, h] = results;
       // Failed panels must not show values from another input/model or feed
       // an old Kf to driver analysis. Independent successful panels remain.
       sweep = s.status === "fulfilled" ? s.value : null;
       sweepInputKey = s.status === "fulfilled" ? inputKey : null;
-      friction = f.status === "fulfilled" ? f.value : null;
       height = h.status === "fulfilled" ? h.value : null;
 
       const reasons = results
@@ -406,8 +422,7 @@
   }
 
   // Touch every input used by the simulation calls. The active-tab check is
-  // intentionally inside the effect so config changes outside Simulation
-  // only invalidate/cancel a pending run; they never invoke simulation IPC.
+  // Inactive documents invalidate/cancel pending work without invoking IPC.
   $effect(() => {
     void forceInputKey;
     void [
@@ -463,7 +478,7 @@
     // sweep starts. Invalidate its Kf now, not only when that sweep settles.
     // Otherwise an old sweep can be paired with the newly edited IPC inputs.
     clearSimulationResults();
-    if (!active || activeTab !== "simulate") {
+    if (!active || designType !== "motor") {
       scheduleSimulation.cancel();
       loading = false;
       // Invalidate an in-flight run. Tab selection releases the app-wide
@@ -480,7 +495,7 @@
   // sweep. The expanded preview also needs live electrical results.
   let driveGeneration = 0;
   const driveRequested = $derived(active && (
-    activeTab === "simulate" || coilPreviewExpanded || previewPanel === "driver"
+    designType === "motor" || coilPreviewExpanded || previewPanel === "driver"
   ));
   const scheduleDrive = debounce((generation: number) => {
     if (generation !== driveGeneration || !driveRequested) return;
@@ -586,37 +601,8 @@
     drc.request();
   });
 
-  function tabStatus(tab: TabId): { label: string; className: string } {
-    if (tab === "design" && designType === "motor") {
-      return valid
-        ? { label: "ready", className: "text-emerald-300" }
-        : { label: "needs attention", className: "text-rose-300" };
-    }
-    if (tab === "simulate") {
-      if (!valid) return { label: "blocked", className: "text-rose-300" };
-      return loading
-        ? { label: "updating", className: "text-amber-300" }
-        : { label: "ready", className: "text-emerald-300" };
-    }
-    if (designType === "sensor") {
-      if (sensorStore.error) {
-        return { label: "needs attention", className: "text-rose-300" };
-      }
-      return sensorStore.loading || !sensorStore.geometry
-        ? { label: "updating", className: "text-amber-300" }
-        : { label: "ready", className: "text-emerald-300" };
-    }
-    return { label: "ready", className: "text-emerald-300" };
-  }
-
-  function selectTab(tab: TabId): void {
-    activeTab = tab;
-    if (tab !== "simulate" && previewPanel === "fields") previewPanel = null;
-    if (tab !== "simulate") loading = false;
-  }
-
   onDestroy(() => {
-    session.runtime = { activeTab, coils, sweep, friction, height, drive };
+    session.runtime = { coils, sweep, height, drive };
     ++previewGeneration;
     ++sensorGeneration;
     ++simulationGeneration;
@@ -637,28 +623,17 @@
     backplaneAnalysis={height?.backplane_analysis ?? null} driveBackplane={drive?.backplane ?? null} />
 {/snippet}
 
+{#snippet toolbarStatus()}
+  <DrcStatus {drc} />
+  <StatusIndicator loading={loading || exportingDxf} />
+{/snippet}
+
 <main
   class="flex min-h-0 flex-1 flex-col bg-slate-900 text-slate-100"
 >
   <!-- BitsConfig centralizes the portal target for every Bits portal
        (dialogs, selects, tooltips) in one place. -->
   <BitsConfig defaultPortalTo="body" defaultLocale="en-US">
-    <!-- Tabs.Root renders its own wrapper element, so the main column's
-         flex layout (grow + shrink floor) lives on it. -->
-    <Tabs.Root
-      value={activeTab}
-      onValueChange={(v) => selectTab(v as TabId)}
-      class="flex min-h-0 flex-1 flex-col"
-    >
-      <header class="shrink-0 bg-slate-900">
-        <TabNav tabs={workflowTabs} statusFor={tabStatus}>
-          {#if projects.kind === "motor"}
-            <DrcStatus {drc} />
-          {/if}
-          <StatusIndicator loading={loading || exportingDxf} />
-        </TabNav>
-      </header>
-
       {#if projects.error}
         <div class="px-4 pt-3">
           <StatusBanner level="error">
@@ -709,12 +684,12 @@
       <div
         inert={externalDialogOpen}
         aria-hidden={externalDialogOpen || undefined}
-        class="grid min-h-0 flex-1 {activeTab === 'design' && designType === 'sensor' ? 'items-start lg:grid-cols-[minmax(360px,0.9fr)_minmax(0,1.35fr)] lg:grid-rows-[minmax(0,1fr)] lg:items-stretch' : 'grid-cols-1 grid-rows-[minmax(0,1fr)] items-stretch'}"
+        class="grid min-h-0 flex-1 {designType === 'sensor' ? 'items-start lg:grid-cols-[minmax(360px,0.9fr)_minmax(0,1.35fr)] lg:grid-rows-[minmax(0,1fr)] lg:items-stretch' : 'grid-cols-1 grid-rows-[minmax(0,1fr)] items-stretch'}"
       >
         <!-- Desktop sensor columns stretch to the remaining viewport height
              and scroll independently. Below lg the sensor columns stack. -->
         {#if designType === "sensor"}<aside
-          class="relative min-w-0 min-h-0 lg:h-full {activeTab !== 'design' ? 'hidden' : ''}"
+          class="relative min-w-0 min-h-0 lg:h-full"
           aria-label="Coil preview panel"
         >
           <ScrollArea class="h-full min-h-0" viewportClass="p-4 lg:pr-2">
@@ -724,39 +699,32 @@
 
         <div class="min-w-0 min-h-0 h-full" bind:clientHeight={motorWorkspaceHeight}>
           {#if designType === "motor"}
-          <!-- Both workflow tabs share one mounted motor workspace. Simulate
-               adds a bottom dock instead of replacing the preview and rails. -->
-          <Tabs.Content
-            value={activeTab}
-            id={`panel-${activeTab}`}
-            class="flex h-full min-h-0 flex-col"
-          >
-            <div class="min-h-0 flex-1">
-              <CoilPreview bind:this={coilPreview} workspace {config} coils={activeCoils} {motion}
-                simulationActive={active && activeTab === "simulate"}
-                onRequestSimulation={() => selectTab("simulate")}
-                active={active && !externalDialogOpen} designSettings={motorSettings}
+           <div class="flex h-full min-h-0 flex-col">
+           <EditorSplit state={analysisWorkspace}>
+             {#snippet left()}
+             <div class="min-h-0 flex-1">
+               <CoilPreview bind:this={coilPreview} workspace {config} coils={activeCoils} {motion}
+                 simulationActive={active}
+                 onRequestSimulation={() => simulationDock?.selectView("fields")}
+                 active={active && !externalDialogOpen} designSettings={motorSettings}
+                 statusContent={toolbarStatus}
                 bind:sidePanel={previewPanel} bind:expanded={coilPreviewExpanded} {drive} {driveError} {drivePending}
                 camera={session.camera} view={session.previewView} importedGeometry={projects.cadGeometry}
                 onGeometryChange={(geometry) => projects.setCadGeometry(geometry)} />
             </div>
-              <SimulateTab
+               <SimulateTab
+                 bind:this={simulationDock}
+                 bind:selected={analysisWorkspace.simulationView}
                 bind:autoSimulation {loading} onRun={runSimulationManually}
                 canRun={valid && (!projects.cadGeometry || !cadMappingProblems(projects.cadGeometry, config.phases, config.min_trace_mm).length)}
                 powerInput={{ config: config.toIpc(), driveSettings: config.drive, desiredTravelMm: config.desired_travel_mm, topology: config.topology, cadGeometry: projects.cadGeometry, sweep: powerSweep, drive: powerDrive, native: isTauriAvailable() }}
-                open={activeTab === "simulate"}
+                 open={true}
                 availableHeight={Math.max(0, motorWorkspaceHeight - motorStatusHeight)}
-                onConfigureWinding={() => {
-                  if (projects.cadGeometry || !config.generatorEndType) session.previewView.requestTerminals();
-                  else coilPreview?.showDesignSettings("routing");
-                }}
+                 onOpenDriverCheck={() => analysisWorkspace.openDriverCheck()}
                 {config}
-                active={active && activeTab === "simulate"}
-                {sweep}
-                {friction}
-                {height}
-                {drive}
-                {driveError}
+                 {active}
+                 {sweep}
+                 {drive}
                 {error}
                 cadGeometry={projects.cadGeometry}
                 onSelectEnds={selectCoilEnds}
@@ -766,14 +734,24 @@
               />
               <div class="shrink-0" bind:clientHeight={motorStatusHeight}>
                 <PreviewStatus {config} {motion} stats={computePreviewSummary(activeCoils)} />
-              </div>
-          </Tabs.Content>
-          {:else}
-            <Tabs.Content value="design" id="panel-design" class="h-full">
+               </div>
+             {/snippet}
+             {#snippet right()}
+               <div id={`driver-document-${session.id}`} data-testid="driver-check-document" role="tabpanel" aria-labelledby={`driver-tab-${session.id}`} tabindex="0"
+                 class="min-h-0 flex-1 overflow-auto overscroll-contain p-4 focus-visible:outline focus-visible:outline-emerald-400"
+                 aria-label="Driver check document">
+                 <p class="mb-4 border-b border-slate-700 pb-3 text-xs text-slate-400">Driver check for <span class="text-slate-200">{session.title}</span>. Live results from this design's routed copper, not a separate saved file.</p>
+                 <DriverSuitability analysis={powerDrive} error={driveError} embedded onConfigureWinding={windingNeedsConfiguration ? configureWinding : undefined} />
+               </div>
+             {/snippet}
+           </EditorSplit>
+           </div>
+           {:else}
+             <div class="h-full">
               <ScrollArea id="sensor-settings-scroll" class="h-full" viewportClass="p-4 lg:pl-2" aria-label="Sensor settings">
                 <SensorTab store={sensorStore} />
               </ScrollArea>
-            </Tabs.Content>
+             </div>
           {/if}
         </div>
       </div>
@@ -797,12 +775,10 @@
           initialCoilType={designType}
           onClose={() => (cadImportDialogOpen = false)}
           onComplete={() => {
-             selectTab("design");
              cadImportDialogOpen = false;
           }}
         />
       {/if}
 
-    </Tabs.Root>
   </BitsConfig>
 </main>

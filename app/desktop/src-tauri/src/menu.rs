@@ -39,6 +39,46 @@ pub const SAVE_NEW_VERSION_ID: &str = "menu:save-project-new-version";
 pub const SETTINGS_ID: &str = "menu:settings";
 /// Menu item id == webview event name for importing CAD geometry.
 pub const IMPORT_CAD_ID: &str = "menu:import-cad";
+pub const SIMULATE_EVENT: &str = "menu:simulate";
+const SIMULATE_PREFIX: &str = "simulate:";
+
+#[cfg(test)]
+mod simulation_tests {
+    use super::*;
+
+    #[test]
+    fn simulation_menu_routes_only_bundled_actions() {
+        let entries = simulation_entries();
+        assert_eq!(entries.len(), 6);
+        assert!(entries.iter().any(|item| item.id == "driver" && item.label == "Driver check"));
+        for entry in entries {
+            assert_eq!(simulation_event_payload(&format!("simulate:{}", entry.id)), Some(entry.id));
+        }
+        assert_eq!(simulation_event_payload("simulate:unknown"), None);
+        assert_eq!(simulation_event_payload("menu:save-project"), None);
+    }
+}
+
+#[derive(serde::Deserialize)]
+struct SimulationMenuEntry { id: String, label: String }
+
+fn simulation_entries() -> Vec<SimulationMenuEntry> {
+    serde_json::from_str(include_str!("../../src/lib/simulationMenu.json"))
+        .expect("bundled simulation menu must be valid JSON")
+}
+
+pub fn simulation_event_payload(id: &str) -> Option<String> {
+    let action = id.strip_prefix(SIMULATE_PREFIX)?;
+    simulation_entries().into_iter().find(|item| item.id == action).map(|item| item.id)
+}
+
+fn simulation_submenu(app: &tauri::AppHandle) -> tauri::Result<Submenu<Wry>> {
+    let menu = Submenu::with_id(app, "simulate", "Simulate", true)?;
+    for item in simulation_entries() {
+        menu.append(&MenuItem::with_id(app, format!("{SIMULATE_PREFIX}{}", item.id), item.label, true, None::<&str>)?)?;
+    }
+    Ok(menu)
+}
 
 /// Submenu id of the "Open Recent" container inside the File menu. Purely
 /// internal — the container itself never fires an event.
@@ -92,17 +132,18 @@ pub fn install(app: &tauri::AppHandle) -> tauri::Result<()> {
     let file = file_submenu(app)?;
     let edit = edit_submenu(app)?;
     let view = crate::view_menu::submenu(app)?;
+    let simulate = simulation_submenu(app)?;
 
     #[cfg(target_os = "macos")]
     let menu = {
         let app_menu = app_submenu(app)?;
-        Menu::with_items(app, &[&app_menu, &file, &edit, &view])?
+        Menu::with_items(app, &[&app_menu, &file, &edit, &view, &simulate])?
     };
     #[cfg(not(target_os = "macos"))]
     let menu = {
         let settings = MenuItem::with_id(app, SETTINGS_ID, "Settings…", true, Some("CmdOrCtrl+,"))?;
         let app_menu = Submenu::with_id_and_items(app, "app", "pcbmotorgen", true, &[&settings])?;
-        Menu::with_items(app, &[&app_menu, &file, &edit, &view])?
+        Menu::with_items(app, &[&app_menu, &file, &edit, &view, &simulate])?
     };
 
     app.set_menu(menu)?;

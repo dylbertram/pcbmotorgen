@@ -3,8 +3,8 @@ import { SensorStore } from "./sensor.svelte";
 import { MotionStore } from "./motion.svelte";
 import { ProjectStore } from "./project.svelte";
 import type { RecentFilesStore } from "./recentFiles.svelte";
-import type { DocumentKind, WorkspaceLoad, ForceSweepResult, CoilPathDto, FrictionBudgetDto, HeightStackResultDto, DriveAnalysis } from "../types";
-import type { TabId } from "../ui";
+import type { DocumentKind, WorkspaceLoad, ForceSweepResult, CoilPathDto, HeightStackResultDto, DriveAnalysis } from "../types";
+import { AnalysisWorkspace } from "./analysisWorkspace.svelte";
 import { PreviewCamera } from "../utils/coilPreviewGestures.svelte";
 import { CoilPreviewViewState } from "../components/design/coilPreviewViewState.svelte";
 import { fileExists, loadWorkspace, pickProjectOpenPath, pickWorkspaceSavePath, resolveDocumentPath, saveWorkspace } from "../ipc";
@@ -16,18 +16,20 @@ let nextDocumentId = 1;
 
 /** One complete working session per file. No editable state is shared by tabs. */
 export class DocumentSession {
+  readonly analysis = new AnalysisWorkspace();
   readonly id = nextDocumentId++;
   readonly config = new ConfigStore();
   readonly sensor = new SensorStore();
   readonly motion = new MotionStore(this.config);
   readonly projects: ProjectStore;
+  get title(): string { return this.projects.fileName ?? `Untitled ${this.kind} ${this.id}`; }
   readonly camera = new PreviewCamera();
   readonly previewView = new CoilPreviewViewState();
   runtime: {
-    activeTab: TabId; coils: CoilPathDto | null; sweep: ForceSweepResult | null;
-    friction: FrictionBudgetDto | null; height: HeightStackResultDto | null;
+    coils: CoilPathDto | null; sweep: ForceSweepResult | null;
+    height: HeightStackResultDto | null;
     drive: DriveAnalysis | null;
-  } = { activeTab: "design", coils: null, sweep: null, friction: null, height: null, drive: null };
+  } = { coils: null, sweep: null, height: null, drive: null };
 
   constructor(readonly kind: DocumentKind, recents?: RecentFilesStore) {
     this.projects = new ProjectStore(this.config, this.motion, recents, this.sensor, kind);

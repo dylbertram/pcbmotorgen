@@ -95,7 +95,7 @@ test("off-center window sets a copper-depth pivot and orbit stays around it", as
     },{timeout:10000}).toBeGreaterThanOrEqual(2);
     const orbited=await snapshot();
     await nativeViewAction(page,"view:zoom-extents");
-    await expect.poll(async()=>Math.hypot(...(await snapshot()).target)).toBeLessThan(.1);
+    await expect.poll(async()=>Math.hypot(...(await snapshot()).target.map((v,i)=>v-initial.target[i]))).toBeLessThan(1e-5);
     await expect.poll(async()=>(await snapshot()).zoom).toBeLessThan(fitted.zoom);
     // OrbitControls stops emitting below its change-event epsilon even while
     // subpixel damping remains. Allow <0.006 degrees between those snapshots.

@@ -6,7 +6,6 @@ async function gotoDesignApp(page: Page) {
 }
 
 async function simulation(page: Page, plot: "driver" | "thrust", settings: "driver" | "drive" | "none" = "none") {
-  await page.getByRole("tab", { name: /^Simulate/i }).click();
   if (plot === "driver") await openDriverChecks(page);
   else await openSimulationView(page, "Force");
   if (settings === "driver") {
@@ -53,7 +52,6 @@ test("workspace driver inductor stays synchronized with simulation results", asy
   await simulationInductor.press("Enter");
   await expect(results).not.toContainText("series per phase");
 
-  await page.getByRole("tab", { name: /^Design/i }).click();
   const trigger = preview.getByRole("button", { name: "Driver settings", exact: true });
   if (await trigger.getAttribute("aria-expanded") !== "true") await trigger.click();
   await expect(inductor).toHaveValue("0");
@@ -274,7 +272,6 @@ test("delta compatibility blocks stale results and returns to the connection con
   await simulation(page, "driver");
   const results = page.locator('section[aria-labelledby="driver-suitability-heading"]');
   await expect(results).toContainText("at 5.0 V");
-  await page.getByRole("tab", { name: /^Design/i }).click();
   await selectRoutingConnection(page, "delta");
   await page.getByRole("button", { name: "Set coil terminals", exact: true }).click();
   await expect(page.getByRole("dialog", { name: "Coil terminals", exact: true })).toBeVisible();

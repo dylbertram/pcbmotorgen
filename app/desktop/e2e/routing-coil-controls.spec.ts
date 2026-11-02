@@ -116,10 +116,9 @@ test("uploaded winding warnings lead to the editable connection in Coil ends", a
   await panel.getByRole("button", { name: "Apply terminals", exact: true }).click();
   await panel.getByRole("combobox", { name: "Winding connection", exact: true }).selectOption("delta");
   await panel.getByRole("button", { name: "Close terminals panel", exact: true }).click();
-  await page.getByRole("tab", { name: /^Simulate/i }).click();
   const dock = page.getByRole("region", { name: "Simulation results", exact: true });
   await openDriverChecks(page);
-  await dock.getByRole("button", { name: "Change winding connection", exact: true }).click();
+  await page.getByTestId("driver-check-document").getByRole("button", { name: "Change winding connection", exact: true }).click();
   await expect(panel).toBeVisible();
   await expect(panel.getByRole("combobox", { name: "Winding connection", exact: true })).toHaveValue("delta");
   await expect(page.getByRole("dialog", { name: "Routing", exact: true })).toHaveCount(0);

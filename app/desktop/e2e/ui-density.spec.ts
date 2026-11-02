@@ -40,7 +40,6 @@ test("math tooltips render LaTeX with accessible MathML and diagrams", async ({ 
 
 test("simulation uses the available width and keeps the preview mounted", async ({ page }, testInfo) => {
   await gotoDesignApp(page);
-  await page.getByRole("tab", { name: /^Simulate/i }).click();
   await expect(coilWorkspace(page)).toBeVisible();
   const diagrams = page.getByRole("region", { name: "Simulation results", exact: true });
   expect((await diagrams.boundingBox())!.width).toBeGreaterThan(page.viewportSize()!.width / 2);

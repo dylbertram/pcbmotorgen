@@ -18,7 +18,7 @@ test.describe("Design constraints restructure", () => {
     const constraints = designConstraintsPanel(page);
     const stackup = page.locator("#backplane-heading");
     await expect(constraints.getByRole("img", { name: "Three-quarter isometric view of the assembly" })).toBeVisible();
-    await expect(page.locator("#panel-design").getByLabel("Mover position (mm)", { exact: true })).toBeVisible();
+    await expect(coilWorkspace(page).getByLabel("Mover position (mm)", { exact: true })).toBeVisible();
     await selectDesignPanel(page, "Stackup");
     await expect(stackup.getByRole("img", { name: /Front-on orthographic/ })).toBeVisible();
     await selectDesignPanel(page, "Routing");
@@ -27,11 +27,10 @@ test.describe("Design constraints restructure", () => {
     await expect(constraints.getByRole("img", { name: /Per-phase holding force/ })).toHaveCount(0);
     await expect(constraints.getByText("Band margin", { exact: true })).toBeVisible();
 
-    const inline = page.locator("#panel-design");
+    const inline = coilWorkspace(page);
     await expect(inline.getByRole("group", { name: "Coil terminal markers" })).toBeVisible();
     await openCoilPreview(page);
     await expect(coilWorkspace(page).getByRole("group", { name: "Coil terminal markers" })).toBeVisible();
-    await page.getByRole("tab", { name: /^Simulate/i }).click();
     const dock = page.getByRole("region", { name: "Simulation results", exact: true });
     await dock.getByRole("tab", { name: "Force", exact: true }).click();
     await expect(dock.getByRole("img", { name: "Thrust sweep plot", exact: true })).toBeVisible();
@@ -128,7 +127,7 @@ test.describe("Design constraints restructure", () => {
       page.getByRole("button", { name: "Traces", exact: true }),
     ).toHaveCount(0);
     await openCoilPreview(page);
-    await expect(page.locator("#panel-design").getByRole("slider", { name: "Mover position slider (mm)" })).toBeVisible();
+    await expect(coilWorkspace(page).getByRole("slider", { name: "Mover position slider (mm)" })).toBeVisible();
     await selectDesignPanel(page, "Routing");
     await expect(numberField(page, "Active area width (mm)")).toBeEnabled();
   }, { tag: ["@constraints", "@desktop"] });
@@ -168,10 +167,10 @@ test.describe("Design constraints restructure", () => {
     await gotoDesignApp(page);
 
     await expect(
-      page.locator("#panel-design").getByText("Drive & force targets", { exact: true }),
+      coilWorkspace(page).getByRole("dialog", { name: "Drive & force targets", exact: true }),
     ).toHaveCount(0);
-    for (const workflow of ["Design", "Simulate"]) {
-      await page.getByRole("tab", { name: new RegExp(`^${workflow}`, "i") }).click();
+    for (const workflow of ["Move & power", "Force"]) {
+      await page.getByRole("tab", { name: workflow, exact: true }).click();
       await selectDesignPanel(page, "Drive & force targets");
       const targets = coilWorkspace(page).getByRole("dialog", { name: "Drive & force targets", exact: true });
       await expect(targets.getByRole("spinbutton", { name: "Phase current (A)", exact: true })).toBeVisible();

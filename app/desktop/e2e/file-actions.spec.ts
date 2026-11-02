@@ -32,15 +32,15 @@ test("Export tab is removed and DRC is available beside Ready", async ({ page })
   await expect(trigger).toBeFocused();
 });
 
-test("Send to KiCad opens details without leaving the Design tab", async ({ page }) => {
+test("Send to KiCad opens details without replacing the design workspace", async ({ page }) => {
   await gotoDesignApp(page);
   await page.evaluate(() => window.dispatchEvent(new CustomEvent("test-file-action", { detail: "sendKicad" })));
   const dialog = page.getByRole("dialog", { name: "Send to KiCad", exact: true });
   await expect(dialog).toBeVisible();
   await expect(dialog.getByRole("button", { name: "Connect" })).toBeVisible();
-  await expect(page.getByRole("tab", { name: "Design" })).toHaveAttribute("aria-selected", "true");
   await dialog.getByRole("button", { name: "Close", exact: true }).click();
   await expect(dialog).toBeHidden();
+  await expect(page.getByRole("region", { name: "Coil design workspace", exact: true })).toBeVisible();
 });
 
 test("DXF exports directly and New adds a file without clearing an edited design", async ({ page }) => {

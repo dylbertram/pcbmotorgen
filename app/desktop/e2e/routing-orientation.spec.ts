@@ -38,8 +38,8 @@ test("Routing flips remain generated, compose independently, and persist across 
   }
   await panel.getByRole("checkbox", { name: labels[0], exact: true }).check();
   await panel.getByRole("button", { name: "Close routing panel", exact: true }).click();
-  await page.getByRole("tab", { name: /^Simulate/i }).click();
-  await page.getByRole("tab", { name: /^Design/i }).click();
+  await page.getByRole("tab", { name: "Force", exact: true }).click();
+  await page.getByRole("tab", { name: "Move & power", exact: true }).click();
   await selectDesignPanel(page, "Routing");
   await expect(panel.getByRole("checkbox", { name: labels[0], exact: true })).toBeChecked();
   await page.screenshot({ path: info.outputPath("routing-orientation-controls.png") });
@@ -55,6 +55,7 @@ for (const width of [1280, 390]) test(`Star generator keeps flip checkboxes visi
   await expect(orientation.getByRole("button")).toHaveCount(0);
   for (const label of ["Mirror left/right (X)", "Mirror up/down (Y)", "Reverse layers (Z)"]) {
     const checkbox = orientation.getByRole("checkbox", { name: label, exact: true });
+    await checkbox.scrollIntoViewIfNeeded();
     await expect(checkbox).toBeInViewport({ ratio: 1 });
     await expect(checkbox).not.toBeChecked();
     await checkbox.check(); await expect(checkbox).toBeChecked();
@@ -99,8 +100,8 @@ test("XYZ indicator is camera-aligned, passive and inside every desktop/mobile v
       if (id === "left") { await expect.poll(async () => (await direction("Y"))[0]).toBeCloseTo(-1); }
       if (id === "iso") {
         const before = await direction("X");
-        await page.mouse.move(frame.x + frame.width * .55, frame.y + frame.height * .4); await page.mouse.down();
-        await page.mouse.move(frame.x + frame.width * .65, frame.y + frame.height * .5, { steps: 8 }); await page.mouse.up();
+        await page.mouse.move(frame.x + frame.width * .55, frame.y + frame.height * .2); await page.mouse.down();
+        await page.mouse.move(frame.x + frame.width * .65, frame.y + frame.height * .3, { steps: 8 }); await page.mouse.up();
         await expect.poll(() => direction("X")).not.toEqual(before);
       }
       await page.screenshot({ path: info.outputPath(`xyz-${id}-${width}.png`) });

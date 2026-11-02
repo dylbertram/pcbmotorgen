@@ -54,6 +54,7 @@
     simulation = null,
     onRequestSimulation,
     designSettings,
+    statusContent,
     sidePanel = $bindable<PreviewPanelId | null>(null),
     height = PREVIEW_H,
     config,
@@ -94,6 +95,7 @@
     simulation?: VisualizationInput | null;
     onRequestSimulation?: () => void;
     designSettings?: Snippet<[DesignPanelId]>;
+    statusContent?: Snippet;
     sidePanel?: PreviewPanelId | null;
     height?: number;
     config: ConfigStore;
@@ -298,6 +300,7 @@
              backed so the buttons stay legible over the drawing. -->
         <div class="absolute inset-x-0 top-0 z-20" bind:clientHeight={toolbarHeight}>
           <GeometryEditingToolbar label="Coil preview tools" geometry={onGeometryChange ? importedGeometry : null}
+            {statusContent}
             {selection} {measure} {terminalTool} {onSimplify} {onUndoSimplify} {simplifyNotice} borderless
             spatialMeasure={view.viewMode !== "top" ? measure3d : null}
             zoomWindow={view.zoomWindow} onToggleZoomWindow={toggleZoomWindow} showZoomWindowControl={false}

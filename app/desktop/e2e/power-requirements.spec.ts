@@ -12,7 +12,6 @@ async function useTwelveVolts(page: Page) {
 }
 
 async function openMove(page: Page) {
-  await page.getByRole("tab", { name: /^Simulate/i }).click();
   await page.getByRole("tab", { name: "Move & power", exact: true }).click();
   return page.getByRole("region", { name: "Move and power", exact: true });
 }
@@ -21,13 +20,13 @@ test("simulation opens on the move form and keeps demo results out", async ({ pa
   await gotoDesignApp(page);
   const panel = await openMove(page);
   const dock = page.getByRole("region", { name: "Simulation results", exact: true });
-  await expect(dock.getByRole("tab")).toHaveText(["Move & power", "Force", "Fields"]);
+  await expect(dock.getByRole("tab")).toHaveText(["Move & power", "Force", "Fields", "Advanced"]);
   await expect(panel.getByRole("spinbutton", { name: "Move start in millimetres", exact: true })).toHaveValue("0");
   const end = panel.getByRole("spinbutton", { name: "Move end in millimetres", exact: true });
   const full = await end.inputValue();
   expect(Number(full)).toBeGreaterThan(0);
   await end.fill("10");
-  await panel.getByRole("button", { name: "Full travel", exact: true }).click();
+  await panel.getByRole("button", { name: "Set move end to maximum", exact: true }).click();
   await expect(end).toHaveValue(full);
   await expect(panel.getByRole("spinbutton", { name: "Move duration in seconds", exact: true })).toHaveValue("0.5");
   await expect(panel).toContainText("magnets only");

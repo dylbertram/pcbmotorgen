@@ -35,7 +35,6 @@ test("carriage mass defaults to magnets and the move form uses the complete asse
   await page.getByRole("spinbutton", { name: "Magnet count", exact: true }).press("Enter");
   await tools.getByRole("button", { name: "Drive & force targets", exact: true }).click();
   await expect(carriage.getByRole("spinbutton", { name: "Full carriage mass (g)", exact: true })).toHaveValue("15");
-  await page.getByRole("tab", { name: /^Simulate/i }).click();
   const power = page.getByRole("region", { name: "Move and power", exact: true });
   await expect(power).toContainText("15.00 g full moving assembly");
   await expect(power).toContainText("0.060 N sliding friction");

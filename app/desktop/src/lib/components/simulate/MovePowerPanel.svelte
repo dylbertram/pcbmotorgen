@@ -106,11 +106,6 @@
     message = "";
   });
 
-  function fullTravel(): void {
-    form.fromMm = 0;
-    form.toMm = Number(design.fullTravelMm.toFixed(6));
-  }
-
   async function calculate(): Promise<void> {
     if (!canCalculate) return;
     error = "";
@@ -223,7 +218,7 @@
   <header class="space-y-1">
     <h2 class="text-base font-semibold text-slate-100">Move &amp; power</h2>
     <p class="max-w-3xl text-xs leading-relaxed text-slate-400">
-      Enter the fader move and calculate its power from the active copper. The motion is smooth, with zero speed at both ends. Nothing is stored until you calculate.
+      Calculate peak and average power, energy and supply current from the active copper. The design's mass and friction are used unless you edit the load. The move starts and stops smoothly at zero speed. Nothing is stored until you calculate.
     </p>
   </header>
 
@@ -234,8 +229,9 @@
     <p class="rounded border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-200" role="status">Move power supports one linear track. Rotary motion is not supported.</p>
   {/if}
 
-  <div class="space-y-3 rounded border border-slate-700 bg-slate-800/40 p-3">
-    <div class="flex flex-wrap items-end gap-2">
+  <div class="space-y-3">
+    <div class="flex flex-wrap items-start gap-3">
+      <div class="flex flex-col gap-1">
       <label class="flex flex-col gap-1 text-xs text-slate-400">From
         <span class="flex items-baseline gap-1">
           <input type="number" min="0" step="0.1" aria-label="Move start in millimetres" bind:value={form.fromMm}
@@ -243,6 +239,9 @@
           <span class="text-slate-500">mm</span>
         </span>
       </label>
+      <button type="button" aria-label="Set move start to minimum" onclick={() => { form.fromMm = 0; }} class="self-end pr-5 text-[11px] text-sky-300 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400">min</button>
+      </div>
+      <div class="flex flex-col gap-1">
       <label class="flex flex-col gap-1 text-xs text-slate-400">To
         <span class="flex items-baseline gap-1">
           <input type="number" min="0" step="0.1" aria-label="Move end in millimetres" bind:value={form.toMm}
@@ -250,6 +249,8 @@
           <span class="text-slate-500">mm</span>
         </span>
       </label>
+      <button type="button" aria-label="Set move end to maximum" onclick={() => { form.toMm = Number(design.fullTravelMm.toFixed(6)); }} class="self-end pr-5 text-[11px] text-sky-300 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400">max</button>
+      </div>
       <label class="flex flex-col gap-1 text-xs text-slate-400">Travel time
         <span class="flex items-baseline gap-1">
           <input type="number" min="0.001" step="0.01" aria-label="Move duration in seconds" bind:value={form.durationS}
@@ -257,8 +258,7 @@
           <span class="text-slate-500">s</span>
         </span>
       </label>
-      <button type="button" onclick={fullTravel} class="rounded border border-slate-600 px-2.5 py-1.5 text-xs text-slate-200 hover:bg-slate-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400">Full travel</button>
-      <div class="ml-auto flex items-center gap-2">
+      <div class="ml-auto flex items-center gap-2 pt-5">
         <button type="button" disabled={!canCalculate} onclick={calculate}
           class="rounded border border-emerald-500 bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400">
           {pending ? (preparingLabel || "Calculating…") : "Calculate power"}
@@ -424,7 +424,5 @@
     <p class="text-xs text-slate-400" role="status">Calculating from the active copper. Cancellation takes effect at the next solver checkpoint.</p>
   {:else if status === "cancelled"}
     <p class="text-xs text-slate-400">Calculation cancelled. Define or adjust the move to calculate again.</p>
-  {:else}
-    <p class="text-xs leading-relaxed text-slate-500">Choose Calculate to estimate peak and average power, energy and the supply current for this move. The design's own mass and friction are used unless you edit the load.</p>
   {/if}
 </section>

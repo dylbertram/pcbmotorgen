@@ -84,9 +84,13 @@ test.describe("touch pinch", () => {
     const viewer = page.getByTestId("coil-iso");
     await expect(viewer).toHaveAttribute("data-camera", /position/);
     const rect = await drawingRect(viewer), snapshot = async () => JSON.parse((await viewer.getAttribute("data-camera"))!) as Snapshot;
-    const x = .6, y = .43, before = await snapshot(), world = worldAt(before, rect, "iso", x, y);
+    // Keep fingers above the mobile legends and position controls.
+    const x = .6, y = .25, before = await snapshot(), world = worldAt(before, rect, "iso", x, y);
     const touch = await page.context().newCDPSession(page);
     const points = (dx: number, dy: number) => [-18, 18].map((offset, id) => ({ id, x: rect.x + rect.width * x + offset + dx, y: rect.y + rect.height * y + dy }));
+    for (const point of points(0, 0)) {
+      expect(await page.evaluate(p => !!document.elementFromPoint(p.x, p.y)?.closest('[aria-label="Simulation overlay legend"]'), point)).toBe(false);
+    }
     await touch.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: points(0, 0) });
     await touch.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: points(24, 32) });
     await touch.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
@@ -107,7 +111,7 @@ test.describe("touch pinch", () => {
       await expect(viewer).toHaveAttribute("data-camera", /position/);
       const rect = await drawingRect(viewer);
       const snapshot = async () => JSON.parse((await viewer.getAttribute("data-camera"))!) as Snapshot;
-      const x = .68, y = .43, before = await snapshot(), world = worldAt(before, rect, id, x, y);
+      const x = .68, y = .25, before = await snapshot(), world = worldAt(before, rect, id, x, y);
       await page.mouse.move(rect.x + rect.width * .3, rect.y + rect.height * .7);
       // Top keeps its CAD convention: two-finger pan, three-finger zoom.
       const offsets = id === "top" ? [[-18, -9], [18, -9], [0, 18]] : [[-18, 0], [18, 0]];

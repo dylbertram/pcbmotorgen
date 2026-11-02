@@ -56,6 +56,8 @@ fn main() {
                 // The "Clear Recent Files" entry is handled by the frontend
                 // recents store, the single owner of the list.
                 let _ = app.emit(id, ());
+            } else if let Some(action) = menu::simulation_event_payload(id) {
+                let _ = app.emit(menu::SIMULATE_EVENT, action);
             } else if let Some(action) = view_menu::event_payload(&app.state::<view_menu::ActiveViewMenu>(), id) {
                 let _ = app.emit(view_menu::VIEW_EVENT, action);
             } else if let Some(path) =

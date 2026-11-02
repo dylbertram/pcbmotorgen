@@ -95,15 +95,17 @@ then click **Write to KiCad** when ready.
 
 ### Simulation controls and model scope
 
-In **Simulate**, **Move & power** opens first. Enter the move in millimetres, seconds and grams, check the inherited mass and friction, then choose **Calculate power**. One action prepares the winding analysis, builds the documented estimate and calculates the native move demand. Backplane or housing designs require an explicit analysis-only exclusion for this calculation. **Save report** writes a standalone HTML report; Markdown, time-series and reproducibility exports are under **Export data**. **Force** holds thrust over travel and the expandable driver checks. **Fields** holds the cross-section field view. The restricted material-coupled DC analysis sits behind **Advanced**.
+The bottom simulation dock stays open alongside the design, with **Move & power** selected first. Enter the move in millimetres, seconds and grams, check the inherited mass and friction, then choose **Calculate power**. The **min** and **max** links reset the start and end independently. One action prepares the winding analysis, builds the documented estimate and calculates the native move demand. Backplane or housing designs require an explicit analysis-only exclusion for this calculation. **Save report** writes a standalone HTML report; Markdown, time-series and reproducibility exports are under **Export data**. **Force** holds thrust over travel. **Fields** holds the cross-section field view. The restricted material-coupled DC analysis sits under **Advanced**.
 
-**Run simulations** recalculates thrust over travel, friction and stack height for **Force** and **Fields**. **Auto-run on edits** can be turned off for manual operation.
+Choose **Open driver check** in Force, or **Simulate → Driver check** in the native menu, to open the detailed winding and driver analysis in a resizable editor group. This is a live view of its source motor, not a duplicate or saved motor file. Each source keeps its own split and selected simulation view. Close the driver tab independently; File → Close file closes it when that group has focus. DRC and calculation status sit in the drawing's editing toolbar. The native **Simulate** menu also selects result views and runs simulations.
+
+**Run simulations** recalculates thrust over travel and the stack geometry used by the field view. **Auto-run on edits** can be turned off for manual operation. Force does not display an assumed friction breakdown or stack-height summary.
 Imported copper needs phase mapping and confirmed coil ends. Editing inputs
 clears old results; late responses cannot populate another design or tab.
 
 The **3D fields and heat** view defaults to **Coil currents, routed estimate**.
 Open **Field and loss settings** from the right-hand rail. Opening it selects
-**Simulate** and switches Top-down to 3D, while keeping an existing Front or Left
+**Fields** in the simulation dock and switches Top-down to 3D, while keeping an existing Front or Left
 view. Opening **Coil ends** selects Top-down so its picking controls are usable.
 The routed estimate does not require a previously audited design. It calculates
 the routed copper's Biot-Savart contribution from signed resistor-graph branch currents,

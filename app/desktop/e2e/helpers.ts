@@ -1,10 +1,10 @@
 import { expect, type Locator, type Page } from "@playwright/test";
 
-/** The Design tab's scrollable settings container. */
+/** The design drawer's scrollable settings container. */
 export const DESIGN_SCROLL = "#design-settings-scroll";
 
 /** The embedded motor workspace, retained as ASIDE for shared preview tests. */
-export const ASIDE = "#panel-design";
+export const ASIDE = '[aria-label="Coil design workspace"]';
 
 /** Open a motor document with generated defaults in the workspace. */
 export async function gotoDesignApp(page: Page): Promise<void> {
@@ -60,7 +60,7 @@ export async function box(page: Page, locator: Locator) {
 
 /** The full Design tab's outer box. */
 export function designPanel(page: Page) {
-  return page.locator("#panel-design");
+  return coilWorkspace(page);
 }
 
 /** Active-area length readout in Design constraints. */
@@ -89,20 +89,19 @@ export function simulationDock(page: Page): Locator {
   return page.getByRole("region", { name: "Simulation results", exact: true });
 }
 
-/** Primary simulation views. Advanced analysis is a secondary entry. */
-export async function openSimulationView(page: Page, view: "Move & power" | "Force" | "Fields"): Promise<void> {
+/** The simulation dock's result views. */
+export async function openSimulationView(page: Page, view: "Move & power" | "Force" | "Fields" | "Advanced"): Promise<void> {
   const dock = simulationDock(page);
   await dock.getByRole("tab", { name: view, exact: true }).click();
   await expect(dock.getByRole("tabpanel", { name: view, exact: true })).toBeVisible();
 }
 
-/** The driver checks live inside the Force view's expandable detail. */
+/** The driver check opens as a source-linked document in the right group. */
 export async function openDriverChecks(page: Page): Promise<void> {
   const dock = simulationDock(page);
   await openSimulationView(page, "Force");
-  const details = dock.locator("details").filter({ hasText: "Winding and driver checks at this current" });
-  if (!(await details.evaluate((el: HTMLDetailsElement) => el.open))) await details.locator("summary").click();
-  await expect(details.getByRole("region", { name: "Driver suitability" })).toBeVisible();
+  await dock.getByRole("button", { name: "Open driver check", exact: true }).click();
+  await expect(page.getByTestId("driver-check-document")).toBeVisible();
 }
 
 /** NumberField wrapper by aria-label. */

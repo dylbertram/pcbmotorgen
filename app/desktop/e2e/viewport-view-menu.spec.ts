@@ -60,7 +60,6 @@ test("view choices live at the viewport top-left and survive both views", async 
   await top.click();
   await expect(workspace.getByTestId("coil-iso")).toHaveCount(0);
   await expect.poll(() => checked(page, "view:top")).toBe(true);
-  await page.getByRole("tab", { name: /^Simulate/i }).click();
   await expect(page.getByRole("region", { name: "Simulation results", exact: true }).getByRole("button", { name: /3D fields/ })).toHaveCount(0);
 });
 

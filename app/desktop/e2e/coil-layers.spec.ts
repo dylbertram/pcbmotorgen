@@ -62,7 +62,7 @@ test("persistent workspace edits and middle-drag panning survive workflow change
   await page.mouse.up({ button: "middle" });
   await expect(canvas).not.toHaveAttribute("data-revision", revision!);
   await expect(frame).toHaveCSS("cursor", "grab");
-  await page.getByRole("tab", { name: /^Simulate/i }).click();
+  await page.getByRole("tab", { name: "Force", exact: true }).click();
   await expect(frame).toBeVisible();
   await expect(page.getByRole("button", { name: "Open coil preview", exact: true })).toHaveCount(0);
 });
@@ -102,7 +102,7 @@ test("side rail panels do not resize the drawing and keep display choices", asyn
   await expect(canvas).toHaveAttribute("data-vias", "0");
   await setViewMenuChecked(page, "view:centerlines", true);
   await layers.getByRole("button", { name: "Close layers panel" }).click();
-  await page.getByRole("tab", { name: /^Simulate/i }).click();
+  await page.getByRole("tab", { name: "Force", exact: true }).click();
   await view.getByRole("button", { name: "Layers", exact: true }).click();
   await expect(layers.getByRole("radio", { name: "Layers", exact: true })).toBeChecked();
   await expect.poll(() => viewMenuChecked(page, "view:vias")).toBe(false);
@@ -237,7 +237,7 @@ test("position controls stay aligned and waveform lives in the simulation dock",
     return Math.abs(p.y + p.height / 2 - s.y - s.height / 2);
   }).toBeLessThan(2);
   await expect(view.getByRole("dialog", { name: "Phase waveform", exact: true })).toHaveCount(0);
-  await page.getByRole("tab", { name: /^Simulate/i }).click();
+  await page.getByRole("tab", { name: "Force", exact: true }).click();
   await expect(page.getByRole("region", { name: "Simulation results", exact: true })).toBeVisible();
   await expect(position).toBeVisible();
 });
@@ -248,8 +248,8 @@ test("workflow changes preserve mover position and keep the preview mounted", as
   const value = await position.inputValue();
   const canvas = view.getByTestId("coil-annotations");
   await canvas.evaluate(el => el.setAttribute("data-mount-witness", "retained"));
-  await page.getByRole("tab", { name: /^Simulate/i }).click();
-  await page.getByRole("tab", { name: /^Design/i }).click();
+  await page.getByRole("tab", { name: "Force", exact: true }).click();
+  await page.getByRole("tab", { name: "Move & power", exact: true }).click();
   await expect(position).toHaveValue(value);
   await expect(canvas).toHaveAttribute("data-mount-witness", "retained");
 });

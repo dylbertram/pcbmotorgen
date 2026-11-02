@@ -112,6 +112,7 @@
       .catch(() => undefined)
       .finally(() => (recentLoading = false));
     const unbind = bindProjectMenuActions({
+      simulate: (command) => { if (!workspace.pending) editor?.handleSimulationAction(command); },
       newFile: () => { if (!workspace.pending) newFileOpen = true; },
       newProject: () => { void workspace.newProject(); },
       open: () => { void workspace.open(); },
@@ -119,7 +120,11 @@
       saveWorkspace: () => { void workspace.save(); },
       saveWorkspaceAs: () => { void workspace.save(true); },
       saveAll: () => { void workspace.saveAll(); },
-      closeFile: () => { if (workspace.activeId !== null) void workspace.close(workspace.activeId); },
+      closeFile: () => {
+        const current = workspace.active;
+        if (current?.analysis.driverCheckOpen && current.analysis.focusedGroup === "driver") current.analysis.closeDriverCheck();
+        else if (workspace.activeId !== null) void workspace.close(workspace.activeId);
+      },
       saveNewVersion: () => action("versions"),
       exportDxf: () => action("export"), sendKicad: () => action("kicad"),
       importCad: () => action("import"), settings: () => action("settings"),
@@ -136,11 +141,12 @@
 </script>
 
 <main class="flex min-h-screen flex-col bg-slate-900 text-slate-100 {workspace.active?.kind === 'motor' ? 'h-dvh overflow-hidden' : 'lg:h-screen lg:overflow-hidden'}">
-  <header class="shrink-0 border-b border-slate-700 bg-slate-950/60">
-    <nav class="flex min-h-10 items-stretch overflow-x-auto pl-[95px]" aria-label="Open files" data-tauri-drag-region>
+  <header class="file-groups shrink-0 border-b border-slate-700 bg-slate-950/60" class:split={workspace.active?.analysis.driverCheckOpen}
+    style:--split-left={`${workspace.active?.analysis.leftPercent ?? 55}fr`} style:--split-right={`${100 - (workspace.active?.analysis.leftPercent ?? 55)}fr`}>
+    <nav class="flex min-h-10 min-w-0 items-stretch overflow-x-auto pl-[95px]" aria-label="Open files" data-tauri-drag-region>
       <div role="tablist" aria-label="Coil files" class="flex items-stretch">
       {#each workspace.documents as document (document.id)}
-        {@const tabTitle = document.projects.fileName ?? `Untitled ${document.kind} ${document.id}`}
+        {@const tabTitle = document.title}
         <ContextMenu.Root>
           <ContextMenu.Trigger class="flex shrink-0 items-center gap-1 border-r border-slate-700 border-t-2 pr-1 {workspace.activeId === document.id ? 'border-t-emerald-400 bg-slate-800' : 'border-t-transparent bg-slate-950/30'}">
             <button type="button" role="tab" id={`file-tab-${document.id}`} aria-controls="active-document" aria-selected={workspace.activeId === document.id} tabindex={workspace.activeId === document.id ? 0 : -1} onkeydown={(event) => void fileTabKeydown(event, document.id)} class="flex items-center gap-2 px-3 py-2 text-xs focus-visible:outline focus-visible:outline-emerald-400 disabled:opacity-50" disabled={workspace.pending} title={document.projects.currentPath ?? document.projects.defaultFileName} onclick={() => workspace.activate(document.id)}>
@@ -178,6 +184,21 @@
       </div>
       <button type="button" class="shrink-0 px-4 py-2 text-slate-400 hover:bg-slate-800 focus-visible:outline focus-visible:outline-emerald-400 disabled:opacity-50" disabled={workspace.pending} aria-label="New coil file" onclick={() => (newFileOpen = true)}>+</button>
     </nav>
+    {#if workspace.active?.analysis.driverCheckOpen}
+      {@const current = workspace.active}
+      <div class="bg-slate-700" aria-hidden="true"></div>
+      <nav aria-label="Analysis editor group" class="flex min-w-0 items-stretch overflow-hidden">
+        <div role="tablist" aria-label="Analysis documents" class="flex min-w-0">
+          <div class="flex min-w-0 items-center border-r border-t-2 border-slate-700 border-t-emerald-400 bg-slate-800">
+            <button type="button" role="tab" id={`driver-tab-${current.id}`} aria-selected="true" aria-controls={`driver-document-${current.id}`}
+              class="truncate px-3 py-2 text-xs text-slate-200 focus-visible:outline focus-visible:outline-emerald-400"
+              title={`Driver check for ${current.title}`}
+              onclick={() => { current.analysis.focusedGroup = "driver"; document.getElementById(`driver-document-${current.id}`)?.focus(); }}>Driver check <span class="ml-2 text-slate-500">{current.title}</span></button>
+            <button type="button" aria-label="Close driver check" onclick={() => current.analysis.closeDriverCheck()} class="mr-1 rounded px-1.5 py-0.5 text-slate-400 hover:bg-slate-700 hover:text-slate-100 focus-visible:outline focus-visible:outline-emerald-400">×</button>
+          </div>
+        </div>
+      </nav>
+    {/if}
   </header>
 
   {#if workspace.error}
@@ -242,3 +263,12 @@
     </Dialog.Portal>
   </Dialog.Root>
 </main>
+
+<style>
+  .file-groups { display: grid; grid-template-columns: minmax(0, 1fr); }
+  .file-groups.split { grid-template-columns: minmax(0, var(--split-left)) 5px minmax(0, var(--split-right)); }
+  @media (max-width: 767px) {
+    .file-groups.split { grid-template-columns: minmax(0, 1fr); }
+    .file-groups.split > div[aria-hidden] { display: none; }
+  }
+</style>

@@ -1,0 +1,8 @@
+[
+  { "id": "driver", "label": "Driver check" },
+  { "id": "run", "label": "Run simulations" },
+  { "id": "move", "label": "Move & power" },
+  { "id": "force", "label": "Force" },
+  { "id": "fields", "label": "Fields" },
+  { "id": "advanced", "label": "Advanced analysis" }
+]

@@ -3,7 +3,6 @@ import { gotoDesignApp } from "./helpers";
 
 async function openPanel(page: Page, bridge = true) {
   await gotoDesignApp(page);
-  await page.getByRole("tab", { name: /^Simulate/i }).click();
   if (bridge) await page.evaluate(() => {
     const w = window as any;
     w.dcMode = "completed"; w.dcInspectMode = "qualified"; w.dcCalls = [];
@@ -49,7 +48,7 @@ async function openPanel(page: Page, bridge = true) {
       throw new Error(`UI fixture has no ${command} calculation`);
     }};
   });
-  await page.getByRole("button", {name:"Advanced",exact:true}).click();
+  await page.getByRole("tab", {name:"Advanced",exact:true}).click();
   return page.getByRole("region", {name:"Audited DC force at one pose",exact:true});
 }
 

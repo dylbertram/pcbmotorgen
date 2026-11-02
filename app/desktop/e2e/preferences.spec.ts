@@ -66,7 +66,6 @@ test("driver library edits persist and feed the Simulation selector", async ({ p
   // The Simulation tab selects from the same library.
   await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
   await selectDesignPanel(page, "Routing");
-  await page.getByRole("tab", { name: /^Simulate/i }).click();
   await coilWorkspace(page).getByRole("button", { name: "Driver settings", exact: true }).click();
   await page.getByRole("combobox", { name: "Driver to evaluate" }).selectOption("Settings driver v2");
   await openDriverChecks(page);
@@ -87,7 +86,6 @@ test("bundled drivers live in the library, are deletable, and leave the selector
 
   // The Simulation tab reads the same library, so the removed driver is gone.
   await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
-  await page.getByRole("tab", { name: /^Simulate/i }).click();
   await coilWorkspace(page).getByRole("button", { name: "Driver settings", exact: true }).click();
   const selector = page.getByRole("combobox", { name: "Driver to evaluate" });
   await expect(selector.locator("option", { hasText: "DRV8313" })).toHaveCount(0);

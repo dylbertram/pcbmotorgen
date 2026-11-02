@@ -27,6 +27,7 @@ import type {
   WorkspaceLoad,
 } from "../types";
 import { isTauriAvailable } from "./core";
+import { isSimulationAction, type SimulationAction } from "../simulationMenu";
 
 const PROJECT_FILE_FILTERS = [
   { name: "pcbmotorgen files", extensions: ["pmproj", "pmmotor", "pmsensor"] },
@@ -210,6 +211,7 @@ export async function fileExists(path: string): Promise<boolean> {
  * native menu).
  */
 export async function bindProjectMenuActions(handlers: {
+  simulate?: (action: SimulationAction) => void;
   newFile?: () => void;
   newProject?: () => void;
   saveWorkspace?: () => void;
@@ -237,6 +239,7 @@ export async function bindProjectMenuActions(handlers: {
     return () => {};
   }
   const unlisteners = await Promise.all([
+    listen<unknown>("menu:simulate", (event) => { if (isSimulationAction(event.payload)) handlers.simulate?.(event.payload); }),
     listen("menu:new-file", () => handlers.newFile?.()),
     listen("menu:new-project", () => handlers.newProject?.()),
     listen("menu:save-workspace", () => handlers.saveWorkspace?.()),
