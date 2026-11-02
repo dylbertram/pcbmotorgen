@@ -707,7 +707,6 @@
              <div class="min-h-0 flex-1">
                <CoilPreview bind:this={coilPreview} workspace {config} coils={activeCoils} {motion}
                  simulationActive={active}
-                 onRequestSimulation={() => simulationDock?.selectView("fields")}
                  active={active && !externalDialogOpen} {focused} designSettings={motorSettings}
                  {onOpenDriverCalculator}
                  statusContent={toolbarStatus}

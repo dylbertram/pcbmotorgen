@@ -16,7 +16,6 @@ import type {
   ForceSweepResult,
   HeightStackResultDto,
   FrictionBudgetDto,
-  BFieldGridDto,
   TravelEnvelopeDto,
   MagnetGrade,
   DriveSettings,
@@ -34,7 +33,6 @@ import {
   mockForceSweep,
   mockHeightStack,
   mockFriction,
-  mockBFieldGrid,
   mockTravelEnvelope,
   mockMagnetGrades,
   mockDriveAnalysis,
@@ -163,34 +161,4 @@ export async function analyzeHousingMotion(
     throw new Error("Housing motion estimates require the desktop app. Browser previews do not substitute physics results.");
   }
   return await invoke<HousingMotionAnalysis>("analyze_housing_motion", { config, profile, speed, cadGeometry });
-}
-
-/**
- * Sample the B-field on an X–Z grid for the (fixed plain alternating)
- * magnet array.
- * Returns a flat row-major array (Z slow axis) of B-vectors + positions.
- *
- * Defaults: 24×12 grid, x = [0, active_area_length_m],
- * z = [0, air_gap + magnet_height + 2 mm] (a 2 mm window above the magnet top).
- */
-export async function sampleBField(
-  config: LinearMotorConfig,
-  n_x: number = 24,
-  n_z: number = 12,
-  x_extent_m: [number, number] = [0, config.active_area_length_m],
-  z_extent_m: [number, number] = [
-    0,
-    config.air_gap_m + config.magnet_height_m + 2e-3,
-  ],
-): Promise<BFieldGridDto> {
-  if (!isTauriAvailable()) {
-    return mockBFieldGrid(config, n_x, n_z, x_extent_m, z_extent_m);
-  }
-  return await invoke<BFieldGridDto>("sample_b_field", {
-    config,
-    nX: n_x,
-    nZ: n_z,
-    xExtentM: x_extent_m,
-    zExtentM: z_extent_m,
-  });
 }

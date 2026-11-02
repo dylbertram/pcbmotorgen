@@ -59,7 +59,9 @@
   });
 </script>
 
-<main class="min-h-dvh bg-slate-900 p-5 text-slate-100 sm:p-8" aria-label="Driver calculator">
+<!-- The scroll container must be focusable for keyboard scrolling in WebKit. -->
+<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+<main class="h-dvh overflow-y-auto overscroll-contain bg-slate-900 p-5 text-slate-100 sm:p-8" aria-label="Driver calculator" tabindex="0">
   <header class="mb-6 flex flex-wrap items-start justify-between gap-4 border-b border-slate-700 pb-5">
     <div class="max-w-2xl space-y-2">
       <h1 class="text-xl font-semibold">Driver calculator</h1>

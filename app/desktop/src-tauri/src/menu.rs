@@ -49,7 +49,8 @@ mod simulation_tests {
     #[test]
     fn simulation_menu_routes_only_bundled_actions() {
         let entries = simulation_entries();
-        assert_eq!(entries.len(), 6);
+        assert_eq!(entries.len(), 5);
+        assert!(!entries.iter().any(|item| item.id == "fields"));
         assert!(entries.iter().any(|item| item.id == "driver" && item.label == "Driver calculator…"));
         for entry in entries {
             assert_eq!(simulation_event_payload(&format!("simulate:{}", entry.id)), Some(entry.id));

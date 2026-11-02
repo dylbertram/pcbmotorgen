@@ -154,7 +154,7 @@
     {#if !designOnly && onOpenFields}
       <button type="button" bind:this={triggers.fields} aria-label="Field and loss settings" aria-expanded={open === "fields"} onclick={() => toggle("fields")}
         class="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-transparent text-slate-300 hover:bg-slate-800 aria-expanded:border-emerald-500 aria-expanded:text-emerald-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
-        title="Field and loss settings. Opens Simulate in a spatial view."><Waves size={16} aria-hidden="true" /></button>
+        title="Field and loss settings. Opens a spatial view."><Waves size={16} aria-hidden="true" /></button>
     {/if}
     {#if !drawingOnly}
     {#if geometry && terminalTool && onStartTerminals}

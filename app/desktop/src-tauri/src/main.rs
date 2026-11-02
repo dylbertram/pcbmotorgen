@@ -87,7 +87,6 @@ fn main() {
             commands::physics::periodic_backplane_reference,
             commands::physics::generate_coils,
             commands::physics::evaluate_force_sweep,
-            commands::physics::sample_b_field,
             commands::visualization::sample_simulation_visualization,
             commands::physics::travel_envelope,
             commands::physics::compute_friction,

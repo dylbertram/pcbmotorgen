@@ -26,7 +26,7 @@ test("unified workspace, min/max links and consistently underlined Advanced", as
   await gotoDesignApp(page);
   const dock = simulationDock(page);
   await expect(page.getByRole("tab", { name: /^(Design|Simulate)$/i })).toHaveCount(0);
-  await expect(dock.getByRole("tab")).toHaveText(["Move & power", "Force", "Fields", "Advanced"]);
+  await expect(dock.getByRole("tab")).toHaveText(["Move & power", "Force", "Advanced"]);
   const toolbar = page.getByRole("toolbar", { name: "Coil preview tools", exact: true });
   await expect(toolbar.getByRole("button", { name: /^Design rule check:/ })).toBeVisible();
   const move = page.getByRole("region", { name: "Move and power", exact: true });
@@ -38,7 +38,7 @@ test("unified workspace, min/max links and consistently underlined Advanced", as
   await expect(from).toHaveValue("0"); await expect(to).toHaveValue("20");
   await move.getByRole("button", { name: "Set move end to maximum", exact: true }).click();
   await expect(to).toHaveValue(max);
-  for (const name of ["Move & power", "Force", "Fields", "Advanced"]) {
+  for (const name of ["Move & power", "Force", "Advanced"]) {
     const tab = dock.getByRole("tab", { name, exact: true }); await tab.click();
     await expect(tab).toHaveAttribute("aria-selected", "true");
     expect(await tab.evaluate(el => getComputedStyle(el, "::after").backgroundColor)).not.toBe("rgba(0, 0, 0, 0)");

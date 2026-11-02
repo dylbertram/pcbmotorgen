@@ -33,6 +33,26 @@ test("the standalone calculator works without a motor and clears invalid checks"
   }
 });
 
+test("calculator scrolls with the wheel and keyboard at desktop and narrow widths", async ({ page }) => {
+  await page.goto("/?tool=driver-calculator");
+  const calculator = page.getByRole("main", { name: "Driver calculator", exact: true });
+  for (const width of [1100, 1280, 390]) {
+    await page.setViewportSize({ width, height: 500 });
+    await calculator.focus();
+    await page.keyboard.press("Control+Home");
+    await expect.poll(() => calculator.evaluate(el => el.scrollTop)).toBe(0);
+    expect(await calculator.evaluate(el => el.scrollHeight > el.clientHeight)).toBe(true);
+    await page.mouse.move(width - 25, 200);
+    await page.mouse.wheel(0, 350);
+    await expect.poll(() => calculator.evaluate(el => el.scrollTop)).toBeGreaterThan(0);
+    await calculator.focus();
+    await page.keyboard.press("Control+End");
+    await expect.poll(() => calculator.evaluate(el => Math.abs(el.scrollHeight - el.clientHeight - el.scrollTop))).toBeLessThan(2);
+    await expect(page.getByRole("spinbutton", { name: "Trace ampacity, optional (A)", exact: true })).toBeInViewport();
+    expect(await page.evaluate(() => window.scrollY)).toBe(0);
+  }
+});
+
 test("a timed-out import cannot overwrite later calculator edits or a newer request", async ({ page }) => {
   await page.route(/\/src\/lib\/driverCalculatorWindow\.ts(?:\?t=\d+)?$/, route => route.fulfill({
     contentType: "application/javascript",

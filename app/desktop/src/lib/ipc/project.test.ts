@@ -47,11 +47,12 @@ describe("native File menu actions", () => {
     const simulate = vi.fn();
     const unbind = await bindProjectMenuActions({ simulate, open: vi.fn(), save: vi.fn(), saveAs: vi.fn() });
     const handler = vi.mocked(listen).mock.calls.find(([name]) => name === "menu:simulate")![1];
-    for (const payload of ["driver", "run", "move", "force", "fields", "advanced"]) handler({ event: "menu:simulate", id: 1, payload });
-    expect(simulate).toHaveBeenCalledTimes(6);
+    for (const payload of ["driver", "run", "move", "force", "advanced"]) handler({ event: "menu:simulate", id: 1, payload });
+    expect(simulate).toHaveBeenCalledTimes(5);
+    handler({ event: "menu:simulate", id: 1, payload: "fields" });
     handler({ event: "menu:simulate", id: 1, payload: "fixture" });
     handler({ event: "menu:simulate", id: 1, payload: null });
-    expect(simulate).toHaveBeenCalledTimes(6);
+    expect(simulate).toHaveBeenCalledTimes(5);
     unbind();
   });
 });

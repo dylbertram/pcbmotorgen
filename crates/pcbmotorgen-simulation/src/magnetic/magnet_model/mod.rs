@@ -21,9 +21,6 @@ mod arrangements;
 /// By = across board, Bz = vertical). Y is fixed at the board centre-line
 /// (`board_width_m / 2`) for every sample.
 ///
-/// `BFieldSample2D` is the core equivalent of the IPC `BFieldSampleIpc`
-/// (in `app/src-tauri/src/ipc.rs`); the IPC DTO adds a precomputed magnitude
-/// `mag_t = sqrt(bx² + by² + bz²)` for the Svelte renderer's convenience.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct BFieldSample2D {
     pub x: f64,
@@ -111,9 +108,7 @@ impl<'a> MagnetArray<'a> {
     /// Sample the B-field on a 2D X–Z grid at the board centre-line
     /// (`y = board_width_m / 2`).
     ///
-    /// This is the WP4 / WP5 flux-viz sampler: a 24×12 arrow grid that the
-    /// `FluxDiagram` Svelte component renders. It composes the existing
-    /// 1D [`Self::bfield_at_pcb_surface`] at each Z row — no magba plumbing
+    /// Composes the existing 1D [`Self::bfield_at_pcb_surface`] at each Z row — no magba plumbing
     /// is duplicated. The 1D sampler routes through
     /// `pcbmotorgen_simulation::physics::compute_b_batch_parallel` (the magba
     /// adapter) and [`Self::build_assembly`] always builds the plain

@@ -12,7 +12,6 @@ import {
   mockBoardDiagnostics,
   mockPreviewCoils,
   mockDxfExportResult,
-  mockBFieldGrid,
   mockTravelEnvelope,
   mockMagnetGrades,
   PLACEHOLDER_TRAVEL_ENVELOPE,
@@ -304,19 +303,6 @@ describe("mockDxfExportResult", () => {
     expect(r.dxf_content).toContain("SECTION");
     expect(r.dxf_content).toContain("EOF");
     expect(r.summary.total_lines).toBe(0);
-  });
-});
-
-describe("mockBFieldGrid", () => {
-  it("samples n_x × n_z points in row-major Z-slow order", () => {
-    const c = makeConfig();
-    const g = mockBFieldGrid(c, 24, 12, [0, 0.195], [0, 0.006]);
-    expect(g.samples).toHaveLength(24 * 12);
-    expect(g.x_extent_m).toEqual([0, 0.195]);
-    expect(g.z_extent_m).toEqual([0, 0.006]);
-    for (const s of g.samples) {
-      expect(s.mag_t).toBeCloseTo(Math.hypot(s.bx_t, s.by_t, s.bz_t), 10);
-    }
   });
 });
 

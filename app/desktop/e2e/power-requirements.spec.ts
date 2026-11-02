@@ -20,7 +20,7 @@ test("simulation opens on the move form and keeps demo results out", async ({ pa
   await gotoDesignApp(page);
   const panel = await openMove(page);
   const dock = page.getByRole("region", { name: "Simulation results", exact: true });
-  await expect(dock.getByRole("tab")).toHaveText(["Move & power", "Force", "Fields", "Advanced"]);
+  await expect(dock.getByRole("tab")).toHaveText(["Move & power", "Force", "Advanced"]);
   await expect(panel.getByRole("spinbutton", { name: "Move start in millimetres", exact: true })).toHaveValue("0");
   const end = panel.getByRole("spinbutton", { name: "Move end in millimetres", exact: true });
   const full = await end.inputValue();

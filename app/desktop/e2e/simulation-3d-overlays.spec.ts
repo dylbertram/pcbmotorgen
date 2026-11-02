@@ -22,7 +22,6 @@ async function nativeFixture(page: Page) {
       if (command === "compute_friction") return mocks.mockFriction(args.config);
       if (command === "travel_envelope") return mocks.mockTravelEnvelope(args.config);
       if (command === "analyze_drive") return mocks.mockDriveAnalysis(args.config, args.drive, null);
-      if (command === "sample_b_field") return mocks.mockBFieldGrid(args.config, args.nX, args.nZ, args.xExtentM, args.zExtentM);
       if (command === "dc_coupling_capability") return { available: false, reason: "No qualified coil source in this UI fixture." };
       if (command !== "sample_simulation_visualization") throw new Error(`UI fixture has no${command}`);
       w.vizCalls.push(args); const r = args.request, config = args.config;

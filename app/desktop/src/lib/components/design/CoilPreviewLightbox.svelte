@@ -53,7 +53,6 @@
     active = true,
     focused = true,
     simulation = null,
-    onRequestSimulation,
     onOpenDriverCalculator,
     designSettings,
     statusContent,
@@ -96,7 +95,6 @@
     active?: boolean;
     focused?: boolean;
     simulation?: VisualizationInput | null;
-    onRequestSimulation?: () => void;
     onOpenDriverCalculator?: () => void;
     designSettings?: Snippet<[DesignPanelId]>;
     statusContent?: Snippet;
@@ -146,7 +144,6 @@
   function setFieldSettings(next: Snippet | null) { fieldSettings = next; }
   function openFields() {
     if (view.viewMode === "top") view.viewMode = "iso";
-    onRequestSimulation?.();
   }
   $effect(() => { void terminalGeometry; untrack(() => measure3d.clear()); });
   function toggleZoomWindow() {
@@ -332,7 +329,7 @@
         <!-- Right rail: hangs from the bottom of the top toolbar down to the
               status bar, so the Layers panel pulls out under it. -->
         <div class="absolute bottom-0 right-0 z-20 w-11" style:top={`${toolbarHeight}px`}>
-              <PreviewSideRail viewControlsInMenu drawingOnly={!!designSettings} {fieldSettings} {onOpenDriverCalculator} onOpenFields={onRequestSimulation ? openFields : undefined} generated={!importedGeometry} {config} {drive} {driveError} {drivePending} {view} bind:open={sidePanel} active={active && focused} layers={importedGeometry ? importedGeometry.layer_z_mm.map((_, idx) => ({ idx })) : uniqueLayers} phases={importedGeometry ? [] : uniquePhases}
+              <PreviewSideRail viewControlsInMenu drawingOnly={!!designSettings} {fieldSettings} {onOpenDriverCalculator} onOpenFields={openFields} generated={!importedGeometry} {config} {drive} {driveError} {drivePending} {view} bind:open={sidePanel} active={active && focused} layers={importedGeometry ? importedGeometry.layer_z_mm.map((_, idx) => ({ idx })) : uniqueLayers} phases={importedGeometry ? [] : uniquePhases}
              {terminalTool} {onStartTerminals} terminalsDisabled={!onGeometryChange}
            geometry={terminalGeometry ?? importedGeometry} selection={importedGeometry ? selection : undefined} assignmentDisabled={view.viewMode !== "top" || !importedGeometry || !onGeometryChange || measure.mode || !!terminalTool?.active || view.oneSection}
           coils={importedGeometry ? uniquePhases.map((phase) => ({ name: phase.name, colorIdx: phase.colorIdx })) : []}

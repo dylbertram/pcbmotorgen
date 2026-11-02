@@ -36,7 +36,7 @@ test("Force metrics stay inside the plot frame and above its footer when reflowi
   }).toPass();
 });
 
-test("four result views stay below the same live coil workspace", async ({ page }, testInfo) => {
+test("three result views stay below the same live coil workspace", async ({ page }, testInfo) => {
   await gotoDesignApp(page);
   const canvas = page.getByRole("region", { name: "Coil design workspace", exact: true }).getByTestId("coil-annotations");
   await expect.poll(async () => Number(await canvas.getAttribute("data-segments"))).toBeGreaterThan(0);
@@ -66,13 +66,13 @@ test("four result views stay below the same live coil workspace", async ({ page 
   expect(results.y + results.height).toBe(statusBounds.y);
   expect(statusBounds.y + statusBounds.height).toBe(page.viewportSize()!.height);
   expect(await page.getByRole("group", { name: "Preview status", exact: true }).count()).toBe(1);
-  for (const name of ["Move & power", "Force", "Advanced", "Fields"] as const) {
+  for (const name of ["Move & power", "Force", "Advanced"] as const) {
     await openSimulationView(page, name);
     await expect(dock.getByRole("tab", { name, exact: true })).toHaveAttribute("aria-selected", "true");
   }
+  await openSimulationView(page, "Force");
   await expect(dock.getByRole("spinbutton")).toHaveCount(0);
   await expect(dock.getByRole("combobox")).toHaveCount(0);
-  await openSimulationView(page, "Force");
   await expect(dock.getByRole("heading", { name: "Force", exact: true })).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath("simulation-force.png") });
   await expect(dock.getByRole("img", { name: "Thrust sweep plot", exact: true })).toBeVisible();

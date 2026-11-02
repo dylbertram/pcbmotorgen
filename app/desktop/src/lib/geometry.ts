@@ -2,7 +2,7 @@
  * Pure geometry helpers shared by the SVG visualization components.
  *
  * All functions are deterministic and unit-agnostic (callers pick mm or m
- * consistently). Extracted from TravelDiagram / FluxDiagram / CoilPreview /
+ * consistently). Extracted from TravelDiagram / CoilPreview /
  * DesignDimensions to remove duplicated derived math.
  */
 

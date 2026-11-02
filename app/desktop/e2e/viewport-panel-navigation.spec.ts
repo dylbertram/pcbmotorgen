@@ -2,14 +2,15 @@ import { test, expect } from "@playwright/test";
 import { gotoDesignApp } from "./helpers";
 
 for (const mobile of [false, true]) {
-  test(`rail panels select their required result view and viewport ${mobile ? "mobile" : "desktop"}`, async ({ page }, info) => {
+  test(`rail panels select their viewport without changing the results tab ${mobile ? "mobile" : "desktop"}`, async ({ page }, info) => {
     if (mobile) await page.setViewportSize({ width: 390, height: 844 });
     await gotoDesignApp(page);
     const fields = page.getByRole("toolbar", { name: "Preview side tools", exact: true }).getByRole("button", { name: "Field and loss settings", exact: true });
     const panel = page.getByRole("dialog", { name: "Field and loss settings", exact: true });
     await expect(page.getByRole("tab", { name: "Move & power", exact: true })).toHaveAttribute("aria-selected", "true");
     await fields.click();
-    await expect(page.getByRole("tab", { name: "Fields", exact: true })).toHaveAttribute("aria-selected", "true");
+    await expect(page.getByRole("tab", { name: "Fields", exact: true })).toHaveCount(0);
+    await expect(page.getByRole("tab", { name: "Move & power", exact: true })).toHaveAttribute("aria-selected", "true");
     await expect(page.getByRole("button", { name: "3D fields and heat", exact: true })).toHaveAttribute("aria-pressed", "true");
     await expect(panel).toBeVisible();
     await expect(page.getByTestId("coil-iso").getByRole("group", { name: "3D simulation overlays", exact: true })).toHaveCount(0);
@@ -41,12 +42,12 @@ for (const mobile of [false, true]) {
     // A compatible spatial view is preserved while opening field settings.
     await page.getByRole("button", { name: "Front", exact: true }).click();
     await fields.click();
-    await expect(page.getByRole("tab", { name: "Fields", exact: true })).toHaveAttribute("aria-selected", "true");
+    await expect(page.getByRole("tab", { name: "Move & power", exact: true })).toHaveAttribute("aria-selected", "true");
     await expect(page.getByRole("button", { name: "Front", exact: true })).toHaveAttribute("aria-pressed", "true");
     await expect(panel).toBeVisible();
     await ends.click();
     await expect(panel).toBeHidden();
     await expect(page.getByRole("button", { name: "Top-down", exact: true })).toHaveAttribute("aria-pressed", "true");
-    await expect(page.getByRole("tab", { name: "Fields", exact: true })).toHaveAttribute("aria-selected", "true");
+    await expect(page.getByRole("tab", { name: "Move & power", exact: true })).toHaveAttribute("aria-selected", "true");
   });
 }

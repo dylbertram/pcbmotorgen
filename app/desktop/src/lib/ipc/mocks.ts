@@ -26,7 +26,6 @@ import type {
   CoilPreview,
   KicadConnection,
   KicadWriteResult,
-  BFieldGridDto,
   DxfExportResult,
   TravelEnvelopeDto,
   MagnetGrade,
@@ -485,41 +484,6 @@ export function mockDxfExportResult(config: LinearMotorConfig): DxfExportResult 
   };
 }
 
-/**
- * Mock B-field grid: sinusoidal Bz, magnitude ∝ Br. Sufficient for
- * visualising the alternating-pole field in the absence of a backend.
- */
-export function mockBFieldGrid(
-  c: LinearMotorConfig,
-  n_x: number,
-  n_z: number,
-  x_extent_m: [number, number],
-  z_extent_m: [number, number],
-): BFieldGridDto {
-  const xs = Array.from({ length: n_x }, (_, i) =>
-    x_extent_m[0] + (x_extent_m[1] - x_extent_m[0]) * (i / Math.max(n_x - 1, 1)),
-  );
-  const zs = Array.from({ length: n_z }, (_, i) =>
-    z_extent_m[0] + (z_extent_m[1] - z_extent_m[0]) * (i / Math.max(n_z - 1, 1)),
-  );
-  const samples: BFieldGridDto["samples"] = [];
-  for (const z of zs) {
-    for (const x of xs) {
-      const br = c.magnet_remanence_t;
-      const k = (2 * Math.PI) / Math.max(c.magnet_pitch_m, 1e-6);
-      const bz = 0.4 * br * Math.sin(k * x) * Math.exp(-z / 0.003);
-      const bx = 0.05 * br * Math.cos(k * x) * Math.exp(-z / 0.003);
-      const by = 0.0;
-      const mag = Math.sqrt(bx * bx + by * by + bz * bz);
-      samples.push({ x_m: x, z_m: z, bx_t: bx, by_t: by, bz_t: bz, mag_t: mag });
-    }
-  }
-  return {
-    samples,
-    x_extent_m,
-    z_extent_m,
-  };
-}
 
 /**
  * Mock driver analysis for `vite dev`: a single-strand, two-layer estimate

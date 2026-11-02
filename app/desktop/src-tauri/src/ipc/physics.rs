@@ -1,69 +1,9 @@
-//! IPC physics-result DTOs: B-field grid, force sweep, height stack, friction
+//! IPC physics-result DTOs: force sweep, height stack, friction
 //! budget, and travel envelope.
 
 use serde::{Deserialize, Serialize};
 
 use super::enums::CommutationModeIpc;
-
-// ===========================================================================
-// B-field grid (sample_b_field) — WP4 / WP5 flux-viz backend
-// ===========================================================================
-
-/// One B-field sample on the X–Z flux-viz grid.
-///
-/// All units SI: positions in metres, B-field in Tesla. `mag_t` is the
-/// precomputed `sqrt(bx² + by² + bz²)` — the Svelte renderer uses it to
-/// colour-code arrows by magnitude without recomputing.
-///
-/// Field naming on the wire: every field has an explicit `#[serde(rename)]`
-/// so the unit suffix (`_m`, `_t`) is preserved end-to-end and stable
-/// across Rust → JSON → TypeScript.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct BFieldSampleIpc {
-    #[serde(rename = "x_m")]
-    pub x_m: f64,
-    #[serde(rename = "z_m")]
-    pub z_m: f64,
-    #[serde(rename = "bx_t")]
-    pub bx_t: f64,
-    #[serde(rename = "by_t")]
-    pub by_t: f64,
-    #[serde(rename = "bz_t")]
-    pub bz_t: f64,
-    #[serde(rename = "mag_t")]
-    pub mag_t: f64,
-}
-
-impl BFieldSampleIpc {
-    /// Convert a core `pcbmotorgen_simulation::magnetic::BFieldSample2D` to the
-    /// IPC wire form, computing the magnitude on the way out.
-    pub fn from_core(s: &pcbmotorgen_simulation::magnetic::BFieldSample2D) -> Self {
-        Self {
-            x_m: s.x,
-            z_m: s.z,
-            bx_t: s.bx,
-            by_t: s.by,
-            bz_t: s.bz,
-            mag_t: (s.bx * s.bx + s.by * s.by + s.bz * s.bz).sqrt(),
-        }
-    }
-}
-
-/// Full 2D B-field grid response for the `sample_b_field` Tauri command.
-///
-/// `samples` is **row-major** with Z as the slow axis:
-/// `samples[i_z * n_x + i_x]`. The Svelte `FluxDiagram` reshapes the flat
-/// `samples` into a 2D `n_z × n_x` arrow grid using `x_extent_m` /
-/// `z_extent_m` to recover the physical axes.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub struct BFieldGridIpc {
-    pub samples: Vec<BFieldSampleIpc>,
-    /// `[x_min, x_max]` over which the grid was sampled [m].
-    pub x_extent_m: [f64; 2],
-    /// `[z_min, z_max]` over which the grid was sampled [m].
-    pub z_extent_m: [f64; 2],
-}
 
 // ===========================================================================
 // Force sweep (evaluate_force_sweep)

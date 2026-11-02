@@ -9,14 +9,13 @@
   import { inferMissingCoilEnds } from "../../cadTerminals";
   import MovePowerPanel from "../simulate/MovePowerPanel.svelte";
   import ForcePanel from "../simulate/ForcePanel.svelte";
-  import FieldsPanel from "../simulate/FieldsPanel.svelte";
   import DcCouplingPanel from "../simulate/DcCouplingPanel.svelte";
 
   let { config, active, open, availableHeight, sweep,
     error, cadGeometry = null,
     onSelectEnds, onUseInferredEnds, powerInput, autoSimulation = $bindable(true), loading = false, onRun, canRun = true,
     onOpenFieldSettings, onOpenDriverCheck, designName = "Untitled design", selected = $bindable("move") }: {
-    selected?: "move" | "force" | "fields" | "advanced";
+    selected?: "move" | "force" | "advanced";
     autoSimulation?: boolean;
     loading?: boolean;
     onRun?: () => void;
@@ -40,7 +39,6 @@
   const results = [
     { id: "move", label: "Move & power" },
     { id: "force", label: "Force" },
-    { id: "fields", label: "Fields" },
     { id: "advanced", label: "Advanced" },
   ];
   let requestedHeight = $state(320);
@@ -123,7 +121,7 @@
     event.preventDefault();
     resize(values[event.key]);
   }
-  export function selectView(value: "move" | "force" | "fields" | "advanced"): void {
+  export function selectView(value: "move" | "force" | "advanced"): void {
     selected = value;
     collapsed = false;
   }
@@ -142,7 +140,7 @@
     <span aria-hidden="true" class="h-0.5 w-10 rounded-full bg-slate-600"></span>
   </div>
   {/if}
-  <Tabs.Root value={collapsed ? "" : selected} onValueChange={(value) => { if (value === "move" || value === "force" || value === "fields" || value === "advanced") { selected = value; collapsed = false; } }} class="flex min-h-0 flex-1 flex-col">
+  <Tabs.Root value={collapsed ? "" : selected} onValueChange={(value) => { if (value === "move" || value === "force" || value === "advanced") { selected = value; collapsed = false; } }} class="flex min-h-0 flex-1 flex-col">
     <div class="flex shrink-0 items-stretch border-slate-700 {collapsed ? 'h-9' : 'h-11 border-b'}">
       <Tabs.List aria-label="Simulation views" class="flex min-w-0 flex-1 items-stretch overflow-x-auto px-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {#each results as result (result.id)}
@@ -169,10 +167,6 @@
     <Tabs.Content value="force" data-dock-panel="force" class="min-h-0 flex-1 overflow-auto p-3">
       {@render warnings()}
       <ForcePanel {config} {sweep} {onOpenDriverCheck} />
-    </Tabs.Content>
-    <Tabs.Content value="fields" data-dock-panel="fields" class="min-h-0 flex-1 overflow-auto p-3">
-      {@render warnings()}
-      <FieldsPanel {config} active={active && open && !collapsed && selected === "fields"} {onOpenFieldSettings} />
     </Tabs.Content>
     <Tabs.Content value="advanced" data-dock-panel="advanced" class="min-h-0 flex-1 overflow-auto p-3">
       <div class="mb-2 flex flex-wrap items-center justify-between gap-2">

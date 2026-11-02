@@ -92,7 +92,6 @@
     active = true,
     focused = true,
     simulationActive = false,
-    onRequestSimulation,
     onOpenDriverCalculator,
     designSettings,
     statusContent,
@@ -104,7 +103,7 @@
     onGeometryChange,
     camera,
     view = new CoilPreviewViewState(),
-  }: { config: ConfigStore; coils: CoilPathDto | null; motion: MotionStore; expanded?: boolean; workspace?: boolean; active?: boolean; focused?: boolean; simulationActive?: boolean; onRequestSimulation?: () => void; onOpenDriverCalculator?: () => void; designSettings?: Snippet<[DesignPanelId]>; statusContent?: Snippet; sidePanel?: PreviewPanelId | null; drive?: DriveAnalysis | null; driveError?: string | null; drivePending?: boolean; importedGeometry?: CadGeometry | null; onGeometryChange?: (geometry: CadGeometry) => void; camera?: PreviewCamera; view?: CoilPreviewViewState } =
+  }: { config: ConfigStore; coils: CoilPathDto | null; motion: MotionStore; expanded?: boolean; workspace?: boolean; active?: boolean; focused?: boolean; simulationActive?: boolean; onOpenDriverCalculator?: () => void; designSettings?: Snippet<[DesignPanelId]>; statusContent?: Snippet; sidePanel?: PreviewPanelId | null; drive?: DriveAnalysis | null; driveError?: string | null; drivePending?: boolean; importedGeometry?: CadGeometry | null; onGeometryChange?: (geometry: CadGeometry) => void; camera?: PreviewCamera; view?: CoilPreviewViewState } =
     $props();
 
   export function showDesignSettings(section: DesignPanelId = "routing"): void {
@@ -603,7 +602,6 @@
       embedded={inline}
       {active}
       simulation={visualizationInput}
-      {onRequestSimulation}
        {designSettings}
        {statusContent}
        {onOpenDriverCalculator}

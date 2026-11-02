@@ -23,7 +23,6 @@
 //! | `get_board_diagnostics`       | REAL          | KiCad IPC: live board snapshot.          |
 //! | `validate_write_preconditions`| REAL (pure)   | Config-vs-board rule check (no IPC).     |
 //! | `preview_coils`               | REAL (pure)   | Dry-run coil geometry preview (no IPC).  |
-//! | `sample_b_field`              | REAL          | Uses core `MagnetArray::bfield_grid`.    |
 //! | `export_coils_dxf`            | REAL          | Pure DXF R12 ASCII export (`pcbmotorgen-export`). |
 //! | `save_project`                | REAL          | Versioned `.pmproj` artifact, atomic write. |
 //! | `load_project`                | REAL          | Parse + migrate + validate a `.pmproj` artifact. |

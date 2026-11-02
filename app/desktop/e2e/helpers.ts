@@ -90,7 +90,7 @@ export function simulationDock(page: Page): Locator {
 }
 
 /** The simulation dock's result views. */
-export async function openSimulationView(page: Page, view: "Move & power" | "Force" | "Fields" | "Advanced"): Promise<void> {
+export async function openSimulationView(page: Page, view: "Move & power" | "Force" | "Advanced"): Promise<void> {
   const dock = simulationDock(page);
   await dock.getByRole("tab", { name: view, exact: true }).click();
   await expect(dock.getByRole("tabpanel", { name: view, exact: true })).toBeVisible();
