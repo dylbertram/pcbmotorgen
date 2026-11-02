@@ -65,7 +65,17 @@ test("zoom window uses two clicks and Escape cancels in both viewer modes", asyn
     await expect(picker).toContainText("Choose the opposite corner");
     await page.keyboard.press("Escape");
     await expect(picker).toHaveCount(0); await expect(button).toHaveAttribute("aria-pressed", "false");
-    if (camera) await expect(viewer).toHaveAttribute("data-camera", camera);
+    if (camera) {
+      const before = JSON.parse(camera);
+      await expect.poll(async () => {
+        const after = JSON.parse((await viewer.getAttribute("data-camera"))!);
+        return Math.max(
+          ...["position", "target", "up"].flatMap(key => before[key].map((v: number, i: number) => Math.abs(v - after[key][i]))),
+          Math.abs(before.zoom - after.zoom),
+          Math.abs(before.fitZoom - after.fitZoom),
+        );
+      }).toBeLessThan(1e-9);
+    }
     await button.click();
     await page.mouse.click(rect.x + rect.width * .3, rect.y + rect.height * .3);
     await page.mouse.click(rect.x + rect.width * .6, rect.y + rect.height * .6);

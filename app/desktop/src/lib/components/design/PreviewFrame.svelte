@@ -1,15 +1,15 @@
 <script lang="ts">
   import type { Snippet } from "svelte";
-  import type { CoilPreviewGestures } from "../../utils/coilPreviewGestures.svelte";
-  import type { CoilPreviewMeasure } from "../../utils/coilPreviewMeasure.svelte";
+  import type { PreviewGestures } from "../../utils/previewGestures.svelte";
+  import type { PreviewMeasure } from "../../measure/previewMeasure.svelte";
 
   let { frame = $bindable(), width = $bindable(760), height = $bindable(260),
     gestures, measure, label, interactive = false, navigationEnabled = true, aspectRatio, children, ondblclick }: {
     frame?: HTMLDivElement;
     width?: number;
     height?: number;
-    gestures: CoilPreviewGestures;
-    measure?: CoilPreviewMeasure;
+    gestures: PreviewGestures;
+    measure?: PreviewMeasure;
     label: string;
     interactive?: boolean;
     /** Threlte owns pointer, touch and wheel input in the 3D view. */

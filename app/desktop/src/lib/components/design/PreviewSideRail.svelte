@@ -19,15 +19,15 @@
   import { Layers, X, Plug, CircuitBoard, Route, Magnet, Gauge, Waves } from "@lucide/svelte";
   import type { Snippet } from "svelte";
   import { DESIGN_PANELS, isDesignPanel, isLeftPanel, type DesignPanelId, type PreviewPanelId } from "./previewPanels";
-  import CoilTerminalPanel from "./CoilTerminalPanel.svelte";
-  import type { CoilTerminalTool } from "../../utils/coilTerminalTool.svelte";
+  import CoilTerminalPanel from "../winding/CoilTerminalPanel.svelte";
+  import type { CoilTerminalTool } from "../../cad/coilTerminalTool.svelte";
   import CoilPreviewVisibilityPanel from "./CoilPreviewVisibilityPanel.svelte";
   import type { CoilPreviewViewState } from "./coilPreviewViewState.svelte";
   import type { CadGeometry, DriveAnalysis } from "../../types";
   import DriverSelector from "../simulate/DriverSelector.svelte";
   import HelpTag from "../ui/HelpTag.svelte";
   import seriesInductorSvg from "../../assets/series-inductor.svg";
-  import type { CadSelectionTool } from "../../utils/cadSelectionTool.svelte";
+  import type { CadSelectionTool } from "../../cad/cadSelectionTool.svelte";
   import type { ConfigStore } from "../../stores/config.svelte";
   import NumberField from "../ui/NumberField.svelte";
 

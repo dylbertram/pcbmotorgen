@@ -1266,11 +1266,11 @@ supplied archives:
 
 ```sh
 PCB_MOTOR_SUPPLIED_DESIGN_DIR="$DESIGNS" PCB_MOTOR_SCREENING_OUTPUT="$OUT/baselines" cargo test -p pcbmotorgen export_saved_design_screening_inputs -- --ignored --nocapture
-(cd app/desktop && PCB_MOTOR_SCREENING_BASELINES="$OUT/baselines" PCB_MOTOR_ESTIMATE_OUTPUT="$OUT/models" pnpm exec vitest run src/lib/practicalMoveEstimate.test.ts)
+(cd app/desktop && PCB_MOTOR_SCREENING_BASELINES="$OUT/baselines" PCB_MOTOR_ESTIMATE_OUTPUT="$OUT/models" pnpm exec vitest run src/lib/move/practicalMoveEstimate.test.ts)
 PCB_MOTOR_ENGINEERING_ESTIMATE=1 PCB_MOTOR_SCREENING_BASELINES="$OUT/baselines" PCB_MOTOR_SCREENING_MODELS="$OUT/models" PCB_MOTOR_SCREENING_OUTPUT="$OUT/results" cargo test -p pcbmotorgen evaluate_saved_design_screening_assumptions -- --ignored --nocapture
 PCB_MOTOR_SCREENING_RESULTS="$OUT/results" PCB_MOTOR_SCREENING_OUTPUT="$OUT/winding" cargo test -p pcbmotorgen winding_ac_uncertainty_sensitivity -- --ignored --nocapture
-(cd app/desktop && PCB_MOTOR_SCREENING_RESULTS="$OUT/results" pnpm exec vitest run src/lib/powerRequirements.test.ts)
-python3 scripts/solvers/summarize_move_screening.py "$OUT/baselines" "$OUT/models" "$OUT/results" "$OUT/summary.json" --engineering-estimate --builder app/desktop/src/lib/practicalMoveEstimate.ts --winding-sensitivity "$OUT/winding"
+(cd app/desktop && PCB_MOTOR_SCREENING_RESULTS="$OUT/results" pnpm exec vitest run src/lib/move/powerRequirements.test.ts)
+python3 scripts/solvers/summarize_move_screening.py "$OUT/baselines" "$OUT/models" "$OUT/results" "$OUT/summary.json" --engineering-estimate --builder app/desktop/src/lib/move/practicalMoveEstimate.ts --winding-sensitivity "$OUT/winding"
 ```
 
 Use absolute paths for `OUT` and `DESIGNS`. Archive hashes are enforced by the

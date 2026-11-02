@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { ConfigStore } from "./config.svelte";
 import { listRoutingPatterns, routingPatternParameters } from "../ipc/routing";
-import { validateDesign } from "../validation";
+import { validateDesign } from "../constraints/validation";
 
 describe("routing source connection metadata", () => {
   it("keeps an edited pitch and reports oversized magnets without resizing them", () => {

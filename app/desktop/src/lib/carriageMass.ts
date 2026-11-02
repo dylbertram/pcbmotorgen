@@ -5,7 +5,7 @@ export const MAGNET_MASS_REFERENCES = [
 
 // 0.57 g / 75 mm³. Use this approximate NdFeB density for unlisted sizes;
 // do not invent vendor weights or grade-dependent density precision.
-export const ESTIMATED_NDFEB_DENSITY_G_MM3 = 0.0076;
+const ESTIMATED_NDFEB_DENSITY_G_MM3 = 0.0076;
 
 export function magnetMass(dimensionsMm: readonly number[], grade: string) {
   const dimensions = [...dimensionsMm].sort((a, b) => a - b);

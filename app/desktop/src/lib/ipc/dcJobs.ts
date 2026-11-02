@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { isTauriAvailable } from "./core";
-import { assertCadMapping } from "../cadMapping";
+import { assertCadMapping } from "../cad/cadMapping";
 import type { LinearMotorConfig, DriveSettings, CadGeometry } from "../types";
 import type { DcApplicability, DcCapability, DcJobStatus, DcStudy, WindingFieldSampling } from "../types/dcCoupling";
 

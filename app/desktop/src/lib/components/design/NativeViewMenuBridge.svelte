@@ -1,8 +1,8 @@
 <script lang="ts">
   import { onDestroy } from "svelte";
   import type { CoilPreviewViewState } from "./coilPreviewViewState.svelte";
-  import { applyViewMenuAction, viewMenuItems } from "../../viewMenu";
-  import { nativeViewMenu } from "../../viewMenuController";
+  import { applyViewMenuAction, viewMenuItems } from "../../menu/viewMenu";
+  import { nativeViewMenu } from "../../menu/viewMenuController";
 
   let { view, active, hasPolePitchData, hasBandWidthData, hasPoleRegionData, onFitExtents, onToggleZoomWindow }: {
     view: CoilPreviewViewState; active: boolean;

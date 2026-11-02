@@ -64,7 +64,7 @@ mod simulation_tests {
 struct SimulationMenuEntry { id: String, label: String }
 
 fn simulation_entries() -> Vec<SimulationMenuEntry> {
-    serde_json::from_str(include_str!("../../src/lib/simulationMenu.json"))
+    serde_json::from_str(include_str!("../../src/lib/menu/simulationMenu.json"))
         .expect("bundled simulation menu must be valid JSON")
 }
 

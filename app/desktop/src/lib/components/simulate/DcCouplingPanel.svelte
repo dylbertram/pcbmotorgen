@@ -4,7 +4,7 @@
   import type { CadGeometry, LinearMotorConfig, DriveSettings } from "../../types";
   import type { DcApplicability, DcCapability, DcQualifiedCase, DcStudy } from "../../types/dcCoupling";
   import { dcCouplingCapability, inspectDcCoupling, startDcCoupling, startDcPreparation, dcCouplingStatus, cancelDcCoupling } from "../../ipc/dcJobs";
-  import { DcJobController, type DcViewState } from "../../dcJobController";
+  import { DcJobController, type DcViewState } from "../../simulation/dcJobController";
 
   let { config, cadGeometry = null, active }: { config: ConfigStore; cadGeometry?: CadGeometry | null; active: boolean } = $props();
   let capability = $state<DcCapability>({ available: false, reason: "Checking the desktop DC worker…" });

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { warningClasses, warningLabel, pluralize, rippleStatus, formatSi } from "./format";
+import { warningClasses, warningLabel, formatSi, formatMetresMm, formatMarginMm } from "./format";
 
 describe("warningClasses", () => {
   it("returns a distinct tailwind triple per severity", () => {
@@ -22,26 +22,20 @@ describe("warningLabel", () => {
   });
 });
 
-describe("pluralize", () => {
-  it("adds s only for counts ≠ 1", () => {
-    expect(pluralize(1, "line")).toBe("1 line");
-    expect(pluralize(0, "line")).toBe("0 lines");
-    expect(pluralize(3, "line")).toBe("3 lines");
+describe("formatMetresMm / formatMarginMm", () => {
+  it("formats metre lengths as compact mm", () => {
+    expect(formatMetresMm(0.012)).toBe("12.0 mm");
+    expect(formatMetresMm(0.001777)).toBe("1.78 mm");
+    expect(formatMetresMm(0.0002)).toBe("0.200 mm");
+    expect(formatMetresMm(Number.NaN)).toBe("—");
+  });
+
+  it("formats signed slot margins", () => {
+    expect(formatMarginMm(0.002)).toBe("+2.00 mm");
+    expect(formatMarginMm(-0.0005)).toBe("-0.500 mm");
   });
 });
 
-describe("rippleStatus", () => {
-  it("classifies ripple thresholds", () => {
-    expect(rippleStatus(0)).toBe("ok");
-    expect(rippleStatus(4.9)).toBe("ok");
-    expect(rippleStatus(5)).toBe("warn");
-    expect(rippleStatus(9.9)).toBe("warn");
-    expect(rippleStatus(10)).toBe("bad");
-    expect(rippleStatus(null)).toBe("na");
-    expect(rippleStatus(undefined)).toBe("na");
-    expect(rippleStatus(Number.NaN)).toBe("na");
-  });
-});
 describe("formatSi", () => {
   it("picks the prefix and keeps significant digits", () => {
     expect(formatSi(2.2e-6, "H")).toBe("2.20 µH");

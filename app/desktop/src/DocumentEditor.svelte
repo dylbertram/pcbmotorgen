@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { placedCopperGeometry } from "./lib/copperLayerPlacement";
+  import { placedCopperGeometry } from "./lib/pcb/copperLayerPlacement";
   import { onDestroy, untrack } from "svelte";
   import type { DocumentSession, DocumentView } from "./lib/stores/workspace.svelte";
   import { BitsConfig } from "bits-ui";
@@ -25,18 +25,18 @@
     CadGeometry,
     TravelEnvelopeDto,
   } from "./lib/types";
-  import type { SimulationAction } from "./lib/simulationMenu";
-  import { usesDeltaConnection } from "./lib/driverConnection";
-  import { snapshotFromAnalysis, type DriverCalculatorSnapshot } from "./lib/driverCalculator";
+  import type { SimulationAction } from "./lib/menu/simulationMenu";
+  import { usesDeltaConnection } from "./lib/driver/driverConnection";
+  import { snapshotFromAnalysis, type DriverCalculatorSnapshot } from "./lib/driver/driverCalculator";
   import { DrcController } from "./lib/stores/drc.svelte";
   import { LatestAsyncTask } from "./lib/utils/latestAsyncTask";
-  import { measureTrace, computePreviewSummary } from "./lib/previewGeometry";
+  import { measureTrace, computePreviewSummary } from "./lib/preview/previewGeometry";
   import PreviewStatus from "./lib/components/design/PreviewStatus.svelte";
-  import { cadGeometryToPreview } from "./lib/cadPreview";
+  import { cadGeometryToPreview } from "./lib/cad/cadPreview";
   import { saveTextToFile } from "./lib/files";
-  import { geometryKey } from "./lib/cadPhases";
-  import { cadMappingProblems } from "./lib/cadMapping";
-  import { inferMissingCoilEnds } from "./lib/cadTerminals";
+  import { geometryKey } from "./lib/cad/cadPhases";
+  import { cadMappingProblems } from "./lib/cad/cadMapping";
+  import { inferMissingCoilEnds } from "./lib/cad/cadTerminals";
 
   import DrcStatus from "./lib/components/layout/DrcStatus.svelte";
   import StatusIndicator from "./lib/components/layout/StatusIndicator.svelte";
@@ -50,7 +50,7 @@
   import KicadDialog from "./lib/components/layout/KicadDialog.svelte";
   import CadImportDialog from "./lib/components/layout/CadImportDialog.svelte";
   import SensorTab from "./lib/components/layout/SensorTab.svelte";
-  import SensorPreview from "./lib/components/design/SensorPreview.svelte";
+  import SensorPreview from "./lib/components/sensor/SensorPreview.svelte";
   import ProjectVersionsDialog from "./lib/components/layout/ProjectVersionsDialog.svelte";
   import PreferencesDialog from "./lib/components/layout/PreferencesDialog.svelte";
 
@@ -84,13 +84,6 @@
   // Async result state.
   let sweep = $state<ForceSweepResult | null>(untrack(() => editorView.runtime.sweep));
   let coils = $state<CoilPathDto | null>(untrack(() => editorView.runtime.coils));
-  /**
-   * Geometry MEASURED from the returned coil payload (trace X extent +
-   * canvas-consistent magnet-strip rest bounds). The routing braid floors
-   * whole periods, so the measured trace span is intentionally shorter than
-   * the configured routing domain — every preview and readout consumes THIS,
-   * never the configured numbers. Null until the first payload arrives.
-   */
   let height = $state<HeightStackResultDto | null>(untrack(() => editorView.runtime.height));
   let drive = $state<DriveAnalysis | null>(untrack(() => editorView.runtime.drive));
   let driveError = $state<string | null>(null);
@@ -138,16 +131,8 @@
   // Whether the current config produces a valid travel range.
   let valid = $derived(config.travel_mm > 0);
 
-  // Shared mover position for Design constraints: the position slider
-  // and the CoilPreview magnet strip both read from this store.
-
-  // Project save/load (kata 0cgm): all persistence logic lives in the Rust
-  // backend behind save_project/load_project; this store is the interface
-  // half (DTO mapping + dirty tracking + dialog flows).
-  // Startup has no active project yet. Catalog loading can adjust defaults,
-  // but those adjustments are not user edits. Open/create/import establish
-  // the first baseline when the user leaves the startup chooser.
   let activeCoils = $derived(projects.cadGeometry ? cadGeometryToPreview(projects.cadGeometry) : coils);
+  // The generated braid may cover less than its configured routing domain.
   let measuredTrace = $derived.by(() => measureTrace(activeCoils, config));
 
   export function openVersions(creating = false): void {

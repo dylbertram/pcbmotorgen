@@ -1,6 +1,5 @@
 /**
- * Presentation formatting helpers shared by panels: severity → Tailwind
- * classes, pluralization, and threshold classification.
+ * Presentation formatting helpers shared by panels.
  */
 
 /** Severity level of a write pre-condition warning. */
@@ -26,18 +25,20 @@ export function warningLabel(level: WarningLevel): string {
   return level.toUpperCase();
 }
 
-/** `pluralize(1, "line")` → "1 line"; `pluralize(3, "line")` → "3 lines". */
-export function pluralize(count: number, singular: string): string {
-  return `${count} ${singular}${count === 1 ? "" : "s"}`;
+/** Format a metre length as a compact mm string, e.g. "12 mm" / "1.78 mm". */
+export function formatMetresMm(v: number): string {
+  if (!Number.isFinite(v)) return "—";
+  const mmV = Math.abs(v * 1000);
+  const digits = mmV >= 100 ? 0 : mmV >= 10 ? 1 : mmV >= 1 ? 2 : 3;
+  return `${(v * 1000).toFixed(digits)} mm`;
 }
 
-/** Status tone for force ripple: <5% ok, <10% warn, else bad; "na" when unknown. */
-export function rippleStatus(ripplePct: number | null | undefined): "ok" | "warn" | "bad" | "na" {
-  if (ripplePct === null || ripplePct === undefined || !Number.isFinite(ripplePct)) return "na";
-  if (ripplePct < 5) return "ok";
-  if (ripplePct < 10) return "warn";
-  return "bad";
+/** Signed mm formatter for band margins, e.g. "+0.28 mm" / "-0.10 mm". */
+export function formatMarginMm(v: number): string {
+  const magnitude = formatMetresMm(Math.abs(v));
+  return v < 0 ? `-${magnitude}` : `+${magnitude}`;
 }
+
 const SI_PREFIXES: [number, string][] = [
   [1e6, "M"],
   [1e3, "k"],

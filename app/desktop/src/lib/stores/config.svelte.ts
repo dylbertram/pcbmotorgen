@@ -21,15 +21,15 @@ import {
   layerOptions as layerOptionsFor,
   nearestLayer,
   patternLayerRange,
-} from "../layerConstraints";
+} from "../constraints/layerConstraints";
 import { mm, listRoutingPatterns, routingPatternParameters, loadInstalledPlugins, fetchMagnetGrades } from "../ipc";
 import { readPreferences } from "../preferences";
-import { generatorConnection } from "../routingSources";
+import { generatorConnection } from "../routing/routingSources";
 import { MAX_PCB_LAYERS } from "../types/simulationLimits";
 import type { RoutedMoveRequest } from "../types/movePower";
 import { magnetMass } from "../carriageMass";
-import { pcbStackupThicknessMm, pcbStackupToSi, type PcbStackupMm } from "../pcbStackup";
-import { DEFAULT_ROUTING_ORIENTATION, type RoutingOrientation, type RoutingFlip } from "../routingOrientation";
+import { pcbStackupThicknessMm, pcbStackupToSi, type PcbStackupMm } from "../pcb/pcbStackup";
+import { DEFAULT_ROUTING_ORIENTATION, type RoutingOrientation, type RoutingFlip } from "../routing/routingOrientation";
 
 export class ConfigStore {
   constructor() {

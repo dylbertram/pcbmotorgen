@@ -5,9 +5,8 @@ const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? "http://127.0.0.1:1420";
 /**
  * Visual-layout e2e suite for the pcbmotorgen desktop UI.
  *
- * The Tauri shell is NOT required: every IPC call is gated behind
- * `isTauriAvailable()` in `src/lib/tauri.ts`, and the browser falls back to
- * deterministic mocks, so the full layout renders under Vite. This lets us
+ * The Tauri shell is not required: browser-compatible IPC calls use
+ * deterministic mocks, while native-only operations report their limits. This lets us
  * verify geometry invariants (column alignment, scrollbar position, panel
  * restructure) without `tauri-driver` — which has no free macOS WKWebView
  * driver (CrabNebula's fork is paid).

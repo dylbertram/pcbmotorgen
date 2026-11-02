@@ -10,7 +10,7 @@
  * repaints the shared schematic, and the state survives open/close cycles.
  *
  * The class carries NO geometry: what the toggles DO (camera-fit unions,
- * segment filters, zone filtering) is derived in lib/previewGeometry
+ * segment filters, zone filtering) is derived in lib/preview/previewGeometry
  * consumers (CoilPreview.svelte) — this is the plain presentation state.
  */
 

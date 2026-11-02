@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { emptyDriverInput } from "../src/lib/driverCalculator";
+import { emptyDriverInput } from "../src/lib/driver/driverCalculator";
 
 test("the standalone calculator works without a motor and clears invalid checks", async ({ page }, info) => {
   await page.goto("/?tool=driver-calculator");
@@ -87,9 +87,9 @@ test("stacked calculator content still scrolls at narrow widths", async ({ page 
 });
 
 test("a timed-out import cannot overwrite later calculator edits or a newer request", async ({ page }) => {
-  await page.route(/\/src\/lib\/driverCalculatorWindow\.ts(?:\?t=\d+)?$/, route => route.fulfill({
+  await page.route(/\/src\/lib\/driver\/driverCalculatorWindow\.ts(?:\?t=\d+)?$/, route => route.fulfill({
     contentType: "application/javascript",
-    body: `export * from '/src/lib/driverCalculatorWindow.ts?original';
+    body: `export * from '/src/lib/driver/driverCalculatorWindow.ts?original';
       export async function calculatorSeed() { return null; }
       export async function requestDriverImport(id) { window.__importId = id; }
       export async function listenDriverImport(handler) { window.__importResult = handler; return () => {}; }`,

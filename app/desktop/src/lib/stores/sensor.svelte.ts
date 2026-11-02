@@ -4,7 +4,7 @@ import {
   type SensorGeometry,
   type CadGeometry,
 } from "../types";
-import { cadGeometryToSensorPreview } from "../sensorCadPreview";
+import { cadGeometryToSensorPreview } from "../preview/sensorCadPreview";
 
 /** Independent state for the induction-position-sensor design workflow. */
 export class SensorStore {

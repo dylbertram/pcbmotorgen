@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { DriverSpec } from "../../types";
   import { DRIVER_PRESETS } from "../../types";
-  import { driverValidationError } from "../../driverLibrary";
+  import { driverValidationError } from "../../driver/driverLibrary";
   import { driverLibrary } from "../../stores/driverLibrary.svelte";
   import AddDriverModal from "../simulate/AddDriverModal.svelte";
 

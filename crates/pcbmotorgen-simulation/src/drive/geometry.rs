@@ -560,11 +560,34 @@ fn find_terminals(b: &Builder, pos: impl Fn(usize) -> (f64, f64)) -> (Vec<usize>
     (terminal, star)
 }
 
-#[derive(Clone, Copy, PartialEq, PartialOrd)]
+// Heap entries are zero or distances that passed `nd < dist[v]`, so they
+// cannot be NaN. Keep PartialOrd consistent with the heap's Ord.
+#[derive(Clone, Copy, PartialEq)]
 struct OrdF(f64);
 impl Eq for OrdF {}
+impl PartialOrd for OrdF {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
 impl Ord for OrdF {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         self.0.partial_cmp(&other.0).unwrap_or(std::cmp::Ordering::Equal)
+    }
+}
+
+#[cfg(test)]
+mod ordering_tests {
+    use super::OrdF;
+
+    #[test]
+    fn heap_distance_ordering_is_consistent_for_non_nan_values() {
+        for a in [-0.0, 0.0, 1.0, f64::INFINITY] {
+            for b in [-0.0, 0.0, 1.0, f64::INFINITY] {
+                let (a, b) = (OrdF(a), OrdF(b));
+                assert_eq!(a.partial_cmp(&b), Some(a.cmp(&b)));
+                assert_eq!(a == b, a.cmp(&b).is_eq());
+            }
+        }
     }
 }

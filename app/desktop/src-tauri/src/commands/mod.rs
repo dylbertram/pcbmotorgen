@@ -1,7 +1,7 @@
 //! Tauri v2 async command handlers — the IPC bridge between the Svelte
 //! frontend and the pcbmotorgen-simulation / routing / kicad sub-crates.
 //!
-//! ## Command inventory
+//! ## Selected commands
 //!
 //! | Command                       | Status        | Notes                                    |
 //! |-------------------------------|---------------|------------------------------------------|
@@ -38,15 +38,10 @@
 //!
 //! ## Threading
 //!
-//! All commands are `async fn`, except the two deliberate sync exceptions
-//! (`set_recent_files`, `file_exists`, kata eap8): the native menu must be
-//! mutated on the main thread (macOS NSMenu) and a stat call is cheaper
-//! than the async hop. Per the Tauri v2 docs, async commands
-//! already run on a separate async task (not the main thread). For the
-//! heavier computations (force sweep, coil generation) we additionally wrap
-//! the body in `tauri::async_runtime::spawn_blocking` so the work moves to
-//! the dedicated blocking thread pool — this keeps the async runtime's
-//! worker threads free for IPC dispatch.
+//! Commands use async handlers where appropriate; synchronous handlers include
+//! menu updates, file existence checks, cancellation and job status. Heavy
+//! computations use `tauri::async_runtime::spawn_blocking` to keep the async
+//! runtime available for IPC dispatch.
 //!
 //! ## Linear-only constraint
 //!

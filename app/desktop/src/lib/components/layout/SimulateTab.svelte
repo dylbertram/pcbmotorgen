@@ -1,13 +1,13 @@
 <script lang="ts">
   import { Tabs } from "bits-ui";
-  import type { PowerRequirementsInput } from "../../powerRequirements";
+  import type { PowerRequirementsInput } from "../../move/powerRequirements";
   import { tick } from "svelte";
   import { ChevronDown, ChevronUp } from "@lucide/svelte";
   import type { ConfigStore } from "../../stores/config.svelte";
   import type { ForceSweepResult, DriveAnalysis, CadGeometry } from "../../types";
-  import { cadMappingProblems } from "../../cadMapping";
-  import { inferMissingCoilEnds } from "../../cadTerminals";
-  import MovePowerPanel from "../simulate/MovePowerPanel.svelte";
+  import { cadMappingProblems } from "../../cad/cadMapping";
+  import { inferMissingCoilEnds } from "../../cad/cadTerminals";
+  import MovePowerPanel from "../simulate/move/MovePowerPanel.svelte";
   import ForcePanel from "../simulate/ForcePanel.svelte";
   import DcCouplingPanel from "../simulate/DcCouplingPanel.svelte";
 

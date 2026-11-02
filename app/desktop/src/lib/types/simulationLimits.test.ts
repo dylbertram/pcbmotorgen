@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { MAX_MAGNET_COUNT, MAX_PCB_LAYERS, ABSOLUTE_TEMPERATURE_TARGET_C } from "./simulationLimits";
 import { BACKPLANE_MAX_THICKNESS_M, BACKPLANE_MAX_LAYERS, HOUSING_MAX_THICKNESS_M, HOUSING_MAX_GAP_M, HOUSING_MATERIAL_OPTIONS, isSupportedHousingMaterial } from "./backplane";
-import { layerOptions, patternLayerRange } from "../layerConstraints";
+import { layerOptions, patternLayerRange } from "../constraints/layerConstraints";
 
 describe("coreless screening envelope", () => {
   it("keeps physical input caps distinct from temperature target", () => {

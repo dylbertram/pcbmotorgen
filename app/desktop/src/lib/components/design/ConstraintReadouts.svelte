@@ -4,12 +4,9 @@
   import {
     phaseBandPitchMm as phaseBandPitchMmFor,
     restOffsetMm as restOffsetMmFor,
-  } from "../../geometry";
-  import {
-    formatMarginMm,
-    formatMetresMm,
-    isValidMetres,
-  } from "../../previewGeometry";
+  } from "../../geometry/phaseBands";
+  import { formatMarginMm, formatMetresMm } from "../../format";
+  import { isValidMetres } from "../../preview/dimensionValues";
   import HelpTag from "../ui/HelpTag.svelte";
   import Formula from "../ui/Formula.svelte";
   import windingBandSvg from "../../assets/winding-band.svg";

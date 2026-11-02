@@ -124,7 +124,7 @@ export const LAYER_MATERIAL_OPTIONS: MaterialOption<LayerMaterial>[] = [
 ];
 
 /** Thickness used when a layer is first added [m] (`LayerMaterial::default_thickness_m`). */
-export const LAYER_DEFAULT_THICKNESS_M: Record<LayerMaterial, number> = {
+const LAYER_DEFAULT_THICKNESS_M: Record<LayerMaterial, number> = {
   fr4: 1.6e-3,
   silicon_steel: 0.35e-3,
   mn_zn_ferrite: 2.0e-3,

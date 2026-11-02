@@ -27,7 +27,7 @@ import type {
   WorkspaceLoad,
 } from "../types";
 import { isTauriAvailable } from "./core";
-import { isSimulationAction, type SimulationAction } from "../simulationMenu";
+import { isSimulationAction, type SimulationAction } from "../menu/simulationMenu";
 
 const PROJECT_FILE_FILTERS = [
   { name: "pcbmotorgen files", extensions: ["pmproj", "pmmotor", "pmsensor"] },

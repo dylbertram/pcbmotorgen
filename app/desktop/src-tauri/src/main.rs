@@ -1,11 +1,8 @@
 //! pcbmotorgen Tauri host — entry point.
 //!
 //! Registers all `#[tauri::command]` async handlers from the `commands/`
-//! module tree and the `ipc/` DTO layer with the Tauri v2 `Builder`. The
-//! frontend (`app/src/`) calls these via `invoke("command_name", { config })`
-//! (see `app/src/lib/tauri.ts`).
-//!
-//! Linear mode only (PRODUCT_GOALS.md §7.A). No radial commands are exposed.
+//! module tree with the Tauri v2 `Builder`. Frontend command wrappers live in
+//! `app/desktop/src/lib/ipc/`, and Rust wire types in `ipc/`.
 
 use tauri::{Emitter, Manager};
 

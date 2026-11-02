@@ -20,7 +20,6 @@ import type {
   PhaseBandWidthDto,
   ForceSweepResult,
   HeightStackResultDto,
-  FrictionBudgetDto,
   BoardDiagnostics,
   PreconditionWarning,
   CoilPreview,
@@ -43,8 +42,6 @@ import { MAGNET_GRADES } from "../types/magnets";
 
 /** Force baseline coefficient: ~0.4 × Br × I × layers × (N/10) [N]. */
 const FORCE_BASELINE_K = 0.4;
-/** Friction safety multiplier applied to derive minimum-drive force. */
-const FRICTION_SAFETY_K = 1.3;
 /** Normal-force pull-in relative to thrust (≈1.5–1.7× ). */
 const NORMAL_FORCE_K = 1.6;
 /** Ripple fraction of the baseline thrust. */
@@ -339,18 +336,6 @@ export function mockHeightStack(c: LinearMotorConfig): HeightStackResultDto {
       c.pcb_thickness_m + cu_protrusion_m + SOLDER_MASK_M + c.air_gap_m + c.magnet_height_m + TOLERANCE_M +
       backplane_m + housing_gap_m + housing_m,
     backplane_analysis: null,
-  };
-}
-
-export function mockFriction(c: LinearMotorConfig): FrictionBudgetDto {
-  const total = c.friction_n;
-  return {
-    bearing_friction_n: total * 0.5,
-    cable_drag_n: total * 0.3,
-    wiper_contact_n: total * 0.2,
-    cogging_n: 0,
-    total_n: total,
-    minimum_drive_force_n: total * FRICTION_SAFETY_K,
   };
 }
 

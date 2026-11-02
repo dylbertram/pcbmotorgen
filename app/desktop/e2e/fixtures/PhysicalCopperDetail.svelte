@@ -2,7 +2,7 @@
   import CoilPreview3DView from "../../src/lib/components/design/CoilPreview3DView.svelte";
   import { CoilPreviewViewState } from "../../src/lib/components/design/coilPreviewViewState.svelte";
   import type { CadGeometry } from "../../src/lib/types";
-  import { SpatialMeasure } from "../../src/lib/spatialMeasure.svelte";
+  import { SpatialMeasure } from "../../src/lib/measure/spatialMeasure.svelte";
   import CoilPreviewControls from "../../src/lib/components/design/CoilPreviewControls.svelte";
 
   const view = new CoilPreviewViewState();

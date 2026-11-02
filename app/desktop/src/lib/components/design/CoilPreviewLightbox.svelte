@@ -18,11 +18,11 @@
   import { isDesignPanel, isLeftPanel, type DesignPanelId, type PreviewPanelId } from "./previewPanels";
   import type { CadGeometry } from "../../types";
   import type { WorldTransform } from "../../chart";
-  import type { CoilTerminalTool } from "../../utils/coilTerminalTool.svelte";
-  import CoilTerminalOverlay from "./CoilTerminalOverlay.svelte";
+  import type { CoilTerminalTool } from "../../cad/coilTerminalTool.svelte";
+  import CoilTerminalOverlay from "../winding/CoilTerminalOverlay.svelte";
   import PreviewLayerSlider from "./PreviewLayerSlider.svelte";
-  import type { CoilPreviewGestures } from "../../utils/coilPreviewGestures.svelte";
-  import type { CoilPreviewMeasure } from "../../utils/coilPreviewMeasure.svelte";
+  import type { PreviewGestures } from "../../utils/previewGestures.svelte";
+  import type { PreviewMeasure } from "../../measure/previewMeasure.svelte";
   import {
     attachBackdropScrollGuard,
     lockPageScroll,
@@ -30,21 +30,21 @@
   import CoilPreviewControls from "./CoilPreviewControls.svelte";
   import ViewportViewControls from "./ViewportViewControls.svelte";
   import NativeViewMenuBridge from "./NativeViewMenuBridge.svelte";
-  import GeometryEditingToolbar from "./GeometryEditingToolbar.svelte";
-  import GeometryEditingOverlay from "./GeometryEditingOverlay.svelte";
+  import GeometryEditingToolbar from "../cad/GeometryEditingToolbar.svelte";
+  import GeometryEditingOverlay from "../cad/GeometryEditingOverlay.svelte";
   import PreviewFrame from "./PreviewFrame.svelte";
-  import PreviewMeasureOverlay from "./PreviewMeasureOverlay.svelte";
+  import PreviewMeasureOverlay from "../measure/PreviewMeasureOverlay.svelte";
   import PreviewSideRail from "./PreviewSideRail.svelte";
   import CoilPreviewIsoView from "./CoilPreviewIsoView.svelte";
   import MoverPositionControls from "./MoverPositionControls.svelte";
   import { PREVIEW_H, PREVIEW_W } from "./coilPreviewCanvas";
   import type { CoilPreviewViewState } from "./coilPreviewViewState.svelte";
-  import { CadSelectionTool } from "../../utils/cadSelectionTool.svelte";
+  import { CadSelectionTool } from "../../cad/cadSelectionTool.svelte";
   import HoldingForceChart from "./HoldingForceChart.svelte";
   import PreviewStatus from "./PreviewStatus.svelte";
   import type { DriveAnalysis } from "../../types";
   import type { VisualizationInput } from "../../types/simulationVisualization";
-  import { SpatialMeasure } from "../../spatialMeasure.svelte";
+  import { SpatialMeasure } from "../../measure/spatialMeasure.svelte";
   import ZoomWindowOverlay from "./ZoomWindowOverlay.svelte";
 
   let {
@@ -106,8 +106,8 @@
     drivePending?: boolean;
     motion: MotionStore;
     view: CoilPreviewViewState;
-    gestures: CoilPreviewGestures;
-    measure: CoilPreviewMeasure;
+    gestures: PreviewGestures;
+    measure: PreviewMeasure;
     visibleCopperKeys?: Set<string> | null;
     onRenderStatus?: (available:boolean)=>void;
     onSimplify?: () => void;

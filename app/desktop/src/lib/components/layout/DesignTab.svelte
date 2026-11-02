@@ -5,7 +5,7 @@
   import MagnetsPanel from "../design/parameters/MagnetsPanel.svelte";
   import DrivePanel from "../design/parameters/DrivePanel.svelte";
   import type { MotionStore } from "../../stores/motion.svelte";
-  import { stripBoundsDomainMm, type TraceMeasure } from "../../previewGeometry";
+  import { stripBoundsDomainMm, type TraceMeasure } from "../../preview/previewGeometry";
   import TravelIsoView from "../design/TravelIsoView.svelte";
   import ConstraintReadouts from "../design/ConstraintReadouts.svelte";
   import TopologySelector from "../design/TopologySelector.svelte";

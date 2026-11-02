@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { ConfigStore } from "../../stores/config.svelte";
-  import { pcbStackupHeightsMm } from "../../pcbStackup";
+  import { pcbStackupHeightsMm } from "../../pcb/pcbStackup";
   import {
     HOUSING_MATERIAL_OPTIONS,
     layerMaterialLabel,

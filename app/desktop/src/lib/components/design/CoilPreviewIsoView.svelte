@@ -2,9 +2,9 @@
   import type { CadGeometry } from "../../types";
   import type { CoilPreviewViewState } from "./coilPreviewViewState.svelte";
   import type { VisualizationInput } from "../../types/simulationVisualization";
-  import type { SpatialMeasure } from "../../spatialMeasure.svelte";
-  import type { PcbStackupMm } from "../../pcbStackup";
-  import type { TopCameraTransform } from "../../fitCoilCamera";
+  import type { SpatialMeasure } from "../../measure/spatialMeasure.svelte";
+  import type { PcbStackupMm } from "../../pcb/pcbStackup";
+  import type { TopCameraTransform } from "../../visualization/fitCoilCamera";
   import type { Snippet } from "svelte";
 
   let { geometry, pcbThicknessMm, pcbStackup = null, copperThicknessMm = { outer: .035, inner: .035 }, viaSizeMm = {diameter:.4,drill:.2}, view, isVisible = () => true, showTerminals = true, simulation = null, measure = null, topCamera = null, visibleCopperKeys = null, onRenderStatus, onFieldSettings, axisRightInset = 0 }: {

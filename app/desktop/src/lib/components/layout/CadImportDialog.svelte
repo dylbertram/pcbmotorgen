@@ -6,32 +6,32 @@
   import type { ProjectStore } from "../../stores/project.svelte";
   import type { SensorStore } from "../../stores/sensor.svelte";
   import type { CadGeometry, CadImportResult } from "../../types";
-  import { cadCoilNames, joinCadPreviewEndpoints } from "../../cadPreview";
-  import { PHASE_LABELS, phaseOf, withCoilPhase } from "../../cadPhases";
-  import { simplifyCadLines } from "../../cadSimplify";
+  import { cadCoilNames, joinCadPreviewEndpoints } from "../../cad/cadPreview";
+  import { PHASE_LABELS, phaseOf, withCoilPhase } from "../../cad/cadPhases";
+  import { simplifyCadLines } from "../../cad/cadSimplify";
   import { PHASE_COLORS } from "../design/coilPreviewCanvas";
-  import { arcSvgPath, splineSvgPath } from "../../curvePaths";
+  import { arcSvgPath, splineSvgPath } from "../../geometry/curvePaths";
   import { attachBackdropScrollGuard, lockPageScroll } from "../../utils/pageScrollLock";
   import { fitWorldToView, type WorldTransform } from "../../chart";
   import CoilPreviewControls from "../design/CoilPreviewControls.svelte";
   import PreviewSideRail from "../design/PreviewSideRail.svelte";
   import PreviewFrame from "../design/PreviewFrame.svelte";
-  import GeometryEditingToolbar from "../design/GeometryEditingToolbar.svelte";
-  import GeometryEditingOverlay from "../design/GeometryEditingOverlay.svelte";
-  import PreviewMeasureOverlay from "../design/PreviewMeasureOverlay.svelte";
+  import GeometryEditingToolbar from "../cad/GeometryEditingToolbar.svelte";
+  import GeometryEditingOverlay from "../cad/GeometryEditingOverlay.svelte";
+  import PreviewMeasureOverlay from "../measure/PreviewMeasureOverlay.svelte";
   import PreviewLayerSlider from "../design/PreviewLayerSlider.svelte";
-  import { CoilTerminalTool } from "../../utils/coilTerminalTool.svelte";
-  import { CoilPreviewMeasure } from "../../utils/coilPreviewMeasure.svelte";
-  import { CadSimplifyTool } from "../../utils/cadSimplifyTool.svelte";
-  import { clientToVirtual, virtualToWorld } from "../../previewGeometry";
+  import { CoilTerminalTool } from "../../cad/coilTerminalTool.svelte";
+  import { PreviewMeasure } from "../../measure/previewMeasure.svelte";
+  import { CadSimplifyTool } from "../../cad/cadSimplifyTool.svelte";
+  import { clientToVirtual, virtualToWorld } from "../../measure/measureRuler";
   import { PREVIEW_H, PREVIEW_W } from "../design/coilPreviewCanvas";
   import { CoilPreviewViewState } from "../design/coilPreviewViewState.svelte";
   import {
-    CoilPreviewGestures,
-  } from "../../utils/coilPreviewGestures.svelte";
+    PreviewGestures,
+  } from "../../utils/previewGestures.svelte";
   import HelpTag from "../ui/HelpTag.svelte";
   import ViaSizingGuide from "../design/ViaSizingGuide.svelte";
-  import { CadSelectionTool } from "../../utils/cadSelectionTool.svelte";
+  import { CadSelectionTool } from "../../cad/cadSelectionTool.svelte";
 
   let {
     config,
@@ -171,7 +171,7 @@
   function worldTransformFor(zoom: number): WorldTransform {
     return fitWorldToView(previewBounds, previewView.terminalPanelOpen ? Math.max(120, viewportWidth - 240) : viewportWidth, viewportHeight, previewPad, zoom);
   }
-  const gestures = new CoilPreviewGestures({
+  const gestures = new PreviewGestures({
     interactionMode: "cad",
     get virtualW() { return viewportWidth; },
     get virtualH() { return viewportHeight; },
@@ -182,7 +182,7 @@
   });
   let worldTransform = $derived(worldTransformFor(gestures.zoom));
   let renderedStrokeWidth = $derived(previewView.traceMode === "centerlines" ? 1 / worldTransform.s : previewStrokeWidth);
-  const measure = new CoilPreviewMeasure({
+  const measure = new PreviewMeasure({
     screenToWorld: (x, y) => {
       if (!previewFrameRef) return null;
       const point = clientToVirtual(x, y, previewFrameRef.getBoundingClientRect(), viewportWidth, viewportHeight);

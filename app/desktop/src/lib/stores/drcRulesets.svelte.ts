@@ -2,11 +2,11 @@
  * Shared, reactive view of the saved DRC rulesets.
  *
  * The Settings dialog reads and writes this one instance. Validation and
- * persistence stay in `lib/drcRulesets.ts` (pure functions, unit-tested); this
+ * persistence stay in `lib/drc/drcRulesets.ts`; this
  * store only holds the in-memory list and reports whether a write reached
  * browser storage.
  */
-import { readRulesets, rulesetValidationError, saveRulesets, type DrcRuleset } from "../drcRulesets";
+import { readRulesets, rulesetValidationError, saveRulesets, type DrcRuleset } from "../drc/drcRulesets";
 import type { DrcRules } from "../preferences";
 
 export class DrcRulesets {
@@ -20,7 +20,8 @@ export class DrcRulesets {
 
   /**
    * Save a named snapshot of `rules`. Returns an error message when the name
-   * is empty or already used, otherwise null once the list is persisted.
+   * is empty or already used, otherwise null. Check storageAvailable for
+   * persistence failures.
    */
   add(name: string, rules: DrcRules): string | null {
     const trimmed = name.trim();

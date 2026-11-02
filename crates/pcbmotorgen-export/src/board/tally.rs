@@ -1,7 +1,4 @@
-//! Pure per-item failure tallying for `CreateItemsResponse`.
-//!
-//! Extracted from the write path in [`super::write`] so the grouping /
-//! sorting logic is a self-contained, unit-testable function.
+//! Per-item failure tallying for `CreateItemsResponse`.
 
 use super::{ITEM_STATUS_OK, MAX_FAILURES_TO_REPORT};
 use crate::proto::common::commands::ItemCreationResult;
@@ -14,31 +11,14 @@ use crate::proto::common::commands::ItemCreationResult;
 /// rejections are NOT turned into errors — they are surfaced via the counts
 /// so the UI can show them.
 ///
-/// The returned `failure_summary` is a code-grouped list: each entry is
-/// `(code, count)` where `code` is the `ItemStatus.code` value KiCad
-/// returned (e.g. 7 for `ISC_INVALID_DATA`, 2 for `ISC_INVALID_TYPE`) and
-/// `count` is the number of items rejected with that code. The summary is
-/// computed from **all** per-item outcomes, not just the surfaced ones — so
-/// even if [`MAX_FAILURES_TO_REPORT`] truncates the individual `failures`
-/// list, the summary is always complete. This is the property the user
-/// needs to debug the 99-of-588 case: with the previous
-/// `MAX_FAILURES_TO_REPORT=10` cap, the user only saw 10 of the 99
-/// individual messages and had no way to tell whether the other 89 were
-/// the same error or a different one.
-///
-/// Returns `(items_created, failures, failure_summary)`. The summary is
-/// sorted by count descending (most-frequent failure first); ties broken by
-/// `code` ascending, which makes the rendered output stable across runs
-/// (good for snapshot tests and easier to diff when debugging).
+/// Returns `(items_created, failures, failure_summary)`. The `(code, count)`
+/// summary includes all failures even when individual messages are capped;
+/// it is sorted by descending count and then ascending code.
 pub(crate) fn tally_item_results(
     created_items: &[ItemCreationResult],
 ) -> (u32, Vec<String>, Vec<(i32, u32)>) {
     let mut items_created: u32 = 0;
     let mut failures: Vec<String> = Vec::new();
-    // `BTreeMap` so the final ordering is deterministic: ties on
-    // `count` are broken by `code` ascending, which makes the
-    // rendered output stable across runs (good for snapshot tests
-    // and easier to diff when debugging).
     let mut failure_codes: std::collections::BTreeMap<i32, u32> =
         std::collections::BTreeMap::new();
     for (i, result) in created_items.iter().enumerate() {
@@ -54,32 +34,19 @@ pub(crate) fn tally_item_results(
                 let msg = status
                     .map(|s| s.error_message.clone())
                     .filter(|m| !m.is_empty())
-                    .unwrap_or_else(|| format!("<no error message>"));
+                    .unwrap_or_else(|| "<no error message>".to_string());
                 failures.push(format!("item {i}: code={code}: {msg}"));
             }
         }
     }
 
-    // Materialise the summary as a Vec sorted by count descending
-    // (most-frequent failure first), ties broken by code ascending.
-    // This is the most useful ordering for the UI: the dominant
-    // error appears at the top of the warning banner.
-    let mut failure_summary: Vec<(i32, u32)> = failure_codes
-        .into_iter()
-        .map(|(code, count)| (code, count))
-        .collect();
+    let mut failure_summary: Vec<(i32, u32)> = failure_codes.into_iter().collect();
     failure_summary.sort_by(|(code_a, count_a), (code_b, count_b)| {
-        // Primary: count descending (b.count.cmp(&a.count))
-        // Secondary: code ascending (a.code.cmp(&b.code))
         count_b.cmp(count_a).then(code_a.cmp(code_b))
     });
 
     (items_created, failures, failure_summary)
 }
-
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
 
 #[cfg(test)]
 mod tests {

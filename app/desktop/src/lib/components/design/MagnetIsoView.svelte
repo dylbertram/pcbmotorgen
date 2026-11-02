@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { ConfigStore } from "../../stores/config.svelte";
-  import { isoBoxPath, isoCenter, isoProject, isoVisibleFaces } from "../../geometry";
+  import { isoBoxPath, isoCenter, isoProject, isoVisibleFaces } from "../../geometry/isometric";
 
   let { config }: { config: ConfigStore } = $props();
   const W = 360;

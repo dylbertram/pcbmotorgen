@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { ConfigStore } from "../../stores/config.svelte";
-  import { initialPcbStackup, validatePcbStackup, pcbStackupHeightsMm } from "../../pcbStackup";
+  import { initialPcbStackup, validatePcbStackup, pcbStackupHeightsMm } from "../../pcb/pcbStackup";
   import NumberField from "../ui/NumberField.svelte";
   let { config }: { config: ConfigStore } = $props();
   let error = $state("");

@@ -4,7 +4,7 @@
   import LayerPhaseTreeGroup from "./LayerPhaseTreeGroup.svelte";
   import CoilPreviewDisplayPanel from "./CoilPreviewDisplayPanel.svelte";
   import type { CadGeometry } from "../../types";
-  import type { CadSelectionTool } from "../../utils/cadSelectionTool.svelte";
+  import type { CadSelectionTool } from "../../cad/cadSelectionTool.svelte";
 
   let { view, uniquePhases, uniqueLayers, hasPolePitchData, hasBandWidthData,
     hasPoleRegionData, poleRegionPhases, showMotorControls = true, viewControlsInMenu = false,

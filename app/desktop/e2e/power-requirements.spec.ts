@@ -44,7 +44,7 @@ async function syntheticMove(page: Page) {
     expect(original).toContain("native: isTauriAvailable()");
     await route.fulfill({ response, body: original.replace("native: isTauriAvailable()", "native: true") });
   });
-  await page.route(/\/src\/lib\/movePowerJob\.ts(?:\?t=\d+)?$/, async route => {
+  await page.route(/\/src\/lib\/move\/movePowerJob\.ts(?:\?t=\d+)?$/, async route => {
     const response = await route.fetch();
     const original = await response.text();
     expect(original).toContain("native: isTauriAvailable");
@@ -111,6 +111,8 @@ test("calculate produces a readable estimate, saves an HTML report, and exports 
   await useTwelveVolts(page);
   const panel = await openMove(page);
   await panel.getByRole("spinbutton", { name: "Move end in millimetres", exact: true }).fill("60");
+  await panel.getByText("Advanced move settings", { exact: true }).click();
+  await panel.getByRole("spinbutton", { name: "Time step in seconds", exact: true }).fill("0.0005");
   await panel.getByRole("button", { name: "Calculate power", exact: true }).click();
   await expect(panel.getByText("Power for this move", { exact: true })).toBeVisible();
   await expect(panel.getByText("Engineering estimate", { exact: true })).toBeVisible();
@@ -143,7 +145,7 @@ test("calculate produces a readable estimate, saves an HTML report, and exports 
   expect(markdown.content).toContain("1.16 W");
 
   // Editing any move input invalidates the previous result and its report.
-  await panel.getByRole("spinbutton", { name: "Move duration in seconds", exact: true }).fill("0.6");
+  await panel.getByRole("spinbutton", { name: "Time step in seconds", exact: true }).fill("0.0006");
   await expect(panel.getByRole("button", { name: "Save report", exact: true })).toHaveCount(0);
   await expect(panel.getByText("Power for this move", { exact: true })).toHaveCount(0);
 

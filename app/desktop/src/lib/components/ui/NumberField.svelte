@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { isMultipleOf } from "../../layerConstraints";
+  import { isMultipleOf } from "../../constraints/layerConstraints";
 
   /**
    * A numeric text field that keeps the last committed value in the parent

@@ -4,7 +4,7 @@
   import type { VisualizationInput } from "../../types/simulationVisualization";
   import type { DcCapability, DcStudy, DcWindingFieldResult, WindingFieldSampling } from "../../types/dcCoupling";
   import { dcCouplingCapability, startDcWindingField, dcCouplingStatus, cancelDcCoupling } from "../../ipc/dcJobs";
-  import { DcJobController, type DcViewState } from "../../dcJobController";
+  import { DcJobController, type DcViewState } from "../../simulation/dcJobController";
 
   let { input, geometry, active, onResult }: { input: VisualizationInput; geometry: CadGeometry; active: boolean; onResult: (value: DcWindingFieldResult | null) => void } = $props();
   let capability = $state<DcCapability>({ available: false, reason: "Checking qualified finite-copper sources…" });

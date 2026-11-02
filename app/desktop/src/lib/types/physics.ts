@@ -41,13 +41,3 @@ export interface HeightStackResultDto {
   /** Present only when a backplane is configured. */
   backplane_analysis?: BackplaneAnalysis | null;
 }
-
-/** Friction budget breakdown (compute_friction). */
-export interface FrictionBudgetDto {
-  bearing_friction_n: number;
-  cable_drag_n: number;
-  wiper_contact_n: number;
-  cogging_n: number;
-  total_n: number;
-  minimum_drive_force_n: number;
-}

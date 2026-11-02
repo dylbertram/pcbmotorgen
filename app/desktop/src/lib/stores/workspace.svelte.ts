@@ -5,7 +5,7 @@ import { ProjectStore } from "./project.svelte";
 import type { RecentFilesStore } from "./recentFiles.svelte";
 import type { DocumentKind, WorkspaceLoad, ForceSweepResult, CoilPathDto, HeightStackResultDto, DriveAnalysis } from "../types";
 import { AnalysisWorkspace } from "./analysisWorkspace.svelte";
-import { PreviewCamera } from "../utils/coilPreviewGestures.svelte";
+import { PreviewCamera } from "../utils/previewGestures.svelte";
 import { CoilPreviewViewState } from "../components/design/coilPreviewViewState.svelte";
 import { fileExists, loadWorkspace, pickProjectOpenPath, pickWorkspaceSavePath, resolveDocumentPath, saveWorkspace } from "../ipc";
 

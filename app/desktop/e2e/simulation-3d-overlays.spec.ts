@@ -7,7 +7,7 @@ async function nativeFixture(page: Page) {
   await page.evaluate(async () => {
     const w = window as any;
     const mocks = await import(/* @vite-ignore */ "/src/lib/ipc/mocks.ts");
-    const { generatedTerminalGeometry } = await import(/* @vite-ignore */ "/src/lib/generatedTerminalGeometry.ts");
+    const { generatedTerminalGeometry } = await import(/* @vite-ignore */ "/src/lib/routing/generatedTerminalGeometry.ts");
     w.vizCalls = []; w.vizMode = "ready"; w.simulationCalls = [];
     w.__TAURI_INTERNALS__ = { invoke: async (command: string, args: any) => {
       if (command === "set_view_menu_state") return;
@@ -19,7 +19,6 @@ async function nativeFixture(page: Page) {
         return result;
       }
       if (command === "compute_height_stack") return mocks.mockHeightStack(args.config);
-      if (command === "compute_friction") return mocks.mockFriction(args.config);
       if (command === "travel_envelope") return mocks.mockTravelEnvelope(args.config);
       if (command === "analyze_drive") return mocks.mockDriveAnalysis(args.config, args.drive, null);
       if (command === "dc_coupling_capability") return { available: false, reason: "No qualified coil source in this UI fixture." };
@@ -179,9 +178,9 @@ if(process.env.PCB_MOTOR_NATIVE_WINDING_FIELD_REPORT && process.env.PCB_MOTOR_NA
     const snapshot=JSON.parse(readFileSync(process.env.PCB_MOTOR_NATIVE_VISUALIZATION_REPORT!,"utf8"));
     await gotoDesignApp(page);
     const checked=await page.evaluate(async ({snapshot,winding})=>{
-      const {sampledFieldGrid,fieldLineGeometry,fieldSliceGeometry}=await import(/* @vite-ignore */ "/src/lib/simulationFieldGeometry.ts");
-      const {generatedTerminalGeometry}=await import(/* @vite-ignore */ "/src/lib/generatedTerminalGeometry.ts");
-      const {buildCoilScene}=await import(/* @vite-ignore */ "/src/lib/coilScene.ts");
+      const {sampledFieldGrid,fieldLineGeometry,fieldSliceGeometry}=await import(/* @vite-ignore */ "/src/lib/visualization/simulationFieldGeometry.ts");
+      const {generatedTerminalGeometry}=await import(/* @vite-ignore */ "/src/lib/routing/generatedTerminalGeometry.ts");
+      const {buildCoilScene}=await import(/* @vite-ignore */ "/src/lib/visualization/coilScene.ts");
       const c=snapshot.config,g=snapshot.cad_geometry??generatedTerminalGeometry(snapshot.coils,c.num_layers,c.pcb_thickness_m*1000,c.trace_width_m*1000),scene=buildCoilScene(g);
       sampledFieldGrid(winding.field);
       const lines=fieldLineGeometry(winding.field,scene,.5),slice=fieldSliceGeometry(winding.field,scene,.5);
@@ -204,8 +203,8 @@ if (process.env.PCB_MOTOR_NATIVE_PAIRED_PM_REPORT && process.env.PCB_MOTOR_NATIV
     const winding = JSON.parse(readFileSync(process.env.PCB_MOTOR_NATIVE_WINDING_FIELD_REPORT!, "utf8"));
     await gotoDesignApp(page);
     const checked = await page.evaluate(async ({ pm, winding }) => {
-      const { validateVisualization } = await import(/* @vite-ignore */ "/src/lib/simulationVisualizationController.ts");
-      const { combineVisualizationFields } = await import(/* @vite-ignore */ "/src/lib/combineVisualizationFields.ts");
+      const { validateVisualization } = await import(/* @vite-ignore */ "/src/lib/simulation/simulationVisualizationController.ts");
+      const { combineVisualizationFields } = await import(/* @vite-ignore */ "/src/lib/visualization/combineVisualizationFields.ts");
       validateVisualization(pm.report, pm.request);
       const sum = combineVisualizationFields(winding.field, pm.report.field);
       const residual = Math.max(...sum.samples.flatMap((s: any, i: number) => s.b_t.map((v: number, axis: number) => Math.abs(v - winding.field.samples[i].b_t[axis] - pm.report.field.samples[i].b_t[axis]))));
@@ -302,11 +301,11 @@ if (process.env.PCB_MOTOR_NATIVE_VISUALIZATION_REPORT) {
     const native = JSON.parse(readFileSync(process.env.PCB_MOTOR_NATIVE_VISUALIZATION_REPORT!, "utf8"));
     await gotoDesignApp(page);
     const checked = await page.evaluate(async value => {
-      const { generatedTerminalGeometry } = await import(/* @vite-ignore */ "/src/lib/generatedTerminalGeometry.ts");
-      const { mapCopperLoss } = await import(/* @vite-ignore */ "/src/lib/visualizationGeometry.ts");
-      const { validateVisualization } = await import(/* @vite-ignore */ "/src/lib/simulationVisualizationController.ts");
-      const { buildCoilScene } = await import(/* @vite-ignore */ "/src/lib/coilScene.ts");
-      const { fieldLineGeometry, fieldSliceGeometry } = await import(/* @vite-ignore */ "/src/lib/simulationFieldGeometry.ts");
+      const { generatedTerminalGeometry } = await import(/* @vite-ignore */ "/src/lib/routing/generatedTerminalGeometry.ts");
+      const { mapCopperLoss } = await import(/* @vite-ignore */ "/src/lib/visualization/visualizationGeometry.ts");
+      const { validateVisualization } = await import(/* @vite-ignore */ "/src/lib/simulation/simulationVisualizationController.ts");
+      const { buildCoilScene } = await import(/* @vite-ignore */ "/src/lib/visualization/coilScene.ts");
+      const { fieldLineGeometry, fieldSliceGeometry } = await import(/* @vite-ignore */ "/src/lib/visualization/simulationFieldGeometry.ts");
       validateVisualization(value.report, value.request);
       const c = value.config;
       const geometry = value.cad_geometry ?? generatedTerminalGeometry(value.coils, c.num_layers, c.pcb_thickness_m * 1000, c.trace_width_m * 1000);
@@ -417,7 +416,7 @@ test("slice lines and direction cues stay coplanar at every slider position with
   for (const fraction of [0, .25, .75, 1]) {
     await page.getByRole("slider", { name: "Field slice position", exact: true }).fill(String(fraction));
     const checked = await page.evaluate(async fraction => {
-      const { fieldLineGeometry, fieldSliceGeometry } = await import(/* @vite-ignore */ "/src/lib/simulationFieldGeometry.ts");
+      const { fieldLineGeometry, fieldSliceGeometry } = await import(/* @vite-ignore */ "/src/lib/visualization/simulationFieldGeometry.ts");
       const field = (window as any).vizLastReport.field, before = JSON.stringify(field);
       const scene = { centerMm: [0, 0, 0], scale: .001 };
       const lines = fieldLineGeometry(field, scene, fraction), slice = fieldSliceGeometry(field, scene, fraction);
