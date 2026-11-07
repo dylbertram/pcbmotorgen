@@ -2,7 +2,9 @@ import { calculateDriver, type DriverCalculatorInput, type DriverCalculatorSnaps
 
 export const DRIVER_MODEL_NOTES = [
   "Screening model, not hardware qualification. Constant hot phase resistance and synchronous inductance; balanced sinusoidal three-phase star currents.",
-  "Force = Kf × phase-current amplitude. Phase back-EMF amplitude = (2/3) × Kf × speed; line-to-line amplitude = √3 × phase amplitude. These are ideal motor quantities, not net thrust after drag or loaded terminal voltage.",
+  "Force = Kf × phase-current amplitude. Phase back-EMF amplitude = Ke × speed; entered phase-peak Ke overrides the estimate (2/3) × Kf. Line-to-line peak = √3 × phase peak; line-to-line RMS = line peak / √2. Entering Ke does not infer Kf.",
+  "Voltage margins compare peak line-to-line demand with bus voltage × usable bus share. The back-EMF-only speed ceiling excludes resistive and inductive drops. The loaded speed limit includes winding resistance, inductance and driver drop at target phase-current amplitude. Zero loaded speed means the bus cannot support any positive speed at that current. Missing constants remain unevaluated.",
+  "Passing back-EMF and loaded-voltage checks does not qualify regeneration or back-driving safety. Check absolute maximum driver voltage, bus clamps, braking circuitry and the supply's ability to absorb energy separately.",
   "PWM ripple uses a 50%-duty RL estimate. Phase RMS approximates ripple as triangular. Trace ampacity is an entered limit, not a new thermal solve.",
   "Supply-current demand, regeneration, switching losses, inductor DCR/core losses, frequency-dependent material effects and temperatures are not calculated. Verify datasheet limits and hardware.",
 ];
@@ -24,8 +26,12 @@ export function buildDriverExport(input: DriverCalculatorInput, source: DriverCa
       seriesInductanceH: "H, external per phase", effectiveH: "H, winding + external per phase",
       currentA: "A, phase amplitude", busV: "V", pwmHz: "Hz", speedMS: "m/s",
       forceConstant: "N/A of phase-current amplitude", electricalPeriodM: "m", ampacityA: "A",
+      backEmfConstant: "V·s/m, phase-to-neutral peak", backEmfSource: "source of phase-peak Ke",
       headroom: "fraction", rippleFraction: "fraction of phase-current amplitude",
       forceN: "N, ideal thrust", phaseBackEmfV: "V, phase amplitude", lineBackEmfV: "V, line-to-line amplitude",
+      lineBackEmfRmsV: "V, line-to-line RMS", availableV: "V, usable line-to-line peak",
+      backEmfMarginV: "V, usable minus open-circuit line peak", voltageMarginV: "V, usable minus loaded demand",
+      backEmfSpeedLimitMS: "m/s, back-EMF only", maxSpeedMS: "m/s, voltage-limited at target current",
       copperW: "W, winding before ripple", rippleA: "A, peak-to-peak", holdingV: "V, required bus",
       speedV: "V, required bus", minPwmHz: "Hz", addedInductanceH: "H, additional per phase",
       driver: "Supply limits in V, peak and continuous RMS current in A, on-resistance in Ω, PWM limit in Hz",
@@ -48,6 +54,9 @@ export function driverExportHtml(data: DriverExport): string {
     currentA: "Phase-current amplitude", busV: "Bus voltage", pwmHz: "PWM frequency", speedMS: "Target speed", forceConstant: "Force constant",
     electricalPeriodM: "Electrical period", ampacityA: "Trace ampacity", headroom: "Usable bus share", rippleFraction: "Ripple limit",
     effectiveH: "Effective phase inductance", forceN: "Ideal thrust", phaseBackEmfV: "Phase back-EMF", lineBackEmfV: "Line-to-line back-EMF",
+    backEmfConstant: "Phase-peak back-EMF constant", backEmfSource: "Ke source", lineBackEmfRmsV: "Line-to-line back-EMF RMS",
+    availableV: "Usable line-to-line voltage", backEmfMarginV: "Voltage margin after back-EMF only", voltageMarginV: "Voltage margin at target current and speed",
+    backEmfSpeedLimitMS: "Back-EMF-only speed ceiling", maxSpeedMS: "Voltage-limited speed at target current",
     copperW: "Winding copper loss before ripple", rippleA: "PWM ripple", holdingV: "Voltage to hold phase current", speedV: "Voltage at target speed",
     minPwmHz: "Minimum PWM for ripple limit", addedInductanceH: "Additional inductance needed per phase",
   };

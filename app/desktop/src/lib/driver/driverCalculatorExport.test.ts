@@ -32,6 +32,21 @@ describe("driver calculator exports", () => {
     expect(buildDriverExport({ ...values, speedMS: 0 }, null).result.phaseBackEmfV).toBe(0);
     expect(buildDriverExport({ ...input(), electricalPeriodM: null }, null).result.phaseBackEmfV).toBe(.5);
   });
+  it("exports measured Ke, signed margins and both speed limits with their conventions", () => {
+    const values = { ...input(), backEmfConstant: 2, speedMS: 10 };
+    const data = buildDriverExport(values, null);
+    expect(data.input.backEmfConstant).toBe(2);
+    expect(data.result.backEmfSource).toBe("entered");
+    expect(data.result.phaseBackEmfV).toBe(20);
+    expect(data.result.lineBackEmfRmsV).toBeCloseTo(20 * Math.sqrt(3 / 2), 12);
+    expect(data.result.voltageMarginV).toBeLessThan(0);
+    expect(data.result.backEmfMarginV).toBeLessThan(0);
+    expect(data.result.maxSpeedMS).toBeLessThan(data.result.backEmfSpeedLimitMS!);
+    expect(data.units.backEmfConstant).toContain("phase-to-neutral peak");
+    expect(JSON.parse(JSON.stringify(data)).result).toEqual(data.result);
+    const html = driverExportHtml(data);
+    for (const text of ["Ke source", "entered", "Voltage margin after back-EMF only", "Voltage margin at target current and speed", "Back-EMF-only speed ceiling", "Voltage-limited speed at target current", "does not qualify regeneration"]) expect(html).toContain(text);
+  });
   it("records edited imported provenance and escapes all user text in HTML", () => {
     const source: DriverCalculatorSnapshot = { source: '<script>alert("motor")</script>', capturedAt: "2026-11-07T00:00:00Z", native: false, input: input(), notes: ["Demo <estimate>"] };
     const data = buildDriverExport({ ...input(), resistanceOhm: 3, driver: { ...input().driver, name: '<img src=x onerror="alert(1)">' } }, source);
