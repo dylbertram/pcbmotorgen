@@ -133,19 +133,39 @@ impl ForceEvaluator {
         config: &SimulationInput,
         position_m: f64,
     ) -> Result<Vec<f64>, SimulationError> {
+        self.unit_phase_force_constants_at_with_cancel(config, position_m, &|| false)
+    }
+
+    /// Integrate every conductor sample in bounded field batches, checking
+    /// cancellation between batches without reducing the requested resolution.
+    pub fn unit_phase_force_constants_at_with_cancel(
+        &self,
+        config: &SimulationInput,
+        position_m: f64,
+        cancelled: &impl Fn() -> bool,
+    ) -> Result<Vec<f64>, SimulationError> {
         let phases = self.routed_samples.as_ref().ok_or_else(||
             SimulationError("Unit phase forces require solved routed conductor samples".into()))?;
         if !position_m.is_finite() {
             return Err(SimulationError("Unit phase forces require a finite position".into()));
         }
         let assembly = MagnetArray::new(config).build_assembly(position_m);
-        let result: Vec<f64> = phases.iter().map(|samples| {
-            let points: Vec<_> = samples.iter().map(|s|
-                nalgebra::Point3::from(s.midpoint_3d)).collect();
-            let fields = physics::compute_b_batch_parallel(&assembly, &points);
-            -samples.iter().zip(fields).map(|(s, b)|
-                s.dl_3d[1]*b.z - s.dl_3d[2]*b.y).sum::<f64>()
-        }).collect();
+        let mut result = Vec::with_capacity(phases.len());
+        for samples in phases {
+            let mut force = 0.0;
+            for batch in samples.chunks(4096) {
+                if cancelled() {
+                    return Err(SimulationError("Move force-map calculation cancelled".into()));
+                }
+                let points: Vec<_> = batch.iter().map(|s|
+                    nalgebra::Point3::from(s.midpoint_3d)).collect();
+                let fields = physics::compute_b_batch_parallel(&assembly, &points);
+                for (s, b) in batch.iter().zip(fields) {
+                    force -= s.dl_3d[1]*b.z - s.dl_3d[2]*b.y;
+                }
+            }
+            result.push(force);
+        }
         if result.iter().any(|v| !v.is_finite()) {
             return Err(SimulationError("Unit phase forces produced a nonfinite coefficient".into()));
         }
@@ -616,6 +636,35 @@ mod tests {
     use super::*;
     use crate::params::PhaseBandPosition;
     use pcbmotorgen_routing::CoilSegment;
+
+    #[test]
+    fn batched_unit_phase_force_matches_unbatched_integral_and_cancels_between_batches() {
+        use std::cell::Cell;
+        let config = SimulationInput::default();
+        let samples: Vec<_> = (0..8201).map(|i| ConductorSample {
+            midpoint_3d: [i as f64 * 1e-6, 0.001, 0.0],
+            dl_3d: [0.0, 1e-6, 0.0],
+        }).collect();
+        let assembly = MagnetArray::new(&config).build_assembly(0.0);
+        let points: Vec<_> = samples.iter().map(|s| nalgebra::Point3::from(s.midpoint_3d)).collect();
+        let fields = physics::compute_b_batch_parallel(&assembly, &points);
+        let expected = -samples.iter().zip(fields).map(|(s, b)|
+            s.dl_3d[1] * b.z - s.dl_3d[2] * b.y).sum::<f64>();
+        let evaluator = ForceEvaluator {
+            routed_samples: Some(vec![samples]),
+            ..Default::default()
+        };
+        let actual = evaluator.unit_phase_force_constants_at(&config, 0.0).unwrap()[0];
+        assert!(expected.abs() > 1e-12);
+        assert!((actual - expected).abs() < 1e-12);
+        let checks = Cell::new(0);
+        let error = evaluator.unit_phase_force_constants_at_with_cancel(&config, 0.0, &|| {
+            checks.set(checks.get() + 1);
+            checks.get() == 2
+        }).unwrap_err();
+        assert!(error.to_string().contains("cancelled"));
+        assert_eq!(checks.get(), 2);
+    }
 
     #[test]
     fn winding_reference_alignment_preserves_forward_thrust_guard() {

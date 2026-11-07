@@ -159,11 +159,8 @@ pub fn evaluate_routed_move(
         .iter()
         .map(Vec::len)
         .sum::<usize>();
-    if samples > 40_000 || samples.saturating_mul(request.force_positions) > 8_000_000 {
-        return Err(
-            "Move force-map calculation exceeds its 8-million conductor-point budget".into(),
-        );
-    }
+    // Field integration is batched and cancellable. The mesh, filament and
+    // position limits above bound total work without rejecting dense force maps.
     let (physical_min, physical_max) = evaluator
         .sweep_center_limits_m(sim)
         .map_err(|e| e.to_string())?;
@@ -223,7 +220,7 @@ pub fn evaluate_routed_move(
         }
         let x = p.travel_min_m + i as f64 * step;
         let force: [f64; 3] = evaluator
-            .unit_phase_force_constants_at(sim, x)
+            .unit_phase_force_constants_at_with_cancel(sim, x, cancelled)
             .map_err(|e| e.to_string())?
             .try_into()
             .map_err(|_| "Wrong phase count")?;

@@ -2,6 +2,48 @@ use super::*;
 
 mod declared_losses;
 
+#[test]
+fn dense_routed_move_reaches_cancellable_integration_without_losing_resolution() {
+    use std::cell::Cell;
+    use pcbmotorgen_routing::{Point, RouteSegment, RoutingResult};
+    use super::routed::{evaluate_routed_move, MoveSource, RoutedMoveRequest};
+
+    for segments_per_phase in [50, 110] {
+        let mut routing = RoutingResult::default();
+        for (phase, net) in ["A", "B", "C"].into_iter().enumerate() {
+            for i in 0..segments_per_phase {
+                routing.segments.push(RouteSegment {
+                    start: Point::new(i as f64 * 4.0, phase as f64),
+                    end: Point::new((i + 1) as f64 * 4.0, phase as f64),
+                    layer: 0,
+                    net: net.into(),
+                    is_active: true,
+                });
+            }
+        }
+        let request = RoutedMoveRequest {
+            profile: profile(),
+            control: WindingModel::BalancedStarSinusoidal,
+            electrical_angle_at_zero_rad: 0.0,
+            phase_peak_limit_a: 1.0,
+            source: MoveSource::StiffDcLink { accepts_regeneration: true },
+            additional_driver_loss_w: None,
+            loss_model: None,
+            force_positions: 513,
+        };
+        let checks = Cell::new(0);
+        let error = evaluate_routed_move(
+            &Default::default(), &routing, &Default::default(), &Default::default(),
+            &request, 128, &|| {
+                checks.set(checks.get() + 1);
+                checks.get() >= 3
+            },
+        ).unwrap_err();
+        assert!(error.contains("force-map calculation cancelled"), "{error}");
+        assert_eq!(checks.get(), 3);
+    }
+}
+
 fn profile() -> MoveProfile {
     MoveProfile {
         start_m: 0.0,
