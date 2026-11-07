@@ -53,7 +53,7 @@ export function snapshotFromAnalysis(source: string, analysis: DriveAnalysis, se
 }
 
 export interface CalculatorCheck { label: string; status: "pass" | "fail" | "unknown"; value: number | null; limit: number | null; unit: string }
-export function calculateDriver(input: DriverCalculatorInput): { errors: string[]; checks: CalculatorCheck[]; rippleA?: number; holdingV?: number; speedV?: number | null; copperW?: number; effectiveH?: number; minPwmHz?: number; addedInductanceH?: number } {
+export function calculateDriver(input: DriverCalculatorInput): { errors: string[]; checks: CalculatorCheck[]; rippleA?: number; holdingV?: number; speedV?: number | null; copperW?: number; effectiveH?: number; minPwmHz?: number; addedInductanceH?: number; forceN?: number | null; phaseBackEmfV?: number | null; lineBackEmfV?: number | null } {
   const errors: string[] = [];
   const finite = (v: number | null): v is number => typeof v === "number" && Number.isFinite(v);
   for (const [key, label, positive] of [
@@ -87,6 +87,10 @@ export function calculateDriver(input: DriverCalculatorInput): { errors: string[
   const requiredFL = 2 * r * rippleLimit >= bus ? 0 : r / (4 * Math.atanh(2 * r * rippleLimit / bus));
   const holding = Math.sqrt(3) * i * r + i * driver.rds_on_ohm;
   const speed = input.speedMS!;
+  // Kf uses phase-current amplitude: F = Kf I, Ke_phase = 2 Kf / 3.
+  const forceN = input.forceConstant === null ? null : input.forceConstant * i;
+  const phaseBackEmfV = speed === 0 ? 0 : input.forceConstant === null ? null : (2 / 3) * input.forceConstant * speed;
+  const lineBackEmfV = phaseBackEmfV === null ? null : Math.sqrt(3) * phaseBackEmfV;
   const speedV = speed === 0 ? holding : input.forceConstant !== null && input.electricalPeriodM !== null
     ? Math.sqrt(3) * Math.hypot(i * r + (2 / 3) * input.forceConstant * speed, 2 * Math.PI * speed / input.electricalPeriodM * l * i) + i * driver.rds_on_ohm : null;
   const check = (label: string, value: number | null, limit: number | null, unit: string): CalculatorCheck => ({ label, value, limit, unit, status: value === null || limit === null ? "unknown" : value <= limit ? "pass" : "fail" });
@@ -100,5 +104,5 @@ export function calculateDriver(input: DriverCalculatorInput): { errors: string[
     check("Phase RMS, triangular-ripple approximation", Math.hypot(i / Math.sqrt(2), ripple / Math.sqrt(12)), driver.continuous_rms_a, "A"),
     check("Trace ampacity at imported assumptions", i, input.ampacityA, "A"),
   ];
-  return { errors, checks, rippleA: ripple, holdingV: holding, speedV, copperW: 1.5 * r * i * i, effectiveH: l, minPwmHz: requiredFL / l, addedInductanceH: Math.max(0, requiredFL / pwm - l) };
+  return { errors, checks, rippleA: ripple, holdingV: holding, speedV, copperW: 1.5 * r * i * i, effectiveH: l, minPwmHz: requiredFL / l, addedInductanceH: Math.max(0, requiredFL / pwm - l), forceN, phaseBackEmfV, lineBackEmfV };
 }

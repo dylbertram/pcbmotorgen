@@ -1,6 +1,48 @@
 import { expect, test } from "@playwright/test";
 import { emptyDriverInput } from "../src/lib/driver/driverCalculator";
 
+test("exports the current calculation and handles save cancellation and failure", async ({ page }) => {
+  await page.route(/\/src\/lib\/files\.ts(?:\?t=\d+)?$/, route => route.fulfill({
+    contentType: "application/javascript",
+    body: `export async function saveTextToFile(content, filename, extensions) {
+      window.__savedExport = { content, filename, extensions };
+      if (window.__saveMode === 'error') throw new Error('Disk full');
+      return window.__saveMode === 'cancel' ? null : '/exports/' + filename;
+    }`,
+  }));
+  await page.goto("/?tool=driver-calculator");
+  await page.getByRole("spinbutton", { name: "Hot phase resistance (Ω)", exact: true }).fill("2");
+  await page.getByRole("spinbutton", { name: "Synchronous winding inductance (µH)", exact: true }).fill("100");
+  await page.getByRole("spinbutton", { name: "Force constant, optional (N/A)", exact: true }).fill("1.5");
+  await page.getByRole("spinbutton", { name: "Target speed (m/s)", exact: true }).fill("0.5");
+  const json = page.getByRole("button", { name: "Export JSON", exact: true });
+  const report = page.getByRole("button", { name: "Save report", exact: true });
+  await json.click();
+  await expect(page.getByRole("status")).toContainText("Saved /exports/driver-calculation.json");
+  const saved = await page.evaluate(() => (window as any).__savedExport);
+  expect(saved.extensions).toEqual(["json"]);
+  expect(JSON.parse(saved.content).result).toMatchObject({ forceN: 1.5, phaseBackEmfV: .5, speedV: null });
+  await page.getByRole("spinbutton", { name: "Hot phase resistance (Ω)", exact: true }).fill("3");
+  await report.click();
+  await expect(page.getByRole("status")).toContainText("driver-calculation.html");
+  const html = await page.evaluate(() => (window as any).__savedExport.content);
+  expect(html).toContain("Hot phase resistance</td><td>3</td>");
+  expect(html).toContain("Phase back-EMF");
+  await page.evaluate(() => (window as any).__saveMode = "cancel");
+  await json.click();
+  await expect(page.getByRole("status")).toHaveCount(0);
+  await expect(page.getByRole("alert")).toHaveCount(0);
+  await expect(json).toBeEnabled();
+  await page.evaluate(() => (window as any).__saveMode = "error");
+  await report.click();
+  await expect(page.getByRole("alert")).toContainText("Could not export driver results: Disk full");
+  await expect(report).toBeEnabled();
+  await page.evaluate(() => (window as any).__saveMode = "ok");
+  await report.click();
+  await expect(page.getByRole("status")).toContainText("driver-calculation.html");
+  await expect(page.getByRole("alert")).toHaveCount(0);
+});
+
 test("the standalone calculator works without a motor and clears invalid checks", async ({ page }, info) => {
   await page.goto("/?tool=driver-calculator");
   await expect(page.getByRole("heading", { name: "Driver calculator", exact: true })).toBeVisible();
@@ -81,6 +123,8 @@ test("stacked calculator content still scrolls at narrow widths", async ({ page 
     await calculator.focus();
     await page.keyboard.press("Control+End");
     await expect.poll(() => calculator.evaluate(el => Math.abs(el.scrollHeight - el.clientHeight - el.scrollTop))).toBeLessThan(2);
+    await expect(page.getByLabel("Calculator model limits").getByText(/Supply-current demand/)).toBeInViewport();
+    await page.getByRole("spinbutton", { name: "Trace ampacity, optional (A)", exact: true }).scrollIntoViewIfNeeded();
     await expect(page.getByRole("spinbutton", { name: "Trace ampacity, optional (A)", exact: true })).toBeInViewport();
     expect(await page.evaluate(() => window.scrollY)).toBe(0);
   }

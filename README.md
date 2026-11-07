@@ -103,6 +103,8 @@ Choose **Open driver calculator** in Force or Driver settings, or **Simulate →
 
 At desktop widths, calculator inputs and suitability checks scroll independently below the header. Narrow windows stack them in one scrollable page.
 
+In the driver calculator, **Save report** writes a standalone, printable HTML report and **Export JSON** saves the current inputs, driver limits, checks and source provenance in SI units. Both include hot phase resistance, winding and external series inductance, ideal thrust, and phase and line-to-line back-EMF amplitudes at the target speed. Force uses the entered force constant and phase-current amplitude; back-EMF uses the balanced-star convention. Missing constants remain unevaluated. Invalid or unsupported inputs export their validation errors rather than calculated results.
+
 The calculator uses constant hot phase resistance and synchronous inductance for balanced three-phase star screening: bus-voltage headroom, at-speed voltage when motor constants are supplied, RL PWM ripple, peak current, approximate phase RMS and an optional entered trace-ampacity limit. It is not a geometry or thermal solver. Delta and other phase counts are explicitly unsupported; frequency-dependent backplane/housing behavior, supply-current demand, regeneration and unentered inductor/driver losses are not inferred. The motor's saved drive assumptions remain separate inputs to move-power calculations.
 
 **Run simulations** recalculates thrust over travel and the stack geometry used by the field view. **Auto-run on edits** can be turned off for manual operation. Force does not display an assumed friction breakdown or stack-height summary.

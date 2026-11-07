@@ -5,12 +5,16 @@
   import DriverSelector from "./lib/components/simulate/DriverSelector.svelte";
   import { ConfigStore } from "./lib/stores/config.svelte";
   import { errorMessage } from "./lib/utils/errorMessage";
+  import { buildDriverExport, driverExportHtml } from "./lib/driver/driverCalculatorExport";
+  import { saveTextToFile } from "./lib/files";
   const config = new ConfigStore();
   let input = $state<DriverCalculatorInput>(emptyDriverInput());
   let source = $state<DriverCalculatorSnapshot | null>(null);
   let error = $state<string | null>(null);
   let importing = $state(false);
   let ready = $state(false);
+  let exporting = $state(false);
+  let exportStatus = $state<string | null>(null);
   let activeRequest: string | null = null;
   let timeout: ReturnType<typeof setTimeout> | undefined;
   const calculatorInput = $derived({ ...input, driver: config.drive.driver });
@@ -36,6 +40,16 @@
     input = structuredClone(snapshot.input);
     config.drive = { ...config.drive, driver: { ...snapshot.input.driver } };
     error = null;
+  }
+  async function exportResults(extension: "html" | "json"): Promise<void> {
+    exporting = true; error = null; exportStatus = null;
+    try {
+      const data = buildDriverExport($state.snapshot(calculatorInput), $state.snapshot(source));
+      const content = extension === "html" ? driverExportHtml(data) : JSON.stringify(data, null, 2);
+      const path = await saveTextToFile(content, `driver-calculation.${extension}`, [extension]);
+      if (path) exportStatus = `Saved ${path}`;
+    } catch (e) { error = `Could not export driver results: ${errorMessage(e)}`; }
+    finally { exporting = false; }
   }
   async function importMotor(): Promise<void> {
     importing = true; error = null;
@@ -69,9 +83,14 @@
       <p class="text-xs leading-relaxed text-slate-400">Compare a driver with a balanced three-phase star winding. These inputs are independent. Editing them does not change a motor file, and motor edits do not update this window.</p>
       <p class="text-xs text-slate-400">{source ? `Snapshot from ${source.source} · ${new Date(source.capturedAt).toLocaleString()}${edited ? ' · edited in calculator' : ''}` : "Enter winding values manually, or import the active motor's current winding analysis."}</p>
     </div>
-    <button type="button" disabled={importing || !ready} onclick={() => void importMotor()} class="rounded border border-slate-600 px-3 py-2 text-xs text-sky-300 hover:bg-slate-800 disabled:opacity-40">{importing ? "Importing…" : "Import active motor"}</button>
+    <div class="flex flex-wrap gap-2">
+      <button type="button" disabled={importing || exporting || !ready} onclick={() => void importMotor()} class="rounded border border-slate-600 px-3 py-2 text-xs text-sky-300 hover:bg-slate-800 disabled:opacity-40">{importing ? "Importing…" : "Import active motor"}</button>
+      <button type="button" disabled={exporting || importing || !ready} onclick={() => void exportResults("html")} class="rounded border border-slate-600 px-3 py-2 text-xs text-sky-300 hover:bg-slate-800 disabled:opacity-40">Save report</button>
+      <button type="button" disabled={exporting || importing || !ready} onclick={() => void exportResults("json")} class="rounded border border-slate-600 px-3 py-2 text-xs text-sky-300 hover:bg-slate-800 disabled:opacity-40">Export JSON</button>
+    </div>
   </header>
   {#if error}<p role="alert" class="mb-5 rounded border border-rose-500/40 p-3 text-xs text-rose-300">{error}</p>{/if}
+  {#if exportStatus}<p role="status" class="mb-3 text-xs text-emerald-300">{exportStatus}</p>{/if}
   {#if source}{#each source.notes as note (note)}<p class="mb-3 text-xs text-amber-300">{note}</p>{/each}{/if}
   <div class="grid min-w-0 gap-8 lg:min-h-0 lg:flex-1 lg:grid-cols-[minmax(280px,360px)_minmax(0,1fr)]">
     <!-- Independently focusable panes support keyboard scrolling in WebKit. -->
@@ -101,10 +120,15 @@
         <div role="status" class="space-y-2 rounded border border-amber-500/40 p-4 text-xs text-amber-300">{#each result.errors as message (message)}<p>{message}</p>{/each}</div>
       {:else}
         <dl class="grid grid-cols-2 gap-4 rounded border border-slate-700 bg-slate-800/40 p-4 text-xs">
+          <div><dt class="text-slate-400">Hot phase resistance</dt><dd class="mt-1 font-mono text-slate-200">{format(input.resistanceOhm, "Ω")}</dd></div>
+          <div><dt class="text-slate-400">Synchronous winding inductance</dt><dd class="mt-1 font-mono text-slate-200">{format(input.inductanceH! * 1e6, "µH")}</dd></div>
           <div><dt class="text-slate-400">Effective phase inductance</dt><dd class="mt-1 font-mono text-emerald-300">{format(result.effectiveH! * 1e6, "µH")}</dd></div>
           <div><dt class="text-slate-400">Winding copper loss, before ripple</dt><dd class="mt-1 font-mono text-slate-200">{format(result.copperW, "W")}</dd></div>
           <div><dt class="text-slate-400">Minimum PWM for ripple limit</dt><dd class="mt-1 font-mono text-slate-200">{format(result.minPwmHz! / 1000, "kHz")}</dd></div>
           <div><dt class="text-slate-400">Additional inductance needed per phase</dt><dd class="mt-1 font-mono text-slate-200">{format(result.addedInductanceH! * 1e6, "µH")}</dd></div>
+          <div><dt class="text-slate-400">Ideal thrust at phase-current amplitude</dt><dd class="mt-1 font-mono text-slate-200">{format(result.forceN, "N")}</dd></div>
+          <div><dt class="text-slate-400">Phase back-EMF amplitude at target speed</dt><dd class="mt-1 font-mono text-slate-200">{format(result.phaseBackEmfV, "V")}</dd></div>
+          <div><dt class="text-slate-400">Line-to-line back-EMF amplitude</dt><dd class="mt-1 font-mono text-slate-200">{format(result.lineBackEmfV, "V")}</dd></div>
         </dl>
         <div class="overflow-x-auto rounded border border-slate-700">
           <table class="w-full text-left text-xs" aria-label="Driver checks">
@@ -116,6 +140,7 @@
       <aside class="space-y-2 border-t border-slate-700 pt-4 text-xs leading-relaxed text-slate-400" aria-label="Calculator model limits">
         <h3 class="font-semibold text-slate-300">Screening model, not hardware qualification</h3>
         <p>Constant hot resistance and synchronous inductance. Balanced sinusoidal phase-current amplitude, with a 50%-duty RL PWM ripple estimate. The RMS check approximates ripple as triangular. Optional force constant and electrical period enable the at-speed voltage check.</p>
+        <p>Ideal thrust is force constant × phase-current amplitude, before drag. Phase back-EMF amplitude is ⅔ × force constant × speed; line-to-line amplitude is √3 times that. Missing constants are not evaluated.</p>
         <p>Supply-current demand, regeneration, switching losses, inductor DCR/core losses, frequency-dependent material effects and temperatures are not calculated. Trace ampacity is an entered limit at its original assumptions, not a new thermal solve. Check datasheet limits and verify the design on hardware.</p>
       </aside>
     </section>
