@@ -1,6 +1,36 @@
 import { expect, test } from "@playwright/test";
 import { emptyDriverInput } from "../src/lib/driver/driverCalculator";
 
+test("screens back-EMF with measured Ke, loaded limits and missing constants", async ({ page }) => {
+  await page.goto("/?tool=driver-calculator");
+  await page.getByRole("spinbutton", { name: "Hot phase resistance (Ω)", exact: true }).fill("2");
+  await page.getByRole("spinbutton", { name: "Synchronous winding inductance (µH)", exact: true }).fill("100");
+  await page.getByRole("spinbutton", { name: "Target speed (m/s)", exact: true }).fill("5");
+  const assessment = page.getByRole("region", { name: "Back-EMF assessment", exact: true });
+  const table = page.getByRole("table", { name: "Driver checks", exact: true });
+  const emf = table.getByRole("row").filter({ hasText: "Open-circuit back-EMF" });
+  const loaded = table.getByRole("row").filter({ hasText: "Voltage at target speed" });
+  await expect(emf).toContainText("Not evaluated");
+  const ke = page.getByRole("spinbutton", { name: "Phase-peak back-EMF constant, optional (V·s/m)", exact: true });
+  await ke.fill("1");
+  await expect(assessment).toContainText("entered phase-peak constant");
+  await expect(emf).toContainText("Pass");
+  await expect(loaded).toContainText("Not evaluated");
+  await page.getByRole("spinbutton", { name: "Electrical period, optional (mm)", exact: true }).fill("12");
+  await expect(loaded).toContainText("Fail");
+  await page.getByRole("spinbutton", { name: "Target speed (m/s)", exact: true }).fill("10");
+  await expect(emf).toContainText("Fail");
+  await ke.fill("");
+  await expect(emf).toContainText("Not evaluated");
+  await page.getByRole("spinbutton", { name: "Force constant, optional (N/A)", exact: true }).fill("1.5");
+  await expect(assessment).toContainText("estimated from force constant");
+  await expect(emf).toContainText("Fail");
+  await ke.fill("-1");
+  await expect(assessment).toHaveCount(0);
+  await expect(table).toHaveCount(0);
+  await expect(page.getByRole("status")).toContainText("Phase-peak back-EMF constant must be blank or positive");
+});
+
 test("exports the current calculation and handles save cancellation and failure", async ({ page }) => {
   await page.route(/\/src\/lib\/files\.ts(?:\?t=\d+)?$/, route => route.fulfill({
     contentType: "application/javascript",

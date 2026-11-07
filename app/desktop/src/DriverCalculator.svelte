@@ -31,6 +31,7 @@
     { key: "headroom", label: "Usable bus share", unit: "%", scale: 100 },
     { key: "rippleFraction", label: "Ripple limit relative to phase current", unit: "%", scale: 100 },
     { key: "forceConstant", label: "Force constant, optional", unit: "N/A", scale: 1 },
+    { key: "backEmfConstant", label: "Phase-peak back-EMF constant, optional", unit: "V·s/m", scale: 1 },
     { key: "electricalPeriodM", label: "Electrical period, optional", unit: "mm", scale: 1000 },
     { key: "ampacityA", label: "Trace ampacity, optional", unit: "A", scale: 1 },
   ] as const;
@@ -105,12 +106,13 @@
       <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-1">
         {#each fields as field (field.key)}
           <label class="flex flex-col gap-1.5 text-xs text-slate-400">{field.label} ({field.unit})
-            <input type="number" aria-label={`${field.label} (${field.unit})`} min="0" step="any" value={input[field.key] === null ? "" : input[field.key]! * field.scale}
+            <input type="number" aria-label={`${field.label} (${field.unit})`} min="0" step="any" value={input[field.key] == null ? "" : input[field.key]! * field.scale}
               oninput={event => { const v = event.currentTarget.valueAsNumber; input[field.key] = Number.isFinite(v) ? v / field.scale : null; }}
               class="w-full rounded border border-slate-600 bg-slate-800 px-2.5 py-2 font-mono text-slate-100 focus:border-emerald-500 focus:outline-none" />
           </label>
         {/each}
       </div>
+      <p class="text-xs leading-relaxed text-slate-400">Enter a measured phase-to-neutral peak Ke to override the estimate from force constant. For a sinusoidal line-to-line RMS measurement, Ke = √(2/3) × measured volts / speed in m/s. Leave blank to use ⅔ × Kf.</p>
     </fieldset>
     </section>
     <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
@@ -127,9 +129,23 @@
           <div><dt class="text-slate-400">Minimum PWM for ripple limit</dt><dd class="mt-1 font-mono text-slate-200">{format(result.minPwmHz! / 1000, "kHz")}</dd></div>
           <div><dt class="text-slate-400">Additional inductance needed per phase</dt><dd class="mt-1 font-mono text-slate-200">{format(result.addedInductanceH! * 1e6, "µH")}</dd></div>
           <div><dt class="text-slate-400">Ideal thrust at phase-current amplitude</dt><dd class="mt-1 font-mono text-slate-200">{format(result.forceN, "N")}</dd></div>
-          <div><dt class="text-slate-400">Phase back-EMF amplitude at target speed</dt><dd class="mt-1 font-mono text-slate-200">{format(result.phaseBackEmfV, "V")}</dd></div>
-          <div><dt class="text-slate-400">Line-to-line back-EMF amplitude</dt><dd class="mt-1 font-mono text-slate-200">{format(result.lineBackEmfV, "V")}</dd></div>
         </dl>
+        <section aria-label="Back-EMF assessment" class="space-y-3 rounded border border-slate-700 bg-slate-800/40 p-4 text-xs">
+          <h3 class="font-semibold text-slate-200">Back-EMF at target speed</h3>
+          <p class="text-slate-400">Ke source: {result.backEmfSource === "entered" ? "entered phase-peak constant" : result.backEmfSource === "force constant" ? "estimated from force constant, Ke = ⅔ × Kf" : "not available. Enter Ke or a force constant."}</p>
+          <dl class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div><dt class="text-slate-400">Phase-peak Ke</dt><dd class="mt-1 font-mono">{format(result.backEmfConstant, "V·s/m")}</dd></div>
+            <div><dt class="text-slate-400">Usable line-to-line voltage</dt><dd class="mt-1 font-mono">{format(result.availableV, "V")}</dd></div>
+            <div><dt class="text-slate-400">Phase back-EMF amplitude at target speed</dt><dd class="mt-1 font-mono">{format(result.phaseBackEmfV, "V")}</dd></div>
+            <div><dt class="text-slate-400">Line-to-line back-EMF amplitude</dt><dd class="mt-1 font-mono">{format(result.lineBackEmfV, "V")}</dd></div>
+            <div><dt class="text-slate-400">Line-to-line back-EMF RMS</dt><dd class="mt-1 font-mono">{format(result.lineBackEmfRmsV, "V")}</dd></div>
+            <div><dt class="text-slate-400">Voltage margin after back-EMF only</dt><dd class="mt-1 font-mono">{format(result.backEmfMarginV, "V")}</dd></div>
+            <div><dt class="text-slate-400">Voltage margin at target current and speed</dt><dd class="mt-1 font-mono">{format(result.voltageMarginV, "V")}</dd></div>
+            <div><dt class="text-slate-400">Back-EMF-only speed ceiling</dt><dd class="mt-1 font-mono">{format(result.backEmfSpeedLimitMS, "m/s")}</dd></div>
+            <div><dt class="text-slate-400">Voltage-limited speed at target current</dt><dd class="mt-1 font-mono">{format(result.maxSpeedMS, "m/s")}</dd></div>
+          </dl>
+          <p class="leading-relaxed text-slate-400">A negative margin exceeds usable voltage. The back-EMF-only ceiling excludes winding and driver drops; the loaded limit includes resistance and inductance. A zero loaded limit means no positive speed is available at the target current. Neither limit is a mechanical speed rating or a regeneration safety limit.</p>
+        </section>
         <div class="overflow-x-auto rounded border border-slate-700">
           <table class="w-full text-left text-xs" aria-label="Driver checks">
             <thead class="bg-slate-800 text-slate-400"><tr><th class="p-3 font-normal">Check</th><th class="p-3 font-normal">Demand</th><th class="p-3 font-normal">Limit</th><th class="p-3 font-normal">Result</th></tr></thead>
@@ -139,8 +155,9 @@
       {/if}
       <aside class="space-y-2 border-t border-slate-700 pt-4 text-xs leading-relaxed text-slate-400" aria-label="Calculator model limits">
         <h3 class="font-semibold text-slate-300">Screening model, not hardware qualification</h3>
-        <p>Constant hot resistance and synchronous inductance. Balanced sinusoidal phase-current amplitude, with a 50%-duty RL PWM ripple estimate. The RMS check approximates ripple as triangular. Optional force constant and electrical period enable the at-speed voltage check.</p>
-        <p>Ideal thrust is force constant × phase-current amplitude, before drag. Phase back-EMF amplitude is ⅔ × force constant × speed; line-to-line amplitude is √3 times that. Missing constants are not evaluated.</p>
+        <p>Constant hot resistance and synchronous inductance. Balanced sinusoidal phase-current amplitude, with a 50%-duty RL PWM ripple estimate. The RMS check approximates ripple as triangular. Ke or force constant, plus electrical period, enable the loaded at-speed voltage and speed-limit checks.</p>
+        <p>Ideal thrust is force constant × phase-current amplitude, before drag. Phase back-EMF amplitude is Ke × speed; line-to-line amplitude is √3 times that. Missing constants are not evaluated. Entering Ke does not infer a force constant.</p>
+        <p>Back-driving or braking may charge the DC bus even when these checks pass. Check the driver's absolute maximum voltage, bus clamp, braking circuit and the supply's ability to absorb energy separately. A higher supply rating alone does not establish safe regeneration.</p>
         <p>Supply-current demand, regeneration, switching losses, inductor DCR/core losses, frequency-dependent material effects and temperatures are not calculated. Trace ampacity is an entered limit at its original assumptions, not a new thermal solve. Check datasheet limits and verify the design on hardware.</p>
       </aside>
     </section>
